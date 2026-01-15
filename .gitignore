@@ -176,6 +176,7 @@ Thumbs.db
 # **/Migrations/
 
 ## Application settings (ignore environment-specific; keep example templates)
+appsettings.json
 appsettings.Development.json
 appsettings.Local.json
 appsettings.*.json
