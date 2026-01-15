@@ -175,11 +175,10 @@ Thumbs.db
 ## Entity Framework Migrations (optional - uncomment to ignore)
 # **/Migrations/
 
-## Application settings (keep template, ignore environment-specific)
+## Application settings (ignore environment-specific; keep example templates)
 appsettings.Development.json
 appsettings.Local.json
 appsettings.*.json
-!appsettings.json
 
 ## Local development
 .env

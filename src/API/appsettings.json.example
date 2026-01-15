@@ -1,0 +1,16 @@
+{
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft": "Warning",
+        "Microsoft.Hosting.Lifetime": "Information",
+        "System": "Warning"
+      }
+    }
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Database=AuraEyesDb;Username=postgres;Password=REPLACE_ME"
+  },
+  "AllowedHosts": "*"
+}
