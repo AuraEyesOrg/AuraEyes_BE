@@ -24,6 +24,7 @@ public static class DependencyInjection
         // Register repositories
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<IOphthalmologistRepository, OphthalmologistRepository>();
 
         // Register services
         services.AddTransient<IDateTime, DateTimeService>();

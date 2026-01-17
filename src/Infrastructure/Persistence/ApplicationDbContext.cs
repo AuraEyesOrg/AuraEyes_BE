@@ -12,6 +12,7 @@ public class ApplicationDbContext : DbContext, IUnitOfWork
     }
 
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<Ophthalmologist> Ophthalmologists => Set<Ophthalmologist>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
