@@ -7,6 +7,7 @@ public abstract class BaseEntity
     public DateTime? UpdatedAt { get; protected set; }
     public string? CreatedBy { get; protected set; }
     public string? UpdatedBy { get; protected set; }
+    public bool IsDeleted { get; protected set; }
     
     private readonly List<IDomainEvent> _domainEvents = new();
     public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
@@ -15,6 +16,7 @@ public abstract class BaseEntity
     {
         Id = Guid.NewGuid();
         CreatedAt = DateTime.UtcNow;
+        IsDeleted = false;
     }
 
     protected BaseEntity(Guid id)
