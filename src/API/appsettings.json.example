@@ -12,5 +12,16 @@
   "ConnectionStrings": {
     "DefaultConnection": "Host=localhost;Database=AuraEyesDb;Username=postgres;Password=REPLACE_ME"
   },
+  "JwtSettings": {
+    "SecretKey": "YOUR_SUPER_SECRET_KEY_MUST_BE_AT_LEAST_32_CHARACTERS_LONG",
+    "Issuer": "AuraEyesAPI",
+    "Audience": "AuraEyesClient",
+    "AccessTokenExpiryMinutes": 15,
+    "RefreshTokenExpiryDays": 7,
+    "ValidateIssuer": true,
+    "ValidateAudience": true,
+    "ValidateLifetime": true,
+    "ClockSkewSeconds": 0
+  },
   "AllowedHosts": "*"
 }
