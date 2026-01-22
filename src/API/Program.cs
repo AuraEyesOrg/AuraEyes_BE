@@ -121,9 +121,11 @@ using (var scope = app.Services.CreateScope())
         var context = services.GetRequiredService<Infrastructure.Persistence.ApplicationDbContext>();
         var userManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Infrastructure.Identity.ApplicationUser>>();
         var roleManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Infrastructure.Identity.ApplicationRole>>();
+        var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
+        var seederLogger = loggerFactory.CreateLogger("DatabaseSeeder");
         
-        await Infrastructure.Services.DatabaseSeeder.SeedAsync(context, userManager, roleManager);
-        Log.Information("Database seeded successfully");
+        await Infrastructure.Services.DatabaseSeeder.SeedAsync(context, userManager, roleManager, seederLogger);
+        Log.Information("Database seeding completed successfully");
     }
     catch (Exception ex)
     {
