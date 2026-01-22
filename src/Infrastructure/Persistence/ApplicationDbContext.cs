@@ -61,6 +61,9 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Feedback> Feedbacks => Set<Feedback>();
 
+    // Identity & Auth
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
     #endregion
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
