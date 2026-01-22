@@ -39,6 +39,10 @@
     <!-- Configuration -->
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+    
+    <!-- Email (MailKit + MimeKit) -->
+    <PackageReference Include="MailKit" Version="4.14.1" />
+    <PackageReference Include="MimeKit" Version="4.14.0" />
   </ItemGroup>
 
 </Project>
