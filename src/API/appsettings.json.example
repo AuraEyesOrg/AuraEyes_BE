@@ -23,5 +23,15 @@
     "ValidateLifetime": true,
     "ClockSkewSeconds": 0
   },
+  "Smtp": {
+    "Host": "smtp.gmail.com",
+    "Port": 587,
+    "Username": "your-email@gmail.com",
+    "Password": "YOUR_GMAIL_APP_PASSWORD",
+    "UseSsl": false,
+    "UseStartTls": true,
+    "FromName": "Aura Eyes System",
+    "FromEmail": "noreply@auraeyes.com"
+  },
   "AllowedHosts": "*"
 }
