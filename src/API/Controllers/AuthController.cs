@@ -1,10 +1,13 @@
 using Application.Common.Constants;
 using Application.Common.Interfaces;
+using Application.Common.Models;
 using Application.Common.Models.Auth;
 using Domain.Entities;
+using Domain.Enums;
 using Infrastructure.Identity;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers;
@@ -12,12 +15,9 @@ namespace API.Controllers;
 /// <summary>
 /// Authentication endpoints for user registration, login, and token management.
 /// </summary>
-[ApiController]
-[Route("api/[controller]")]
-[Produces("application/json")]
-public class AuthController : ControllerBase
+public class AuthController : BaseApiController
 {
-    private readonly IIdentityService _identityService;
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenService _refreshTokenService;
     private readonly IEmailService _emailService;
@@ -25,14 +25,14 @@ public class AuthController : ControllerBase
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
-        IIdentityService identityService,
+        UserManager<ApplicationUser> userManager,
         ITokenService tokenService,
         IRefreshTokenService refreshTokenService,
         IEmailService emailService,
         ApplicationDbContext context,
         ILogger<AuthController> logger)
     {
-        _identityService = identityService;
+        _userManager = userManager;
         _tokenService = tokenService;
         _refreshTokenService = refreshTokenService;
         _emailService = emailService;
@@ -43,431 +43,504 @@ public class AuthController : ControllerBase
     /// <summary>
     /// Register a new patient account.
     /// </summary>
-    /// <param name="request">Registration details</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Registration result with confirmation instructions</returns>
     [HttpPost("register/patient")]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<AuthResponse>> RegisterPatient(
+    [ProducesResponseType(typeof(ApiResponse<AuthResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> RegisterPatient(
         [FromBody] RegisterPatientRequest request,
         CancellationToken cancellationToken)
     {
-        var (succeeded, errors) = await _identityService.CreateUserWithRoleAsync(
-            request.Email,
-            request.Password,
-            request.FullName,
-            Roles.Patient,
-            cancellationToken);
-
-        if (!succeeded)
+        try
         {
-            return BadRequest(AuthResponse.Failure(errors));
+            // Check if user already exists
+            var existingUser = await _userManager.FindByEmailAsync(request.Email);
+            if (existingUser != null)
+            {
+                return ErrorResponse("A user with this email already exists");
+            }
+
+            // Create user
+            var user = new ApplicationUser
+            {
+                UserName = request.Email,
+                Email = request.Email,
+                FullName = request.FullName,
+                Address = request.Address,
+                DateOfBirth = request.DateOfBirth,
+                Gender = request.Gender.HasValue ? (Gender)request.Gender.Value : null
+            };
+
+            var result = await _userManager.CreateAsync(user, request.Password);
+            if (!result.Succeeded)
+            {
+                var errors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ApiResponseFactory.Error("Registration failed", errors));
+            }
+
+            // Add to Patient role
+            await _userManager.AddToRoleAsync(user, Roles.Patient);
+
+            // Create Patient profile
+            var patient = new Patient(user.Id, null);
+            _context.Patients.Add(patient);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            // Generate email confirmation token
+            var confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            var confirmationLink = Url.Action(
+                nameof(ConfirmEmail),
+                "Auth",
+                new { userId = user.Id, token = confirmationToken },
+                Request.Scheme);
+
+            await _emailService.SendEmailConfirmationAsync(user.Email!, confirmationLink ?? "", cancellationToken);
+
+            _logger.LogInformation("Patient registered: {Email}", request.Email);
+
+            return OkResponse(new { userId = user.Id }, "Registration successful. Please check your email to confirm your account.");
         }
-
-        var user = await _identityService.GetUserByEmailAsync(request.Email, cancellationToken);
-        if (user == null)
+        catch (Exception ex)
         {
-            return BadRequest(AuthResponse.Failure("Failed to retrieve created user"));
+            _logger.LogError(ex, "Error registering patient: {Email}", request.Email);
+            return InternalError("An error occurred during registration");
         }
-
-        // Create Patient profile
-        var patient = new Patient(user.Id, null);
-        _context.Patients.Add(patient);
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // Generate email confirmation token
-        var confirmationToken = await _identityService.GenerateEmailConfirmationTokenAsync(user.Id);
-        var confirmationLink = Url.Action(
-            nameof(ConfirmEmail),
-            "Auth",
-            new { userId = user.Id, token = confirmationToken },
-            Request.Scheme);
-
-        await _emailService.SendEmailConfirmationAsync(user.Email, confirmationLink ?? "", cancellationToken);
-
-        _logger.LogInformation("Patient registered: {Email}", request.Email);
-
-        return Ok(new AuthResponse
-        {
-            Succeeded = true,
-            Errors = new[] { "Registration successful. Please check your email to confirm your account." }
-        });
     }
 
     /// <summary>
     /// Register a new ophthalmologist account.
     /// </summary>
-    /// <param name="request">Registration details</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Registration result with confirmation instructions</returns>
     [HttpPost("register/ophthalmologist")]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<AuthResponse>> RegisterOphthalmologist(
+    [ProducesResponseType(typeof(ApiResponse<AuthResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> RegisterOphthalmologist(
         [FromBody] RegisterOphthalmologistRequest request,
         CancellationToken cancellationToken)
     {
-        var (succeeded, errors) = await _identityService.CreateUserWithRoleAsync(
-            request.Email,
-            request.Password,
-            request.FullName,
-            Roles.Ophthalmologist,
-            cancellationToken);
-
-        if (!succeeded)
+        try
         {
-            return BadRequest(AuthResponse.Failure(errors));
+            // Check if user already exists
+            var existingUser = await _userManager.FindByEmailAsync(request.Email);
+            if (existingUser != null)
+            {
+                return ErrorResponse("A user with this email already exists");
+            }
+
+            // Create user
+            var user = new ApplicationUser
+            {
+                UserName = request.Email,
+                Email = request.Email,
+                FullName = request.FullName,
+                OrganizationId = request.OrganizationId
+            };
+
+            var result = await _userManager.CreateAsync(user, request.Password);
+            if (!result.Succeeded)
+            {
+                var errors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ApiResponseFactory.Error("Registration failed", errors));
+            }
+
+            // Add to Ophthalmologist role
+            await _userManager.AddToRoleAsync(user, Roles.Ophthalmologist);
+
+            // Create Ophthalmologist profile
+            var ophthalmologist = new Ophthalmologist(user.Id, request.Bio, request.YearsOfExperience);
+            _context.Ophthalmologists.Add(ophthalmologist);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            // Generate email confirmation token
+            var confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            var confirmationLink = Url.Action(
+                nameof(ConfirmEmail),
+                "Auth",
+                new { userId = user.Id, token = confirmationToken },
+                Request.Scheme);
+
+            await _emailService.SendEmailConfirmationAsync(user.Email!, confirmationLink ?? "", cancellationToken);
+
+            _logger.LogInformation("Ophthalmologist registered: {Email}", request.Email);
+
+            return OkResponse(new { userId = user.Id }, "Registration successful. Please check your email to confirm your account.");
         }
-
-        var user = await _identityService.GetUserByEmailAsync(request.Email, cancellationToken);
-        if (user == null)
+        catch (Exception ex)
         {
-            return BadRequest(AuthResponse.Failure("Failed to retrieve created user"));
+            _logger.LogError(ex, "Error registering ophthalmologist: {Email}", request.Email);
+            return InternalError("An error occurred during registration");
         }
-
-        // Create Ophthalmologist profile
-        var ophthalmologist = new Ophthalmologist(user.Id, request.Bio, request.YearsOfExperience);
-        _context.Ophthalmologists.Add(ophthalmologist);
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // Generate email confirmation token
-        var confirmationToken = await _identityService.GenerateEmailConfirmationTokenAsync(user.Id);
-        var confirmationLink = Url.Action(
-            nameof(ConfirmEmail),
-            "Auth",
-            new { userId = user.Id, token = confirmationToken },
-            Request.Scheme);
-
-        await _emailService.SendEmailConfirmationAsync(user.Email, confirmationLink ?? "", cancellationToken);
-
-        _logger.LogInformation("Ophthalmologist registered: {Email}", request.Email);
-
-        return Ok(new AuthResponse
-        {
-            Succeeded = true,
-            Errors = new[] { "Registration successful. Please check your email to confirm your account." }
-        });
     }
 
     /// <summary>
     /// Authenticate user with email and password.
     /// </summary>
-    /// <param name="request">Login credentials</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>JWT access token and refresh token</returns>
     [HttpPost("login")]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<AuthResponse>> Login(
+    [ProducesResponseType(typeof(ApiResponse<AuthResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Login(
         [FromBody] LoginRequest request,
         CancellationToken cancellationToken)
     {
-        var user = await _identityService.GetUserByEmailAsync(request.Email, cancellationToken);
-        if (user == null)
+        try
         {
-            return Unauthorized(AuthResponse.Failure("Invalid email or password"));
-        }
-
-        if (!user.IsActive)
-        {
-            return Unauthorized(AuthResponse.Failure("Account is deactivated. Please contact support."));
-        }
-
-        if (!await _identityService.IsEmailConfirmedAsync(user.Id))
-        {
-            return Unauthorized(AuthResponse.Failure("Please confirm your email before logging in."));
-        }
-
-        if (!await _identityService.CheckPasswordAsync(user.Id, request.Password))
-        {
-            return Unauthorized(AuthResponse.Failure("Invalid email or password"));
-        }
-
-        // Get user roles
-        var roles = await _identityService.GetUserRolesAsync(user.Id);
-
-        // Generate tokens
-        var tokenResult = await _tokenService.GenerateAccessTokenAsync(
-            user.Id,
-            user.Email,
-            user.FullName,
-            roles);
-
-        var refreshToken = _tokenService.GenerateRefreshToken();
-        var refreshTokenHash = TokenService.HashToken(refreshToken);
-
-        // Store refresh token
-        await _refreshTokenService.CreateRefreshTokenAsync(
-            user.Id,
-            refreshTokenHash,
-            tokenResult.Jti,
-            7, // 7 days
-            request.DeviceInfo,
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            cancellationToken);
-
-        // Update last login
-        await _identityService.UpdateLastLoginAsync(user.Id);
-
-        _logger.LogInformation("User logged in: {Email}", request.Email);
-
-        return Ok(AuthResponse.Success(
-            tokenResult.AccessToken,
-            refreshToken,
-            tokenResult.ExpiresAt,
-            new UserInfoResponse
+            var user = await _userManager.FindByEmailAsync(request.Email);
+            if (user == null || user.IsDeleted)
             {
-                Id = user.Id,
-                Email = user.Email,
-                FullName = user.FullName,
-                Roles = roles.ToArray(),
-                EmailConfirmed = user.EmailConfirmed,
-                OrganizationId = user.OrganizationId
-            }));
+                return Unauthorized(ApiResponseFactory.Unauthorized("Invalid email or password"));
+            }
+
+            if (!user.IsActive)
+            {
+                return Unauthorized(ApiResponseFactory.Unauthorized("Account is deactivated. Please contact support."));
+            }
+
+            if (!await _userManager.CheckPasswordAsync(user, request.Password))
+            {
+                return Unauthorized(ApiResponseFactory.Unauthorized("Invalid email or password"));
+            }
+
+            // Check email confirmation (optional - can be disabled for development)
+            if (!user.EmailConfirmed)
+            {
+                return Unauthorized(ApiResponseFactory.Unauthorized("Please confirm your email before logging in."));
+            }
+
+            // Get user roles
+            var roles = await _userManager.GetRolesAsync(user);
+
+            // Generate tokens
+            var tokenResult = await _tokenService.GenerateAccessTokenAsync(
+                user.Id,
+                user.Email!,
+                user.FullName,
+                roles);
+
+            var refreshToken = _tokenService.GenerateRefreshToken();
+            var refreshTokenHash = TokenService.HashToken(refreshToken);
+
+            // Store refresh token
+            await _refreshTokenService.CreateRefreshTokenAsync(
+                user.Id,
+                refreshTokenHash,
+                tokenResult.Jti,
+                7, // 7 days
+                request.DeviceInfo,
+                HttpContext.Connection.RemoteIpAddress?.ToString(),
+                cancellationToken);
+
+            // Update last login
+            user.UpdateLastLogin();
+            await _userManager.UpdateAsync(user);
+
+            _logger.LogInformation("User logged in: {Email}", request.Email);
+
+            var response = new AuthResponse
+            {
+                Succeeded = true,
+                AccessToken = tokenResult.AccessToken,
+                RefreshToken = refreshToken,
+                ExpiresAt = tokenResult.ExpiresAt,
+                User = new UserInfoResponse
+                {
+                    Id = user.Id,
+                    Email = user.Email!,
+                    FullName = user.FullName,
+                    Roles = roles.ToArray(),
+                    EmailConfirmed = user.EmailConfirmed,
+                    OrganizationId = user.OrganizationId
+                }
+            };
+
+            return OkResponse(response, "Login successful");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during login: {Email}", request.Email);
+            return InternalError("An error occurred during login");
+        }
     }
 
     /// <summary>
     /// Refresh access token using refresh token.
-    /// Implements token rotation for security.
     /// </summary>
-    /// <param name="request">Current access token and refresh token</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>New access token and rotated refresh token</returns>
     [HttpPost("refresh")]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<AuthResponse>> RefreshToken(
+    [ProducesResponseType(typeof(ApiResponse<AuthResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> RefreshToken(
         [FromBody] RefreshTokenRequest request,
         CancellationToken cancellationToken)
     {
-        // Validate access token (without lifetime validation)
-        var userId = _tokenService.GetUserIdFromToken(request.AccessToken);
-        var jti = _tokenService.GetJtiFromToken(request.AccessToken);
-
-        if (userId == null || jti == null)
+        try
         {
-            return Unauthorized(AuthResponse.Failure("Invalid access token"));
-        }
+            // Validate access token (without lifetime validation)
+            var userId = _tokenService.GetUserIdFromToken(request.AccessToken);
+            var jti = _tokenService.GetJtiFromToken(request.AccessToken);
 
-        // Validate refresh token
-        var refreshTokenHash = TokenService.HashToken(request.RefreshToken);
-        var storedToken = await _refreshTokenService.GetByTokenHashAsync(refreshTokenHash, cancellationToken);
-
-        if (storedToken == null)
-        {
-            return Unauthorized(AuthResponse.Failure("Invalid refresh token"));
-        }
-
-        if (!storedToken.IsActive)
-        {
-            // Token reuse detected - revoke all tokens for security
-            _logger.LogWarning("Refresh token reuse detected for user {UserId}", storedToken.UserId);
-            await _refreshTokenService.RevokeTokenFamilyAsync(storedToken.Id, "token_reuse_detected", cancellationToken);
-            return Unauthorized(AuthResponse.Failure("Token has been revoked. Please login again."));
-        }
-
-        if (storedToken.JwtId != jti)
-        {
-            return Unauthorized(AuthResponse.Failure("Token mismatch"));
-        }
-
-        if (storedToken.UserId != userId)
-        {
-            return Unauthorized(AuthResponse.Failure("Token mismatch"));
-        }
-
-        // Get user
-        var user = await _identityService.GetUserByIdAsync(userId.Value, cancellationToken);
-        if (user == null || !user.IsActive)
-        {
-            return Unauthorized(AuthResponse.Failure("User not found or inactive"));
-        }
-
-        // Generate new tokens
-        var roles = await _identityService.GetUserRolesAsync(user.Id);
-        var tokenResult = await _tokenService.GenerateAccessTokenAsync(
-            user.Id,
-            user.Email,
-            user.FullName,
-            roles);
-
-        var newRefreshToken = _tokenService.GenerateRefreshToken();
-        var newRefreshTokenHash = TokenService.HashToken(newRefreshToken);
-
-        // Rotate refresh token
-        await _refreshTokenService.RotateRefreshTokenAsync(
-            storedToken.Id,
-            newRefreshTokenHash,
-            tokenResult.Jti,
-            7,
-            null,
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            cancellationToken);
-
-        _logger.LogInformation("Token refreshed for user: {UserId}", user.Id);
-
-        return Ok(AuthResponse.Success(
-            tokenResult.AccessToken,
-            newRefreshToken,
-            tokenResult.ExpiresAt,
-            new UserInfoResponse
+            if (userId == null || jti == null)
             {
-                Id = user.Id,
-                Email = user.Email,
-                FullName = user.FullName,
-                Roles = roles.ToArray(),
-                EmailConfirmed = user.EmailConfirmed,
-                OrganizationId = user.OrganizationId
-            }));
+                return Unauthorized(ApiResponseFactory.Unauthorized("Invalid access token"));
+            }
+
+            // Validate refresh token
+            var refreshTokenHash = TokenService.HashToken(request.RefreshToken);
+            var storedToken = await _refreshTokenService.GetByTokenHashAsync(refreshTokenHash, cancellationToken);
+
+            if (storedToken == null)
+            {
+                return Unauthorized(ApiResponseFactory.Unauthorized("Invalid refresh token"));
+            }
+
+            if (!storedToken.IsActive)
+            {
+                // Token reuse detected - revoke all tokens for security
+                _logger.LogWarning("Refresh token reuse detected for user {UserId}", storedToken.UserId);
+                await _refreshTokenService.RevokeTokenFamilyAsync(storedToken.Id, "token_reuse_detected", cancellationToken);
+                return Unauthorized(ApiResponseFactory.Unauthorized("Token has been revoked. Please login again."));
+            }
+
+            if (storedToken.JwtId != jti || storedToken.UserId != userId)
+            {
+                return Unauthorized(ApiResponseFactory.Unauthorized("Token mismatch"));
+            }
+
+            // Get user
+            var user = await _userManager.FindByIdAsync(userId.Value.ToString());
+            if (user == null || !user.IsActive || user.IsDeleted)
+            {
+                return Unauthorized(ApiResponseFactory.Unauthorized("User not found or inactive"));
+            }
+
+            // Generate new tokens
+            var roles = await _userManager.GetRolesAsync(user);
+            var tokenResult = await _tokenService.GenerateAccessTokenAsync(
+                user.Id,
+                user.Email!,
+                user.FullName,
+                roles);
+
+            var newRefreshToken = _tokenService.GenerateRefreshToken();
+            var newRefreshTokenHash = TokenService.HashToken(newRefreshToken);
+
+            // Rotate refresh token
+            await _refreshTokenService.RotateRefreshTokenAsync(
+                storedToken.Id,
+                newRefreshTokenHash,
+                tokenResult.Jti,
+                7,
+                null,
+                HttpContext.Connection.RemoteIpAddress?.ToString(),
+                cancellationToken);
+
+            _logger.LogInformation("Token refreshed for user: {UserId}", user.Id);
+
+            var response = new AuthResponse
+            {
+                Succeeded = true,
+                AccessToken = tokenResult.AccessToken,
+                RefreshToken = newRefreshToken,
+                ExpiresAt = tokenResult.ExpiresAt,
+                User = new UserInfoResponse
+                {
+                    Id = user.Id,
+                    Email = user.Email!,
+                    FullName = user.FullName,
+                    Roles = roles.ToArray(),
+                    EmailConfirmed = user.EmailConfirmed,
+                    OrganizationId = user.OrganizationId
+                }
+            };
+
+            return OkResponse(response, "Token refreshed successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error refreshing token");
+            return InternalError("An error occurred while refreshing token");
+        }
     }
 
     /// <summary>
     /// Logout and revoke refresh token.
     /// </summary>
-    /// <param name="request">Refresh token to revoke</param>
-    /// <param name="cancellationToken">Cancellation token</param>
     [HttpPost("logout")]
     [Authorize]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Logout(
         [FromBody] RefreshTokenRequest request,
         CancellationToken cancellationToken)
     {
-        var refreshTokenHash = TokenService.HashToken(request.RefreshToken);
-        var storedToken = await _refreshTokenService.GetByTokenHashAsync(refreshTokenHash, cancellationToken);
-
-        if (storedToken != null)
+        try
         {
-            await _refreshTokenService.RevokeTokenAsync(storedToken.Id, "logout", cancellationToken);
+            var refreshTokenHash = TokenService.HashToken(request.RefreshToken);
+            var storedToken = await _refreshTokenService.GetByTokenHashAsync(refreshTokenHash, cancellationToken);
+
+            if (storedToken != null)
+            {
+                await _refreshTokenService.RevokeTokenAsync(storedToken.Id, "logout", cancellationToken);
+            }
+
+            _logger.LogInformation("User logged out");
+            return OkResponse("Logged out successfully");
         }
-
-        _logger.LogInformation("User logged out");
-
-        return Ok(new { message = "Logged out successfully" });
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during logout");
+            return InternalError("An error occurred during logout");
+        }
     }
 
     /// <summary>
     /// Logout from all devices by revoking all refresh tokens.
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
     [HttpPost("logout-all")]
     [Authorize]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> LogoutAll(CancellationToken cancellationToken)
     {
-        var userIdClaim = User.FindFirst("uid")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        
-        if (Guid.TryParse(userIdClaim, out var userId))
+        try
         {
-            await _refreshTokenService.RevokeAllUserTokensAsync(userId, "logout_all", cancellationToken);
-            _logger.LogInformation("All tokens revoked for user: {UserId}", userId);
-        }
+            var userIdClaim = User.FindFirst("uid")?.Value 
+                ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            
+            if (Guid.TryParse(userIdClaim, out var userId))
+            {
+                await _refreshTokenService.RevokeAllUserTokensAsync(userId, "logout_all", cancellationToken);
+                _logger.LogInformation("All tokens revoked for user: {UserId}", userId);
+            }
 
-        return Ok(new { message = "Logged out from all devices" });
+            return OkResponse("Logged out from all devices");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during logout all");
+            return InternalError("An error occurred during logout");
+        }
     }
 
     /// <summary>
     /// Confirm email address.
     /// </summary>
-    /// <param name="request">User ID and confirmation token</param>
-    /// <param name="cancellationToken">Cancellation token</param>
     [HttpGet("confirm-email")]
     [AllowAnonymous]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ConfirmEmail(
         [FromQuery] string userId,
-        [FromQuery] string token,
-        CancellationToken cancellationToken)
+        [FromQuery] string token)
     {
-        if (!Guid.TryParse(userId, out var userGuid))
+        try
         {
-            return BadRequest(new { error = "Invalid user ID" });
+            if (!Guid.TryParse(userId, out var userGuid))
+            {
+                return ErrorResponse("Invalid user ID");
+            }
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return NotFound(ApiResponseFactory.NotFound("User not found"));
+            }
+
+            var result = await _userManager.ConfirmEmailAsync(user, token);
+            if (!result.Succeeded)
+            {
+                var errors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ApiResponseFactory.Error("Email confirmation failed", errors));
+            }
+
+            _logger.LogInformation("Email confirmed for user: {UserId}", userId);
+            return OkResponse("Email confirmed successfully. You can now login.");
         }
-
-        var (succeeded, errors) = await _identityService.ConfirmEmailAsync(userGuid, token);
-
-        if (!succeeded)
+        catch (Exception ex)
         {
-            return BadRequest(new { errors });
+            _logger.LogError(ex, "Error confirming email for user: {UserId}", userId);
+            return InternalError("An error occurred during email confirmation");
         }
-
-        _logger.LogInformation("Email confirmed for user: {UserId}", userId);
-
-        return Ok(new { message = "Email confirmed successfully. You can now login." });
     }
 
     /// <summary>
     /// Request password reset email.
     /// </summary>
-    /// <param name="request">Email address</param>
-    /// <param name="cancellationToken">Cancellation token</param>
     [HttpPost("forgot-password")]
     [AllowAnonymous]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ForgotPassword(
         [FromBody] ForgotPasswordRequest request,
         CancellationToken cancellationToken)
     {
-        var user = await _identityService.GetUserByEmailAsync(request.Email, cancellationToken);
-        
-        // Always return success to prevent email enumeration
-        if (user == null)
+        try
         {
-            _logger.LogWarning("Password reset requested for non-existent email: {Email}", request.Email);
-            return Ok(new { message = "If your email exists in our system, you will receive a password reset link." });
+            // Always return success to prevent email enumeration
+            var user = await _userManager.FindByEmailAsync(request.Email);
+            
+            if (user != null && !user.IsDeleted)
+            {
+                var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var resetLink = $"{Request.Scheme}://{Request.Host}/reset-password?userId={user.Id}&token={Uri.EscapeDataString(resetToken)}";
+
+                await _emailService.SendPasswordResetAsync(user.Email!, resetLink, cancellationToken);
+                _logger.LogInformation("Password reset requested for: {Email}", request.Email);
+            }
+            else
+            {
+                _logger.LogWarning("Password reset requested for non-existent email: {Email}", request.Email);
+            }
+
+            return OkResponse("If your email exists in our system, you will receive a password reset link.");
         }
-
-        var resetToken = await _identityService.GeneratePasswordResetTokenAsync(user.Id);
-        var resetLink = $"{Request.Scheme}://{Request.Host}/reset-password?userId={user.Id}&token={Uri.EscapeDataString(resetToken)}";
-
-        await _emailService.SendPasswordResetAsync(user.Email, resetLink, cancellationToken);
-
-        _logger.LogInformation("Password reset requested for: {Email}", request.Email);
-
-        return Ok(new { message = "If your email exists in our system, you will receive a password reset link." });
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during forgot password: {Email}", request.Email);
+            return InternalError("An error occurred while processing your request");
+        }
     }
 
     /// <summary>
     /// Reset password with token.
     /// </summary>
-    /// <param name="request">User ID, token, and new password</param>
-    /// <param name="cancellationToken">Cancellation token</param>
     [HttpPost("reset-password")]
     [AllowAnonymous]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ResetPassword(
         [FromBody] ResetPasswordRequest request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(request.UserId, out var userGuid))
+        try
         {
-            return BadRequest(new { error = "Invalid user ID" });
+            if (!Guid.TryParse(request.UserId, out var userGuid))
+            {
+                return ErrorResponse("Invalid user ID");
+            }
+
+            var user = await _userManager.FindByIdAsync(request.UserId);
+            if (user == null)
+            {
+                return NotFound(ApiResponseFactory.NotFound("User not found"));
+            }
+
+            var result = await _userManager.ResetPasswordAsync(user, request.Token, request.NewPassword);
+            if (!result.Succeeded)
+            {
+                var errors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(ApiResponseFactory.Error("Password reset failed", errors));
+            }
+
+            // Revoke all refresh tokens for security
+            await _refreshTokenService.RevokeAllUserTokensAsync(userGuid, "password_reset", cancellationToken);
+
+            _logger.LogInformation("Password reset for user: {UserId}", request.UserId);
+            return OkResponse("Password reset successfully. Please login with your new password.");
         }
-
-        var (succeeded, errors) = await _identityService.ResetPasswordAsync(
-            userGuid,
-            request.Token,
-            request.NewPassword);
-
-        if (!succeeded)
+        catch (Exception ex)
         {
-            return BadRequest(new { errors });
+            _logger.LogError(ex, "Error resetting password for user: {UserId}", request.UserId);
+            return InternalError("An error occurred while resetting password");
         }
-
-        // Revoke all refresh tokens for security
-        await _refreshTokenService.RevokeAllUserTokensAsync(userGuid, "password_reset", cancellationToken);
-
-        _logger.LogInformation("Password reset for user: {UserId}", request.UserId);
-
-        return Ok(new { message = "Password reset successfully. Please login with your new password." });
     }
 
     /// <summary>
@@ -475,33 +548,80 @@ public class AuthController : ControllerBase
     /// </summary>
     [HttpGet("me")]
     [Authorize]
-    [ProducesResponseType(typeof(UserInfoResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<UserInfoResponse>> GetCurrentUser(CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(ApiResponse<UserInfoResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetCurrentUser()
     {
-        var userIdClaim = User.FindFirst("uid")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        
-        if (!Guid.TryParse(userIdClaim, out var userId))
+        try
         {
-            return Unauthorized();
+            var userIdClaim = User.FindFirst("uid")?.Value 
+                ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            
+            if (!Guid.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(ApiResponseFactory.Unauthorized("Invalid token"));
+            }
+
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user == null || user.IsDeleted)
+            {
+                return Unauthorized(ApiResponseFactory.Unauthorized("User not found"));
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+
+            var response = new UserInfoResponse
+            {
+                Id = user.Id,
+                Email = user.Email!,
+                FullName = user.FullName,
+                Roles = roles.ToArray(),
+                EmailConfirmed = user.EmailConfirmed,
+                OrganizationId = user.OrganizationId
+            };
+
+            return OkResponse(response, "User information retrieved successfully");
         }
-
-        var user = await _identityService.GetUserByIdAsync(userId, cancellationToken);
-        if (user == null)
+        catch (Exception ex)
         {
-            return Unauthorized();
+            _logger.LogError(ex, "Error getting current user");
+            return InternalError("An error occurred while retrieving user information");
         }
+    }
 
-        var roles = await _identityService.GetUserRolesAsync(userId);
-
-        return Ok(new UserInfoResponse
+    /// <summary>
+    /// Resend email confirmation.
+    /// </summary>
+    [HttpPost("resend-confirmation")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ResendConfirmation(
+        [FromBody] ForgotPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
         {
-            Id = user.Id,
-            Email = user.Email,
-            FullName = user.FullName,
-            Roles = roles.ToArray(),
-            EmailConfirmed = user.EmailConfirmed,
-            OrganizationId = user.OrganizationId
-        });
+            var user = await _userManager.FindByEmailAsync(request.Email);
+            
+            if (user != null && !user.EmailConfirmed && !user.IsDeleted)
+            {
+                var confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                var confirmationLink = Url.Action(
+                    nameof(ConfirmEmail),
+                    "Auth",
+                    new { userId = user.Id, token = confirmationToken },
+                    Request.Scheme);
+
+                await _emailService.SendEmailConfirmationAsync(user.Email!, confirmationLink ?? "", cancellationToken);
+                _logger.LogInformation("Confirmation email resent to: {Email}", request.Email);
+            }
+
+            return OkResponse("If your email exists and is not confirmed, you will receive a confirmation link.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error resending confirmation email: {Email}", request.Email);
+            return InternalError("An error occurred while processing your request");
+        }
     }
 }

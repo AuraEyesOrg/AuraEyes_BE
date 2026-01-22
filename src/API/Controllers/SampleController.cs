@@ -1,5 +1,6 @@
 using Application.Common.Constants;
 using Application.Common.Interfaces;
+using Application.Common.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,10 +9,7 @@ namespace API.Controllers;
 /// <summary>
 /// Sample controller demonstrating role-based and policy-based authorization.
 /// </summary>
-[ApiController]
-[Route("api/[controller]")]
-[Produces("application/json")]
-public class SampleController : ControllerBase
+public class SampleController : BaseApiController
 {
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<SampleController> _logger;
@@ -31,7 +29,7 @@ public class SampleController : ControllerBase
     [AllowAnonymous]
     public IActionResult PublicEndpoint()
     {
-        return Ok(new { message = "This is a public endpoint", timestamp = DateTime.UtcNow });
+        return OkResponse(new { message = "This is a public endpoint", timestamp = DateTime.UtcNow });
     }
 
     /// <summary>
@@ -41,7 +39,7 @@ public class SampleController : ControllerBase
     [Authorize]
     public IActionResult AuthenticatedEndpoint()
     {
-        return Ok(new
+        return OkResponse(new
         {
             message = "You are authenticated!",
             userId = _currentUserService.UserId,
@@ -57,7 +55,7 @@ public class SampleController : ControllerBase
     [Authorize(Roles = Roles.Patient)]
     public IActionResult PatientOnlyEndpoint()
     {
-        return Ok(new
+        return OkResponse(new
         {
             message = "Welcome, Patient!",
             userId = _currentUserService.UserId
@@ -71,7 +69,7 @@ public class SampleController : ControllerBase
     [Authorize(Roles = Roles.Ophthalmologist)]
     public IActionResult OphthalmologistOnlyEndpoint()
     {
-        return Ok(new
+        return OkResponse(new
         {
             message = "Welcome, Doctor!",
             userId = _currentUserService.UserId
@@ -86,7 +84,7 @@ public class SampleController : ControllerBase
     [Authorize(Policy = Policies.AdminsOnly)]
     public IActionResult AdminOnlyEndpoint()
     {
-        return Ok(new
+        return OkResponse(new
         {
             message = "Welcome, Admin!",
             userId = _currentUserService.UserId,
@@ -101,7 +99,7 @@ public class SampleController : ControllerBase
     [Authorize(Policy = Policies.SystemAdminOnly)]
     public IActionResult SystemAdminOnlyEndpoint()
     {
-        return Ok(new
+        return OkResponse(new
         {
             message = "Welcome, System Administrator!",
             userId = _currentUserService.UserId
@@ -115,7 +113,7 @@ public class SampleController : ControllerBase
     [Authorize(Policy = Policies.MedicalStaff)]
     public IActionResult MedicalStaffEndpoint()
     {
-        return Ok(new
+        return OkResponse(new
         {
             message = "Welcome, Medical Staff!",
             userId = _currentUserService.UserId,
@@ -130,7 +128,7 @@ public class SampleController : ControllerBase
     [Authorize(Roles = $"{Roles.Patient},{Roles.Ophthalmologist},{Roles.OrgAdmin}")]
     public IActionResult MultiRoleEndpoint()
     {
-        return Ok(new
+        return OkResponse(new
         {
             message = "You have one of the allowed roles!",
             userId = _currentUserService.UserId,

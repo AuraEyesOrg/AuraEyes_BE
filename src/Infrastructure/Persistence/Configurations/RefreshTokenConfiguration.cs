@@ -51,5 +51,9 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
         builder.Ignore(t => t.IsExpired);
         builder.Ignore(t => t.IsRevoked);
         builder.Ignore(t => t.IsActive);
+
+        // Query filter to match ApplicationUser's soft delete filter
+        // This ensures tokens of soft-deleted users are also filtered out
+        builder.HasQueryFilter(t => !t.User.IsDeleted);
     }
 }
