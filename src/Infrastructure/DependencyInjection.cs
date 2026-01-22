@@ -6,6 +6,7 @@ using Infrastructure.Identity;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.Services;
+using Infrastructure.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +32,9 @@ public static class DependencyInjection
         var jwtSettings = new JwtSettings();
         configuration.Bind(JwtSettings.SectionName, jwtSettings);
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
+        
+        // SMTP Settings
+        services.Configure<SmtpSettings>(configuration.GetSection(SmtpSettings.SectionName));
 
         // ASP.NET Core Identity configuration
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
