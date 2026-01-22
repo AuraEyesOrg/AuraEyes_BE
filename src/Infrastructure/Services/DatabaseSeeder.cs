@@ -39,45 +39,50 @@ public static class DatabaseSeeder
             logger?.LogInformation("Migrations applied successfully");
         }
 
-        // Seed roles
-        await SeedRolesAsync(roleManager, logger);
+        // Check if any roles exist - only seed if database is completely empty
+        var hasRoles = await roleManager.Roles.AnyAsync();
+        
+        if (!hasRoles)
+        {
+            logger?.LogInformation("No roles found in database. Starting initial seed...");
+            
+            // Seed roles first
+            await SeedRolesAsync(roleManager, logger);
 
-        // Seed default accounts
-        await SeedDefaultAccountsAsync(userManager, logger);
+            // Then seed default accounts
+            await SeedDefaultAccountsAsync(userManager, logger);
+        }
+        else
+        {
+            logger?.LogInformation("Roles already exist. Skipping seed process.");
+        }
     }
 
     private static async Task SeedRolesAsync(RoleManager<ApplicationRole> roleManager, ILogger? logger)
     {
-        logger?.LogInformation("Seeding Identity roles...");
+        logger?.LogInformation("Seeding Identity roles into AspNetRoles table...");
 
         foreach (var roleName in Roles.All)
         {
-            if (!await roleManager.RoleExistsAsync(roleName))
+            var role = new ApplicationRole(roleName)
             {
-                var role = new ApplicationRole(roleName)
-                {
-                    Description = GetRoleDescription(roleName)
-                };
-                
-                var result = await roleManager.CreateAsync(role);
-                
-                if (result.Succeeded)
-                {
-                    logger?.LogInformation("Created role: {RoleName}", roleName);
-                }
-                else
-                {
-                    logger?.LogWarning("Failed to create role {RoleName}: {Errors}", 
-                        roleName, string.Join(", ", result.Errors.Select(e => e.Description)));
-                }
+                Description = GetRoleDescription(roleName)
+            };
+            
+            var result = await roleManager.CreateAsync(role);
+            
+            if (result.Succeeded)
+            {
+                logger?.LogInformation("✓ Created role: {RoleName} → AspNetRoles", roleName);
             }
             else
             {
-                logger?.LogDebug("Role {RoleName} already exists, skipping", roleName);
+                logger?.LogError("✗ Failed to create role {RoleName}: {Errors}", 
+                    roleName, string.Join(", ", result.Errors.Select(e => e.Description)));
             }
         }
 
-        logger?.LogInformation("Role seeding completed. Total roles: {Count}", Roles.All.Length);
+        logger?.LogInformation("Role seeding completed. Total roles created: {Count}", Roles.All.Length);
     }
 
     private static string GetRoleDescription(string roleName)
@@ -94,54 +99,47 @@ public static class DatabaseSeeder
 
     private static async Task SeedDefaultAccountsAsync(UserManager<ApplicationUser> userManager, ILogger? logger)
     {
-        logger?.LogInformation("Seeding default user accounts...");
+        logger?.LogInformation("Seeding default user accounts into AspNetUsers and AspNetUserRoles...");
 
         foreach (var (email, password, role, fullName) in DefaultAccounts)
         {
-            var existingUser = await userManager.FindByEmailAsync(email);
-
-            if (existingUser == null)
+            var user = new ApplicationUser
             {
-                var user = new ApplicationUser
+                UserName = email,
+                Email = email,
+                FullName = fullName,
+                EmailConfirmed = true,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            // Create user → inserts into AspNetUsers table
+            var createResult = await userManager.CreateAsync(user, password);
+
+            if (createResult.Succeeded)
+            {
+                logger?.LogInformation("✓ Created user: {Email} → AspNetUsers", email);
+
+                // Assign role → inserts into AspNetUserRoles table
+                var roleResult = await userManager.AddToRoleAsync(user, role);
+
+                if (roleResult.Succeeded)
                 {
-                    UserName = email,
-                    Email = email,
-                    FullName = fullName,
-                    EmailConfirmed = true,
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                var createResult = await userManager.CreateAsync(user, password);
-
-                if (createResult.Succeeded)
-                {
-                    logger?.LogInformation("Created user: {Email} with role {Role}", email, role);
-
-                    var roleResult = await userManager.AddToRoleAsync(user, role);
-
-                    if (roleResult.Succeeded)
-                    {
-                        logger?.LogInformation("Assigned role {Role} to user {Email}", role, email);
-                    }
-                    else
-                    {
-                        logger?.LogWarning("Failed to assign role {Role} to user {Email}: {Errors}",
-                            role, email, string.Join(", ", roleResult.Errors.Select(e => e.Description)));
-                    }
+                    logger?.LogInformation("✓ Assigned role {Role} to {Email} → AspNetUserRoles", role, email);
                 }
                 else
                 {
-                    logger?.LogWarning("Failed to create user {Email}: {Errors}",
-                        email, string.Join(", ", createResult.Errors.Select(e => e.Description)));
+                    logger?.LogError("✗ Failed to assign role {Role} to user {Email}: {Errors}",
+                        role, email, string.Join(", ", roleResult.Errors.Select(e => e.Description)));
                 }
             }
             else
             {
-                logger?.LogDebug("User {Email} already exists, skipping", email);
+                logger?.LogError("✗ Failed to create user {Email}: {Errors}",
+                    email, string.Join(", ", createResult.Errors.Select(e => e.Description)));
             }
         }
 
-        logger?.LogInformation("Default account seeding completed. Total accounts: {Count}", DefaultAccounts.Length);
+        logger?.LogInformation("Default account seeding completed. Total accounts created: {Count}", DefaultAccounts.Length);
     }
 }
