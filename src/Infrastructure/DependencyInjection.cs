@@ -1,13 +1,17 @@
+using System.Text;
+using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Domain.Common;
 using Infrastructure.Identity;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Infrastructure;
 
@@ -23,6 +27,11 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<ApplicationDbContext>());
         
+        // JWT Settings
+        var jwtSettings = new JwtSettings();
+        configuration.Bind(JwtSettings.SectionName, jwtSettings);
+        services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
+
         // ASP.NET Core Identity configuration
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
         {
@@ -50,11 +59,67 @@ public static class DependencyInjection
         .AddEntityFrameworkStores<ApplicationDbContext>()
         .AddDefaultTokenProviders();
 
+        // Configure JWT Authentication
+        services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+        })
+        .AddJwtBearer(options =>
+        {
+            options.SaveToken = true;
+            options.RequireHttpsMetadata = true; // Set to false for development only
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
+                ValidateIssuer = jwtSettings.ValidateIssuer,
+                ValidIssuer = jwtSettings.Issuer,
+                ValidateAudience = jwtSettings.ValidateAudience,
+                ValidAudience = jwtSettings.Audience,
+                ValidateLifetime = jwtSettings.ValidateLifetime,
+                ClockSkew = TimeSpan.FromSeconds(jwtSettings.ClockSkewSeconds)
+            };
+            
+            // Add events for debugging/logging
+            options.Events = new JwtBearerEvents
+            {
+                OnAuthenticationFailed = context =>
+                {
+                    if (context.Exception.GetType() == typeof(SecurityTokenExpiredException))
+                    {
+                        context.Response.Headers["Token-Expired"] = "true";
+                    }
+                    return Task.CompletedTask;
+                }
+            };
+        });
+
+        // Configure Authorization Policies
+        services.AddAuthorizationBuilder()
+            .AddPolicy(Policies.Authenticated, policy => policy.RequireAuthenticatedUser())
+            .AddPolicy(Policies.PatientOnly, policy => policy.RequireRole(Roles.Patient))
+            .AddPolicy(Policies.OphthalmologistOnly, policy => policy.RequireRole(Roles.Ophthalmologist))
+            .AddPolicy(Policies.OrgAdminOnly, policy => policy.RequireRole(Roles.OrgAdmin))
+            .AddPolicy(Policies.SystemAdminOnly, policy => policy.RequireRole(Roles.SystemAdmin))
+            .AddPolicy(Policies.AdminsOnly, policy => policy.RequireRole(Roles.Admins))
+            .AddPolicy(Policies.MedicalStaff, policy => policy.RequireRole(Roles.Medical))
+            .AddPolicy(Policies.OrganizationMember, policy => 
+                policy.RequireAssertion(context => 
+                    context.User.HasClaim(c => c.Type == "org_id" && !string.IsNullOrEmpty(c.Value))));
+
         // Register repositories
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
-        // Register services
+        // Register Identity Services
+        services.AddScoped<IIdentityService, IdentityService>();
+        services.AddScoped<ITokenService, TokenService>();
+        services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+
+        // Register other services
         services.AddTransient<IDateTime, DateTimeService>();
+        services.AddTransient<IEmailService, EmailService>();
 
         return services;
     }
