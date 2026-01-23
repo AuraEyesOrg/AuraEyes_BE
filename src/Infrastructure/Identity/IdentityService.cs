@@ -241,4 +241,169 @@ public class IdentityService : IIdentityService
             user.OrganizationId
         );
     }
+
+    // Admin User Management Methods
+
+    public async Task<(List<UserAdminDto> Users, int TotalCount)> GetUsersAsync(
+        string? searchTerm = null,
+        string? roleFilter = null,
+        string? statusFilter = null,
+        int pageNumber = 1,
+        int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _userManager.Users.Where(u => !u.IsDeleted);
+
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            query = query.Where(u =>
+                u.Email!.Contains(searchTerm) ||
+                u.FullName.Contains(searchTerm) ||
+                u.UserName!.Contains(searchTerm));
+        }
+
+        // Apply status filter
+        if (!string.IsNullOrWhiteSpace(statusFilter))
+        {
+            switch (statusFilter.ToLowerInvariant())
+            {
+                case "active":
+                    query = query.Where(u => u.IsActive);
+                    break;
+                case "pending":
+                    query = query.Where(u => !u.EmailConfirmed);
+                    break;
+                case "suspended":
+                    query = query.Where(u => !u.IsActive);
+                    break;
+            }
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var users = await query
+            .OrderByDescending(u => u.CreatedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        var items = new List<UserAdminDto>();
+        foreach (var user in users)
+        {
+            var roles = await _userManager.GetRolesAsync(user);
+
+            // Filter by role if specified
+            if (!string.IsNullOrWhiteSpace(roleFilter) &&
+                !roles.Contains(roleFilter, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            items.Add(new UserAdminDto(
+                user.Id,
+                user.Email ?? string.Empty,
+                user.FullName,
+                user.PhoneNumber,
+                roles.ToList(),
+                GetUserStatus(user),
+                user.IsActive,
+                user.EmailConfirmed,
+                user.CreatedAt,
+                user.LastLoginAt
+            ));
+        }
+
+        return (items, totalCount);
+    }
+
+    public async Task<UserMetricsDto> GetUserMetricsAsync(CancellationToken cancellationToken = default)
+    {
+        // Total users
+        var totalUsers = await _userManager.Users.CountAsync(u => !u.IsDeleted, cancellationToken);
+        var lastMonthDate = DateTime.UtcNow.AddMonths(-1);
+        var lastMonthUsers = await _userManager.Users.CountAsync(u => !u.IsDeleted && u.CreatedAt <= lastMonthDate, cancellationToken);
+        var totalUsersChange = lastMonthUsers > 0
+            ? ((decimal)(totalUsers - lastMonthUsers) / lastMonthUsers) * 100
+            : totalUsers > 0 ? 100 : 0;
+
+        // Active doctors - get users in Ophthalmologist role
+        var activeDoctors = await GetUsersInRoleCountAsync("Ophthalmologist", true, cancellationToken);
+
+        // Pending approvals
+        var pendingApprovals = await _userManager.Users
+            .CountAsync(u => !u.IsDeleted && (!u.EmailConfirmed || !u.IsActive), cancellationToken);
+
+        return new UserMetricsDto(
+            totalUsers,
+            Math.Round(totalUsersChange, 1),
+            activeDoctors,
+            0, // Would need historical data for change
+            0, // Would need screening data - passed separately
+            0, // Would need screening data
+            pendingApprovals
+        );
+    }
+
+    public async Task<int> GetUsersInRoleCountAsync(string role, bool activeOnly = true, CancellationToken cancellationToken = default)
+    {
+        var usersInRole = await _userManager.GetUsersInRoleAsync(role);
+        return activeOnly
+            ? usersInRole.Count(u => u.IsActive && !u.IsDeleted)
+            : usersInRole.Count(u => !u.IsDeleted);
+    }
+
+    public async Task<(bool Succeeded, string[] Errors)> RemoveFromRoleAsync(Guid userId, string role)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null)
+        {
+            return (false, new[] { "User not found" });
+        }
+
+        var result = await _userManager.RemoveFromRoleAsync(user, role);
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<(bool Succeeded, string[] Errors)> ActivateUserAsync(Guid userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null)
+        {
+            return (false, new[] { "User not found" });
+        }
+
+        user.Activate();
+        var result = await _userManager.UpdateAsync(user);
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<(bool Succeeded, string[] Errors)> ApproveUserAsync(Guid userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null)
+        {
+            return (false, new[] { "User not found" });
+        }
+
+        user.EmailConfirmed = true;
+        user.Activate();
+        user.UpdatedAt = DateTime.UtcNow;
+        var result = await _userManager.UpdateAsync(user);
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<int> GetPendingApprovalsCountAsync(CancellationToken cancellationToken = default)
+    {
+        return await _userManager.Users
+            .CountAsync(u => !u.IsDeleted && (!u.EmailConfirmed || !u.IsActive), cancellationToken);
+    }
+
+    private static string GetUserStatus(ApplicationUser user)
+    {
+        if (!user.IsActive) return "Suspended";
+        if (!user.EmailConfirmed) return "Pending";
+        if (user.LastLoginAt.HasValue && user.LastLoginAt.Value > DateTime.UtcNow.AddMinutes(-15)) return "Online";
+        return "Active";
+    }
 }
