@@ -21,6 +21,8 @@ public class AuthController : BaseApiController
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenService _refreshTokenService;
     private readonly IEmailService _emailService;
+    private readonly IIdentityService _identityService;
+    private readonly ICurrentUserService _currentUserService;
     private readonly ApplicationDbContext _context;
     private readonly ILogger<AuthController> _logger;
 
@@ -29,6 +31,8 @@ public class AuthController : BaseApiController
         ITokenService tokenService,
         IRefreshTokenService refreshTokenService,
         IEmailService emailService,
+        IIdentityService identityService,
+        ICurrentUserService currentUserService,
         ApplicationDbContext context,
         ILogger<AuthController> logger)
     {
@@ -36,6 +40,8 @@ public class AuthController : BaseApiController
         _tokenService = tokenService;
         _refreshTokenService = refreshTokenService;
         _emailService = emailService;
+        _identityService = identityService;
+        _currentUserService = currentUserService;
         _context = context;
         _logger = logger;
     }
@@ -174,10 +180,12 @@ public class AuthController : BaseApiController
 
     /// <summary>
     /// Authenticate user with email and password.
+    /// Returns TwoFactorRequiredResponse if 2FA is enabled.
     /// </summary>
     [HttpPost("login")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<AuthResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<TwoFactorRequiredResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login(
@@ -208,59 +216,146 @@ public class AuthController : BaseApiController
                 return Unauthorized(ApiResponseFactory.Unauthorized("Please confirm your email before logging in."));
             }
 
-            // Get user roles
-            var roles = await _userManager.GetRolesAsync(user);
-
-            // Generate tokens
-            var tokenResult = await _tokenService.GenerateAccessTokenAsync(
-                user.Id,
-                user.Email!,
-                user.FullName,
-                roles);
-
-            var refreshToken = _tokenService.GenerateRefreshToken();
-            var refreshTokenHash = TokenService.HashToken(refreshToken);
-
-            // Store refresh token
-            await _refreshTokenService.CreateRefreshTokenAsync(
-                user.Id,
-                refreshTokenHash,
-                tokenResult.Jti,
-                7, // 7 days
-                request.DeviceInfo,
-                HttpContext.Connection.RemoteIpAddress?.ToString(),
-                cancellationToken);
-
-            // Update last login
-            user.UpdateLastLogin();
-            await _userManager.UpdateAsync(user);
-
-            _logger.LogInformation("User logged in: {Email}", request.Email);
-
-            var response = new AuthResponse
+            // Check if 2FA is enabled
+            if (await _userManager.GetTwoFactorEnabledAsync(user))
             {
-                Succeeded = true,
-                AccessToken = tokenResult.AccessToken,
-                RefreshToken = refreshToken,
-                ExpiresAt = tokenResult.ExpiresAt,
-                User = new UserInfoResponse
+                _logger.LogInformation("2FA required for user: {Email}", request.Email);
+                
+                var twoFactorResponse = new TwoFactorRequiredResponse
                 {
-                    Id = user.Id,
-                    Email = user.Email!,
-                    FullName = user.FullName,
-                    Roles = roles.ToArray(),
-                    EmailConfirmed = user.EmailConfirmed,
-                    OrganizationId = user.OrganizationId
-                }
-            };
+                    RequiresTwoFactor = true,
+                    UserId = user.Id,
+                    Message = "Two-factor authentication is required. Please enter your verification code from your authenticator app."
+                };
+                
+                return OkResponse(twoFactorResponse, "Two-factor authentication required");
+            }
 
-            return OkResponse(response, "Login successful");
+            // Complete login (no 2FA)
+            return await CompleteLoginAsync(user, request.DeviceInfo, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during login: {Email}", request.Email);
             return InternalError("An error occurred during login");
         }
+    }
+
+    /// <summary>
+    /// Complete login after 2FA verification.
+    /// </summary>
+    [HttpPost("login/verify-2fa")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<AuthResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> VerifyTwoFactorLogin(
+        [FromBody] VerifyTwoFactorRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var user = await _userManager.FindByIdAsync(request.UserId.ToString());
+            if (user == null || user.IsDeleted || !user.IsActive)
+            {
+                return Unauthorized(ApiResponseFactory.Unauthorized("User not found or inactive"));
+            }
+
+            if (!await _userManager.GetTwoFactorEnabledAsync(user))
+            {
+                return BadRequest(ApiResponseFactory.Error("Two-factor authentication is not enabled for this account"));
+            }
+
+            bool isValidCode;
+
+            if (request.UseRecoveryCode)
+            {
+                // Verify recovery code
+                var result = await _identityService.VerifyRecoveryCodeAsync(user.Id, request.Code);
+                isValidCode = result.Succeeded;
+                
+                if (isValidCode)
+                {
+                    _logger.LogWarning("Recovery code used for user: {UserId}", user.Id);
+                }
+            }
+            else
+            {
+                // Verify TOTP code from authenticator app
+                isValidCode = await _identityService.VerifyTwoFactorCodeAsync(user.Id, request.Code);
+            }
+
+            if (!isValidCode)
+            {
+                _logger.LogWarning("Invalid 2FA code for user: {UserId}", user.Id);
+                return Unauthorized(ApiResponseFactory.Unauthorized("Invalid verification code"));
+            }
+
+            return await CompleteLoginAsync(user, request.DeviceInfo, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during 2FA verification for user: {UserId}", request.UserId);
+            return InternalError("An error occurred during verification");
+        }
+    }
+
+    /// <summary>
+    /// Helper method to complete login and generate tokens.
+    /// </summary>
+    private async Task<IActionResult> CompleteLoginAsync(
+        ApplicationUser user, 
+        string? deviceInfo, 
+        CancellationToken cancellationToken)
+    {
+        // Get user roles
+        var roles = await _userManager.GetRolesAsync(user);
+
+        // Generate tokens
+        var tokenResult = await _tokenService.GenerateAccessTokenAsync(
+            user.Id,
+            user.Email!,
+            user.FullName,
+            roles);
+
+        var refreshToken = _tokenService.GenerateRefreshToken();
+        var refreshTokenHash = TokenService.HashToken(refreshToken);
+
+        // Store refresh token
+        await _refreshTokenService.CreateRefreshTokenAsync(
+            user.Id,
+            refreshTokenHash,
+            tokenResult.Jti,
+            7, // 7 days
+            deviceInfo,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            cancellationToken);
+
+        // Update last login
+        user.UpdateLastLogin();
+        await _userManager.UpdateAsync(user);
+
+        _logger.LogInformation("User logged in: {Email}", user.Email);
+
+        var response = new AuthResponse
+        {
+            Succeeded = true,
+            AccessToken = tokenResult.AccessToken,
+            RefreshToken = refreshToken,
+            ExpiresAt = tokenResult.ExpiresAt,
+            User = new UserInfoResponse
+            {
+                Id = user.Id,
+                Email = user.Email!,
+                FullName = user.FullName,
+                Roles = roles.ToArray(),
+                EmailConfirmed = user.EmailConfirmed,
+                OrganizationId = user.OrganizationId,
+                TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user)
+            }
+        };
+
+        return OkResponse(response, "Login successful");
     }
 
     /// <summary>
@@ -350,7 +445,8 @@ public class AuthController : BaseApiController
                     FullName = user.FullName,
                     Roles = roles.ToArray(),
                     EmailConfirmed = user.EmailConfirmed,
-                    OrganizationId = user.OrganizationId
+                    OrganizationId = user.OrganizationId,
+                    TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user)
                 }
             };
 
@@ -403,12 +499,10 @@ public class AuthController : BaseApiController
     {
         try
         {
-            var userIdClaim = User.FindFirst("uid")?.Value 
-                ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            
-            if (Guid.TryParse(userIdClaim, out var userId))
+            var userId = _currentUserService.UserId;
+            if (userId.HasValue)
             {
-                await _refreshTokenService.RevokeAllUserTokensAsync(userId, "logout_all", cancellationToken);
+                await _refreshTokenService.RevokeAllUserTokensAsync(userId.Value, "logout_all", cancellationToken);
                 _logger.LogInformation("All tokens revoked for user: {UserId}", userId);
             }
 
@@ -554,15 +648,13 @@ public class AuthController : BaseApiController
     {
         try
         {
-            var userIdClaim = User.FindFirst("uid")?.Value 
-                ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            
-            if (!Guid.TryParse(userIdClaim, out var userId))
+            var userId = _currentUserService.UserId;
+            if (userId == null)
             {
                 return Unauthorized(ApiResponseFactory.Unauthorized("Invalid token"));
             }
 
-            var user = await _userManager.FindByIdAsync(userId.ToString());
+            var user = await _userManager.FindByIdAsync(userId.Value.ToString());
             if (user == null || user.IsDeleted)
             {
                 return Unauthorized(ApiResponseFactory.Unauthorized("User not found"));
@@ -577,7 +669,8 @@ public class AuthController : BaseApiController
                 FullName = user.FullName,
                 Roles = roles.ToArray(),
                 EmailConfirmed = user.EmailConfirmed,
-                OrganizationId = user.OrganizationId
+                OrganizationId = user.OrganizationId,
+                TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user)
             };
 
             return OkResponse(response, "User information retrieved successfully");

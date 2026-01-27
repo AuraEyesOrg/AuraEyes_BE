@@ -54,6 +54,27 @@ public interface IIdentityService
     
     Task<(bool Succeeded, string[] Errors)> SoftDeleteUserAsync(Guid userId);
 
+    // Two-Factor Authentication (2FA) - TOTP Authenticator
+    
+    Task<bool> IsTwoFactorEnabledAsync(Guid userId);
+    
+    /// <summary>
+    /// Get the current authenticator key (without regenerating).
+    /// </summary>
+    Task<string?> GetAuthenticatorKeyAsync(Guid userId);
+    
+    Task<string> GetOrCreateAuthenticatorKeyAsync(Guid userId);
+    
+    string GenerateAuthenticatorUri(string email, string sharedKey);
+    
+    string FormatAuthenticatorKey(string key);
+    
+    Task<(bool Succeeded, string[] Errors, string[]? RecoveryCodes)> EnableTwoFactorAsync(Guid userId, string verificationCode);
+    Task<(bool Succeeded, string[] Errors)> DisableTwoFactorAsync(Guid userId);
+    Task<bool> VerifyTwoFactorCodeAsync(Guid userId, string code);
+    Task<(bool Succeeded, string[] Errors)> VerifyRecoveryCodeAsync(Guid userId, string recoveryCode);
+    Task<string[]> GenerateNewRecoveryCodesAsync(Guid userId, int count = 10);
+    Task<int> GetRecoveryCodesCountAsync(Guid userId);
     // Admin User Management
     /// <summary>
     /// Get paginated list of users with optional filters.
@@ -107,7 +128,8 @@ public record UserDto(
     bool EmailConfirmed,
     bool IsActive,
     bool IsDeleted,
-    Guid? OrganizationId
+    Guid? OrganizationId,
+    bool TwoFactorEnabled = false
 );
 
 /// <summary>
