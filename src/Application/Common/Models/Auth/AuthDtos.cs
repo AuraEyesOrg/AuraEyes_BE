@@ -127,6 +127,11 @@ public record UserInfoResponse
     public string[] Roles { get; init; } = Array.Empty<string>();
     public bool EmailConfirmed { get; init; }
     public Guid? OrganizationId { get; init; }
+    
+    /// <summary>
+    /// Indicates if 2FA is enabled for this user.
+    /// </summary>
+    public bool TwoFactorEnabled { get; init; }
 }
 
 /// <summary>
@@ -182,3 +187,87 @@ public record ConfirmEmailRequest
     [Required]
     public string Token { get; init; } = string.Empty;
 }
+
+#region Two-Factor Authentication DTOs
+
+/// <summary>
+/// Response when 2FA setup is initiated.
+/// Contains the shared key and QR code URI for authenticator apps.
+/// </summary>
+public record TwoFactorSetupResponse
+{
+    public string SharedKey { get; init; } = string.Empty;
+    public string AuthenticatorUri { get; init; } = string.Empty;
+    public string FormattedKey { get; init; } = string.Empty;
+}
+
+public record EnableTwoFactorRequest
+{
+    [Required]
+    [StringLength(6, MinimumLength = 6)]
+    public string VerificationCode { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// Response after successfully enabling 2FA.
+/// Contains recovery codes that should be saved securely.
+/// </summary>
+public record EnableTwoFactorResponse
+{
+    public bool Succeeded { get; init; }
+    public string[] RecoveryCodes { get; init; } = Array.Empty<string>();
+    public string[] Errors { get; init; } = Array.Empty<string>();
+}
+
+public record DisableTwoFactorRequest
+{
+    [Required]
+    [MinLength(8)]
+    public string Password { get; init; } = string.Empty;
+}
+
+public record VerifyTwoFactorRequest
+{
+    [Required]
+    public Guid UserId { get; init; }
+    
+    [Required]
+    [StringLength(10, MinimumLength = 6)]
+    public string Code { get; init; } = string.Empty;
+    
+    /// <summary>
+    /// Set to true if the code is a recovery code instead of TOTP.
+    /// </summary>
+    public bool UseRecoveryCode { get; init; }
+    public string? DeviceInfo { get; init; }
+}
+
+public record TwoFactorStatusResponse
+{
+    public bool IsEnabled { get; init; }
+    public int RecoveryCodesRemaining { get; init; }
+    public bool HasAuthenticator { get; init; }
+}
+
+public record GenerateRecoveryCodesRequest
+{
+    [Required]
+    [MinLength(8)]
+    public string Password { get; init; } = string.Empty;
+}
+
+public record RecoveryCodesResponse
+{
+    public bool Succeeded { get; init; }
+    public string[] RecoveryCodes { get; init; } = Array.Empty<string>();
+    public string[] Errors { get; init; } = Array.Empty<string>();
+}
+
+public record TwoFactorRequiredResponse
+{
+    public bool RequiresTwoFactor { get; init; } = true;
+    public Guid UserId { get; init; }
+    public string Message { get; init; } = "Two-factor authentication is required.";
+}
+
+#endregion
