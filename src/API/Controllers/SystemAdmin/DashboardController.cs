@@ -1,0 +1,123 @@
+using Application.Common.Constants;
+using Application.Common.Models;
+using Application.SystemAdmin.Dashboard.Queries.GetDashboardMetrics;
+using Application.SystemAdmin.Dashboard.Queries.GetPopulationRiskAnalysis;
+using Application.SystemAdmin.Dashboard.Queries.GetRecentScreenings;
+using Application.SystemAdmin.Dashboard.Queries.GetScreeningVolumeTrends;
+using Application.SystemAdmin.Dashboard.Queries.GetSystemHealth;
+using MediatR;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace API.Controllers.SystemAdmin;
+
+/// <summary>
+/// System Admin Dashboard endpoints
+/// Provides real-time consolidated overview of system activity, AI screening performance,
+/// operational health, and population-level risk insights.
+/// </summary>
+[Route("api/system-admin/[controller]")]
+[Authorize(Policy = Policies.SystemAdminOnly)]
+public class DashboardController : BaseApiController
+{
+    private readonly IMediator _mediator;
+
+    public DashboardController(IMediator mediator)
+    {
+        _mediator = mediator;
+    }
+
+    /// <summary>
+    /// Get dashboard overview metrics
+    /// </summary>
+    /// <remarks>
+    /// Returns total screenings today, AI accuracy, pending reviews, and quick stats.
+    /// Screen: 3.3.1-3.3.4
+    /// </remarks>
+    [HttpGet("metrics")]
+    [ProducesResponseType(typeof(ApiResponse<DashboardMetricsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetMetrics()
+    {
+        var result = await _mediator.Send(new GetDashboardMetricsQuery());
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Get screening volume trends
+    /// </summary>
+    /// <param name="timeRange">Time range: "weekly" or "monthly"</param>
+    /// <param name="periods">Number of periods to include</param>
+    /// <remarks>
+    /// Screen: 3.3.5 View Screening Volume Trends
+    /// </remarks>
+    [HttpGet("screening-trends")]
+    [ProducesResponseType(typeof(ApiResponse<ScreeningVolumeTrendsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetScreeningTrends(
+        [FromQuery] string timeRange = "monthly",
+        [FromQuery] int periods = 12)
+    {
+        var query = new GetScreeningVolumeTrendsQuery
+        {
+            TimeRange = timeRange,
+            Periods = periods
+        };
+        var result = await _mediator.Send(query);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Get population risk analysis
+    /// </summary>
+    /// <remarks>
+    /// Screen: 3.3.6 View Population Risk Analysis
+    /// </remarks>
+    [HttpGet("risk-analysis")]
+    [ProducesResponseType(typeof(ApiResponse<PopulationRiskAnalysisDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetRiskAnalysis()
+    {
+        var result = await _mediator.Send(new GetPopulationRiskAnalysisQuery());
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Get system health status
+    /// </summary>
+    /// <remarks>
+    /// Screen: 3.3.7 View System Health Status
+    /// </remarks>
+    [HttpGet("system-health")]
+    [ProducesResponseType(typeof(ApiResponse<SystemHealthDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetSystemHealth()
+    {
+        var result = await _mediator.Send(new GetSystemHealthQuery());
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Get recent screenings list
+    /// </summary>
+    /// <param name="pageNumber">Page number (default: 1)</param>
+    /// <param name="pageSize">Page size (default: 10)</param>
+    /// <remarks>
+    /// Screen: 3.3.8 View Recent Screenings List
+    /// </remarks>
+    [HttpGet("recent-screenings")]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<RecentScreeningDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetRecentScreenings(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        var query = new GetRecentScreeningsQuery
+        {
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+        var result = await _mediator.Send(query);
+        return HandleResult(result);
+    }
+}

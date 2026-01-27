@@ -75,6 +75,47 @@ public interface IIdentityService
     Task<(bool Succeeded, string[] Errors)> VerifyRecoveryCodeAsync(Guid userId, string recoveryCode);
     Task<string[]> GenerateNewRecoveryCodesAsync(Guid userId, int count = 10);
     Task<int> GetRecoveryCodesCountAsync(Guid userId);
+    // Admin User Management
+    /// <summary>
+    /// Get paginated list of users with optional filters.
+    /// </summary>
+    Task<(List<UserAdminDto> Users, int TotalCount)> GetUsersAsync(
+        string? searchTerm = null,
+        string? roleFilter = null,
+        string? statusFilter = null,
+        int pageNumber = 1,
+        int pageSize = 10,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get user metrics for admin dashboard.
+    /// </summary>
+    Task<UserMetricsDto> GetUserMetricsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get count of users in a specific role.
+    /// </summary>
+    Task<int> GetUsersInRoleCountAsync(string role, bool activeOnly = true, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Remove user from role.
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> RemoveFromRoleAsync(Guid userId, string role);
+
+    /// <summary>
+    /// Activate a user.
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> ActivateUserAsync(Guid userId);
+
+    /// <summary>
+    /// Approve a pending user (confirms email and activates).
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> ApproveUserAsync(Guid userId);
+
+    /// <summary>
+    /// Get pending approvals count.
+    /// </summary>
+    Task<int> GetPendingApprovalsCountAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -89,4 +130,33 @@ public record UserDto(
     bool IsDeleted,
     Guid? OrganizationId,
     bool TwoFactorEnabled = false
+);
+
+/// <summary>
+/// Extended User DTO for admin operations.
+/// </summary>
+public record UserAdminDto(
+    Guid Id,
+    string Email,
+    string FullName,
+    string? PhoneNumber,
+    List<string> Roles,
+    string Status,
+    bool IsActive,
+    bool EmailConfirmed,
+    DateTime CreatedAt,
+    DateTime? LastLoginAt
+);
+
+/// <summary>
+/// User metrics DTO for dashboard.
+/// </summary>
+public record UserMetricsDto(
+    int TotalUsers,
+    decimal TotalUsersMonthlyChange,
+    int ActiveDoctors,
+    decimal ActiveDoctorsChange,
+    int PatientsScreened,
+    decimal PatientsScreenedChange,
+    int PendingApprovals
 );
