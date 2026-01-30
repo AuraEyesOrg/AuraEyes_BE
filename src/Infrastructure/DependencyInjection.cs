@@ -124,6 +124,7 @@ public static class DependencyInjection
         // Register repositories
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IOphthalmologistRepository, OphthalmologistRepository>();
+        services.AddScoped<IOrganisationRepository, OrganisationRepository>();
 
         // Register Identity Services
         services.AddScoped<IIdentityService, IdentityService>();

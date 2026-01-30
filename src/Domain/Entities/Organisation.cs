@@ -44,4 +44,22 @@ public class Organisation : BaseEntity, IAggregateRoot
         OrgType = orgType;
         UpdatedAt = DateTime.UtcNow;
     }
+
+    public void ChangeOwner(Guid newOwnerId)
+    {
+        OwnerId = newOwnerId;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Delete()
+    {
+        IsDeleted = true;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Restore()
+    {
+        IsDeleted = false;
+        UpdatedAt = DateTime.UtcNow;
+    }
 }
