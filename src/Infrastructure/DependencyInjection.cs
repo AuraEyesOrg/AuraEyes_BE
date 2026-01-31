@@ -3,6 +3,7 @@ using System.Text;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Domain.Common;
+using Domain.Repositories;
 using Infrastructure.Identity;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Repositories;
@@ -122,6 +123,7 @@ public static class DependencyInjection
 
         // Register repositories
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+        services.AddScoped<IOphthalmologistRepository, OphthalmologistRepository>();
 
         // Register Identity Services
         services.AddScoped<IIdentityService, IdentityService>();
