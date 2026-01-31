@@ -1,5 +1,6 @@
 using Domain.Common;
 using Domain.Entities;
+using Domain.Entities.Network;
 using Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -63,6 +64,14 @@ public class ApplicationDbContext : IdentityDbContext<
 
     // Identity & Auth
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+    // Professional Network
+    public DbSet<ProfessionalPost> ProfessionalPosts => Set<ProfessionalPost>();
+    public DbSet<PostReaction> PostReactions => Set<PostReaction>();
+    public DbSet<PostComment> PostComments => Set<PostComment>();
+    public DbSet<PostAttachment> PostAttachments => Set<PostAttachment>();
+    public DbSet<SavedPost> SavedPosts => Set<SavedPost>();
+    public DbSet<Follow> Follows => Set<Follow>();
 
     #endregion
 
