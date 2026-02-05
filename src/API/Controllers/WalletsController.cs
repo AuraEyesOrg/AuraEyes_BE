@@ -135,13 +135,13 @@ public class WalletsController : BaseApiController
         }
 
         var result = await _mediator.Send(new GetDepositRequestQuery(id));
-        
+
         // Verify user owns this deposit request
         if (result.IsSuccess && result.Data!.UserId != userId.Value)
         {
             return StatusCode(403, ApiResponseFactory.Forbidden("You are not authorized to view this deposit request."));
         }
-        
+
         return HandleResult(result);
     }
 
