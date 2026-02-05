@@ -4,6 +4,7 @@ using Application.Wallets.Commands.CreateDeposit;
 using Application.Wallets.Commands.VerifyPayment;
 using Application.Wallets.Common;
 using Application.Wallets.Queries.GetDepositHistory;
+using Application.Wallets.Queries.GetDepositRequest;
 using Application.Wallets.Queries.GetWallet;
 using Application.Wallets.Queries.GetWalletTransactions;
 using Domain.Enums;
@@ -112,6 +113,35 @@ public class WalletsController : BaseApiController
         };
 
         var result = await _mediator.Send(query);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Get a specific deposit request by ID.
+    /// </summary>
+    /// <param name="id">Deposit request ID.</param>
+    /// <returns>Deposit request details.</returns>
+    [HttpGet("deposits/{id:guid}")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponse<DepositRequestDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetDepositRequest(Guid id)
+    {
+        var userId = _currentUserService.UserId;
+        if (!userId.HasValue)
+        {
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated."));
+        }
+
+        var result = await _mediator.Send(new GetDepositRequestQuery(id));
+        
+        // Verify user owns this deposit request
+        if (result.IsSuccess && result.Data!.UserId != userId.Value)
+        {
+            return StatusCode(403, ApiResponseFactory.Forbidden("You are not authorized to view this deposit request."));
+        }
+        
         return HandleResult(result);
     }
 
