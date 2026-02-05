@@ -124,6 +124,8 @@ public static class DependencyInjection
         // Register repositories
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IOphthalmologistRepository, OphthalmologistRepository>();
+        services.AddScoped<IWalletRepository, WalletRepository>();
+        services.AddScoped<IDepositRequestRepository, DepositRequestRepository>();
 
         // Register Identity Services
         services.AddScoped<IIdentityService, IdentityService>();
@@ -134,6 +136,10 @@ public static class DependencyInjection
         // Register other services
         services.AddTransient<IDateTime, DateTimeService>();
         services.AddTransient<IEmailService, EmailService>();
+        
+        // Configure PayOS Settings
+        services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));
+        services.AddScoped<IPayOSService, PayOSService>();
 
         return services;
     }
