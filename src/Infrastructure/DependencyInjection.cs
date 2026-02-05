@@ -30,17 +30,18 @@ public static class DependencyInjection
                 b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<ApplicationDbContext>());
-        
+
         // Register MediatR handlers from Infrastructure assembly
-        services.AddMediatR(cfg => {
+        services.AddMediatR(cfg =>
+        {
             cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly());
         });
-        
+
         // JWT Settings
         var jwtSettings = new JwtSettings();
         configuration.Bind(JwtSettings.SectionName, jwtSettings);
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
-        
+
         // SMTP Settings
         services.Configure<SmtpSettings>(configuration.GetSection(SmtpSettings.SectionName));
 
@@ -93,7 +94,7 @@ public static class DependencyInjection
                 ValidateLifetime = jwtSettings.ValidateLifetime,
                 ClockSkew = TimeSpan.FromSeconds(jwtSettings.ClockSkewSeconds)
             };
-            
+
             // Add events for debugging/logging
             options.Events = new JwtBearerEvents
             {
@@ -117,8 +118,8 @@ public static class DependencyInjection
             .AddPolicy(Policies.SystemAdminOnly, policy => policy.RequireRole(Roles.SystemAdmin))
             .AddPolicy(Policies.AdminsOnly, policy => policy.RequireRole(Roles.Admins))
             .AddPolicy(Policies.MedicalStaff, policy => policy.RequireRole(Roles.Medical))
-            .AddPolicy(Policies.OrganizationMember, policy => 
-                policy.RequireAssertion(context => 
+            .AddPolicy(Policies.OrganizationMember, policy =>
+                policy.RequireAssertion(context =>
                     context.User.HasClaim(c => c.Type == "org_id" && !string.IsNullOrEmpty(c.Value))));
 
         // Register repositories
@@ -136,7 +137,7 @@ public static class DependencyInjection
         // Register other services
         services.AddTransient<IDateTime, DateTimeService>();
         services.AddTransient<IEmailService, EmailService>();
-        
+
         // Configure PayOS Settings
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));
         services.AddScoped<IPayOSService, PayOSService>();

@@ -144,7 +144,7 @@ public class WalletsController : BaseApiController
         };
 
         var result = await _mediator.Send(command);
-        
+
         if (result.IsSuccess)
         {
             return Ok(ApiResponseFactory.Success(result.Data!, "Deposit request created successfully. Please complete the payment."));
@@ -264,22 +264,22 @@ public class CreateDepositRequest
     /// Amount in VND (minimum 10,000, maximum 50,000,000).
     /// </summary>
     public decimal AmountVnd { get; set; }
-    
+
     /// <summary>
     /// Payment method (default: PayOS).
     /// </summary>
     public PaymentMethod? PaymentMethod { get; set; }
-    
+
     /// <summary>
     /// Description for the deposit.
     /// </summary>
     public string? Description { get; set; }
-    
+
     /// <summary>
     /// Return URL after successful payment.
     /// </summary>
     public string? ReturnUrl { get; set; }
-    
+
     /// <summary>
     /// Cancel URL when payment is cancelled.
     /// </summary>

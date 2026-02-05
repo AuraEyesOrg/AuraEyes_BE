@@ -13,22 +13,22 @@ public interface IWalletRepository : IRepository<Wallet>
     /// Get wallet by UserId.
     /// </summary>
     Task<Wallet?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// Get wallet with transactions included.
     /// </summary>
     Task<Wallet?> GetByIdWithTransactionsAsync(Guid id, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// Get wallet with transactions by UserId.
     /// </summary>
     Task<Wallet?> GetByUserIdWithTransactionsAsync(Guid userId, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// Check if wallet exists for a specific user.
     /// </summary>
     Task<bool> ExistsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// Get paginated transactions for a wallet.
     /// </summary>

@@ -9,7 +9,7 @@ namespace Application.Wallets.Commands.VerifyPayment;
 public record VerifyPaymentCommand : ICommand<VerifyPaymentResponse>
 {
     public string OrderCode { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// Optional: User ID for validation (null for webhook/public status check).
     /// </summary>

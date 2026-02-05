@@ -10,48 +10,48 @@ public class DepositRequest : BaseEntity, IAggregateRoot
 {
     public Guid UserId { get; private set; }
     public Guid WalletId { get; private set; }
-    
+
     /// <summary>
     /// Amount in VND
     /// </summary>
     public decimal Amount { get; private set; }
-    
+
     public PaymentMethod PaymentMethod { get; private set; }
     public PaymentStatus Status { get; private set; }
-    
+
     /// <summary>
     /// PayOS order code or other provider transaction ID
     /// </summary>
     public string? PaymentOrderCode { get; private set; }
-    
+
     /// <summary>
     /// PayOS checkout URL
     /// </summary>
     public string? PaymentUrl { get; private set; }
-    
+
     /// <summary>
     /// Provider transaction reference
     /// </summary>
     public string? ProviderTxnRef { get; private set; }
-    
+
     /// <summary>
     /// Provider response data (JSON)
     /// </summary>
     public string? ProviderResponse { get; private set; }
-    
+
     public DateTime? CompletedAt { get; private set; }
     public string? FailureReason { get; private set; }
-    
+
     /// <summary>
     /// Return URL after payment
     /// </summary>
     public string? ReturnUrl { get; private set; }
-    
+
     /// <summary>
     /// Cancel URL if payment is cancelled
     /// </summary>
     public string? CancelUrl { get; private set; }
-    
+
     /// <summary>
     /// Description for payment
     /// </summary>

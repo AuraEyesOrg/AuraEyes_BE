@@ -63,7 +63,7 @@ public class VerifyPaymentCommandHandler : ICommandHandler<VerifyPaymentCommand,
             if (depositRequest.Status == PaymentStatus.Completed)
             {
                 var wallet = await _walletRepository.GetByIdAsync(depositRequest.WalletId, cancellationToken);
-                
+
                 return Result<VerifyPaymentResponse>.Success(new VerifyPaymentResponse
                 {
                     DepositRequestId = depositRequest.Id,
@@ -102,24 +102,24 @@ public class VerifyPaymentCommandHandler : ICommandHandler<VerifyPaymentCommand,
             {
                 // Credit wallet
                 var wallet = await _walletRepository.GetByIdAsync(depositRequest.WalletId, cancellationToken);
-                
+
                 if (wallet is null)
                 {
-                    _logger.LogError("Wallet {WalletId} not found for deposit {DepositRequestId}", 
+                    _logger.LogError("Wallet {WalletId} not found for deposit {DepositRequestId}",
                         depositRequest.WalletId, depositRequest.Id);
                     return Result<VerifyPaymentResponse>.Failure("Wallet not found.");
                 }
 
                 // Update wallet balance
                 wallet.Deposit(depositRequest.Amount, $"Deposit via PayOS - Order: {request.OrderCode}");
-                
+
                 // Add transaction record
                 var transaction = new WalletTransaction(
                     wallet.Id,
                     depositRequest.Amount,
                     TransactionType.Deposit,
                     $"Deposit via PayOS - Order: {request.OrderCode}");
-                
+
                 wallet.AddTransaction(transaction);
 
                 // Update deposit request status

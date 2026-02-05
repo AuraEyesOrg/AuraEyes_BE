@@ -42,19 +42,19 @@ public class CreateDepositCommandHandler : ICommandHandler<CreateDepositCommand,
         {
             // Get or create wallet
             var wallet = await _walletRepository.GetByUserIdAsync(request.UserId, cancellationToken);
-            
+
             if (wallet is null)
             {
                 wallet = new Wallet(request.UserId, 0);
                 await _walletRepository.AddAsync(wallet, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
-                
+
                 _logger.LogInformation("Created new wallet {WalletId} for user {UserId}", wallet.Id, request.UserId);
             }
 
             // Create deposit request
             var description = request.Description ?? $"Nap tien AuraEyes {request.AmountVnd:N0} VND";
-            
+
             var depositRequest = new DepositRequest(
                 request.UserId,
                 wallet.Id,

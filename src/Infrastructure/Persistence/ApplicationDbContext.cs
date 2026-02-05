@@ -13,8 +13,8 @@ namespace Infrastructure.Persistence;
 /// Inherits from IdentityDbContext for Identity support
 /// </summary>
 public class ApplicationDbContext : IdentityDbContext<
-    ApplicationUser, 
-    ApplicationRole, 
+    ApplicationUser,
+    ApplicationRole,
     Guid,
     ApplicationUserClaim,
     ApplicationUserRole,

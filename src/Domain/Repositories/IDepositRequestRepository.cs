@@ -13,7 +13,7 @@ public interface IDepositRequestRepository : IRepository<DepositRequest>
     /// Get deposit request by PayOS order code.
     /// </summary>
     Task<DepositRequest?> GetByOrderCodeAsync(string orderCode, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// Get deposit requests by UserId with pagination.
     /// </summary>
@@ -22,14 +22,14 @@ public interface IDepositRequestRepository : IRepository<DepositRequest>
         int pageNumber = 1,
         int pageSize = 20,
         CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// Get deposit requests by status.
     /// </summary>
     Task<IReadOnlyList<DepositRequest>> GetByStatusAsync(
         PaymentStatus status,
         CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// Get pending deposit requests older than specified time (for cleanup).
     /// </summary>
