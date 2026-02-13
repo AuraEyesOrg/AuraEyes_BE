@@ -2,6 +2,8 @@ using Application.Common.Constants;
 using Application.Common.Models;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisationMetrics;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisations;
+using Domain.Common;
+using Domain.Entities;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,10 +20,12 @@ namespace API.Controllers.SystemAdmin;
 public class OrganisationsController : BaseApiController
 {
     private readonly IMediator _mediator;
+    private readonly IRepository<Organisation> _organisationRepository;
 
-    public OrganisationsController(IMediator mediator)
+    public OrganisationsController(IMediator mediator, IRepository<Organisation> organisationRepository)
     {
         _mediator = mediator;
+        _organisationRepository = organisationRepository;
     }
 
     /// <summary>
@@ -73,28 +77,29 @@ public class OrganisationsController : BaseApiController
     /// Get organisation by ID
     /// </summary>
     /// <param name="id">Organisation ID</param>
-    /// <remarks>
-    /// Screen: 3.4.9 View Organisation Details
-    /// Note: Full implementation will query Organisation repository
-    /// </remarks>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(ApiResponse<OrganisationListDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetOrganisation(Guid id)
     {
-        // Mock single organisation - will be implemented with actual repository
-        var mockOrg = new OrganisationListDto
+        var org = await _organisationRepository.GetByIdAsync(id);
+        if (org == null)
         {
-            Id = id,
-            Name = "Sample Organisation",
-            Address = "123 Sample Street",
-            LicenseNumber = "LIC-001",
-            OrgType = "Hospital",
-            DeviceCount = 15,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow.AddYears(-1)
+            return NotFound(ApiResponseFactory.NotFound("Organisation not found"));
+        }
+
+        var dto = new OrganisationListDto
+        {
+            Id = org.Id,
+            Name = org.Name,
+            Address = org.Address,
+            LicenseNumber = org.LicenseNumber,
+            OrgType = org.OrgType.ToString(),
+            DeviceCount = 0,
+            IsActive = !org.IsDeleted,
+            CreatedAt = org.CreatedAt
         };
 
-        return Ok(ApiResponseFactory.Success(mockOrg));
+        return Ok(ApiResponseFactory.Success(dto));
     }
 }
