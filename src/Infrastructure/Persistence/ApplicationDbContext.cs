@@ -71,7 +71,6 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<PostComment> PostComments => Set<PostComment>();
     public DbSet<PostAttachment> PostAttachments => Set<PostAttachment>();
     public DbSet<SavedPost> SavedPosts => Set<SavedPost>();
-    public DbSet<Follow> Follows => Set<Follow>();
 
     #endregion
 

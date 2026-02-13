@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace Application.Common.Models.Auth;
 
@@ -51,31 +52,45 @@ public record RegisterPatientRequest
 
 /// <summary>
 /// Register ophthalmologist request DTO.
+/// Supports both JSON body and multipart form data (with file uploads).
 /// </summary>
-public record RegisterOphthalmologistRequest
+public class RegisterOphthalmologistRequest
 {
     [Required]
     [EmailAddress]
-    public string Email { get; init; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
     
     [Required]
     [MinLength(8)]
-    public string Password { get; init; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
     
     [Required]
     [Compare(nameof(Password))]
-    public string ConfirmPassword { get; init; } = string.Empty;
+    public string ConfirmPassword { get; set; } = string.Empty;
     
     [Required]
     [MaxLength(200)]
-    public string FullName { get; init; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
     
-    public string? Bio { get; init; }
+    [Phone]
+    public string? Phone { get; set; }
+    
+    public string? Bio { get; set; }
     
     [Range(0, 70)]
-    public int YearsOfExperience { get; init; }
+    public int YearsOfExperience { get; set; }
     
-    public Guid? OrganizationId { get; init; }
+    public Guid? OrganizationId { get; set; }
+    
+    /// <summary>
+    /// Medical license image. Accepts PDF, JPG, PNG.
+    /// </summary>
+    public IFormFile? LicenseImage { get; set; }
+    
+    /// <summary>
+    /// Medical degree image. Accepts PDF, JPG, PNG.
+    /// </summary>
+    public IFormFile? DegreeImage { get; set; }
 }
 
 /// <summary>

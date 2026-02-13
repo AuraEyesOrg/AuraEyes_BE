@@ -4,7 +4,9 @@ using Application.SystemAdmin.Users.Queries.GetUserMetrics;
 using Application.SystemAdmin.Users.Queries.GetUsers;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Infrastructure.Identity;
 
 namespace API.Controllers.SystemAdmin;
 
@@ -17,10 +19,12 @@ namespace API.Controllers.SystemAdmin;
 public class UsersController : BaseApiController
 {
     private readonly IMediator _mediator;
+    private readonly UserManager<ApplicationUser> _userManager;
 
-    public UsersController(IMediator mediator)
+    public UsersController(IMediator mediator, UserManager<ApplicationUser> userManager)
     {
         _mediator = mediator;
+        _userManager = userManager;
     }
 
     /// <summary>
@@ -72,38 +76,73 @@ public class UsersController : BaseApiController
     }
 
     /// <summary>
-    /// Update user role (mock endpoint)
+    /// Update user role
     /// </summary>
     /// <param name="id">User ID</param>
     /// <param name="request">Role update data</param>
-    /// <remarks>
-    /// Screen: 3.5.11 Assign or Update User Role
-    /// Note: Mock implementation - will connect to IdentityService when ready
-    /// </remarks>
     [HttpPatch("{id:guid}/role")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public IActionResult UpdateUserRole(Guid id, [FromBody] UpdateUserRoleRequest request)
+    public async Task<IActionResult> UpdateUserRole(Guid id, [FromBody] UpdateUserRoleRequest request)
     {
-        // Mock response
-        return Ok(ApiResponseFactory.Success(new { success = true }, $"Role '{request.Role}' {(request.AddRole ? "added to" : "removed from")} user successfully"));
+        var user = await _userManager.FindByIdAsync(id.ToString());
+        if (user == null || user.IsDeleted)
+        {
+            return NotFound(ApiResponseFactory.NotFound("User not found"));
+        }
+
+        if (request.AddRole)
+        {
+            var result = await _userManager.AddToRoleAsync(user, request.Role);
+            if (!result.Succeeded)
+                return BadRequest(ApiResponseFactory.Error("Failed to add role", result.Errors.Select(e => e.Description).ToList()));
+        }
+        else
+        {
+            var result = await _userManager.RemoveFromRoleAsync(user, request.Role);
+            if (!result.Succeeded)
+                return BadRequest(ApiResponseFactory.Error("Failed to remove role", result.Errors.Select(e => e.Description).ToList()));
+        }
+
+        return Ok(ApiResponseFactory.Success(new { success = true },
+            $"Role '{request.Role}' {(request.AddRole ? "added to" : "removed from")} user successfully"));
     }
 
     /// <summary>
-    /// Update user status (mock endpoint)
+    /// Update user status (activate, suspend, etc.)
     /// </summary>
     /// <param name="id">User ID</param>
     /// <param name="request">Status update data</param>
-    /// <remarks>
-    /// Screen: 3.5.12 Change User Status (Activate, Suspend, Approve)
-    /// Note: Mock implementation - will connect to IdentityService when ready
-    /// </remarks>
     [HttpPatch("{id:guid}/status")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public IActionResult UpdateUserStatus(Guid id, [FromBody] UpdateUserStatusRequest request)
+    public async Task<IActionResult> UpdateUserStatus(Guid id, [FromBody] UpdateUserStatusRequest request)
     {
-        // Mock response
+        var user = await _userManager.FindByIdAsync(id.ToString());
+        if (user == null || user.IsDeleted)
+        {
+            return NotFound(ApiResponseFactory.NotFound("User not found"));
+        }
+
+        switch (request.Action.ToLower())
+        {
+            case "activate":
+                user.IsActive = true;
+                break;
+            case "suspend":
+                user.IsActive = false;
+                break;
+            case "delete":
+                user.IsDeleted = true;
+                user.DeletedAt = DateTime.UtcNow;
+                break;
+            default:
+                return BadRequest(ApiResponseFactory.Error($"Unknown action: {request.Action}"));
+        }
+
+        user.UpdatedAt = DateTime.UtcNow;
+        await _userManager.UpdateAsync(user);
+
         return Ok(ApiResponseFactory.Success(new { success = true }, $"User {request.Action} successfully"));
     }
 }
