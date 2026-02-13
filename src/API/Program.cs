@@ -151,6 +151,9 @@ app.UseMiddleware<RequestLoggingMiddleware>();
 
 app.UseHttpsRedirection();
 
+// Serve static files from wwwroot (uploaded credentials, etc.)
+app.UseStaticFiles();
+
 app.UseCors("AllowAll");
 
 // Add authentication before authorization
