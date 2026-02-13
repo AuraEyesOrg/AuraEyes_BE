@@ -45,13 +45,15 @@ public class AuthController : BaseApiController
 
     /// <summary>
     /// Register a new ophthalmologist account.
+    /// Accepts multipart form data with optional credential file uploads.
     /// </summary>
     [HttpPost("register/ophthalmologist")]
     [AllowAnonymous]
+    [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(ApiResponse<RegisterResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> RegisterOphthalmologist(
-        [FromBody] RegisterOphthalmologistRequest request,
+        [FromForm] RegisterOphthalmologistRequest request,
         CancellationToken cancellationToken)
     {
         var confirmationUrlBase = Url.Action(nameof(ConfirmEmail), "Auth", null, Request.Scheme);

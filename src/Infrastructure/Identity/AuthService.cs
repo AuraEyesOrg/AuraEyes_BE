@@ -23,6 +23,7 @@ public class AuthService : IAuthService
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenService _refreshTokenService;
     private readonly IEmailService _emailService;
+    private readonly IFileStorageService _fileStorageService;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
     private readonly IUnitOfWork _unitOfWork;
@@ -34,6 +35,7 @@ public class AuthService : IAuthService
         ITokenService tokenService,
         IRefreshTokenService refreshTokenService,
         IEmailService emailService,
+        IFileStorageService fileStorageService,
         IRepository<Patient> patientRepository,
         IRepository<Ophthalmologist> ophthalmologistRepository,
         IUnitOfWork unitOfWork,
@@ -44,6 +46,7 @@ public class AuthService : IAuthService
         _tokenService = tokenService;
         _refreshTokenService = refreshTokenService;
         _emailService = emailService;
+        _fileStorageService = fileStorageService;
         _patientRepository = patientRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _unitOfWork = unitOfWork;
@@ -144,8 +147,28 @@ public class AuthService : IAuthService
 
             await _identityService.AddToRoleAsync(user.Id, Roles.Ophthalmologist);
 
-            // Create Ophthalmologist profile using Repository pattern
-            var ophthalmologist = new Ophthalmologist(user.Id, request.Bio, request.YearsOfExperience);
+            // Upload credential files to Supabase S3 if provided
+            string? licenseUrl = null;
+            string? degreeUrl = null;
+
+            if (request.LicenseImage is { Length: > 0 })
+            {
+                await using var stream = request.LicenseImage.OpenReadStream();
+                licenseUrl = await _fileStorageService.SaveFileAsync(
+                    stream, request.LicenseImage.FileName, $"credentials/{user.Id}", cancellationToken);
+            }
+
+            if (request.DegreeImage is { Length: > 0 })
+            {
+                await using var stream = request.DegreeImage.OpenReadStream();
+                degreeUrl = await _fileStorageService.SaveFileAsync(
+                    stream, request.DegreeImage.FileName, $"credentials/{user.Id}", cancellationToken);
+            }
+
+            // Create Ophthalmologist profile with uploaded file URLs
+            var ophthalmologist = new Ophthalmologist(
+                user.Id, request.Bio, request.YearsOfExperience,
+                request.Phone, licenseUrl, degreeUrl);
             await _ophthalmologistRepository.AddAsync(ophthalmologist, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
