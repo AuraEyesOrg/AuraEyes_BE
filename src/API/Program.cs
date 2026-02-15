@@ -121,26 +121,29 @@ builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
-// Seed database (roles and initial data)
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    try
-    {
-        var context = services.GetRequiredService<Infrastructure.Persistence.ApplicationDbContext>();
-        var userManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Infrastructure.Identity.ApplicationUser>>();
-        var roleManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Infrastructure.Identity.ApplicationRole>>();
-        var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
-        var seederLogger = loggerFactory.CreateLogger("DatabaseSeeder");
-        
-        await Infrastructure.Services.DatabaseSeeder.SeedAsync(context, userManager, roleManager, seederLogger);
-        Log.Information("Database seeding completed successfully");
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "An error occurred while seeding the database");
-    }
-}
+// NOTE: Auto-seeding disabled to prevent startup failures when DB is unreachable
+// Use the manual seed endpoint: POST /api/system-admin/seed-database instead
+// 
+// Original auto-seed code (now disabled):
+// using (var scope = app.Services.CreateScope())
+// {
+//     var services = scope.ServiceProvider;
+//     try
+//     {
+//         var context = services.GetRequiredService<Infrastructure.Persistence.ApplicationDbContext>();
+//         var userManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Infrastructure.Identity.ApplicationUser>>();
+//         var roleManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Infrastructure.Identity.ApplicationRole>>();
+//         var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
+//         var seederLogger = loggerFactory.CreateLogger("DatabaseSeeder");
+//         
+//         await Infrastructure.Services.DatabaseSeeder.SeedAsync(context, userManager, roleManager, seederLogger);
+//         Log.Information("Database seeding completed successfully");
+//     }
+//     catch (Exception ex)
+//     {
+//         Log.Error(ex, "An error occurred while seeding the database");
+//     }
+// }
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
