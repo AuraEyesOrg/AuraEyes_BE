@@ -1,4 +1,6 @@
 using Application.Common.Constants;
+using Domain.Entities;
+using Domain.Enums;
 using Infrastructure.Identity;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -46,11 +48,14 @@ public static class DatabaseSeeder
         {
             logger?.LogInformation("No roles found in database. Starting initial seed...");
             
-            // Seed roles first
+            // Step 1: Seed roles first
             await SeedRolesAsync(roleManager, logger);
 
-            // Then seed default accounts
+            // Step 2: Seed default accounts (AspNetUsers + AspNetUserRoles)
             await SeedDefaultAccountsAsync(userManager, logger);
+
+            // Step 3: Seed domain entities (Organisation, Ophthalmologist, Patient)
+            await SeedDomainEntitiesAsync(context, userManager, logger);
         }
         else
         {
@@ -141,5 +146,116 @@ public static class DatabaseSeeder
         }
 
         logger?.LogInformation("Default account seeding completed. Total accounts created: {Count}", DefaultAccounts.Length);
+    }
+
+    private static async Task SeedDomainEntitiesAsync(
+        ApplicationDbContext context,
+        UserManager<ApplicationUser> userManager,
+        ILogger? logger)
+    {
+        logger?.LogInformation("Seeding domain entities (Organisation, Ophthalmologist, Patient)...");
+
+        // Step 1: Seed Organisation
+        var orgAdminUser = await userManager.FindByEmailAsync("orgadmin@gmail.com");
+        if (orgAdminUser == null)
+        {
+            logger?.LogWarning("OrgAdmin user not found. Skipping organisation seeding.");
+        }
+        else
+        {
+            var existingOrg = await context.Organisations
+                .FirstOrDefaultAsync(o => o.OwnerId == orgAdminUser.Id);
+
+            if (existingOrg == null)
+            {
+                var organisation = new Organisation(
+                    ownerId: orgAdminUser.Id,
+                    name: "Auski Hospital",
+                    orgType: OrgType.Hospital,
+                    address: "S1006 Vinhomes Grand Park, Ho Chi Minh City, Viet Nam",
+                    licenseNumber: "MED-HCM-2024-001"
+                );
+
+                await context.Organisations.AddAsync(organisation);
+                await context.SaveChangesAsync();
+
+                logger?.LogInformation("✓ Created organisation: {OrgName} → Organisations table", organisation.Name);
+
+                // Update OrgAdmin's OrganizationId
+                orgAdminUser.OrganizationId = organisation.Id;
+                await userManager.UpdateAsync(orgAdminUser);
+                logger?.LogInformation("✓ Linked OrgAdmin to organisation");
+            }
+            else
+            {
+                logger?.LogInformation("Organisation already exists. Skipping.");
+            }
+        }
+
+        // Step 2: Seed Ophthalmologist entity
+        var ophthalmologistUser = await userManager.FindByEmailAsync("ophthalmologist@gmail.com");
+        if (ophthalmologistUser == null)
+        {
+            logger?.LogWarning("Ophthalmologist user not found. Skipping ophthalmologist entity seeding.");
+        }
+        else
+        {
+            var existingOphth = await context.Ophthalmologists
+                .FirstOrDefaultAsync(o => o.UserId == ophthalmologistUser.Id);
+
+            if (existingOphth == null)
+            {
+                var ophthalmologist = new Ophthalmologist(
+                    userId: ophthalmologistUser.Id,
+                    bio: "Experienced ophthalmologist specializing in retinal diseases and diabetic retinopathy screening.",
+                    yearsOfExperience: 5,
+                    phone: "+84123456789",
+                    licenseUrl: null, // Will be uploaded later
+                    degreeUrl: null   // Will be uploaded later
+                );
+
+                await context.Ophthalmologists.AddAsync(ophthalmologist);
+                await context.SaveChangesAsync();
+
+                logger?.LogInformation("✓ Created ophthalmologist profile for {Email} → Ophthalmologists table", 
+                    ophthalmologistUser.Email);
+            }
+            else
+            {
+                logger?.LogInformation("Ophthalmologist profile already exists. Skipping.");
+            }
+        }
+
+        // Step 3: Seed Patient entity
+        var patientUser = await userManager.FindByEmailAsync("patient@gmail.com");
+        if (patientUser == null)
+        {
+            logger?.LogWarning("Patient user not found. Skipping patient entity seeding.");
+        }
+        else
+        {
+            var existingPatient = await context.Patients
+                .FirstOrDefaultAsync(p => p.UserId == patientUser.Id);
+
+            if (existingPatient == null)
+            {
+                var patient = new Patient(
+                    userId: patientUser.Id,
+                    medicalHistorySummary: "No significant medical history. First-time screening for diabetic retinopathy."
+                );
+
+                await context.Patients.AddAsync(patient);
+                await context.SaveChangesAsync();
+
+                logger?.LogInformation("✓ Created patient profile for {Email} → Patients table", 
+                    patientUser.Email);
+            }
+            else
+            {
+                logger?.LogInformation("Patient profile already exists. Skipping.");
+            }
+        }
+
+        logger?.LogInformation("Domain entity seeding completed.");
     }
 }

@@ -121,7 +121,8 @@ builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
-// Seed database (roles and initial data)
+// Seed domain entities (Organisation, Ophthalmologist, Patient)
+// Note: This will skip if roles already exist (idempotent)
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;

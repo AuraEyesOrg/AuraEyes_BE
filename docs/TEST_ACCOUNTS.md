@@ -6,14 +6,15 @@
 
 ### 1. System Administrator (Quản trị viên hệ thống)
 
-| Thông tin | Giá trị |
-|-----------|---------|
-| **Email** | `systemadmin@gmail.com` |
-| **Mật khẩu** | `SystemAdmin@123$` |
-| **Vai trò** | `SystemAdmin` |
-| **Trạng thái** | Email đã xác nhận ✅ |
+| Thông tin      | Giá trị                 |
+| -------------- | ----------------------- |
+| **Email**      | `systemadmin@gmail.com` |
+| **Mật khẩu**   | `SystemAdmin@123$`      |
+| **Vai trò**    | `SystemAdmin`           |
+| **Trạng thái** | Email đã xác nhận ✅    |
 
 **Quyền hạn:**
+
 - Toàn quyền truy cập hệ thống
 - Quản lý tất cả người dùng và tổ chức
 - Cấu hình hệ thống
@@ -23,14 +24,15 @@
 
 ### 2. Organization Administrator (Quản trị viên tổ chức)
 
-| Thông tin | Giá trị |
-|-----------|---------|
-| **Email** | `orgadmin@gmail.com` |
-| **Mật khẩu** | `OrgAdmin@123$` |
-| **Vai trò** | `OrgAdmin` |
+| Thông tin      | Giá trị              |
+| -------------- | -------------------- |
+| **Email**      | `orgadmin@gmail.com` |
+| **Mật khẩu**   | `OrgAdmin@123$`      |
+| **Vai trò**    | `OrgAdmin`           |
 | **Trạng thái** | Email đã xác nhận ✅ |
 
 **Quyền hạn:**
+
 - Quản lý người dùng trong tổ chức
 - Quản lý cài đặt tổ chức
 - Xem báo cáo của tổ chức
@@ -40,14 +42,15 @@
 
 ### 3. Ophthalmologist (Bác sĩ nhãn khoa)
 
-| Thông tin | Giá trị |
-|-----------|---------|
-| **Email** | `ophthalmologist@gmail.com` |
-| **Mật khẩu** | `Ophthalmologist@123$` |
-| **Vai trò** | `Ophthalmologist` |
-| **Trạng thái** | Email đã xác nhận ✅ |
+| Thông tin      | Giá trị                     |
+| -------------- | --------------------------- |
+| **Email**      | `ophthalmologist@gmail.com` |
+| **Mật khẩu**   | `Ophthalmologist@123$`      |
+| **Vai trò**    | `Ophthalmologist`           |
+| **Trạng thái** | Email đã xác nhận ✅        |
 
 **Quyền hạn:**
+
 - Xem lịch khám và danh sách bệnh nhân
 - Đánh giá kết quả sàng lọc võng mạc
 - Đưa ra chẩn đoán và khuyến nghị
@@ -57,14 +60,15 @@
 
 ### 4. Patient (Bệnh nhân)
 
-| Thông tin | Giá trị |
-|-----------|---------|
-| **Email** | `patient@gmail.com` |
-| **Mật khẩu** | `Patient@123$` |
-| **Vai trò** | `Patient` |
+| Thông tin      | Giá trị              |
+| -------------- | -------------------- |
+| **Email**      | `patient@gmail.com`  |
+| **Mật khẩu**   | `Patient@123$`       |
+| **Vai trò**    | `Patient`            |
 | **Trạng thái** | Email đã xác nhận ✅ |
 
 **Quyền hạn:**
+
 - Đặt lịch khám sàng lọc võng mạc
 - Xem kết quả khám của bản thân
 - Quản lý thông tin cá nhân
@@ -123,6 +127,7 @@ Các tài khoản này được tạo tự động khi ứng dụng khởi độ
 **File:** `src/Infrastructure/Services/DatabaseSeeder.cs`
 
 **Logic:**
+
 - Kiểm tra role đã tồn tại chưa → Tạo nếu chưa có
 - Kiểm tra user đã tồn tại chưa → Tạo nếu chưa có
 - Gán role cho user sau khi tạo
@@ -130,4 +135,4 @@ Các tài khoản này được tạo tự động khi ứng dụng khởi độ
 
 ---
 
-*Cập nhật lần cuối: Tháng 1, 2026*
+_Cập nhật lần cuối: Tháng 1, 2026_
