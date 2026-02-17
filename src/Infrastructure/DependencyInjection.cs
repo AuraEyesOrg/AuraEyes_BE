@@ -44,6 +44,9 @@ public static class DependencyInjection
         // SMTP Settings
         services.Configure<SmtpSettings>(configuration.GetSection(SmtpSettings.SectionName));
 
+        // Supabase Storage Settings
+        services.Configure<SupabaseStorageSettings>(configuration.GetSection(SupabaseStorageSettings.SectionName));
+
         // ASP.NET Core Identity configuration
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
         {
@@ -129,10 +132,12 @@ public static class DependencyInjection
         services.AddScoped<IIdentityService, IdentityService>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+        services.AddScoped<IAuthService, AuthService>();
 
         // Register other services
         services.AddTransient<IDateTime, DateTimeService>();
         services.AddTransient<IEmailService, EmailService>();
+        services.AddScoped<IFileStorageService, SupabaseStorageService>();
 
         return services;
     }

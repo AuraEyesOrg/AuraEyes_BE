@@ -1,32 +1,49 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Domain.Common;
+using Domain.Entities;
+using Domain.Enums;
 
 namespace Application.SystemAdmin.Organisations.Queries.GetOrganisationMetrics;
 
 /// <summary>
-/// Handler for GetOrganisationMetricsQuery - Returns mock data
+/// Handler for GetOrganisationMetricsQuery - queries real Organisation data.
 /// </summary>
 public class GetOrganisationMetricsQueryHandler : IQueryHandler<GetOrganisationMetricsQuery, OrganisationMetricsDto>
 {
-    public Task<Result<OrganisationMetricsDto>> Handle(GetOrganisationMetricsQuery request, CancellationToken cancellationToken)
+    private readonly IRepository<Organisation> _organisationRepository;
+
+    public GetOrganisationMetricsQueryHandler(IRepository<Organisation> organisationRepository)
     {
-        // Mock organisation metrics
+        _organisationRepository = organisationRepository;
+    }
+
+    public async Task<Result<OrganisationMetricsDto>> Handle(
+        GetOrganisationMetricsQuery request,
+        CancellationToken cancellationToken)
+    {
+        var allOrgs = await _organisationRepository.GetAllAsync(cancellationToken);
+        var orgList = allOrgs.ToList();
+
+        var active = orgList.Count(o => !o.IsDeleted);
+        var inactive = orgList.Count(o => o.IsDeleted);
+
         var dto = new OrganisationMetricsDto
         {
-            TotalOrganisations = 45,
-            ActiveOrganisations = 42,
-            InactiveOrganisations = 3,
-            MonthlyChangePercentage = 5.2m,
-            TotalDevices = 120,
-            OnlineDevices = 105,
-            CalibrationRequiredDevices = 8,
-            CalibrationActionNeeded = true,
-            HospitalCount = 12,
-            ClinicCount = 20,
-            PrivatePracticeCount = 8,
-            OtherCount = 5
+            TotalOrganisations = orgList.Count,
+            ActiveOrganisations = active,
+            InactiveOrganisations = inactive,
+            MonthlyChangePercentage = 0,
+            TotalDevices = 0,
+            OnlineDevices = 0,
+            CalibrationRequiredDevices = 0,
+            CalibrationActionNeeded = false,
+            HospitalCount = orgList.Count(o => o.OrgType == OrgType.Hospital),
+            ClinicCount = orgList.Count(o => o.OrgType == OrgType.Clinic),
+            PrivatePracticeCount = 0,
+            OtherCount = 0
         };
 
-        return Task.FromResult(Result<OrganisationMetricsDto>.Success(dto));
+        return Result<OrganisationMetricsDto>.Success(dto);
     }
 }
