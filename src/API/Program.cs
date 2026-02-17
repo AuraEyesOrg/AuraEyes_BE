@@ -94,6 +94,15 @@ builder.Services.AddSwaggerGen(options =>
     
     // Add custom operation filter for better documentation
     options.EnableAnnotations();
+    
+    // Fix Schema ID collision by using full type name (namespace + class name)
+    // This prevents conflicts when same class names exist in different namespaces
+    options.CustomSchemaIds(type => 
+    {
+        var fullName = type.FullName ?? type.Name;
+        // Replace nested class '+' with '.'
+        return fullName.Replace("+", ".").Replace("[", "Of").Replace("]", "").Replace(",", "").Replace(" ", "");
+    });
 });
 
 // Add CORS
@@ -112,7 +121,8 @@ builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
-// Seed database (roles and initial data)
+// Seed domain entities (Organisation, Ophthalmologist, Patient)
+// Note: This will skip if roles already exist (idempotent)
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -150,6 +160,9 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
 
 app.UseHttpsRedirection();
+
+// Note: Static files are stored in S3, not wwwroot
+// app.UseStaticFiles(); // Removed - using S3 for file storage
 
 app.UseCors("AllowAll");
 

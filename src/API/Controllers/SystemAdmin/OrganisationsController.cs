@@ -4,7 +4,9 @@ using Application.Organisations.Common;
 using Application.Organisations.Queries.GetOrganisation;
 using Application.Organisations.Queries.GetOrganisations;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisationMetrics;
-using Domain.Enums;
+using Application.SystemAdmin.Organisations.Queries.GetOrganisations;
+using Domain.Common;
+using Domain.Entities;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,10 +22,12 @@ namespace API.Controllers.SystemAdmin;
 public class OrganisationsController : BaseApiController
 {
     private readonly IMediator _mediator;
+    private readonly IRepository<Organisation> _organisationRepository;
 
-    public OrganisationsController(IMediator mediator)
+    public OrganisationsController(IMediator mediator, IRepository<Organisation> organisationRepository)
     {
         _mediator = mediator;
+        _organisationRepository = organisationRepository;
     }
 
     /// <summary>
@@ -77,16 +81,30 @@ public class OrganisationsController : BaseApiController
     /// <summary>
     /// Get organisation by ID.
     /// </summary>
-    /// <param name="id">Organisation ID.</param>
-    /// <remarks>
-    /// Screen: 3.4.9 View Organisation Details
-    /// </remarks>
+    /// <param name="id">Organisation ID</param>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(ApiResponse<OrganisationDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetOrganisation(Guid id)
     {
-        var result = await _mediator.Send(new GetOrganisationQuery(id));
-        return HandleResult(result);
+        var org = await _organisationRepository.GetByIdAsync(id);
+        if (org == null)
+        {
+            return NotFound(ApiResponseFactory.NotFound("Organisation not found"));
+        }
+
+        var dto = new OrganisationListDto
+        {
+            Id = org.Id,
+            Name = org.Name,
+            Address = org.Address,
+            LicenseNumber = org.LicenseNumber,
+            OrgType = org.OrgType.ToString(),
+            DeviceCount = 0,
+            IsActive = !org.IsDeleted,
+            CreatedAt = org.CreatedAt
+        };
+
+        return Ok(ApiResponseFactory.Success(dto));
     }
 }

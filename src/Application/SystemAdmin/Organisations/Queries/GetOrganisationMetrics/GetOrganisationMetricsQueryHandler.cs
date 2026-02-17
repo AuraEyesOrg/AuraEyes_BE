@@ -1,44 +1,47 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Domain.Common;
+using Domain.Entities;
 using Domain.Enums;
-using Domain.Repositories;
 
 namespace Application.SystemAdmin.Organisations.Queries.GetOrganisationMetrics;
 
 /// <summary>
-/// Handler for GetOrganisationMetricsQuery.
+/// Handler for GetOrganisationMetricsQuery - queries real Organisation data.
 /// </summary>
 public class GetOrganisationMetricsQueryHandler : IQueryHandler<GetOrganisationMetricsQuery, OrganisationMetricsDto>
 {
-    private readonly IOrganisationRepository _organisationRepository;
+    private readonly IRepository<Organisation> _organisationRepository;
 
-    public GetOrganisationMetricsQueryHandler(IOrganisationRepository organisationRepository)
+    public GetOrganisationMetricsQueryHandler(IRepository<Organisation> organisationRepository)
     {
         _organisationRepository = organisationRepository;
     }
 
-    public async Task<Result<OrganisationMetricsDto>> Handle(GetOrganisationMetricsQuery request, CancellationToken cancellationToken)
+    public async Task<Result<OrganisationMetricsDto>> Handle(
+        GetOrganisationMetricsQuery request,
+        CancellationToken cancellationToken)
     {
-        // Get organisation counts by type
-        var countByType = await _organisationRepository.GetCountByOrgTypeAsync(cancellationToken);
-        var activeCount = await _organisationRepository.GetActiveCountAsync(cancellationToken);
-        var totalCount = countByType.Values.Sum();
+        var allOrgs = await _organisationRepository.GetAllAsync(cancellationToken);
+        var orgList = allOrgs.ToList();
+
+        var active = orgList.Count(o => !o.IsDeleted);
+        var inactive = orgList.Count(o => o.IsDeleted);
 
         var dto = new OrganisationMetricsDto
         {
-            TotalOrganisations = totalCount,
-            ActiveOrganisations = activeCount,
-            InactiveOrganisations = totalCount - activeCount,
-            MonthlyChangePercentage = 0m, // TODO: Calculate from historical data when available
-            TotalDevices = 0, // TODO: Get from Device repository when available
+            TotalOrganisations = orgList.Count,
+            ActiveOrganisations = active,
+            InactiveOrganisations = inactive,
+            MonthlyChangePercentage = 0,
+            TotalDevices = 0,
             OnlineDevices = 0,
             CalibrationRequiredDevices = 0,
             CalibrationActionNeeded = false,
-            HospitalCount = countByType.GetValueOrDefault(OrgType.Hospital),
-            ClinicCount = countByType.GetValueOrDefault(OrgType.Clinic),
-            PrivatePracticeCount = countByType.GetValueOrDefault(OrgType.PrivatePractice),
-            OtherCount = countByType.GetValueOrDefault(OrgType.ResearchCenter) + 
-                         countByType.GetValueOrDefault(OrgType.DiagnosticCenter)
+            HospitalCount = orgList.Count(o => o.OrgType == OrgType.Hospital),
+            ClinicCount = orgList.Count(o => o.OrgType == OrgType.Clinic),
+            PrivatePracticeCount = 0,
+            OtherCount = 0
         };
 
         return Result<OrganisationMetricsDto>.Success(dto);
