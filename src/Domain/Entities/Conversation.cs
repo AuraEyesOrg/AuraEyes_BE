@@ -3,12 +3,13 @@ using Domain.Common;
 namespace Domain.Entities;
 
 /// <summary>
-/// Conversation entity - chat conversation between doctor and patient
+/// Conversation entity - chat conversation between doctor and patient.
+/// Now linked to ConsultationSession instead of ConsultationRequest.
 /// </summary>
 public class Conversation : BaseEntity, IAggregateRoot
 {
     public Guid OphthalmologistId { get; private set; }
-    public Guid ConsultationRequestId { get; private set; }
+    public Guid ConsultationSessionId { get; private set; }
 
     // Navigation properties
     private readonly List<ChatMessage> _messages = new();
@@ -16,10 +17,10 @@ public class Conversation : BaseEntity, IAggregateRoot
 
     private Conversation() { } // EF Core
 
-    public Conversation(Guid ophthalmologistId, Guid consultationRequestId)
+    public Conversation(Guid ophthalmologistId, Guid consultationSessionId)
     {
         OphthalmologistId = ophthalmologistId;
-        ConsultationRequestId = consultationRequestId;
+        ConsultationSessionId = consultationSessionId;
     }
 
     public void AddMessage(ChatMessage message)

@@ -9,6 +9,7 @@ public class MedicalDiagnosis : BaseEntity, IAggregateRoot
 {
     public Guid AiScreeningId { get; private set; }
     public Guid DoctorId { get; private set; }
+    public Guid? ConsultationSessionId { get; private set; }
     public string? DiagnosesCode { get; private set; }
     public string? DiagnosesText { get; private set; }
     public string? TreatmentPlan { get; private set; }

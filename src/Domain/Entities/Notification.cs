@@ -5,7 +5,7 @@ namespace Domain.Entities;
 /// <summary>
 /// Notification entity - user notifications
 /// </summary>
-public class Notification : BaseEntity
+public class Notification : BaseEntity, IAggregateRoot
 {
     public Guid UserId { get; private set; }
     public string Title { get; private set; } = string.Empty;
