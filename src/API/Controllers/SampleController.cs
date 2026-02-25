@@ -12,14 +12,44 @@ namespace API.Controllers;
 public class SampleController : BaseApiController
 {
     private readonly ICurrentUserService _currentUserService;
+    private readonly IFileStorageService _fileStorageService;
     private readonly ILogger<SampleController> _logger;
 
     public SampleController(
         ICurrentUserService currentUserService,
+        IFileStorageService fileStorageService,
         ILogger<SampleController> logger)
     {
         _currentUserService = currentUserService;
+        _fileStorageService = fileStorageService;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// S3 connectivity test — uploads a tiny text file and returns the public URL.
+    /// Call GET /api/sample/test-s3 to diagnose Supabase S3 issues.
+    /// </summary>
+    [HttpGet("test-s3")]
+    [AllowAnonymous]
+    public async Task<IActionResult> TestS3Async(CancellationToken cancellationToken)
+    {
+        try
+        {
+            const string testContent = "Supabase S3 connectivity test — AURA";
+            var bytes = System.Text.Encoding.UTF8.GetBytes(testContent);
+            await using var stream = new MemoryStream(bytes);
+
+            var url = await _fileStorageService.SaveFileAsync(
+                stream, "s3-test.txt", "diagnostics", cancellationToken);
+
+            _logger.LogInformation("S3 test upload succeeded: {Url}", url);
+            return OkResponse(new { success = true, url, timestamp = DateTime.UtcNow });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "S3 test upload failed");
+            return ErrorResponse($"S3 test FAILED: {ex.Message}");
+        }
     }
 
     /// <summary>

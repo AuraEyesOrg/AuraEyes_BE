@@ -89,15 +89,16 @@ public sealed class SupabaseStorageService : IFileStorageService, IDisposable
         catch (AmazonS3Exception ex)
         {
             Console.WriteLine("=== S3 Upload FAILED ===");
-            Console.WriteLine($"  Message    : {ex.Message}");
-            Console.WriteLine($"  StatusCode : {ex.StatusCode}");
-            Console.WriteLine($"  ErrorCode  : {ex.ErrorCode}");
-            Console.WriteLine($"  RequestId  : {ex.RequestId}");
+            Console.WriteLine($"  Message      : {ex.Message}");
+            Console.WriteLine($"  StatusCode   : {ex.StatusCode}");
+            Console.WriteLine($"  ErrorCode    : {ex.ErrorCode}");
+            Console.WriteLine($"  RequestId    : {ex.RequestId}");
+            Console.WriteLine($"  ResponseBody : {ex.ResponseBody}");
             Console.WriteLine("========================");
 
             _logger.LogError(ex,
-                "S3 upload failed: StatusCode={StatusCode}, ErrorCode={ErrorCode}, RequestId={RequestId}",
-                ex.StatusCode, ex.ErrorCode, ex.RequestId);
+                "S3 upload failed: StatusCode={StatusCode}, ErrorCode={ErrorCode}, RequestId={RequestId}, ResponseBody={ResponseBody}",
+                ex.StatusCode, ex.ErrorCode, ex.RequestId, ex.ResponseBody);
             throw;
         }
 
