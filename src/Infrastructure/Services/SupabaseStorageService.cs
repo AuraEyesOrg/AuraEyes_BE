@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Application.Common.Interfaces;
@@ -27,6 +28,7 @@ public sealed class SupabaseStorageService : IFileStorageService, IDisposable
         var config = new AmazonS3Config
         {
             ServiceURL = _settings.Endpoint,
+            AuthenticationRegion = _settings.Region,
             ForcePathStyle = true
         };
 
@@ -43,8 +45,8 @@ public sealed class SupabaseStorageService : IFileStorageService, IDisposable
         string subFolder,
         CancellationToken cancellationToken = default)
     {
-        // Generate unique key: subFolder/guid_filename
-        var safeFileName = Path.GetFileName(fileName);
+        // Sanitize file name: remove spaces and special characters to prevent S3 signature issues
+        var safeFileName = SanitizeFileName(fileName);
         var key = string.IsNullOrWhiteSpace(subFolder)
             ? $"{Guid.NewGuid():N}_{safeFileName}"
             : $"{subFolder.TrimEnd('/')}/{Guid.NewGuid():N}_{safeFileName}";
@@ -55,8 +57,13 @@ public sealed class SupabaseStorageService : IFileStorageService, IDisposable
             Key = key,
             InputStream = fileStream,
             ContentType = GetContentType(safeFileName),
-            DisablePayloadSigning = true
+            DisablePayloadSigning = true,
+            UseChunkEncoding = false
         };
+
+        // Log the endpoint and bucket being used (debug)
+        _logger.LogDebug("Uploading to S3 endpoint={Endpoint}, bucket={Bucket}, key={Key}",
+            _settings.Endpoint, _settings.BucketName, key);
 
         await _s3Client.PutObjectAsync(putRequest, cancellationToken);
         _logger.LogInformation("Uploaded file to Supabase S3: {Key}", key);
@@ -135,6 +142,21 @@ public sealed class SupabaseStorageService : IFileStorageService, IDisposable
         }
 
         return pathOrUrl;
+    }
+
+    /// <summary>
+    /// Sanitize file name by removing spaces and special characters
+    /// that can cause S3 signature mismatches with Supabase.
+    /// </summary>
+    private static string SanitizeFileName(string fileName)
+    {
+        var name = Path.GetFileNameWithoutExtension(fileName);
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+
+        // Replace any character that is not alphanumeric, underscore, hyphen, or dot
+        var safe = Regex.Replace(name, @"[^a-zA-Z0-9_\-]", "_");
+
+        return $"{safe}{ext}";
     }
 
     private static string GetContentType(string fileName)
