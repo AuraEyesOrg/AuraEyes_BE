@@ -63,7 +63,9 @@ public sealed class SupabaseStorageService : IFileStorageService, IDisposable
             BucketName = _settings.BucketName,
             Key = key,
             InputStream = fileStream,
-            ContentType = GetContentType(safeFileName)
+            ContentType = GetContentType(safeFileName),
+            DisablePayloadSigning = true,
+            UseChunkEncoding = false
         };
 
         // Detailed logging before upload
