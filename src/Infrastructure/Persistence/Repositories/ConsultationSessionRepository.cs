@@ -40,6 +40,44 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<(IReadOnlyList<ConsultationSession> Items, int TotalCount)> GetPagedAsync(
+        Guid? patientId = null,
+        Guid? ophthalmologistId = null,
+        ConsultationSessionType? type = null,
+        SessionStatus? status = null,
+        ChatStatus? chatStatus = null,
+        int pageNumber = 1,
+        int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbSet.AsQueryable();
+
+        if (patientId.HasValue)
+            query = query.Where(s => s.PatientId == patientId.Value);
+
+        if (ophthalmologistId.HasValue)
+            query = query.Where(s => s.OphthalmologistId == ophthalmologistId.Value);
+
+        if (type.HasValue)
+            query = query.Where(s => s.Type == type.Value);
+
+        if (status.HasValue)
+            query = query.Where(s => s.Status == status.Value);
+
+        if (chatStatus.HasValue)
+            query = query.Where(s => s.ChatStatus == chatStatus.Value);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderByDescending(s => s.CreatedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return (items, totalCount);
+    }
+
     public async Task<IReadOnlyList<ConsultationSession>> GetStaleSessions(
         TimeSpan inactivityThreshold,
         CancellationToken cancellationToken = default)

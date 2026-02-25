@@ -5,7 +5,6 @@ namespace Domain.Entities;
 
 /// <summary>
 /// Central aggregate for all medical interactions (Verification, VideoCall, ClinicBooking).
-/// Replaces the former ConsultationRequest with a doctor-controlled session model.
 /// </summary>
 public class ConsultationSession : BaseEntity, IAggregateRoot
 {
