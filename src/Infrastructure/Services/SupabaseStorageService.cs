@@ -29,7 +29,8 @@ public sealed class SupabaseStorageService : IFileStorageService, IDisposable
         {
             ServiceURL = _settings.Endpoint,
             AuthenticationRegion = _settings.Region,
-            ForcePathStyle = true
+            ForcePathStyle = true,
+            SignatureVersion = "4"
         };
 
         _s3Client = new AmazonS3Client(
@@ -51,22 +52,52 @@ public sealed class SupabaseStorageService : IFileStorageService, IDisposable
             ? $"{Guid.NewGuid():N}_{safeFileName}"
             : $"{subFolder.TrimEnd('/')}/{Guid.NewGuid():N}_{safeFileName}";
 
+        // Ensure stream is at the beginning
+        if (fileStream.CanSeek)
+        {
+            fileStream.Position = 0;
+        }
+
         var putRequest = new PutObjectRequest
         {
             BucketName = _settings.BucketName,
             Key = key,
             InputStream = fileStream,
-            ContentType = GetContentType(safeFileName),
-            DisablePayloadSigning = true,
-            UseChunkEncoding = false
+            ContentType = GetContentType(safeFileName)
         };
 
-        // Log the endpoint and bucket being used (debug)
+        // Detailed logging before upload
+        Console.WriteLine("=== Supabase S3 Upload Debug ===");
+        Console.WriteLine($"  Endpoint   : {_settings.Endpoint}");
+        Console.WriteLine($"  Region     : {_settings.Region}");
+        Console.WriteLine($"  BucketName : {_settings.BucketName}");
+        Console.WriteLine($"  AccessKey  : {_settings.AccessKey[..Math.Min(4, _settings.AccessKey.Length)]}****");
+        Console.WriteLine($"  Key        : {key}");
+        Console.WriteLine($"  UTC Clock  : {DateTime.UtcNow:O}");
+        Console.WriteLine("================================");
+
         _logger.LogDebug("Uploading to S3 endpoint={Endpoint}, bucket={Bucket}, key={Key}",
             _settings.Endpoint, _settings.BucketName, key);
 
-        await _s3Client.PutObjectAsync(putRequest, cancellationToken);
-        _logger.LogInformation("Uploaded file to Supabase S3: {Key}", key);
+        try
+        {
+            await _s3Client.PutObjectAsync(putRequest, cancellationToken);
+            _logger.LogInformation("Uploaded file to Supabase S3: {Key}", key);
+        }
+        catch (AmazonS3Exception ex)
+        {
+            Console.WriteLine("=== S3 Upload FAILED ===");
+            Console.WriteLine($"  Message    : {ex.Message}");
+            Console.WriteLine($"  StatusCode : {ex.StatusCode}");
+            Console.WriteLine($"  ErrorCode  : {ex.ErrorCode}");
+            Console.WriteLine($"  RequestId  : {ex.RequestId}");
+            Console.WriteLine("========================");
+
+            _logger.LogError(ex,
+                "S3 upload failed: StatusCode={StatusCode}, ErrorCode={ErrorCode}, RequestId={RequestId}",
+                ex.StatusCode, ex.ErrorCode, ex.RequestId);
+            throw;
+        }
 
         // Return public URL
         return $"https://{_settings.ProjectRef}.supabase.co/storage/v1/object/public/{_settings.BucketName}/{key}";
