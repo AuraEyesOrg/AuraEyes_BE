@@ -8,5 +8,4 @@ public record CreateVideoCallSessionCommand : ICommand<Guid>
     public decimal Price { get; init; }
     public DateTime AppointmentTime { get; init; }
     public Guid? OphthalmologistId { get; init; }
-    public string? MeetingLink { get; init; }
 }

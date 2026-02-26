@@ -118,8 +118,7 @@ public class ConsultationSessionsController : BaseApiController
             PatientId = request.PatientId,
             Price = request.Price,
             AppointmentTime = request.AppointmentTime,
-            OphthalmologistId = request.OphthalmologistId,
-            MeetingLink = request.MeetingLink
+            OphthalmologistId = request.OphthalmologistId
         };
 
         var result = await _mediator.Send(command);
@@ -224,7 +223,6 @@ public record CreateVideoCallSessionRequest
     public decimal Price { get; init; }
     public DateTime AppointmentTime { get; init; }
     public Guid? OphthalmologistId { get; init; }
-    public string? MeetingLink { get; init; }
 }
 
 public record SubmitVerificationReportRequest
