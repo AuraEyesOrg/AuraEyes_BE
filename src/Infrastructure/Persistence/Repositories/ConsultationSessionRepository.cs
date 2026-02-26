@@ -46,11 +46,18 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
         ConsultationSessionType? type = null,
         SessionStatus? status = null,
         ChatStatus? chatStatus = null,
+        Guid? participantUserId = null,
         int pageNumber = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
         var query = _dbSet.AsQueryable();
+
+        if (participantUserId.HasValue)
+        {
+            var uid = participantUserId.Value;
+            query = query.Where(s => s.PatientId == uid || s.OphthalmologistId == uid);
+        }
 
         if (patientId.HasValue)
             query = query.Where(s => s.PatientId == patientId.Value);

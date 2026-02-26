@@ -1,3 +1,4 @@
+using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.ConsultationSessions.Common;
@@ -9,10 +10,14 @@ public class GetConsultationSessionQueryHandler
     : IQueryHandler<GetConsultationSessionQuery, ConsultationSessionDto>
 {
     private readonly IConsultationSessionRepository _sessionRepository;
+    private readonly ICurrentUserService _currentUser;
 
-    public GetConsultationSessionQueryHandler(IConsultationSessionRepository sessionRepository)
+    public GetConsultationSessionQueryHandler(
+        IConsultationSessionRepository sessionRepository,
+        ICurrentUserService currentUser)
     {
         _sessionRepository = sessionRepository;
+        _currentUser = currentUser;
     }
 
     public async Task<Result<ConsultationSessionDto>> Handle(
@@ -24,6 +29,17 @@ public class GetConsultationSessionQueryHandler
         {
             return Result<ConsultationSessionDto>.NotFound(
                 $"Session with ID '{request.SessionId}' was not found.");
+        }
+
+        bool isAdmin = _currentUser.Roles.Any(r => Roles.Admins.Contains(r));
+        bool isParticipant = _currentUser.UserId == session.PatientId
+                             || (session.OphthalmologistId.HasValue
+                                 && _currentUser.UserId == session.OphthalmologistId.Value);
+
+        if (!isAdmin && !isParticipant)
+        {
+            return Result<ConsultationSessionDto>.Forbidden(
+                "You are not a participant of this session.");
         }
 
         var dto = new ConsultationSessionDto

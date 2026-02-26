@@ -31,6 +31,13 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         if (session is null)
             return Result.NotFound($"Session '{request.SessionId}' not found.");
 
+        bool isPatient = request.SenderUserId == session.PatientId;
+        bool isDoctor = session.OphthalmologistId.HasValue
+                        && request.SenderUserId == session.OphthalmologistId.Value;
+
+        if (!isPatient && !isDoctor)
+            return Result.Forbidden("You are not a participant of this session.");
+
         if (session.ChatStatus == ChatStatus.Locked)
             return Result.Failure("Chat is locked for this session.");
 

@@ -44,8 +44,15 @@ public class CreateVideoCallSessionCommandHandler
         if (patient is null)
             return Result<Guid>.NotFound($"Patient '{request.PatientId}' not found.");
 
-        var attendeeEmails = await ResolveAttendeeEmailsAsync(
-            patient, request.OphthalmologistId, cancellationToken);
+        var attendeeEmailsResult =
+            await ResolveAttendeeEmailsAsync(patient, request.OphthalmologistId, cancellationToken);
+
+        if (!attendeeEmailsResult.IsSuccess)
+        {
+            return Result<Guid>.Failure(attendeeEmailsResult.ErrorMessage);
+        }
+
+        var attendeeEmails = attendeeEmailsResult.Data; // Hoặc .Value tùy thuộc vào cách bạn thiết kế class Result<T>
 
         MeetingInfo meetingInfo;
         try
@@ -80,7 +87,7 @@ public class CreateVideoCallSessionCommandHandler
         return Result<Guid>.Success(session.Id);
     }
 
-    private async Task<List<string>> ResolveAttendeeEmailsAsync(
+    private async Task<Result<List<string>>> ResolveAttendeeEmailsAsync(
         Patient patient,
         Guid? ophthalmologistId,
         CancellationToken cancellationToken)
@@ -88,24 +95,39 @@ public class CreateVideoCallSessionCommandHandler
         var emails = new List<string>();
 
         var patientUser = await _identityService.GetUserByIdAsync(patient.UserId, cancellationToken);
-        if (patientUser is not null)
-            emails.Add(patientUser.Email);
+        if (patientUser is null || string.IsNullOrWhiteSpace(patientUser.Email))
+        {
+            _logger.LogWarning("Cannot resolve email for Patient {PatientId} (UserId: {UserId})", patient.Id,
+                patient.UserId);
+            return Result<List<string>>.Failure("Patient email is required to schedule a video call.");
+        }
+
+        emails.Add(patientUser.Email);
 
         if (ophthalmologistId.HasValue)
         {
-            var doctor = await _ophthalmologistRepository.GetByIdAsync(
-                ophthalmologistId.Value, cancellationToken);
-
-            if (doctor is not null)
+            var doctor = await _ophthalmologistRepository.GetByIdAsync(ophthalmologistId.Value, cancellationToken);
+            if (doctor is null)
             {
-                var doctorUser = await _identityService.GetUserByIdAsync(
-                    doctor.UserId, cancellationToken);
-
-                if (doctorUser is not null)
+                _logger.LogWarning("Ophthalmologist {DoctorId} not found when resolving emails.",
+                    ophthalmologistId.Value);
+            }
+            else
+            {
+                var doctorUser = await _identityService.GetUserByIdAsync(doctor.UserId, cancellationToken);
+                if (doctorUser is null || string.IsNullOrWhiteSpace(doctorUser.Email))
+                {
+                    _logger.LogWarning(
+                        "Cannot resolve email for Ophthalmologist {DoctorId} (UserId: {UserId}). They might not receive the calendar invite.",
+                        doctor.Id, doctor.UserId);
+                }
+                else
+                {
                     emails.Add(doctorUser.Email);
+                }
             }
         }
 
-        return emails;
+        return Result<List<string>>.Success(emails);
     }
 }

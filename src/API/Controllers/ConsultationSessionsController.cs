@@ -108,7 +108,7 @@ public class ConsultationSessionsController : BaseApiController
     /// Create a new VideoCall session.
     /// </summary>
     [HttpPost("video-call")]
-    // [Authorize(Policy = Policies.PatientOnly)]
+    [Authorize(Policy = Policies.PatientOnly)]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateVideoCallSession(
@@ -188,7 +188,7 @@ public class ConsultationSessionsController : BaseApiController
     /// Cancel a session. Deletes the associated Google Calendar event if present.
     /// </summary>
     [HttpPost("{sessionId:guid}/cancel")]
-    //[Authorize]
+    [Authorize]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]

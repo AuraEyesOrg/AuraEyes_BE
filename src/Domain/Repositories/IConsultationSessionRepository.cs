@@ -24,6 +24,7 @@ public interface IConsultationSessionRepository : IRepository<ConsultationSessio
         ConsultationSessionType? type = null,
         SessionStatus? status = null,
         ChatStatus? chatStatus = null,
+        Guid? participantUserId = null,
         int pageNumber = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default);

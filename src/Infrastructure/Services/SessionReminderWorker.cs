@@ -8,7 +8,7 @@ namespace Infrastructure.Services;
 
 /// <summary>
 /// Background worker that periodically checks for stale consultation sessions
-/// and sends reminders to the assigned doctors. Does NOT auto-close sessions.
+/// and sends reminders to the assigned doctors.
 /// </summary>
 public class SessionReminderWorker : BackgroundService
 {

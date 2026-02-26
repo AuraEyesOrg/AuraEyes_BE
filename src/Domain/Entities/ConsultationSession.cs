@@ -97,7 +97,7 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
         DateTime appointmentTime,
         Guid? ophthalmologistId = null)
     {
-        if (appointmentTime <= DateTime.UtcNow)
+        if (appointmentTime <= DateTime.UtcNow.AddMinutes(1))
             throw new ArgumentException("Appointment time must be in the future", nameof(appointmentTime));
 
         return new ConsultationSession
