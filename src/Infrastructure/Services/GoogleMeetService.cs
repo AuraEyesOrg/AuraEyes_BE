@@ -39,7 +39,7 @@ public class GoogleMeetService : IGoogleMeetService, IDisposable
         var calendarEvent = new Event
         {
             Summary = title,
-            Description = $"AURA Telemedicine – {title}",
+            Description = $"AURA Eyes Telemedicine • Join meeting on AURA Eyes Telemedicine",
             Start = new EventDateTime
             {
                 DateTimeDateTimeOffset = new DateTimeOffset(startTimeUtc, TimeSpan.Zero),
