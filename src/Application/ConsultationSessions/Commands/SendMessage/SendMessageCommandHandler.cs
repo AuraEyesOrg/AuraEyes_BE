@@ -45,8 +45,7 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
             return Result.Failure("Session has been archived. No new messages allowed.");
 
         if (session.ChatStatus == ChatStatus.MemoOnly
-            && session.OphthalmologistId.HasValue
-            && request.SenderUserId == session.OphthalmologistId.Value)
+            && isDoctor)
         {
             return Result.Failure("In MemoOnly mode, only the patient can send notes.");
         }

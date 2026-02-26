@@ -28,6 +28,17 @@ public class MedicalDiagnosis : BaseEntity, IAggregateRoot
         ReferralRequired = false;
     }
 
+    public MedicalDiagnosis(Guid aiScreeningId, Guid doctorId, string? diagnosesCode = null,
+        string? diagnosesText = null, string? treatmentPlan = null)
+    {
+        AiScreeningId = aiScreeningId;
+        DoctorId = doctorId;
+        DiagnosesCode = diagnosesCode;
+        DiagnosesText = diagnosesText;
+        TreatmentPlan = treatmentPlan;
+        ReferralRequired = false;
+    }
+
     public void UpdateDiagnosis(string? diagnosesCode, string? diagnosesText, string? treatmentPlan)
     {
         DiagnosesCode = diagnosesCode;

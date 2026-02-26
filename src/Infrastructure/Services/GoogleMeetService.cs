@@ -13,6 +13,9 @@ namespace Infrastructure.Services;
 
 public class GoogleMeetService : IGoogleMeetService, IDisposable
 {
+    private const int MaxMeetLinkRetries = 3;
+    private static readonly TimeSpan InitialRetryDelay = TimeSpan.FromSeconds(2);
+
     private readonly CalendarService _calendarService;
     private readonly GoogleMeetSettings _settings;
     private readonly ILogger<GoogleMeetService> _logger;
@@ -82,17 +85,21 @@ public class GoogleMeetService : IGoogleMeetService, IDisposable
 
         var createdEvent = await request.ExecuteAsync(cancellationToken);
 
-        var meetLink = createdEvent.ConferenceData?.EntryPoints?
-            .FirstOrDefault(ep => ep.EntryPointType == "video")?.Uri;
+        var meetLink = ExtractMeetLink(createdEvent);
 
         if (string.IsNullOrEmpty(meetLink))
         {
-            _logger.LogWarning(
-                "Calendar event {EventId} created but no Meet link generated",
-                createdEvent.Id);
+            meetLink = await RetryGetMeetLinkAsync(createdEvent.Id, cancellationToken);
+        }
+
+        if (string.IsNullOrEmpty(meetLink))
+        {
+            await CleanupOrphanedEventAsync(createdEvent.Id, cancellationToken);
 
             throw new InvalidOperationException(
-                "Failed to generate Google Meet link. Ensure the Gmail account has Google Meet enabled.");
+                "Failed to generate Google Meet link after retries. " +
+                "The orphaned calendar event has been cleaned up. " +
+                "Ensure the Google Workspace account has Google Meet enabled.");
         }
 
         _logger.LogInformation(
@@ -118,6 +125,59 @@ public class GoogleMeetService : IGoogleMeetService, IDisposable
         {
             _logger.LogWarning("Calendar event {EventId} already deleted", calendarEventId);
         }
+    }
+
+    /// <summary>
+    /// Google sometimes populates conference data asynchronously.
+    /// Re-fetch the event with exponential backoff to wait for the Meet link.
+    /// </summary>
+    private async Task<string?> RetryGetMeetLinkAsync(string eventId, CancellationToken cancellationToken)
+    {
+        var delay = InitialRetryDelay;
+
+        for (var attempt = 1; attempt <= MaxMeetLinkRetries; attempt++)
+        {
+            _logger.LogDebug(
+                "Meet link not yet available for event {EventId}, retry {Attempt}/{Max} after {Delay}ms",
+                eventId, attempt, MaxMeetLinkRetries, delay.TotalMilliseconds);
+
+            await Task.Delay(delay, cancellationToken);
+            delay *= 2;
+
+            var refreshed = await _calendarService.Events
+                .Get(_settings.CalendarId, eventId)
+                .ExecuteAsync(cancellationToken);
+
+            var link = ExtractMeetLink(refreshed);
+            if (!string.IsNullOrEmpty(link))
+                return link;
+        }
+
+        return null;
+    }
+
+    private async Task CleanupOrphanedEventAsync(string eventId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _calendarService.Events
+                .Delete(_settings.CalendarId, eventId)
+                .ExecuteAsync(cancellationToken);
+
+            _logger.LogWarning(
+                "Deleted orphaned calendar event {EventId} (no Meet link after retries)", eventId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to delete orphaned calendar event {EventId}. Manual cleanup required.", eventId);
+        }
+    }
+
+    private static string? ExtractMeetLink(Event calendarEvent)
+    {
+        return calendarEvent.ConferenceData?.EntryPoints?
+            .FirstOrDefault(ep => ep.EntryPointType == "video")?.Uri;
     }
 
     private CalendarService CreateCalendarService()

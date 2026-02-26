@@ -44,15 +44,19 @@ public class SubmitVerificationReportCommandHandler
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            var diagnosis = new MedicalDiagnosis(
-                session.AiScreeningId.Value,
-                request.DoctorId,
-                request.DiagnosesCode,
-                request.DiagnosesText);
-
-            if (request.TreatmentPlan is not null)
-                diagnosis.UpdateDiagnosis(request.DiagnosesCode, request.DiagnosesText, request.TreatmentPlan);
-
+            var diagnosis = request.TreatmentPlan is not null
+                ? new MedicalDiagnosis(
+                    session.AiScreeningId.Value,
+                    request.DoctorId,
+                    request.DiagnosesCode,
+                    request.DiagnosesText,
+                    request.TreatmentPlan)
+                : new MedicalDiagnosis(
+                    session.AiScreeningId.Value,
+                    request.DoctorId,
+                    request.DiagnosesCode,
+                    request.DiagnosesText);
+            
             await _diagnosisRepository.AddAsync(diagnosis, cancellationToken);
 
             session.OpenChat();
