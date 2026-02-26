@@ -28,5 +28,10 @@ public class MedicalDiagnosisConfiguration : IEntityTypeConfiguration<MedicalDia
             .WithMany()
             .HasForeignKey(e => e.AiScreeningId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<ConsultationSession>()
+            .WithMany(s => s.MedicalDiagnoses)
+            .HasForeignKey(e => e.ConsultationSessionId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

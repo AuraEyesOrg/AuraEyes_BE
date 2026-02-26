@@ -43,7 +43,7 @@ public class ApplicationDbContext : IdentityDbContext<
 
     // Schedule & Communication
     public DbSet<Schedule> Schedules => Set<Schedule>();
-    public DbSet<ConsultationRequest> ConsultationRequests => Set<ConsultationRequest>();
+    public DbSet<ConsultationSession> ConsultationSessions => Set<ConsultationSession>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
 

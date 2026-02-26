@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260226073746_AddCalendarEventIdToConsultationSession")]
+    partial class AddCalendarEventIdToConsultationSession
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -312,9 +315,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("LastActivityAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime?>("LastReminderSentAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("MeetingLink")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -358,7 +358,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PatientId");
 
-                    b.HasIndex("Status", "ChatStatus", "LastActivityAt", "LastReminderSentAt")
+                    b.HasIndex("Status", "ChatStatus", "LastActivityAt")
                         .HasDatabaseName("IX_ConsultationSessions_StaleSessionLookup");
 
                     b.ToTable("ConsultationSessions");
