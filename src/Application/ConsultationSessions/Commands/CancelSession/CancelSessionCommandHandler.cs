@@ -32,13 +32,6 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
         if (session is null)
             return Result.NotFound($"Session '{request.SessionId}' not found.");
 
-        bool isPatient = request.CancelledByUserId == session.PatientId;
-        bool isDoctor = session.OphthalmologistId.HasValue
-                        && request.CancelledByUserId == session.OphthalmologistId.Value;
-
-        if (!isPatient && !isDoctor)
-            return Result.Forbidden("You are not a participant of this session.");
-
         if (session.Status == SessionStatus.Completed)
             return Result.Failure("Cannot cancel a completed session.");
 

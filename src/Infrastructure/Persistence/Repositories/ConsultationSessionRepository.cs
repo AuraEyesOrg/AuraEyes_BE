@@ -87,16 +87,19 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
 
     public async Task<IReadOnlyList<ConsultationSession>> GetStaleSessions(
         TimeSpan inactivityThreshold,
+        TimeSpan reminderCooldown,
         CancellationToken cancellationToken = default)
     {
-        var cutoff = DateTime.UtcNow - inactivityThreshold;
+        var activityCutoff = DateTime.UtcNow - inactivityThreshold;
+        var reminderCutoff = DateTime.UtcNow - reminderCooldown;
 
         return await _dbSet
             .Where(s =>
                 s.Status != SessionStatus.Completed &&
                 s.Status != SessionStatus.Cancelled &&
                 s.ChatStatus == ChatStatus.Open &&
-                s.LastActivityAt < cutoff)
+                s.LastActivityAt < activityCutoff &&
+                (s.LastReminderSentAt == null || s.LastReminderSentAt < reminderCutoff))
             .ToListAsync(cancellationToken);
     }
 }

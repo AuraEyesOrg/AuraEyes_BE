@@ -30,10 +30,11 @@ public interface IConsultationSessionRepository : IRepository<ConsultationSessio
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Returns active sessions with open chat that have been inactive for the given threshold.
-    /// Used by the SessionReminderWorker.
+    /// Returns active sessions with open chat that have been inactive for the given threshold
+    /// and have not received a reminder within the specified cooldown period.
     /// </summary>
     Task<IReadOnlyList<ConsultationSession>> GetStaleSessions(
         TimeSpan inactivityThreshold,
+        TimeSpan reminderCooldown,
         CancellationToken cancellationToken = default);
 }

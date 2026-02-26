@@ -40,6 +40,9 @@ public class ConsultationSessionConfiguration : IEntityTypeConfiguration<Consult
         builder.Property(e => e.LastActivityAt)
             .IsRequired();
 
+        builder.Property(e => e.LastReminderSentAt)
+            .IsRequired(false);
+
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
@@ -67,7 +70,7 @@ public class ConsultationSessionConfiguration : IEntityTypeConfiguration<Consult
         // Indexes for common query patterns
         builder.HasIndex(e => e.PatientId);
         builder.HasIndex(e => e.OphthalmologistId);
-        builder.HasIndex(e => new { e.Status, e.ChatStatus, e.LastActivityAt })
+        builder.HasIndex(e => new { e.Status, e.ChatStatus, e.LastActivityAt, e.LastReminderSentAt })
             .HasDatabaseName("IX_ConsultationSessions_StaleSessionLookup");
     }
 }

@@ -23,6 +23,7 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     public string? CalendarEventId { get; private set; }
 
     public DateTime LastActivityAt { get; private set; }
+    public DateTime? LastReminderSentAt { get; private set; }
     public DateTime? ClosedAt { get; private set; }
     public Guid? ClosedBy { get; private set; }
     public string? ClosingReason { get; private set; }
@@ -165,6 +166,15 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     public void RecordActivity()
     {
         LastActivityAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Marks that a stale-session reminder was sent, preventing duplicate notifications.
+    /// </summary>
+    public void RecordReminderSent()
+    {
+        LastReminderSentAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
     }
 
