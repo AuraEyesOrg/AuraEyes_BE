@@ -20,6 +20,7 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
 
     public DateTime? AppointmentTime { get; private set; }
     public string? MeetingLink { get; private set; }
+    public string? CalendarEventId { get; private set; }
 
     public DateTime LastActivityAt { get; private set; }
     public DateTime? ClosedAt { get; private set; }
@@ -65,7 +66,8 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
         decimal price,
         DateTime appointmentTime,
         Guid? ophthalmologistId = null,
-        string? meetingLink = null)
+        string? meetingLink = null,
+        string? calendarEventId = null)
     {
         if (appointmentTime <= DateTime.UtcNow)
             throw new ArgumentException("Appointment time must be in the future", nameof(appointmentTime));
@@ -80,6 +82,7 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
             Price = price,
             AppointmentTime = appointmentTime,
             MeetingLink = meetingLink,
+            CalendarEventId = calendarEventId,
             LastActivityAt = DateTime.UtcNow
         };
     }
@@ -126,12 +129,20 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void SetMeetingLink(string meetingLink)
+    public void SetMeetingInfo(string meetingLink, string? calendarEventId = null)
     {
         if (string.IsNullOrWhiteSpace(meetingLink))
             throw new ArgumentException("Meeting link cannot be empty", nameof(meetingLink));
 
         MeetingLink = meetingLink;
+        CalendarEventId = calendarEventId;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void ClearMeetingInfo()
+    {
+        MeetingLink = null;
+        CalendarEventId = null;
         UpdatedAt = DateTime.UtcNow;
     }
 

@@ -2,6 +2,7 @@ using Application.Common.Constants;
 using Application.Common.Models;
 using Application.ConsultationSessions.Commands.CreateVerificationSession;
 using Application.ConsultationSessions.Commands.CreateVideoCallSession;
+using Application.ConsultationSessions.Commands.CancelSession;
 using Application.ConsultationSessions.Commands.EndSession;
 using Application.ConsultationSessions.Commands.SendMessage;
 using Application.ConsultationSessions.Commands.SubmitVerificationReport;
@@ -184,6 +185,29 @@ public class ConsultationSessionsController : BaseApiController
     }
 
     /// <summary>
+    /// Cancel a session. Deletes the associated Google Calendar event if present.
+    /// </summary>
+    [HttpPost("{sessionId:guid}/cancel")]
+    //[Authorize]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CancelSession(
+        Guid sessionId,
+        [FromBody] CancelSessionRequest request)
+    {
+        var command = new CancelSessionCommand
+        {
+            SessionId = sessionId,
+            CancelledByUserId = request.CancelledByUserId,
+            Reason = request.Reason
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result, "Session cancelled successfully.");
+    }
+
+    /// <summary>
     /// Doctor manually ends/closes a session. Archives the chat.
     /// </summary>
     [HttpPost("{sessionId:guid}/end")]
@@ -237,6 +261,12 @@ public record SendMessageRequest
 {
     public Guid SenderUserId { get; init; }
     public string Message { get; init; } = string.Empty;
+}
+
+public record CancelSessionRequest
+{
+    public Guid CancelledByUserId { get; init; }
+    public string? Reason { get; init; }
 }
 
 public record EndSessionRequest

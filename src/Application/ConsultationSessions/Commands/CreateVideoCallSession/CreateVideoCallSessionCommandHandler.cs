@@ -67,7 +67,8 @@ public class CreateVideoCallSessionCommandHandler
             request.Price,
             request.AppointmentTime,
             request.OphthalmologistId,
-            meetingInfo.MeetingLink);
+            meetingInfo.MeetingLink,
+            meetingInfo.CalendarEventId);
 
         await _sessionRepository.AddAsync(session, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

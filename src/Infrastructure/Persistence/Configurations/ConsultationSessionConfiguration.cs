@@ -31,6 +31,9 @@ public class ConsultationSessionConfiguration : IEntityTypeConfiguration<Consult
         builder.Property(e => e.MeetingLink)
             .HasMaxLength(500);
 
+        builder.Property(e => e.CalendarEventId)
+            .HasMaxLength(1024);
+
         builder.Property(e => e.ClosingReason)
             .HasMaxLength(200);
 
