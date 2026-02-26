@@ -216,3 +216,6 @@ node_modules/
 healthchecksdb
 
 .cursor/
+
+**/aura-google-meet-token/
+/src/API/credentials.json
