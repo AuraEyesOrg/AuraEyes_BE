@@ -107,7 +107,7 @@ public class ConsultationSessionsController : BaseApiController
     /// Create a new VideoCall session.
     /// </summary>
     [HttpPost("video-call")]
-    [Authorize(Policy = Policies.PatientOnly)]
+    // [Authorize(Policy = Policies.PatientOnly)]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateVideoCallSession(

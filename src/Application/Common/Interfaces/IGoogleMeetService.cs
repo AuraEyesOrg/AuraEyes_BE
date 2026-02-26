@@ -6,15 +6,17 @@ public interface IGoogleMeetService
 {
     /// <summary>
     /// Creates a Google Calendar event with an auto-generated Google Meet link.
+    /// Attendees are added so they can join without "Ask to join".
     /// </summary>
     /// <param name="title">Event title.</param>
     /// <param name="startTimeUtc">Start time in UTC.</param>
+    /// <param name="attendeeEmails">Emails of participants (patient + doctor). They join Meet directly.</param>
     /// <param name="durationMinutes">Duration in minutes (null = use default).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The generated Meet link and optional Calendar event ID.</returns>
     Task<MeetingInfo> CreateMeetingAsync(
         string title,
         DateTime startTimeUtc,
+        IReadOnlyList<string>? attendeeEmails = null,
         int? durationMinutes = null,
         CancellationToken cancellationToken = default);
 

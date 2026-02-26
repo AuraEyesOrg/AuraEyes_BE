@@ -29,6 +29,7 @@ public class GoogleMeetService : IGoogleMeetService, IDisposable
     public async Task<MeetingInfo> CreateMeetingAsync(
         string title,
         DateTime startTimeUtc,
+        IReadOnlyList<string>? attendeeEmails = null,
         int? durationMinutes = null,
         CancellationToken cancellationToken = default)
     {
@@ -59,11 +60,25 @@ public class GoogleMeetService : IGoogleMeetService, IDisposable
                         Type = "hangoutsMeet"
                     }
                 }
-            }
+            },
+            GuestsCanInviteOthers = false,
+            GuestsCanModify = false
         };
+
+        if (attendeeEmails is { Count: > 0 })
+        {
+            calendarEvent.Attendees = attendeeEmails
+                .Select(email => new EventAttendee
+                {
+                    Email = email,
+                    ResponseStatus = "accepted"
+                })
+                .ToList();
+        }
 
         var request = _calendarService.Events.Insert(calendarEvent, _settings.CalendarId);
         request.ConferenceDataVersion = 1;
+        request.SendUpdates = EventsResource.InsertRequest.SendUpdatesEnum.All;
 
         var createdEvent = await request.ExecuteAsync(cancellationToken);
 
@@ -81,8 +96,8 @@ public class GoogleMeetService : IGoogleMeetService, IDisposable
         }
 
         _logger.LogInformation(
-            "Google Meet created: {MeetLink} (event {EventId})",
-            meetLink, createdEvent.Id);
+            "Google Meet created: {MeetLink} (event {EventId}, attendees: {Attendees})",
+            meetLink, createdEvent.Id, string.Join(", ", attendeeEmails ?? []));
 
         return new MeetingInfo(meetLink, createdEvent.Id);
     }
