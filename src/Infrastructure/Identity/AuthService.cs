@@ -101,10 +101,20 @@ public class AuthService : IAuthService
             // All DB operations succeeded — commit transaction
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
-            // Send confirmation email (best-effort, after commit)
-            var confirmationToken = await _identityService.GenerateEmailConfirmationTokenAsync(user.Id);
-            var confirmationLink = $"{confirmationUrlBase}?userId={user.Id}&token={Uri.EscapeDataString(confirmationToken)}";
-            await _emailService.SendEmailConfirmationAsync(user.Email!, confirmationLink, cancellationToken);
+            // Send confirmation email (best-effort, after commit — failure must NOT
+            // trigger rollback since DB is already committed)
+            try
+            {
+                var confirmationToken = await _identityService.GenerateEmailConfirmationTokenAsync(user.Id);
+                var confirmationLink = $"{confirmationUrlBase}?userId={user.Id}&token={Uri.EscapeDataString(confirmationToken)}";
+                await _emailService.SendEmailConfirmationAsync(user.Email!, confirmationLink, cancellationToken);
+            }
+            catch (Exception emailEx)
+            {
+                _logger.LogWarning(emailEx,
+                    "Failed to send confirmation email for {Email}. User is registered but needs manual email confirmation.",
+                    request.Email);
+            }
 
             _logger.LogInformation("Patient registered: {Email}", request.Email);
 
@@ -197,10 +207,20 @@ public class AuthService : IAuthService
             // All DB operations succeeded — commit transaction
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
-            // Send confirmation email (best-effort, after commit)
-            var confirmationToken = await _identityService.GenerateEmailConfirmationTokenAsync(user.Id);
-            var confirmationLink = $"{confirmationUrlBase}?userId={user.Id}&token={Uri.EscapeDataString(confirmationToken)}";
-            await _emailService.SendEmailConfirmationAsync(user.Email!, confirmationLink, cancellationToken);
+            // Send confirmation email (best-effort, after commit — failure here must NOT
+            // trigger rollback or S3 cleanup since DB is already committed)
+            try
+            {
+                var confirmationToken = await _identityService.GenerateEmailConfirmationTokenAsync(user.Id);
+                var confirmationLink = $"{confirmationUrlBase}?userId={user.Id}&token={Uri.EscapeDataString(confirmationToken)}";
+                await _emailService.SendEmailConfirmationAsync(user.Email!, confirmationLink, cancellationToken);
+            }
+            catch (Exception emailEx)
+            {
+                _logger.LogWarning(emailEx,
+                    "Failed to send confirmation email for {Email}. User is registered but needs manual email confirmation.",
+                    request.Email);
+            }
 
             _logger.LogInformation("Ophthalmologist registered: {Email}", request.Email);
 

@@ -1,8 +1,12 @@
+using System.Text;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Infrastructure.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using Supabase;
 
 namespace API.Controllers;
 
@@ -14,42 +18,103 @@ public class SampleController : BaseApiController
     private readonly ICurrentUserService _currentUserService;
     private readonly IFileStorageService _fileStorageService;
     private readonly ILogger<SampleController> _logger;
+    private readonly SupabaseStorageSettings _storageSettings;
 
     public SampleController(
         ICurrentUserService currentUserService,
         IFileStorageService fileStorageService,
-        ILogger<SampleController> logger)
+        ILogger<SampleController> logger,
+        IOptions<SupabaseStorageSettings> storageSettings)
     {
         _currentUserService = currentUserService;
         _fileStorageService = fileStorageService;
         _logger = logger;
+        _storageSettings = storageSettings.Value;
     }
 
     /// <summary>
-    /// S3 connectivity test — uploads a tiny text file and returns the public URL.
-    /// Call GET /api/sample/test-s3 to diagnose Supabase S3 issues.
+    /// Supabase Storage diagnostic endpoint.
+    /// Tests: supabase-csharp SDK upload + IFileStorageService upload.
+    /// Call GET /api/sample/test-s3 to diagnose upload issues.
     /// </summary>
     [HttpGet("test-s3")]
     [AllowAnonymous]
     public async Task<IActionResult> TestS3Async(CancellationToken cancellationToken)
     {
+        var results = new Dictionary<string, object>
+        {
+            ["config"] = new
+            {
+                url = _storageSettings.Url,
+                bucket = _storageSettings.BucketName,
+                hasServiceKey = !string.IsNullOrEmpty(_storageSettings.ServiceKey),
+                utcNow = DateTime.UtcNow.ToString("O")
+            }
+        };
+
+        // ── 1. Direct supabase-csharp SDK test ──
         try
         {
-            const string testContent = "Supabase S3 connectivity test — AURA";
-            var bytes = System.Text.Encoding.UTF8.GetBytes(testContent);
-            await using var stream = new MemoryStream(bytes);
+            var supabase = new Client(_storageSettings.Url, _storageSettings.ServiceKey, new SupabaseOptions
+            {
+                AutoConnectRealtime = false
+            });
+            await supabase.InitializeAsync();
 
-            var url = await _fileStorageService.SaveFileAsync(
-                stream, "s3-test.txt", "diagnostics", cancellationToken);
+            var testBytes = Encoding.UTF8.GetBytes($"Supabase SDK test – {DateTime.UtcNow:O}");
+            var testPath = $"diagnostics/sdk-test-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt";
 
-            _logger.LogInformation("S3 test upload succeeded: {Url}", url);
-            return OkResponse(new { success = true, url, timestamp = DateTime.UtcNow });
+            await supabase.Storage
+                .From(_storageSettings.BucketName)
+                .Upload(testBytes, testPath, new Supabase.Storage.FileOptions
+                {
+                    ContentType = "text/plain",
+                    Upsert = true
+                });
+
+            var publicUrl = supabase.Storage
+                .From(_storageSettings.BucketName)
+                .GetPublicUrl(testPath);
+
+            results["1_sdkUpload"] = new
+            {
+                success = true,
+                path = testPath,
+                publicUrl
+            };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "S3 test upload failed");
-            return ErrorResponse($"S3 test FAILED: {ex.Message}");
+            results["1_sdkUpload"] = new
+            {
+                success = false,
+                message = ex.Message,
+                innerMessage = ex.InnerException?.Message
+            };
         }
+
+        // ── 2. IFileStorageService test (uses SupabaseStorageService) ──
+        try
+        {
+            var bytes = Encoding.UTF8.GetBytes("IFileStorageService test");
+            await using var stream = new MemoryStream(bytes);
+            var url = await _fileStorageService.SaveFileAsync(
+                stream, "service-test.txt", "diagnostics", cancellationToken);
+
+            results["2_serviceUpload"] = new { success = true, url };
+        }
+        catch (Exception ex)
+        {
+            results["2_serviceUpload"] = new
+            {
+                success = false,
+                message = ex.Message,
+                innerMessage = ex.InnerException?.Message
+            };
+        }
+
+        _logger.LogInformation("Supabase Storage diagnostic: {@Results}", results);
+        return OkResponse(results);
     }
 
     /// <summary>

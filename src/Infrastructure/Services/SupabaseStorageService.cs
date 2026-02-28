@@ -1,20 +1,19 @@
 using System.Text.RegularExpressions;
-using Amazon.S3;
-using Amazon.S3.Model;
 using Application.Common.Interfaces;
 using Infrastructure.Settings;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Supabase;
 
 namespace Infrastructure.Services;
 
 /// <summary>
-/// Supabase S3-compatible file storage service.
-/// Uses AWSSDK.S3 with Supabase's S3-compatible endpoint.
+/// Supabase Storage file service using supabase-csharp SDK.
+/// Uses service_role key to bypass RLS policies (server-side only).
+/// Modelled after EVCSMS Listings service pattern.
 /// </summary>
-public sealed class SupabaseStorageService : IFileStorageService, IDisposable
+public sealed class SupabaseStorageService : IFileStorageService
 {
-    private readonly AmazonS3Client _s3Client;
     private readonly SupabaseStorageSettings _settings;
     private readonly ILogger<SupabaseStorageService> _logger;
 
@@ -25,18 +24,9 @@ public sealed class SupabaseStorageService : IFileStorageService, IDisposable
         _settings = settings.Value;
         _logger = logger;
 
-        var config = new AmazonS3Config
-        {
-            ServiceURL = _settings.Endpoint,
-            AuthenticationRegion = _settings.Region,
-            ForcePathStyle = true,
-            SignatureVersion = "4"
-        };
-
-        _s3Client = new AmazonS3Client(
-            _settings.AccessKey,
-            _settings.SecretKey,
-            config);
+        _logger.LogInformation(
+            "SupabaseStorageService initialised – Url={Url}, Bucket={Bucket}, HasKey={HasKey}",
+            _settings.Url, _settings.BucketName, !string.IsNullOrEmpty(_settings.ServiceKey));
     }
 
     /// <inheritdoc />
@@ -46,64 +36,58 @@ public sealed class SupabaseStorageService : IFileStorageService, IDisposable
         string subFolder,
         CancellationToken cancellationToken = default)
     {
-        // Sanitize file name: remove spaces and special characters to prevent S3 signature issues
         var safeFileName = SanitizeFileName(fileName);
-        var key = string.IsNullOrWhiteSpace(subFolder)
+        var storagePath = string.IsNullOrWhiteSpace(subFolder)
             ? $"{Guid.NewGuid():N}_{safeFileName}"
             : $"{subFolder.TrimEnd('/')}/{Guid.NewGuid():N}_{safeFileName}";
 
-        // Ensure stream is at the beginning
+        // Convert stream to byte array (Supabase SDK requires byte[])
         if (fileStream.CanSeek)
-        {
             fileStream.Position = 0;
+
+        byte[] fileBytes;
+        using (var ms = new MemoryStream())
+        {
+            await fileStream.CopyToAsync(ms, cancellationToken);
+            fileBytes = ms.ToArray();
         }
 
-        var putRequest = new PutObjectRequest
+        if (fileBytes.Length == 0)
+            throw new InvalidOperationException("File stream is empty, cannot upload.");
+
+        _logger.LogDebug(
+            "Uploading to Supabase Storage – Bucket={Bucket}, Path={Path}, Size={Size} bytes",
+            _settings.BucketName, storagePath, fileBytes.Length);
+
+        // Initialise Supabase client with service_role key (bypasses RLS)
+        var supabase = new Client(_settings.Url, _settings.ServiceKey, new SupabaseOptions
         {
-            BucketName = _settings.BucketName,
-            Key = key,
-            InputStream = fileStream,
-            ContentType = GetContentType(safeFileName),
-            DisablePayloadSigning = true,
-            UseChunkEncoding = false
-        };
+            AutoConnectRealtime = false
+        });
+        await supabase.InitializeAsync();
 
-        // Detailed logging before upload
-        Console.WriteLine("=== Supabase S3 Upload Debug ===");
-        Console.WriteLine($"  Endpoint   : {_settings.Endpoint}");
-        Console.WriteLine($"  Region     : {_settings.Region}");
-        Console.WriteLine($"  BucketName : {_settings.BucketName}");
-        Console.WriteLine($"  AccessKey  : {_settings.AccessKey[..Math.Min(4, _settings.AccessKey.Length)]}****");
-        Console.WriteLine($"  Key        : {key}");
-        Console.WriteLine($"  UTC Clock  : {DateTime.UtcNow:O}");
-        Console.WriteLine("================================");
+        // Upload file
+        await supabase.Storage
+            .From(_settings.BucketName)
+            .Upload(fileBytes, storagePath, new Supabase.Storage.FileOptions
+            {
+                ContentType = GetContentType(safeFileName),
+                Upsert = true
+            });
 
-        _logger.LogDebug("Uploading to S3 endpoint={Endpoint}, bucket={Bucket}, key={Key}",
-            _settings.Endpoint, _settings.BucketName, key);
+        // Get public URL
+        var publicUrl = supabase.Storage
+            .From(_settings.BucketName)
+            .GetPublicUrl(storagePath);
 
-        try
+        // Fallback: build URL manually if SDK returns relative path
+        if (!string.IsNullOrEmpty(publicUrl) && !publicUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
         {
-            await _s3Client.PutObjectAsync(putRequest, cancellationToken);
-            _logger.LogInformation("Uploaded file to Supabase S3: {Key}", key);
-        }
-        catch (AmazonS3Exception ex)
-        {
-            Console.WriteLine("=== S3 Upload FAILED ===");
-            Console.WriteLine($"  Message      : {ex.Message}");
-            Console.WriteLine($"  StatusCode   : {ex.StatusCode}");
-            Console.WriteLine($"  ErrorCode    : {ex.ErrorCode}");
-            Console.WriteLine($"  RequestId    : {ex.RequestId}");
-            Console.WriteLine($"  ResponseBody : {ex.ResponseBody}");
-            Console.WriteLine("========================");
-
-            _logger.LogError(ex,
-                "S3 upload failed: StatusCode={StatusCode}, ErrorCode={ErrorCode}, RequestId={RequestId}, ResponseBody={ResponseBody}",
-                ex.StatusCode, ex.ErrorCode, ex.RequestId, ex.ResponseBody);
-            throw;
+            publicUrl = $"{_settings.Url}/storage/v1/object/public/{_settings.BucketName}/{storagePath}";
         }
 
-        // Return public URL
-        return $"https://{_settings.ProjectRef}.supabase.co/storage/v1/object/public/{_settings.BucketName}/{key}";
+        _logger.LogInformation("Uploaded to Supabase Storage: {Url}", publicUrl);
+        return publicUrl;
     }
 
     /// <inheritdoc />
@@ -111,18 +95,21 @@ public sealed class SupabaseStorageService : IFileStorageService, IDisposable
     {
         try
         {
-            // Extract key from full URL or use as-is
-            var key = ExtractKey(relativePath);
-            if (string.IsNullOrEmpty(key)) return false;
+            var filePath = ExtractStoragePath(relativePath);
+            if (string.IsNullOrEmpty(filePath)) return false;
 
-            var deleteRequest = new DeleteObjectRequest
+            var supabase = new Client(_settings.Url, _settings.ServiceKey, new SupabaseOptions
             {
-                BucketName = _settings.BucketName,
-                Key = key
-            };
+                AutoConnectRealtime = false
+            });
+            supabase.InitializeAsync().GetAwaiter().GetResult();
 
-            _s3Client.DeleteObjectAsync(deleteRequest).GetAwaiter().GetResult();
-            _logger.LogInformation("Deleted file from Supabase S3: {Key}", key);
+            supabase.Storage
+                .From(_settings.BucketName)
+                .Remove(new List<string> { filePath })
+                .GetAwaiter().GetResult();
+
+            _logger.LogInformation("Deleted file from Supabase Storage: {Path}", filePath);
             return true;
         }
         catch (Exception ex)
@@ -135,23 +122,18 @@ public sealed class SupabaseStorageService : IFileStorageService, IDisposable
     /// <inheritdoc />
     public bool FileExists(string relativePath)
     {
+        // Supabase SDK doesn't have a direct "exists" check.
+        // We attempt to get a public URL — if the file was uploaded, the URL is valid.
+        // For a more robust check, we could do a HEAD request to the public URL.
         try
         {
-            var key = ExtractKey(relativePath);
-            if (string.IsNullOrEmpty(key)) return false;
+            var filePath = ExtractStoragePath(relativePath);
+            if (string.IsNullOrEmpty(filePath)) return false;
 
-            var request = new GetObjectMetadataRequest
-            {
-                BucketName = _settings.BucketName,
-                Key = key
-            };
-
-            _s3Client.GetObjectMetadataAsync(request).GetAwaiter().GetResult();
-            return true;
-        }
-        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-        {
-            return false;
+            using var httpClient = new HttpClient();
+            var url = $"{_settings.Url}/storage/v1/object/public/{_settings.BucketName}/{filePath}";
+            var response = httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, url)).GetAwaiter().GetResult();
+            return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
         {
@@ -161,35 +143,28 @@ public sealed class SupabaseStorageService : IFileStorageService, IDisposable
     }
 
     /// <summary>
-    /// Extract the S3 key from a full Supabase public URL or a plain key.
+    /// Extract the storage path from a full Supabase public URL or a plain path.
     /// </summary>
-    private string ExtractKey(string pathOrUrl)
+    private string ExtractStoragePath(string pathOrUrl)
     {
         if (string.IsNullOrWhiteSpace(pathOrUrl)) return string.Empty;
 
-        // If it's a full URL, extract the key after /object/public/{bucket}/
         var marker = $"/object/public/{_settings.BucketName}/";
         var idx = pathOrUrl.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
         if (idx >= 0)
-        {
             return pathOrUrl[(idx + marker.Length)..];
-        }
 
         return pathOrUrl;
     }
 
     /// <summary>
-    /// Sanitize file name by removing spaces and special characters
-    /// that can cause S3 signature mismatches with Supabase.
+    /// Sanitize file name — remove spaces and special characters.
     /// </summary>
     private static string SanitizeFileName(string fileName)
     {
         var name = Path.GetFileNameWithoutExtension(fileName);
         var ext = Path.GetExtension(fileName).ToLowerInvariant();
-
-        // Replace any character that is not alphanumeric, underscore, hyphen, or dot
         var safe = Regex.Replace(name, @"[^a-zA-Z0-9_\-]", "_");
-
         return $"{safe}{ext}";
     }
 
@@ -205,10 +180,5 @@ public sealed class SupabaseStorageService : IFileStorageService, IDisposable
             ".webp" => "image/webp",
             _ => "application/octet-stream"
         };
-    }
-
-    public void Dispose()
-    {
-        _s3Client.Dispose();
     }
 }
