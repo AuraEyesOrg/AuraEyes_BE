@@ -1,0 +1,44 @@
+using Domain.Enums;
+
+namespace Application.ConsultationSessions.Common;
+
+public record ConsultationSessionDto
+{
+    public Guid Id { get; init; }
+    public Guid PatientId { get; init; }
+    public Guid? OphthalmologistId { get; init; }
+    public Guid? OrganisationId { get; init; }
+    public Guid? AiScreeningId { get; init; }
+    public ConsultationSessionType Type { get; init; }
+    public string TypeName => Type.ToString();
+    public SessionStatus Status { get; init; }
+    public string StatusName => Status.ToString();
+    public ChatStatus ChatStatus { get; init; }
+    public string ChatStatusName => ChatStatus.ToString();
+    public decimal Price { get; init; }
+    public DateTime? AppointmentTime { get; init; }
+    public string? MeetingLink { get; init; }
+    public DateTime LastActivityAt { get; init; }
+    public DateTime? ClosedAt { get; init; }
+    public Guid? ClosedBy { get; init; }
+    public string? ClosingReason { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? UpdatedAt { get; init; }
+}
+
+public record ConsultationSessionListDto
+{
+    public Guid Id { get; init; }
+    public Guid PatientId { get; init; }
+    public Guid? OphthalmologistId { get; init; }
+    public ConsultationSessionType Type { get; init; }
+    public string TypeName => Type.ToString();
+    public SessionStatus Status { get; init; }
+    public string StatusName => Status.ToString();
+    public ChatStatus ChatStatus { get; init; }
+    public string ChatStatusName => ChatStatus.ToString();
+    public decimal Price { get; init; }
+    public DateTime? AppointmentTime { get; init; }
+    public DateTime LastActivityAt { get; init; }
+    public DateTime CreatedAt { get; init; }
+}

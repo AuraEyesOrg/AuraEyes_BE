@@ -47,6 +47,9 @@ public static class DependencyInjection
         // Supabase Storage Settings
         services.Configure<SupabaseStorageSettings>(configuration.GetSection(SupabaseStorageSettings.SectionName));
 
+        // Google Meet Settings
+        services.Configure<GoogleMeetSettings>(configuration.GetSection(GoogleMeetSettings.SectionName));
+
         // ASP.NET Core Identity configuration
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
         {
@@ -128,6 +131,7 @@ public static class DependencyInjection
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IOphthalmologistRepository, OphthalmologistRepository>();
         services.AddScoped<IScheduleRepository, ScheduleRepository>();
+        services.AddScoped<IConsultationSessionRepository, ConsultationSessionRepository>();
 
         // Register Identity Services
         services.AddScoped<IIdentityService, IdentityService>();
@@ -139,6 +143,11 @@ public static class DependencyInjection
         services.AddTransient<IDateTime, DateTimeService>();
         services.AddTransient<IEmailService, EmailService>();
         services.AddScoped<IFileStorageService, SupabaseStorageService>();
+        services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IGoogleMeetService, GoogleMeetService>();
+
+        // Background workers
+        services.AddHostedService<SessionReminderWorker>();
 
         return services;
     }
