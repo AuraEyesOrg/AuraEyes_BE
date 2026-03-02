@@ -1,6 +1,13 @@
 using Domain.Common;
-using Domain.Entities;
+using Domain.Entities.Authorization;
+using Domain.Entities.Consultation;
+using Domain.Entities.Contracts;
+using Domain.Entities.Financial;
 using Domain.Entities.Network;
+using Domain.Entities.Platform;
+using Domain.Entities.Scheduling;
+using Domain.Entities.Screening;
+using Domain.Entities.Users;
 using Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -28,24 +35,27 @@ public class ApplicationDbContext : IdentityDbContext<
 
     #region DbSets - Domain Entities
 
-    // Core Medical
+    // Users
     public DbSet<Organisation> Organisations => Set<Organisation>();
     public DbSet<Ophthalmologist> Ophthalmologists => Set<Ophthalmologist>();
     public DbSet<Patient> Patients => Set<Patient>();
     public DbSet<Certificate> Certificates => Set<Certificate>();
     public DbSet<Consent> Consents => Set<Consent>();
 
-    // AI & Diagnosis
+    // Screening
     public DbSet<AiScreening> AiScreenings => Set<AiScreening>();
     public DbSet<RetinalImage> RetinalImages => Set<RetinalImage>();
     public DbSet<ScreeningResult> ScreeningResults => Set<ScreeningResult>();
     public DbSet<MedicalDiagnosis> MedicalDiagnoses => Set<MedicalDiagnosis>();
 
-    // Schedule & Communication
-    public DbSet<Schedule> Schedules => Set<Schedule>();
+    // Consultation
     public DbSet<ConsultationSession> ConsultationSessions => Set<ConsultationSession>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<Feedback> Feedbacks => Set<Feedback>();
+
+    // Scheduling
+    public DbSet<Schedule> Schedules => Set<Schedule>();
 
     // Financial
     public DbSet<Wallet> Wallets => Set<Wallet>();
@@ -53,20 +63,23 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<DepositRequest> DepositRequests => Set<DepositRequest>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<Payment> Payments => Set<Payment>();
+
+    // Contracts
     public DbSet<Contract> Contracts => Set<Contract>();
     public DbSet<ContractTemplate> ContractTemplates => Set<ContractTemplate>();
 
-    // Permission & Audit
+    // Authorization
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
+
+    // Platform
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Notification> Notifications => Set<Notification>();
-    public DbSet<Feedback> Feedbacks => Set<Feedback>();
 
-    // Identity & Auth
+    // Identity
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
-    // Professional Network
+    // Network
     public DbSet<ProfessionalPost> ProfessionalPosts => Set<ProfessionalPost>();
     public DbSet<PostReaction> PostReactions => Set<PostReaction>();
     public DbSet<PostComment> PostComments => Set<PostComment>();
