@@ -1,7 +1,7 @@
 using Domain.Common;
 using Domain.Enums;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Contracts;
 
 /// <summary>
 /// Contract entity - signed contracts between parties

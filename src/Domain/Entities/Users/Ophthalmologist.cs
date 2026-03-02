@@ -1,7 +1,7 @@
 using Domain.Common;
 using Domain.Enums;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Users;
 
 /// <summary>
 /// Ophthalmologist profile entity - linked to ApplicationUser

@@ -1,6 +1,6 @@
 using Domain.Common;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Authorization;
 
 /// <summary>
 /// User Permission entity - many-to-many join table with extra fields

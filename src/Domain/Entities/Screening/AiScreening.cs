@@ -1,6 +1,6 @@
 using Domain.Common;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Screening;
 
 /// <summary>
 /// AI Screening entity - contains AI processing results

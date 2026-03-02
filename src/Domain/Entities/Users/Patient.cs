@@ -1,6 +1,7 @@
 using Domain.Common;
+using Domain.Entities.Screening;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Users;
 
 /// <summary>
 /// Patient profile entity - linked to ApplicationUser

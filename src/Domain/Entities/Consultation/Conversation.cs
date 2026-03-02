@@ -1,6 +1,6 @@
 using Domain.Common;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Consultation;
 
 /// <summary>
 /// Conversation entity - chat conversation between doctor and patient.

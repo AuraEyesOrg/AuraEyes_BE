@@ -1,6 +1,6 @@
 using Domain.Common;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Platform;
 
 /// <summary>
 /// Audit Log entity - tracks all changes in the system

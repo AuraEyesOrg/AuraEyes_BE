@@ -1,7 +1,7 @@
 using Domain.Common;
 using Domain.Enums;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Screening;
 
 /// <summary>
 /// Screening Result entity - AI screening analysis results

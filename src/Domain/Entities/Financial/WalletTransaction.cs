@@ -1,7 +1,7 @@
 using Domain.Common;
 using Domain.Enums;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Financial;
 
 /// <summary>
 /// Wallet Transaction entity - transaction history for wallet

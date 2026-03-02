@@ -1,6 +1,6 @@
 using Domain.Common;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Consultation;
 
 /// <summary>
 /// Chat Message entity - individual message in a conversation

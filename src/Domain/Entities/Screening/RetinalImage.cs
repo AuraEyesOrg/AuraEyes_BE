@@ -1,7 +1,7 @@
 using Domain.Common;
 using Domain.Enums;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Screening;
 
 /// <summary>
 /// Retinal Image entity - captured eye images for screening

@@ -1,7 +1,7 @@
 using Domain.Common;
 using Domain.Enums;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Scheduling;
 
 /// <summary>
 /// Schedule entity - doctor's available time slots

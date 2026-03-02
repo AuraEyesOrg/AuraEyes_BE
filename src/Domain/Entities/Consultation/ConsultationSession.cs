@@ -1,7 +1,8 @@
 using Domain.Common;
+using Domain.Entities.Screening;
 using Domain.Enums;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Consultation;
 
 /// <summary>
 /// Central aggregate for all medical interactions (Verification, VideoCall, ClinicBooking).

@@ -1,6 +1,6 @@
 using Domain.Common;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Financial;
 
 /// <summary>
 /// Wallet entity - user's digital wallet

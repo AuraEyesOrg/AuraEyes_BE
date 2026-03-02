@@ -1,6 +1,6 @@
 using Domain.Common;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Authorization;
 
 /// <summary>
 /// Permission entity - granular permissions for authorization

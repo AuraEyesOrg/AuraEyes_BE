@@ -1,6 +1,6 @@
 using Domain.Common;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Screening;
 
 /// <summary>
 /// Medical Diagnosis entity - doctor's diagnosis based on AI screening

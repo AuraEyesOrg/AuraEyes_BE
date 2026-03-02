@@ -1,7 +1,7 @@
 using Domain.Common;
 using Domain.Enums;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Financial;
 
 /// <summary>
 /// DepositRequest entity - deposit request for wallet top-up via PayOS

@@ -1,6 +1,6 @@
 using Domain.Common;
 
-namespace Domain.Entities;
+namespace Domain.Entities.Users;
 
 /// <summary>
 /// Consent entity - patient consent for data processing
