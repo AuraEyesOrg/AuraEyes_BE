@@ -1,7 +1,8 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
-using Domain.Entities;
+using Domain.Entities.Consultation;
+using Domain.Entities.Screening;
 using Domain.Enums;
 using Domain.Repositories;
 

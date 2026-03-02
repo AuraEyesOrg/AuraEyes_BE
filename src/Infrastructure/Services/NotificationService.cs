@@ -1,5 +1,5 @@
 using Application.Common.Interfaces;
-using Domain.Entities;
+using Domain.Entities.Platform;
 using Domain.Common;
 using Microsoft.Extensions.Logging;
 

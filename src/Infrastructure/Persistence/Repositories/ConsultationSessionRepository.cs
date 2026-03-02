@@ -1,4 +1,4 @@
-using Domain.Entities;
+using Domain.Entities.Consultation;
 using Domain.Enums;
 using Domain.Repositories;
 using Microsoft.EntityFrameworkCore;

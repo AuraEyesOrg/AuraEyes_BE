@@ -1,7 +1,7 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
-using Domain.Entities;
+using Domain.Entities.Scheduling;
 using Domain.Repositories;
 
 namespace Application.Ophthalmologists.Schedules.Commands.CreateSchedule;

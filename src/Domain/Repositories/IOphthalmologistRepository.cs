@@ -1,5 +1,5 @@
 using Domain.Common;
-using Domain.Entities;
+using Domain.Entities.Users;
 
 namespace Domain.Repositories;
 
