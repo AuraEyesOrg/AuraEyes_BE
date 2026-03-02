@@ -1,4 +1,5 @@
-using Domain.Entities;
+using Domain.Entities.Scheduling;
+using Domain.Entities.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
