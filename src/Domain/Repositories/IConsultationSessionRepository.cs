@@ -37,4 +37,9 @@ public interface IConsultationSessionRepository : IRepository<ConsultationSessio
         TimeSpan inactivityThreshold,
         TimeSpan reminderCooldown,
         CancellationToken cancellationToken = default);
+
+    Task<bool> IsUserParticipantAsync(
+        Guid sessionId,
+        Guid applicationUserId,
+        CancellationToken cancellationToken = default);
 }
