@@ -24,8 +24,8 @@ public class GetConsultationSessionsQueryHandler
         GetConsultationSessionsQuery request,
         CancellationToken cancellationToken)
     {
-        bool isAdmin = _currentUser.Roles.Any(r => Roles.Admins.Contains(r));
-        Guid? participantScope = isAdmin ? null : _currentUser.UserId;
+        var isAdmin = _currentUser.Roles.Any(r => Roles.Admins.Contains(r));
+        Guid? participantProfileId = isAdmin ? null : _currentUser.ProfileId;
 
         var (items, totalCount) = await _sessionRepository.GetPagedAsync(
             request.PatientId,
@@ -33,7 +33,7 @@ public class GetConsultationSessionsQueryHandler
             request.Type,
             request.Status,
             request.ChatStatus,
-            participantScope,
+            participantProfileId,
             request.PageNumber,
             request.PageSize,
             cancellationToken);

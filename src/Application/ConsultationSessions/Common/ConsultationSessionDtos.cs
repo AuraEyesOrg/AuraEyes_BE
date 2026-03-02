@@ -2,6 +2,15 @@ using Domain.Enums;
 
 namespace Application.ConsultationSessions.Common;
 
+public record ChatMessageDto
+{
+    public Guid Id { get; init; }
+    public Guid SenderUserId { get; init; }
+    public string Message { get; init; } = string.Empty;
+    public bool IsRead { get; init; }
+    public DateTime SentAt { get; init; }
+}
+
 public record ConsultationSessionDto
 {
     public Guid Id { get; init; }
@@ -24,6 +33,7 @@ public record ConsultationSessionDto
     public string? ClosingReason { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
+    public IReadOnlyList<ChatMessageDto> Messages { get; init; } = [];
 }
 
 public record ConsultationSessionListDto

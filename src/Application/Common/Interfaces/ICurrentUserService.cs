@@ -7,10 +7,16 @@ namespace Application.Common.Interfaces;
 public interface ICurrentUserService
 {
     /// <summary>
-    /// Current authenticated user ID.
+    /// Current authenticated user ID (ApplicationUser.Id).
     /// </summary>
     Guid? UserId { get; }
-    
+
+    /// <summary>
+    /// Domain profile entity ID (Patient.Id or Ophthalmologist.Id).
+    /// Resolved from the "profile_id" JWT claim. Use this for authorization checks
+    /// </summary>
+    Guid? ProfileId { get; }
+
     /// <summary>
     /// Current user's email.
     /// </summary>

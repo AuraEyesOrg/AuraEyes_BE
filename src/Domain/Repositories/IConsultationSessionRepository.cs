@@ -1,5 +1,5 @@
 using Domain.Common;
-using Domain.Entities;
+using Domain.Entities.Consultation;
 using Domain.Enums;
 
 namespace Domain.Repositories;
@@ -24,7 +24,7 @@ public interface IConsultationSessionRepository : IRepository<ConsultationSessio
         ConsultationSessionType? type = null,
         SessionStatus? status = null,
         ChatStatus? chatStatus = null,
-        Guid? participantUserId = null,
+        Guid? participantProfileId = null,
         int pageNumber = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default);

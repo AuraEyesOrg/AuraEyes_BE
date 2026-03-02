@@ -11,7 +11,7 @@ using Infrastructure.Identity;
 namespace API.Controllers.SystemAdmin;
 
 /// <summary>
-/// System Admin User & Role Management endpoints
+/// System Admin User and Role Management endpoints
 /// Provides centralized interface to manage users, roles, permissions, and monitor user activity.
 /// </summary>
 [Route("api/system-admin/[controller]")]
@@ -51,7 +51,7 @@ public class UsersController : BaseApiController
     /// <param name="pageNumber">Page number (default: 1)</param>
     /// <param name="pageSize">Page size (default: 10)</param>
     /// <remarks>
-    /// Screen: 3.5.1, 3.5.6-3.5.9 View User & Role Management Overview, Search/Filter Users
+    /// Screen: 3.5.1, 3.5.6-3.5.9 View User and Role Management Overview, Search/Filter Users
     /// </remarks>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<UserListDto>>), StatusCodes.Status200OK)]

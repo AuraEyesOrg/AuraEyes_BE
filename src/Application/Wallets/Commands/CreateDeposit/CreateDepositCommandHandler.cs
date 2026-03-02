@@ -2,7 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Wallets.Common;
 using Domain.Common;
-using Domain.Entities;
+using Domain.Entities.Financial;
 using Domain.Enums;
 using Domain.Repositories;
 using Microsoft.Extensions.Logging;

@@ -1,7 +1,8 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
-using Domain.Entities;
+using Domain.Entities.Consultation;
+using Domain.Entities.Users;
 using Domain.Repositories;
 using Microsoft.Extensions.Logging;
 

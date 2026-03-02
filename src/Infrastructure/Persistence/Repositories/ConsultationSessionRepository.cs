@@ -1,4 +1,4 @@
-using Domain.Entities;
+using Domain.Entities.Consultation;
 using Domain.Enums;
 using Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -46,17 +46,17 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
         ConsultationSessionType? type = null,
         SessionStatus? status = null,
         ChatStatus? chatStatus = null,
-        Guid? participantUserId = null,
+        Guid? participantProfileId = null,
         int pageNumber = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
         var query = _dbSet.AsQueryable();
 
-        if (participantUserId.HasValue)
+        if (participantProfileId.HasValue)
         {
-            var uid = participantUserId.Value;
-            query = query.Where(s => s.PatientId == uid || s.OphthalmologistId == uid);
+            var pid = participantProfileId.Value;
+            query = query.Where(s => s.PatientId == pid || s.OphthalmologistId == pid);
         }
 
         if (patientId.HasValue)
@@ -102,4 +102,5 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
                 (s.LastReminderSentAt == null || s.LastReminderSentAt < reminderCutoff))
             .ToListAsync(cancellationToken);
     }
+
 }
