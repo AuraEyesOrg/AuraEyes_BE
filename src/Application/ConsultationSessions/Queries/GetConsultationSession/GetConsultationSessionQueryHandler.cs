@@ -32,10 +32,10 @@ public class GetConsultationSessionQueryHandler
                 $"Session with ID '{request.SessionId}' was not found.");
         }
 
-        bool isAdmin = _currentUser.Roles.Any(r => Roles.Admins.Contains(r));
-        bool isParticipant = _currentUser.UserId.HasValue
-                             && await _sessionRepository.IsUserParticipantAsync(
-                                 session.Id, _currentUser.UserId.Value, cancellationToken);
+        var isAdmin = _currentUser.Roles.Any(r => Roles.Admins.Contains(r));
+        var isParticipant = _currentUser.ProfileId.HasValue
+                            && (session.PatientId == _currentUser.ProfileId.Value
+                                || session.OphthalmologistId == _currentUser.ProfileId.Value);
 
         if (!isAdmin && !isParticipant)
         {
