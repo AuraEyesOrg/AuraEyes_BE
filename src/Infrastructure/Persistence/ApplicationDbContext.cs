@@ -13,8 +13,8 @@ namespace Infrastructure.Persistence;
 /// Inherits from IdentityDbContext for Identity support
 /// </summary>
 public class ApplicationDbContext : IdentityDbContext<
-    ApplicationUser, 
-    ApplicationRole, 
+    ApplicationUser,
+    ApplicationRole,
     Guid,
     ApplicationUserClaim,
     ApplicationUserRole,
@@ -50,6 +50,7 @@ public class ApplicationDbContext : IdentityDbContext<
     // Financial
     public DbSet<Wallet> Wallets => Set<Wallet>();
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
+    public DbSet<DepositRequest> DepositRequests => Set<DepositRequest>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Contract> Contracts => Set<Contract>();
