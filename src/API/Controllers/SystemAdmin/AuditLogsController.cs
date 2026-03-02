@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace API.Controllers.SystemAdmin;
 
 /// <summary>
-/// System Admin Audit Logs & Compliance endpoints
+/// System Admin Audit Logs and Compliance endpoints
 /// Provides audit trail access for compliance and security monitoring.
 /// </summary>
 [Route("api/system-admin/[controller]")]
@@ -34,7 +34,7 @@ public class AuditLogsController : BaseApiController
     /// <param name="pageNumber">Page number (default: 1)</param>
     /// <param name="pageSize">Page size (default: 20)</param>
     /// <remarks>
-    /// Screen: Audit Logs & Compliance
+    /// Screen: Audit Logs and Compliance
     /// </remarks>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<AuditLogDto>>), StatusCodes.Status200OK)]
