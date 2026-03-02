@@ -7,8 +7,13 @@ namespace Infrastructure.Persistence.Repositories;
 
 public class ConsultationSessionRepository : Repository<ConsultationSession>, IConsultationSessionRepository
 {
+    private readonly DbSet<Patient> _patients;
+    private readonly DbSet<Ophthalmologist> _ophthalmologists;
+
     public ConsultationSessionRepository(ApplicationDbContext context) : base(context)
     {
+        _patients = context.Set<Patient>();
+        _ophthalmologists = context.Set<Ophthalmologist>();
     }
 
     public async Task<ConsultationSession?> GetByIdWithConversationsAsync(
@@ -56,7 +61,12 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
         if (participantUserId.HasValue)
         {
             var uid = participantUserId.Value;
-            query = query.Where(s => s.PatientId == uid || s.OphthalmologistId == uid);
+            // participantUserId is the ApplicationUser.Id (from JWT).
+            // ConsultationSession stores entity IDs (Patient.Id / Ophthalmologist.Id),
+            // so we must join through the entity tables to match on UserId.
+            query = query.Where(s =>
+                _patients.Any(p => p.Id == s.PatientId && p.UserId == uid) ||
+                _ophthalmologists.Any(o => o.Id == s.OphthalmologistId && o.UserId == uid));
         }
 
         if (patientId.HasValue)
@@ -101,5 +111,19 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
                 s.LastActivityAt < activityCutoff &&
                 (s.LastReminderSentAt == null || s.LastReminderSentAt < reminderCutoff))
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> IsUserParticipantAsync(
+        Guid sessionId,
+        Guid applicationUserId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbSet.AnyAsync(s =>
+            s.Id == sessionId &&
+            (
+                _patients.Any(p => p.Id == s.PatientId && p.UserId == applicationUserId) ||
+                _ophthalmologists.Any(o => o.Id == s.OphthalmologistId && o.UserId == applicationUserId)
+            ),
+            cancellationToken);
     }
 }

@@ -24,7 +24,8 @@ public class GetConsultationSessionQueryHandler
         GetConsultationSessionQuery request,
         CancellationToken cancellationToken)
     {
-        var session = await _sessionRepository.GetByIdAsync(request.SessionId, cancellationToken);
+        var session = await _sessionRepository.GetByIdWithConversationsAsync(
+            request.SessionId, cancellationToken);
         if (session is null)
         {
             return Result<ConsultationSessionDto>.NotFound(
@@ -32,15 +33,29 @@ public class GetConsultationSessionQueryHandler
         }
 
         bool isAdmin = _currentUser.Roles.Any(r => Roles.Admins.Contains(r));
-        bool isParticipant = _currentUser.UserId == session.PatientId
-                             || (session.OphthalmologistId.HasValue
-                                 && _currentUser.UserId == session.OphthalmologistId.Value);
+        bool isParticipant = _currentUser.UserId.HasValue
+                             && await _sessionRepository.IsUserParticipantAsync(
+                                 session.Id, _currentUser.UserId.Value, cancellationToken);
 
         if (!isAdmin && !isParticipant)
         {
-            return Result<ConsultationSessionDto>.Forbidden(
-                "You are not a participant of this session.");
+           return Result<ConsultationSessionDto>.Forbidden(
+               "You are not a participant of this session.");
         }
+
+        // Flatten all messages from all conversations, ordered by SentAt
+        var messages = session.Conversations
+            .SelectMany(c => c.Messages)
+            .OrderBy(m => m.SentAt)
+            .Select(m => new ChatMessageDto
+            {
+                Id = m.Id,
+                SenderUserId = m.SenderUserId,
+                Message = m.Message,
+                IsRead = m.IsRead,
+                SentAt = m.SentAt,
+            })
+            .ToList();
 
         var dto = new ConsultationSessionDto
         {
@@ -60,7 +75,8 @@ public class GetConsultationSessionQueryHandler
             ClosedBy = session.ClosedBy,
             ClosingReason = session.ClosingReason,
             CreatedAt = session.CreatedAt,
-            UpdatedAt = session.UpdatedAt
+            UpdatedAt = session.UpdatedAt,
+            Messages = messages
         };
 
         return Result<ConsultationSessionDto>.Success(dto);
