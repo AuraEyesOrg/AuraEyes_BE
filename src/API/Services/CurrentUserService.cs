@@ -27,6 +27,15 @@ public class CurrentUserService : ICurrentUserService
         }
     }
 
+    public Guid? ProfileId
+    {
+        get
+        {
+            var profileIdClaim = _httpContextAccessor.HttpContext?.User.FindFirst("profile_id")?.Value;
+            return Guid.TryParse(profileIdClaim, out var profileId) ? profileId : null;
+        }
+    }
+
     public string? Email => _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.Email)?.Value
                          ?? _httpContextAccessor.HttpContext?.User.FindFirst("email")?.Value;
 

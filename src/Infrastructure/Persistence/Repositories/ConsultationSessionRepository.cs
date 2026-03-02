@@ -7,13 +7,8 @@ namespace Infrastructure.Persistence.Repositories;
 
 public class ConsultationSessionRepository : Repository<ConsultationSession>, IConsultationSessionRepository
 {
-    private readonly DbSet<Patient> _patients;
-    private readonly DbSet<Ophthalmologist> _ophthalmologists;
-
     public ConsultationSessionRepository(ApplicationDbContext context) : base(context)
     {
-        _patients = context.Set<Patient>();
-        _ophthalmologists = context.Set<Ophthalmologist>();
     }
 
     public async Task<ConsultationSession?> GetByIdWithConversationsAsync(
@@ -51,22 +46,17 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
         ConsultationSessionType? type = null,
         SessionStatus? status = null,
         ChatStatus? chatStatus = null,
-        Guid? participantUserId = null,
+        Guid? participantProfileId = null,
         int pageNumber = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
         var query = _dbSet.AsQueryable();
 
-        if (participantUserId.HasValue)
+        if (participantProfileId.HasValue)
         {
-            var uid = participantUserId.Value;
-            // participantUserId is the ApplicationUser.Id (from JWT).
-            // ConsultationSession stores entity IDs (Patient.Id / Ophthalmologist.Id),
-            // so we must join through the entity tables to match on UserId.
-            query = query.Where(s =>
-                _patients.Any(p => p.Id == s.PatientId && p.UserId == uid) ||
-                _ophthalmologists.Any(o => o.Id == s.OphthalmologistId && o.UserId == uid));
+            var pid = participantProfileId.Value;
+            query = query.Where(s => s.PatientId == pid || s.OphthalmologistId == pid);
         }
 
         if (patientId.HasValue)
@@ -113,17 +103,4 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<bool> IsUserParticipantAsync(
-        Guid sessionId,
-        Guid applicationUserId,
-        CancellationToken cancellationToken = default)
-    {
-        return await _dbSet.AnyAsync(s =>
-            s.Id == sessionId &&
-            (
-                _patients.Any(p => p.Id == s.PatientId && p.UserId == applicationUserId) ||
-                _ophthalmologists.Any(o => o.Id == s.OphthalmologistId && o.UserId == applicationUserId)
-            ),
-            cancellationToken);
-    }
 }

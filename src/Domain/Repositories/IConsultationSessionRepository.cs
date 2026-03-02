@@ -24,7 +24,7 @@ public interface IConsultationSessionRepository : IRepository<ConsultationSessio
         ConsultationSessionType? type = null,
         SessionStatus? status = null,
         ChatStatus? chatStatus = null,
-        Guid? participantUserId = null,
+        Guid? participantProfileId = null,
         int pageNumber = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default);
@@ -36,10 +36,5 @@ public interface IConsultationSessionRepository : IRepository<ConsultationSessio
     Task<IReadOnlyList<ConsultationSession>> GetStaleSessions(
         TimeSpan inactivityThreshold,
         TimeSpan reminderCooldown,
-        CancellationToken cancellationToken = default);
-
-    Task<bool> IsUserParticipantAsync(
-        Guid sessionId,
-        Guid applicationUserId,
         CancellationToken cancellationToken = default);
 }

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
@@ -365,11 +366,14 @@ public class AuthService : IAuthService
     {
         var roles = await _userManager.GetRolesAsync(user);
 
+        var additionalClaims = await BuildProfileClaimsAsync(user.Id, roles, cancellationToken);
+
         var tokenResult = await _tokenService.GenerateAccessTokenAsync(
             user.Id,
             user.Email!,
             user.FullName,
-            roles);
+            roles,
+            additionalClaims);
 
         var refreshToken = _tokenService.GenerateRefreshToken();
         var refreshTokenHash = TokenService.HashToken(refreshToken);
@@ -450,11 +454,14 @@ public class AuthService : IAuthService
             }
 
             var roles = await _userManager.GetRolesAsync(user);
+            var additionalClaims = await BuildProfileClaimsAsync(user.Id, roles, cancellationToken);
+
             var tokenResult = await _tokenService.GenerateAccessTokenAsync(
                 user.Id,
                 user.Email!,
                 user.FullName,
-                roles);
+                roles,
+                additionalClaims);
 
             var newRefreshToken = _tokenService.GenerateRefreshToken();
             var newRefreshTokenHash = TokenService.HashToken(newRefreshToken);
@@ -688,5 +695,27 @@ public class AuthService : IAuthService
             _logger.LogError(ex, "Error resending confirmation email: {Email}", email);
             return Result.Failure("An error occurred while processing your request");
         }
+    }
+    private async Task<List<Claim>> BuildProfileClaimsAsync(
+        Guid userId, IList<string> roles, CancellationToken cancellationToken)
+    {
+        var claims = new List<Claim>();
+
+        if (roles.Contains(Roles.Patient))
+        {
+            var patients = await _patientRepository.FindAsync(
+                p => p.UserId == userId, cancellationToken);
+            if (patients.Count > 0)
+                claims.Add(new Claim("profile_id", patients[0].Id.ToString()));
+        }
+        else if (roles.Contains(Roles.Ophthalmologist))
+        {
+            var doctors = await _ophthalmologistRepository.FindAsync(
+                o => o.UserId == userId, cancellationToken);
+            if (doctors.Count > 0)
+                claims.Add(new Claim("profile_id", doctors[0].Id.ToString()));
+        }
+
+        return claims;
     }
 }
