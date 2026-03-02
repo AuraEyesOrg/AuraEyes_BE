@@ -121,7 +121,15 @@ public class ApplicationDbContext : IdentityDbContext<
     {
         UpdateAuditFields();
         await DispatchDomainEventsAsync(cancellationToken);
-        return await base.SaveChangesAsync(cancellationToken);
+        try
+        {
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException ex)
+        {
+            throw new Domain.Common.ConcurrencyException(
+                "A concurrent write conflict occurred. Another request may have modified the same data.", ex);
+        }
     }
 
     private void UpdateAuditFields()
