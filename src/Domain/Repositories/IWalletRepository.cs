@@ -30,6 +30,13 @@ public interface IWalletRepository : IRepository<Wallet>
     Task<bool> ExistsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Explicitly add a new WalletTransaction to the context.
+    /// Use this instead of relying on navigation-property cascade
+    /// to avoid EF marking new entities as Modified.
+    /// </summary>
+    Task AddTransactionAsync(WalletTransaction transaction, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get paginated transactions for a wallet.
     /// </summary>
     Task<(IReadOnlyList<WalletTransaction> Items, int TotalCount)> GetTransactionsPagedAsync(

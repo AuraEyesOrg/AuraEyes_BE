@@ -38,6 +38,11 @@ public class WalletRepository : Repository<Wallet>, IWalletRepository
         return await _dbSet.AnyAsync(w => w.UserId == userId, cancellationToken);
     }
 
+    public async Task AddTransactionAsync(WalletTransaction transaction, CancellationToken cancellationToken = default)
+    {
+        await _context.Set<WalletTransaction>().AddAsync(transaction, cancellationToken);
+    }
+
     public async Task<(IReadOnlyList<WalletTransaction> Items, int TotalCount)> GetTransactionsPagedAsync(
         Guid walletId,
         int pageNumber = 1,

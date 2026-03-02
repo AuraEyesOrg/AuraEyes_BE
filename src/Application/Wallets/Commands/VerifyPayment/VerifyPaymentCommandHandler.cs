@@ -110,23 +110,26 @@ public class VerifyPaymentCommandHandler : ICommandHandler<VerifyPaymentCommand,
                     return Result<VerifyPaymentResponse>.Failure("Wallet not found.");
                 }
 
-                // Update wallet balance
+                // Update wallet balance (entity is already tracked by EF change tracker)
                 wallet.Deposit(depositRequest.Amount, $"Deposit via PayOS - Order: {request.OrderCode}");
 
-                // Add transaction record
+                // Create transaction record and explicitly add to context
+                // NOTE: Do NOT use wallet.AddTransaction() + _walletRepository.UpdateAsync()
+                // because DbSet.Update() marks ALL reachable entities as Modified,
+                // including new child entities that should be Added → causes
+                // UPDATE instead of INSERT → DbUpdateConcurrencyException.
                 var transaction = new WalletTransaction(
                     wallet.Id,
                     depositRequest.Amount,
                     TransactionType.Deposit,
                     $"Deposit via PayOS - Order: {request.OrderCode}");
 
-                wallet.AddTransaction(transaction);
+                await _walletRepository.AddTransactionAsync(transaction, cancellationToken);
 
-                // Update deposit request status
+                // Update deposit request status (entity already tracked, no need for UpdateAsync)
                 depositRequest.Complete(txnRef, $"PayOS Status: {payosStatus}");
 
-                await _walletRepository.UpdateAsync(wallet, cancellationToken);
-                await _depositRequestRepository.UpdateAsync(depositRequest, cancellationToken);
+                // EF change tracker detects all modifications automatically
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
                 _logger.LogInformation(
@@ -147,7 +150,7 @@ public class VerifyPaymentCommandHandler : ICommandHandler<VerifyPaymentCommand,
             else if (payosStatus.Equals("CANCELLED", StringComparison.OrdinalIgnoreCase))
             {
                 depositRequest.Cancel("Payment cancelled by user or provider.");
-                await _depositRequestRepository.UpdateAsync(depositRequest, cancellationToken);
+                // Entity already tracked — change tracker detects the modification
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
                 return Result<VerifyPaymentResponse>.Success(new VerifyPaymentResponse
@@ -163,7 +166,7 @@ public class VerifyPaymentCommandHandler : ICommandHandler<VerifyPaymentCommand,
             else if (payosStatus.Equals("EXPIRED", StringComparison.OrdinalIgnoreCase))
             {
                 depositRequest.Fail("Payment link expired.");
-                await _depositRequestRepository.UpdateAsync(depositRequest, cancellationToken);
+                // Entity already tracked — change tracker detects the modification
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
                 return Result<VerifyPaymentResponse>.Success(new VerifyPaymentResponse
