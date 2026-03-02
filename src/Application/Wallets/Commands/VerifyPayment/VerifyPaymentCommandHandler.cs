@@ -190,6 +190,37 @@ public class VerifyPaymentCommandHandler : ICommandHandler<VerifyPaymentCommand,
                 });
             }
         }
+        catch (ConcurrencyException)
+        {
+            // Race condition: two concurrent requests both passed the Pending check
+            // before either had finished writing. The first one succeeded; we need to
+            // reload and return its result instead of failing the second request.
+            _logger.LogWarning(
+                "Concurrency conflict while verifying OrderCode {OrderCode}. Reloading to check final state.",
+                request.OrderCode);
+
+            var refreshed = await _depositRequestRepository.GetByOrderCodeAsync(
+                request.OrderCode, cancellationToken);
+
+            if (refreshed?.Status == PaymentStatus.Completed)
+            {
+                var wallet = await _walletRepository.GetByIdAsync(refreshed.WalletId, cancellationToken);
+                return Result<VerifyPaymentResponse>.Success(new VerifyPaymentResponse
+                {
+                    DepositRequestId = refreshed.Id,
+                    OrderCode = request.OrderCode,
+                    Status = "Completed",
+                    Amount = refreshed.Amount,
+                    IsSuccess = true,
+                    Message = "Payment verified and wallet credited successfully.",
+                    NewBalance = wallet?.Balance
+                });
+            }
+
+            // Concurrency conflict but payment wasn't completed – treat as failure
+            return Result<VerifyPaymentResponse>.Failure(
+                "Payment verification encountered a conflict. Please try again.");
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to verify payment for OrderCode: {OrderCode}", request.OrderCode);
