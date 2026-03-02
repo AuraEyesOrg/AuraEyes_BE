@@ -267,11 +267,36 @@ namespace Infrastructure.Persistence.Migrations
                     b.ToTable("Consents");
                 });
 
-            modelBuilder.Entity("Domain.Entities.ConsultationRequest", b =>
+            modelBuilder.Entity("Domain.Entities.ConsultationSession", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AiScreeningId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AppointmentTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CalendarEventId")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("ChatStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ClosedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ClosingReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -279,38 +304,43 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
 
-                    b.Property<string>("DiagnosisNote")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
-                    b.Property<bool>("IsFeedbackRequested")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
+                    b.Property<DateTime>("LastActivityAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastReminderSentAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("MeetingLink")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<Guid?>("OphthalmologistId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("OrganisationId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("RequestAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RequestMessage")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -320,9 +350,18 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AiScreeningId");
+
+                    b.HasIndex("OphthalmologistId");
+
+                    b.HasIndex("OrganisationId");
+
                     b.HasIndex("PatientId");
 
-                    b.ToTable("ConsultationRequests");
+                    b.HasIndex("Status", "ChatStatus", "LastActivityAt", "LastReminderSentAt")
+                        .HasDatabaseName("IX_ConsultationSessions_StaleSessionLookup");
+
+                    b.ToTable("ConsultationSessions");
                 });
 
             modelBuilder.Entity("Domain.Entities.Contract", b =>
@@ -448,7 +487,7 @@ namespace Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("ConsultationRequestId")
+                    b.Property<Guid>("ConsultationSessionId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -473,7 +512,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ConsultationRequestId");
+                    b.HasIndex("ConsultationSessionId");
 
                     b.HasIndex("OphthalmologistId");
 
@@ -620,6 +659,9 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("ConfirmedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("ConsultationSessionId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -664,67 +706,9 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("AiScreeningId");
 
+                    b.HasIndex("ConsultationSessionId");
+
                     b.ToTable("MedicalDiagnoses");
-                });
-
-            modelBuilder.Entity("Domain.Entities.Network.Follow", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("FollowerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("FollowerType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<Guid>("FollowingId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("FollowingType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("NotificationsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FollowerId");
-
-                    b.HasIndex("FollowingId");
-
-                    b.HasIndex("FollowerId", "FollowerType");
-
-                    b.HasIndex("FollowerId", "FollowingId")
-                        .IsUnique();
-
-                    b.HasIndex("FollowingId", "FollowingType");
-
-                    b.ToTable("Follows", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Network.PostAttachment", b =>
@@ -1110,6 +1094,10 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
 
+                    b.Property<string>("DegreeUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -1120,6 +1108,18 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<string>("LicenseUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1128,6 +1128,13 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("VerificationStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("PendingVerification");
 
                     b.Property<int>("YearsOfExperience")
                         .ValueGeneratedOnAdd()
@@ -2032,8 +2039,23 @@ namespace Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Domain.Entities.ConsultationRequest", b =>
+            modelBuilder.Entity("Domain.Entities.ConsultationSession", b =>
                 {
+                    b.HasOne("Domain.Entities.AiScreening", null)
+                        .WithMany()
+                        .HasForeignKey("AiScreeningId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Entities.Ophthalmologist", null)
+                        .WithMany()
+                        .HasForeignKey("OphthalmologistId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Entities.Organisation", null)
+                        .WithMany()
+                        .HasForeignKey("OrganisationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Domain.Entities.Patient", null)
                         .WithMany()
                         .HasForeignKey("PatientId")
@@ -2052,9 +2074,9 @@ namespace Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Domain.Entities.Conversation", b =>
                 {
-                    b.HasOne("Domain.Entities.ConsultationRequest", null)
+                    b.HasOne("Domain.Entities.ConsultationSession", null)
                         .WithMany("Conversations")
-                        .HasForeignKey("ConsultationRequestId")
+                        .HasForeignKey("ConsultationSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -2083,6 +2105,11 @@ namespace Infrastructure.Persistence.Migrations
                         .HasForeignKey("AiScreeningId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("Domain.Entities.ConsultationSession", null)
+                        .WithMany("MedicalDiagnoses")
+                        .HasForeignKey("ConsultationSessionId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Domain.Entities.Network.PostAttachment", b =>
@@ -2279,9 +2306,11 @@ namespace Infrastructure.Persistence.Migrations
                     b.Navigation("ScreeningResults");
                 });
 
-            modelBuilder.Entity("Domain.Entities.ConsultationRequest", b =>
+            modelBuilder.Entity("Domain.Entities.ConsultationSession", b =>
                 {
                     b.Navigation("Conversations");
+
+                    b.Navigation("MedicalDiagnoses");
                 });
 
             modelBuilder.Entity("Domain.Entities.Conversation", b =>

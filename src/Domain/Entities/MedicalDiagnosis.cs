@@ -9,6 +9,7 @@ public class MedicalDiagnosis : BaseEntity, IAggregateRoot
 {
     public Guid AiScreeningId { get; private set; }
     public Guid DoctorId { get; private set; }
+    public Guid? ConsultationSessionId { get; private set; }
     public string? DiagnosesCode { get; private set; }
     public string? DiagnosesText { get; private set; }
     public string? TreatmentPlan { get; private set; }
@@ -24,6 +25,17 @@ public class MedicalDiagnosis : BaseEntity, IAggregateRoot
         DoctorId = doctorId;
         DiagnosesCode = diagnosesCode;
         DiagnosesText = diagnosesText;
+        ReferralRequired = false;
+    }
+
+    public MedicalDiagnosis(Guid aiScreeningId, Guid doctorId, string? diagnosesCode = null,
+        string? diagnosesText = null, string? treatmentPlan = null)
+    {
+        AiScreeningId = aiScreeningId;
+        DoctorId = doctorId;
+        DiagnosesCode = diagnosesCode;
+        DiagnosesText = diagnosesText;
+        TreatmentPlan = treatmentPlan;
         ReferralRequired = false;
     }
 

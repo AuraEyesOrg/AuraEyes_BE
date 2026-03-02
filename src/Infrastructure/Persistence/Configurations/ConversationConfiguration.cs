@@ -17,9 +17,9 @@ public class ConversationConfiguration : IEntityTypeConfiguration<Conversation>
             .HasForeignKey(e => e.OphthalmologistId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne<ConsultationRequest>()
+        builder.HasOne<ConsultationSession>()
             .WithMany(c => c.Conversations)
-            .HasForeignKey(e => e.ConsultationRequestId)
+            .HasForeignKey(e => e.ConsultationSessionId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

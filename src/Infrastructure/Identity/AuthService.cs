@@ -23,6 +23,7 @@ public class AuthService : IAuthService
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenService _refreshTokenService;
     private readonly IEmailService _emailService;
+    private readonly IFileStorageService _fileStorageService;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
     private readonly IUnitOfWork _unitOfWork;
@@ -34,6 +35,7 @@ public class AuthService : IAuthService
         ITokenService tokenService,
         IRefreshTokenService refreshTokenService,
         IEmailService emailService,
+        IFileStorageService fileStorageService,
         IRepository<Patient> patientRepository,
         IRepository<Ophthalmologist> ophthalmologistRepository,
         IUnitOfWork unitOfWork,
@@ -44,6 +46,7 @@ public class AuthService : IAuthService
         _tokenService = tokenService;
         _refreshTokenService = refreshTokenService;
         _emailService = emailService;
+        _fileStorageService = fileStorageService;
         _patientRepository = patientRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _unitOfWork = unitOfWork;
@@ -66,6 +69,9 @@ public class AuthService : IAuthService
                 return Result<RegisterResponse>.Failure("A user with this email already exists");
             }
 
+            // Begin transaction to ensure atomicity across User + Role + Patient profile
+            await _unitOfWork.BeginTransactionAsync(cancellationToken);
+
             // Create user
             var user = new ApplicationUser
             {
@@ -80,6 +86,7 @@ public class AuthService : IAuthService
             var createResult = await _userManager.CreateAsync(user, request.Password);
             if (!createResult.Succeeded)
             {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
                 return Result<RegisterResponse>.Failure(createResult.Errors.Select(e => e.Description));
             }
 
@@ -91,12 +98,23 @@ public class AuthService : IAuthService
             await _patientRepository.AddAsync(patient, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            // Generate email confirmation token and send email
-            var confirmationToken = await _identityService.GenerateEmailConfirmationTokenAsync(user.Id);
-            var confirmationLink = $"{confirmationUrlBase}?userId={user.Id}&token={Uri.EscapeDataString(confirmationToken)}";
-            
-            // Delegate email sending to IEmailService
-            await _emailService.SendEmailConfirmationAsync(user.Email!, confirmationLink, cancellationToken);
+            // All DB operations succeeded — commit transaction
+            await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+            // Send confirmation email (best-effort, after commit — failure must NOT
+            // trigger rollback since DB is already committed)
+            try
+            {
+                var confirmationToken = await _identityService.GenerateEmailConfirmationTokenAsync(user.Id);
+                var confirmationLink = $"{confirmationUrlBase}?userId={user.Id}&token={Uri.EscapeDataString(confirmationToken)}";
+                await _emailService.SendEmailConfirmationAsync(user.Email!, confirmationLink, cancellationToken);
+            }
+            catch (Exception emailEx)
+            {
+                _logger.LogWarning(emailEx,
+                    "Failed to send confirmation email for {Email}. User is registered but needs manual email confirmation.",
+                    request.Email);
+            }
 
             _logger.LogInformation("Patient registered: {Email}", request.Email);
 
@@ -110,6 +128,14 @@ public class AuthService : IAuthService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error registering patient: {Email}", request.Email);
+
+            // Rollback all DB changes (User, Role, Patient)
+            try { await _unitOfWork.RollbackTransactionAsync(cancellationToken); }
+            catch (Exception rbEx)
+            {
+                _logger.LogWarning(rbEx, "Failed to rollback transaction for: {Email}", request.Email);
+            }
+
             return Result<RegisterResponse>.Failure("An error occurred during registration");
         }
     }
@@ -120,6 +146,9 @@ public class AuthService : IAuthService
         string confirmationUrlBase,
         CancellationToken cancellationToken = default)
     {
+        // Track uploaded files for compensating rollback if DB commit fails
+        var uploadedFileUrls = new List<string>();
+
         try
         {
             var existingUser = await _identityService.GetUserByEmailAsync(request.Email, cancellationToken);
@@ -127,6 +156,9 @@ public class AuthService : IAuthService
             {
                 return Result<RegisterResponse>.Failure("A user with this email already exists");
             }
+
+            // Begin transaction to ensure atomicity across User + Role + Ophthalmologist profile
+            await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
             var user = new ApplicationUser
             {
@@ -139,21 +171,56 @@ public class AuthService : IAuthService
             var createResult = await _userManager.CreateAsync(user, request.Password);
             if (!createResult.Succeeded)
             {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
                 return Result<RegisterResponse>.Failure(createResult.Errors.Select(e => e.Description));
             }
 
             await _identityService.AddToRoleAsync(user.Id, Roles.Ophthalmologist);
 
-            // Create Ophthalmologist profile using Repository pattern
-            var ophthalmologist = new Ophthalmologist(user.Id, request.Bio, request.YearsOfExperience);
+            // Upload credential files to Supabase S3 if provided
+            string? licenseUrl = null;
+            string? degreeUrl = null;
+
+            if (request.LicenseImage is { Length: > 0 })
+            {
+                await using var stream = request.LicenseImage.OpenReadStream();
+                licenseUrl = await _fileStorageService.SaveFileAsync(
+                    stream, request.LicenseImage.FileName, $"credentials/{user.Id}", cancellationToken);
+                uploadedFileUrls.Add(licenseUrl);
+            }
+
+            if (request.DegreeImage is { Length: > 0 })
+            {
+                await using var stream = request.DegreeImage.OpenReadStream();
+                degreeUrl = await _fileStorageService.SaveFileAsync(
+                    stream, request.DegreeImage.FileName, $"credentials/{user.Id}", cancellationToken);
+                uploadedFileUrls.Add(degreeUrl);
+            }
+
+            // Create Ophthalmologist profile with uploaded file URLs
+            var ophthalmologist = new Ophthalmologist(
+                user.Id, request.Bio, request.YearsOfExperience,
+                request.Phone, licenseUrl, degreeUrl);
             await _ophthalmologistRepository.AddAsync(ophthalmologist, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            var confirmationToken = await _identityService.GenerateEmailConfirmationTokenAsync(user.Id);
-            var confirmationLink = $"{confirmationUrlBase}?userId={user.Id}&token={Uri.EscapeDataString(confirmationToken)}";
-            
-            // Delegate to IEmailService
-            await _emailService.SendEmailConfirmationAsync(user.Email!, confirmationLink, cancellationToken);
+            // All DB operations succeeded — commit transaction
+            await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+            // Send confirmation email (best-effort, after commit — failure here must NOT
+            // trigger rollback or S3 cleanup since DB is already committed)
+            try
+            {
+                var confirmationToken = await _identityService.GenerateEmailConfirmationTokenAsync(user.Id);
+                var confirmationLink = $"{confirmationUrlBase}?userId={user.Id}&token={Uri.EscapeDataString(confirmationToken)}";
+                await _emailService.SendEmailConfirmationAsync(user.Email!, confirmationLink, cancellationToken);
+            }
+            catch (Exception emailEx)
+            {
+                _logger.LogWarning(emailEx,
+                    "Failed to send confirmation email for {Email}. User is registered but needs manual email confirmation.",
+                    request.Email);
+            }
 
             _logger.LogInformation("Ophthalmologist registered: {Email}", request.Email);
 
@@ -167,6 +234,24 @@ public class AuthService : IAuthService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error registering ophthalmologist: {Email}", request.Email);
+
+            // Rollback all DB changes (User, Role, Ophthalmologist)
+            try { await _unitOfWork.RollbackTransactionAsync(cancellationToken); }
+            catch (Exception rbEx)
+            {
+                _logger.LogWarning(rbEx, "Failed to rollback transaction for: {Email}", request.Email);
+            }
+
+            // Compensating action: delete any files already uploaded to S3
+            foreach (var url in uploadedFileUrls)
+            {
+                try { _fileStorageService.DeleteFile(url); }
+                catch (Exception delEx)
+                {
+                    _logger.LogWarning(delEx, "Failed to cleanup uploaded file during rollback: {Url}", url);
+                }
+            }
+
             return Result<RegisterResponse>.Failure("An error occurred during registration");
         }
     }

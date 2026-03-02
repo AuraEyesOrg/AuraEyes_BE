@@ -25,6 +25,8 @@ public interface IAuthService
         string confirmationUrlBase,
         CancellationToken cancellationToken = default);
 
+
+
     /// <summary>
     /// Authenticate user with email and password.
     /// Returns TwoFactorRequired if 2FA is enabled.

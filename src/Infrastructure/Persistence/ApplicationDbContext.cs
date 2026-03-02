@@ -43,7 +43,7 @@ public class ApplicationDbContext : IdentityDbContext<
 
     // Schedule & Communication
     public DbSet<Schedule> Schedules => Set<Schedule>();
-    public DbSet<ConsultationRequest> ConsultationRequests => Set<ConsultationRequest>();
+    public DbSet<ConsultationSession> ConsultationSessions => Set<ConsultationSession>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
 
@@ -72,7 +72,6 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<PostComment> PostComments => Set<PostComment>();
     public DbSet<PostAttachment> PostAttachments => Set<PostAttachment>();
     public DbSet<SavedPost> SavedPosts => Set<SavedPost>();
-    public DbSet<Follow> Follows => Set<Follow>();
 
     #endregion
 
