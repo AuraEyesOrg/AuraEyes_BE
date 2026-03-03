@@ -2,7 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Patients.Common;
 using Domain.Common;
-using Domain.Entities;
+using Domain.Entities.Users;
 using Domain.Enums;
 using Microsoft.Extensions.Logging;
 

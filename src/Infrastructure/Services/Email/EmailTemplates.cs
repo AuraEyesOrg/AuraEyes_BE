@@ -2,28 +2,39 @@ namespace Infrastructure.Services.Email;
 
 /// <summary>
 /// Email template provider for Aura healthcare system.
-/// Generates professional, healthcare-appropriate HTML emails in Vietnamese.
+/// Generates minimalist, card-based HTML emails in Vietnamese.
 /// </summary>
 internal static class EmailTemplates
 {
-    #region Color Palette (from Aura FE index.css)
-    
-    private const string BrandPrimary = "#13ECEC";      // Vibrant Cyan/Teal
-    private const string BrandDark = "#1A202C";         // Dark background
-    private const string BrandSoft = "#F0FDFA";         // Soft teal background
-    private const string TextMain = "#2D3748";          // Main text color
-    private const string TextMuted = "#718096";         // Muted text
-    private const string SurfaceWhite = "#FFFFFF";      // White surface
-    private const string BorderColor = "#E2E8F0";       // Border color
-    private const string BgPrimary = "#F7FAFC";         // Light background
-    
+    #region Color Palette
+
+    // Brand
+    private const string BrandPrimary = "#00E5FF";      // Cyan (Aura Primary)
+    private const string BrandDarkText = "#004D56";     // Dark teal for text on primary background
+    private const string BrandSoft = "#F0FDFA";         // Soft teal for background blocks
+    private const string BrandSoftBorder = "#CCFBF1";   // Border for soft blocks
+
+    // Typography
+    private const string TextMain = "#202124";
+    private const string TextMuted = "#5F6368";
+
+    // Structure
+    private const string SurfaceWhite = "#FFFFFF";
+    private const string BorderColor = "#E2E8F0";
+    private const string BgPrimary = "#F8F9FA";
+
+    // Status/Alerts
+    private const string AlertWarningBg = "#FFFBEB";
+    private const string AlertWarningText = "#B7791F";
+    private const string BorderWarning = "#F6AD55";
+
     #endregion
 
     #region Email Subjects
 
-    public const string EmailConfirmationSubject = "[AURA] Xác nhận địa chỉ email – Hệ thống quản lý khám sàng lọc mắt";
-    public const string PasswordResetSubject = "[AURA] Yêu cầu đặt lại mật khẩu tài khoản";
-    public const string WelcomeSubject = "[AURA] Chào mừng bạn đến với Hệ thống Aura";
+    public const string EmailConfirmationSubject = "Xác nhận địa chỉ email - Hệ thống Aura";
+    public const string PasswordResetSubject = "Yêu cầu đặt lại mật khẩu - Hệ thống Aura";
+    public const string WelcomeSubject = "Chào mừng bạn đến với Hệ thống Aura";
 
     #endregion
 
@@ -37,93 +48,58 @@ internal static class EmailTemplates
     <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
     <meta http-equiv=""X-UA-Compatible"" content=""IE=edge"">
     <title>Hệ thống Aura</title>
-    <!--[if mso]>
-    <noscript>
-        <xml>
-            <o:OfficeDocumentSettings>
-                <o:PixelsPerInch>96</o:PixelsPerInch>
-            </o:OfficeDocumentSettings>
-        </xml>
-    </noscript>
-    <![endif]-->
     <style>
-        /* Reset styles */
         body, table, td, a {{ -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }}
         table, td {{ mso-table-lspace: 0pt; mso-table-rspace: 0pt; }}
         img {{ -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }}
         body {{ margin: 0; padding: 0; width: 100% !important; height: 100% !important; }}
         a {{ color: {BrandPrimary}; text-decoration: none; }}
         
-        /* Typography */
         body, table, td, p, a, li, blockquote {{
-            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         }}
         
-        /* Responsive */
         @media only screen and (max-width: 600px) {{
-            .container {{ width: 100% !important; padding: 20px !important; }}
-            .content {{ padding: 30px 20px !important; }}
-            .button {{ width: 100% !important; display: block !important; }}
+            .container {{ width: 100% !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; }}
+            .content {{ padding: 32px 20px !important; }}
+            .button {{ width: 100% !important; display: block !important; box-sizing: border-box; text-align: center; }}
         }}
     </style>
 </head>
 <body style=""margin: 0; padding: 0; background-color: {BgPrimary};"">
-    <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BgPrimary};"">
+    <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BgPrimary}; padding: 40px 0;"">
         <tr>
-            <td align=""center"" style=""padding: 40px 20px;"">
-                <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""600"" class=""container"" style=""max-width: 600px; background-color: {SurfaceWhite}; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);"">
+            <td align=""center"">
+                <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""600"" class=""container"" style=""max-width: 600px; background-color: {SurfaceWhite}; border-top: 6px solid {BrandPrimary}; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden;"">
                     
-                    <!-- Header -->
                     <tr>
-                        <td style=""background: linear-gradient(135deg, {BrandDark} 0%, #0F172A 100%); padding: 30px 40px; border-radius: 16px 16px 0 0;"">
-                            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"">
-                                <tr>
-                                    <td>
-                                        <h1 style=""margin: 0; color: {SurfaceWhite}; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;"">
-                                            <span style=""color: {BrandPrimary};"">AURA</span>
-                                        </h1>
-                                        <p style=""margin: 8px 0 0 0; color: {TextMuted}; font-size: 14px; font-weight: 500;"">
-                                            Hệ thống quản lý khám sàng lọc mắt
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
+                        <td style=""padding: 32px 40px 16px 40px; text-align: center; border-bottom: 1px solid #F1F3F4;"">
+                            <h1 style=""margin: 0; color: {BrandPrimary}; font-size: 26px; font-weight: 700; letter-spacing: 1px;"">
+                                ❖ AURA
+                            </h1>
+                            <p style=""margin: 6px 0 0 0; color: {TextMuted}; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;"">
+                                Hệ thống quản lý khám sàng lọc mắt
+                            </p>
                         </td>
                     </tr>
                     
-                    <!-- Content -->
                     <tr>
                         <td class=""content"" style=""padding: 40px;"">
                             {content}
                         </td>
                     </tr>
                     
-                    <!-- Footer -->
                     <tr>
-                        <td style=""padding: 30px 40px; border-top: 1px solid {BorderColor}; background-color: {BrandSoft}; border-radius: 0 0 16px 16px;"">
-                            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"">
-                                <tr>
-                                    <td>
-                                        <p style=""margin: 0 0 8px 0; color: {TextMain}; font-size: 14px; font-weight: 600;"">
-                                            Hệ thống Aura – Quản lý khám sàng lọc mắt
-                                        </p>
-                                        <p style=""margin: 0 0 4px 0; color: {TextMuted}; font-size: 13px;"">
-                                            Email liên hệ: <a href=""mailto:vietbmt19@gmail.com"" style=""color: {BrandPrimary};"">vietbmt19@gmail.com</a>
-                                        </p>
-                                        <p style=""margin: 0 0 16px 0; color: {TextMuted}; font-size: 13px;"">
-                                            Điện thoại hỗ trợ: (Đang cập nhật)
-                                        </p>
-                                        <hr style=""border: none; border-top: 1px solid {BorderColor}; margin: 16px 0;"" />
-                                        <p style=""margin: 0; color: {TextMuted}; font-size: 12px; font-style: italic;"">
-                                            Đây là email được gửi tự động từ hệ thống.<br />
-                                            Vui lòng không trả lời trực tiếp email này.
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
+                        <td style=""padding: 24px 40px; background-color: #F8F9FA; border-top: 1px solid {BorderColor}; text-align: center;"">
+                            <p style=""margin: 0 0 8px 0; color: {TextMuted}; font-size: 12px; font-weight: 500;"">
+                                © 2026 AURA Healthcare System
+                            </p>
+                            <p style=""margin: 0 0 0 0; color: {TextMuted}; font-size: 12px; line-height: 1.5;"">
+                                Email này được tạo tự động, vui lòng không trả lời.<br>
+                                Cần hỗ trợ? Liên hệ <a href=""mailto:support@auraeyes.vn"" style=""color: {BrandDarkText}; text-decoration: underline;"">support@auraeyes.vn</a>
+                            </p>
                         </td>
                     </tr>
-                    
                 </table>
             </td>
         </tr>
@@ -138,62 +114,50 @@ internal static class EmailTemplates
     public static string GetEmailConfirmationBody(string confirmationLink)
     {
         var content = $@"
-            <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 20px; font-weight: 600;"">
+            <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 22px; font-weight: 600;"">
                 Xác nhận địa chỉ email
             </h2>
             
             <p style=""margin: 0 0 16px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
-                Kính chào Quý khách,
+                Xin chào,
             </p>
             
-            <p style=""margin: 0 0 16px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
-                Cảm ơn Quý khách đã đăng ký tài khoản trên <strong>Hệ thống Aura – Quản lý khám sàng lọc mắt</strong>.
+            <p style=""margin: 0 0 32px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Cảm ơn bạn đã đăng ký tài khoản trên hệ thống <strong>Aura</strong>. Để bảo mật thông tin và kích hoạt tài khoản, vui lòng xác nhận email của bạn.
             </p>
             
-            <p style=""margin: 0 0 24px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
-                Để hoàn tất quá trình đăng ký và kích hoạt tài khoản, vui lòng nhấn vào nút bên dưới để xác nhận địa chỉ email của Quý khách:
-            </p>
-            
-            <!-- CTA Button -->
-            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""margin: 0 0 24px 0;"">
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BrandSoft}; border: 1px solid {BrandSoftBorder}; border-radius: 8px; margin: 0 0 32px 0;"">
                 <tr>
-                    <td align=""center"">
-                        <a href=""{confirmationLink}"" class=""button"" style=""display: inline-block; background-color: {BrandPrimary}; color: {BrandDark}; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px; text-decoration: none; box-shadow: 0 4px 14px rgba(19, 236, 236, 0.25);"">
-                            Xác nhận email
+                    <td align=""center"" style=""padding: 32px 24px;"">
+                        <p style=""margin: 0 0 20px 0; color: {BrandDarkText}; font-size: 15px; font-weight: 500;"">
+                            Nhấn vào nút bên dưới để hoàn tất đăng ký:
+                        </p>
+                        <a href=""{confirmationLink}"" class=""button"" style=""display: inline-block; background-color: {BrandPrimary}; color: {BrandDarkText}; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 6px; text-decoration: none; box-shadow: 0 2px 4px rgba(0, 229, 255, 0.2);"">
+                            ✓ Xác nhận email
                         </a>
                     </td>
                 </tr>
             </table>
             
-            <p style=""margin: 0 0 16px 0; color: {TextMuted}; font-size: 13px; line-height: 1.6;"">
-                Nếu nút trên không hoạt động, Quý khách có thể sao chép và dán đường dẫn sau vào trình duyệt:
+            <p style=""margin: 0 0 8px 0; color: {TextMuted}; font-size: 13px; line-height: 1.6;"">
+                Hoặc sao chép đường dẫn này vào trình duyệt của bạn:
             </p>
             
-            <p style=""margin: 0 0 24px 0; padding: 12px 16px; background-color: {BrandSoft}; border-radius: 8px; word-break: break-all;"">
-                <a href=""{confirmationLink}"" style=""color: {BrandPrimary}; font-size: 13px; text-decoration: none;"">
-                    {confirmationLink}
-                </a>
-            </p>
-            
-            <!-- Security Notice -->
-            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: #FFF5F5; border-radius: 8px; border-left: 4px solid #FC8181;"">
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BgPrimary}; border: 1px dashed {BorderColor}; border-radius: 6px; margin: 0 0 32px 0;"">
                 <tr>
-                    <td style=""padding: 16px;"">
-                        <p style=""margin: 0 0 8px 0; color: #C53030; font-size: 14px; font-weight: 600;"">
-                            Lưu ý bảo mật
-                        </p>
-                        <p style=""margin: 0; color: {TextMain}; font-size: 13px; line-height: 1.6;"">
-                            Nếu Quý khách không thực hiện đăng ký tài khoản này, vui lòng bỏ qua email này. 
-                            Đường dẫn xác nhận sẽ tự động hết hạn và tài khoản sẽ không được kích hoạt.
+                    <td style=""padding: 12px 16px;"">
+                        <p style=""margin: 0; color: {TextMuted}; font-size: 12px; line-height: 1.6; word-break: break-all; font-family: 'Courier New', Courier, monospace;"">
+                            <a href=""{confirmationLink}"" style=""color: #009CA6; text-decoration: none;"">{confirmationLink}</a>
                         </p>
                     </td>
                 </tr>
             </table>
             
-            <p style=""margin: 24px 0 0 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
-                Trân trọng,<br />
-                <strong>Hệ thống Aura</strong>
-            </p>";
+            <div style=""border-left: 3px solid #E2E8F0; padding-left: 16px; margin-top: 16px;"">
+                <p style=""margin: 0; color: {TextMuted}; font-size: 13px; line-height: 1.5;"">
+                    Nếu bạn không tạo tài khoản này, bạn có thể bỏ qua email này. Tài khoản sẽ không được kích hoạt nếu không có sự xác nhận của bạn.
+                </p>
+            </div>";
 
         return WrapInBaseTemplate(content);
     }
@@ -205,80 +169,60 @@ internal static class EmailTemplates
     public static string GetPasswordResetBody(string resetLink)
     {
         var content = $@"
-            <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 20px; font-weight: 600;"">
-                Yêu cầu đặt lại mật khẩu
+            <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 22px; font-weight: 600;"">
+                Đặt lại mật khẩu
             </h2>
             
             <p style=""margin: 0 0 16px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
-                Kính chào Quý khách,
+                Xin chào,
             </p>
             
-            <p style=""margin: 0 0 16px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
-                Hệ thống đã nhận được yêu cầu đặt lại mật khẩu cho tài khoản của Quý khách trên <strong>Hệ thống Aura – Quản lý khám sàng lọc mắt</strong>.
+            <p style=""margin: 0 0 32px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản Aura của bạn.
             </p>
             
-            <p style=""margin: 0 0 24px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
-                Để đặt lại mật khẩu, vui lòng nhấn vào nút bên dưới:
-            </p>
-            
-            <!-- CTA Button -->
-            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""margin: 0 0 24px 0;"">
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BrandSoft}; border: 1px solid {BrandSoftBorder}; border-radius: 8px; margin: 0 0 32px 0;"">
                 <tr>
-                    <td align=""center"">
-                        <a href=""{resetLink}"" class=""button"" style=""display: inline-block; background-color: {BrandPrimary}; color: {BrandDark}; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px; text-decoration: none; box-shadow: 0 4px 14px rgba(19, 236, 236, 0.25);"">
-                            Đặt lại mật khẩu
+                    <td align=""center"" style=""padding: 32px 24px;"">
+                        <p style=""margin: 0 0 20px 0; color: {BrandDarkText}; font-size: 15px; font-weight: 500;"">
+                            Nhấn vào nút bên dưới để thiết lập mật khẩu mới:
+                        </p>
+                        <a href=""{resetLink}"" class=""button"" style=""display: inline-block; background-color: {BrandPrimary}; color: {BrandDarkText}; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 6px; text-decoration: none; box-shadow: 0 2px 4px rgba(0, 229, 255, 0.2);"">
+                            Thay đổi mật khẩu
                         </a>
                     </td>
                 </tr>
             </table>
             
-            <p style=""margin: 0 0 16px 0; color: {TextMuted}; font-size: 13px; line-height: 1.6;"">
-                Nếu nút trên không hoạt động, Quý khách có thể sao chép và dán đường dẫn sau vào trình duyệt:
+            <p style=""margin: 0 0 8px 0; color: {TextMuted}; font-size: 13px; line-height: 1.6;"">
+                Hoặc sao chép đường dẫn này vào trình duyệt của bạn:
             </p>
             
-            <p style=""margin: 0 0 24px 0; padding: 12px 16px; background-color: {BrandSoft}; border-radius: 8px; word-break: break-all;"">
-                <a href=""{resetLink}"" style=""color: {BrandPrimary}; font-size: 13px; text-decoration: none;"">
-                    {resetLink}
-                </a>
-            </p>
-            
-            <!-- Time Warning -->
-            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: #FFFBEB; border-radius: 8px; border-left: 4px solid #F6AD55; margin-bottom: 16px;"">
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BgPrimary}; border: 1px dashed {BorderColor}; border-radius: 6px; margin: 0 0 32px 0;"">
                 <tr>
-                    <td style=""padding: 16px;"">
-                        <p style=""margin: 0 0 8px 0; color: #C05621; font-size: 14px; font-weight: 600;"">
-                            Thời hạn có hiệu lực
-                        </p>
-                        <p style=""margin: 0; color: {TextMain}; font-size: 13px; line-height: 1.6;"">
-                            Đường dẫn đặt lại mật khẩu này sẽ hết hạn sau <strong>24 giờ</strong> kể từ thời điểm yêu cầu.
-                            Sau thời gian này, Quý khách cần thực hiện yêu cầu đặt lại mật khẩu mới.
+                    <td style=""padding: 12px 16px;"">
+                        <p style=""margin: 0; color: {TextMuted}; font-size: 12px; line-height: 1.6; word-break: break-all; font-family: 'Courier New', Courier, monospace;"">
+                            <a href=""{resetLink}"" style=""color: #009CA6; text-decoration: none;"">{resetLink}</a>
                         </p>
                     </td>
                 </tr>
             </table>
             
-            <!-- Security Notice -->
-            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: #FFF5F5; border-radius: 8px; border-left: 4px solid #FC8181;"">
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {AlertWarningBg}; border-left: 3px solid {BorderWarning}; margin-bottom: 24px;"">
                 <tr>
                     <td style=""padding: 16px;"">
-                        <p style=""margin: 0 0 8px 0; color: #C53030; font-size: 14px; font-weight: 600;"">
-                            Cảnh báo bảo mật
-                        </p>
-                        <p style=""margin: 0; color: {TextMain}; font-size: 13px; line-height: 1.6;"">
-                            Nếu Quý khách <strong>không thực hiện yêu cầu này</strong>, vui lòng bỏ qua email này và không nhấn vào đường dẫn trên.
-                            Mật khẩu hiện tại của Quý khách sẽ không bị thay đổi.
-                        </p>
-                        <p style=""margin: 8px 0 0 0; color: {TextMain}; font-size: 13px; line-height: 1.6;"">
-                            Nếu Quý khách nghi ngờ tài khoản đã bị xâm phạm, vui lòng liên hệ ngay với bộ phận hỗ trợ.
+                        <p style=""margin: 0; color: {AlertWarningText}; font-size: 13px; line-height: 1.5;"">
+                            <strong>Lưu ý:</strong> Đường dẫn này chỉ có hiệu lực trong vòng 24 giờ kể từ lúc yêu cầu.
                         </p>
                     </td>
                 </tr>
             </table>
             
-            <p style=""margin: 24px 0 0 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
-                Trân trọng,<br />
-                <strong>Hệ thống Aura</strong>
-            </p>";
+            <div style=""border-left: 3px solid #E2E8F0; padding-left: 16px;"">
+                <p style=""margin: 0; color: {TextMuted}; font-size: 13px; line-height: 1.5;"">
+                    Nếu bạn không yêu cầu đổi mật khẩu, vui lòng bỏ qua email này. Mật khẩu của bạn vẫn an toàn và không bị thay đổi.
+                </p>
+            </div>";
 
         return WrapInBaseTemplate(content);
     }
@@ -289,50 +233,49 @@ internal static class EmailTemplates
 
     public static string GetWelcomeBody(string fullName)
     {
-        var displayName = string.IsNullOrWhiteSpace(fullName) ? "Quý khách" : fullName;
-        
+        var displayName = string.IsNullOrWhiteSpace(fullName) ? "bạn" : fullName;
+
         var content = $@"
-            <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 20px; font-weight: 600;"">
-                Chào mừng đến với Hệ thống Aura
+            <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 22px; font-weight: 600;"">
+                Chào mừng đến với Aura
             </h2>
             
             <p style=""margin: 0 0 16px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
-                Kính chào <strong>{displayName}</strong>,
+                Xin chào <strong>{displayName}</strong>,
             </p>
             
-            <p style=""margin: 0 0 16px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
-                Chúc mừng Quý khách đã đăng ký thành công tài khoản trên <strong>Hệ thống Aura – Quản lý khám sàng lọc mắt</strong>.
+            <p style=""margin: 0 0 24px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Tài khoản của bạn đã được tạo thành công. Chúng tôi rất vui được đồng hành cùng bạn trong việc theo dõi và chăm sóc sức khỏe thị lực.
             </p>
             
-            <p style=""margin: 0 0 16px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
-                Hệ thống Aura cung cấp các tính năng quản lý và theo dõi khám sàng lọc mắt chuyên nghiệp, 
-                giúp Quý khách chủ động trong việc chăm sóc sức khỏe thị lực.
-            </p>
-            
-            <!-- Info Box -->
-            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BrandSoft}; border-radius: 8px; border-left: 4px solid {BrandPrimary}; margin: 24px 0;"">
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BrandSoft}; border: 1px solid {BrandSoftBorder}; border-radius: 8px; margin: 0 0 32px 0;"">
                 <tr>
-                    <td style=""padding: 16px;"">
-                        <p style=""margin: 0 0 8px 0; color: {TextMain}; font-size: 14px; font-weight: 600;"">
-                            Các tính năng chính:
+                    <td style=""padding: 24px;"">
+                        <p style=""margin: 0 0 16px 0; color: {BrandDarkText}; font-size: 15px; font-weight: 600;"">
+                            Với Aura, bạn có thể:
                         </p>
-                        <ul style=""margin: 0; padding-left: 20px; color: {TextMain}; font-size: 13px; line-height: 1.8;"">
-                            <li>Quản lý lịch khám sàng lọc mắt</li>
-                            <li>Theo dõi kết quả khám và lịch sử thăm khám</li>
-                            <li>Nhận thông báo nhắc nhở lịch hẹn</li>
-                            <li>Tra cứu thông tin sức khỏe thị lực</li>
-                        </ul>
+                        
+                        <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"">
+                            <tr>
+                                <td width=""24"" valign=""top"" style=""padding: 0 0 12px 0; color: {BrandPrimary};"">❖</td>
+                                <td style=""padding: 0 0 12px 0; color: {TextMain}; font-size: 14px; line-height: 1.5;"">Đặt và quản lý lịch hẹn khám sàng lọc dễ dàng</td>
+                            </tr>
+                            <tr>
+                                <td width=""24"" valign=""top"" style=""padding: 0 0 12px 0; color: {BrandPrimary};"">❖</td>
+                                <td style=""padding: 0 0 12px 0; color: {TextMain}; font-size: 14px; line-height: 1.5;"">Xem kết quả phân tích và theo dõi tình trạng võng mạc</td>
+                            </tr>
+                            <tr>
+                                <td width=""24"" valign=""top"" style=""padding: 0; color: {BrandPrimary};"">❖</td>
+                                <td style=""padding: 0; color: {TextMain}; font-size: 14px; line-height: 1.5;"">Lưu trữ hồ sơ y tế cá nhân an toàn và bảo mật</td>
+                            </tr>
+                        </table>
                     </td>
                 </tr>
             </table>
             
-            <p style=""margin: 0 0 16px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
-                Nếu Quý khách có bất kỳ câu hỏi nào, vui lòng liên hệ với bộ phận hỗ trợ qua thông tin bên dưới.
-            </p>
-            
-            <p style=""margin: 24px 0 0 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
-                Trân trọng,<br />
-                <strong>Hệ thống Aura</strong>
+            <p style=""margin: 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Trân trọng,<br>
+                <strong>Đội ngũ Aura</strong>
             </p>";
 
         return WrapInBaseTemplate(content);

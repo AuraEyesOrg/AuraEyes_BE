@@ -3,7 +3,7 @@ using Application.Common.Models;
 using Application.Patients.Common;
 using Domain.Common;
 using Domain.Entities;
-using Domain.Enums;
+using Domain.Entities.Users;
 using Microsoft.Extensions.Logging;
 
 namespace Application.Patients.Queries.GetPatientProfile;
