@@ -650,6 +650,7 @@ public class AuthService : IAuthService
                 return Result<UserInfoResponse>.Unauthorized("User not found");
             }
 
+            var userDetails = await _identityService.GetUserDetailsAsync(userId, cancellationToken);
             var roles = await _identityService.GetUserRolesAsync(userId);
             var twoFactorEnabled = await _identityService.IsTwoFactorEnabledAsync(userId);
 
@@ -658,6 +659,7 @@ public class AuthService : IAuthService
                 Id = userDto.Id,
                 Email = userDto.Email,
                 FullName = userDto.FullName,
+                AvatarUrl = userDetails?.AvatarUrl,
                 Roles = roles.ToArray(),
                 EmailConfirmed = userDto.EmailConfirmed,
                 OrganizationId = userDto.OrganizationId,

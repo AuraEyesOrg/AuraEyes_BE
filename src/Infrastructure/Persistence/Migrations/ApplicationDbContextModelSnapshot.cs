@@ -63,7 +63,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("AiScreenings");
+                    b.ToTable("AiScreenings", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.AuditLog", b =>
@@ -118,7 +118,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("AuditLogs");
+                    b.ToTable("AuditLogs", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Certificate", b =>
@@ -170,7 +170,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OphthalmologistId");
 
-                    b.ToTable("Certificates");
+                    b.ToTable("Certificates", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.ChatMessage", b =>
@@ -219,7 +219,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ConversationId");
 
-                    b.ToTable("ChatMessages");
+                    b.ToTable("ChatMessages", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Consent", b =>
@@ -264,7 +264,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PatientId");
 
-                    b.ToTable("Consents");
+                    b.ToTable("Consents", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.ConsultationSession", b =>
@@ -361,7 +361,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("Status", "ChatStatus", "LastActivityAt", "LastReminderSentAt")
                         .HasDatabaseName("IX_ConsultationSessions_StaleSessionLookup");
 
-                    b.ToTable("ConsultationSessions");
+                    b.ToTable("ConsultationSessions", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Contract", b =>
@@ -420,7 +420,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TemplateId");
 
-                    b.ToTable("Contracts");
+                    b.ToTable("Contracts", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.ContractTemplate", b =>
@@ -478,7 +478,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("Type", "ContractVersion")
                         .IsUnique();
 
-                    b.ToTable("ContractTemplates");
+                    b.ToTable("ContractTemplates", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Conversation", b =>
@@ -516,7 +516,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OphthalmologistId");
 
-                    b.ToTable("Conversations");
+                    b.ToTable("Conversations", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Feedback", b =>
@@ -555,7 +555,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Feedbacks");
+                    b.ToTable("Feedbacks", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.MedicalDiagnosis", b =>
@@ -619,7 +619,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ConsultationSessionId");
 
-                    b.ToTable("MedicalDiagnoses");
+                    b.ToTable("MedicalDiagnoses", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Network.PostAttachment", b =>
@@ -986,7 +986,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Notifications");
+                    b.ToTable("Notifications", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Ophthalmologist", b =>
@@ -1057,7 +1057,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Ophthalmologists");
+                    b.ToTable("Ophthalmologists", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Order", b =>
@@ -1093,7 +1093,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Orders");
+                    b.ToTable("Orders", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Organisation", b =>
@@ -1142,7 +1142,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Organisations");
+                    b.ToTable("Organisations", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Patient", b =>
@@ -1179,7 +1179,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Patients");
+                    b.ToTable("Patients", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Payment", b =>
@@ -1229,7 +1229,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrderId");
 
-                    b.ToTable("Payments");
+                    b.ToTable("Payments", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Permission", b =>
@@ -1283,7 +1283,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Permissions");
+                    b.ToTable("Permissions", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.RetinalImage", b =>
@@ -1342,7 +1342,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PatientId");
 
-                    b.ToTable("RetinalImages");
+                    b.ToTable("RetinalImages", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Schedule", b =>
@@ -1403,7 +1403,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrganisationId");
 
-                    b.ToTable("Schedules");
+                    b.ToTable("Schedules", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.ScreeningResult", b =>
@@ -1453,7 +1453,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("AiScreeningId");
 
-                    b.ToTable("ScreeningResults");
+                    b.ToTable("ScreeningResults", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.UserPermission", b =>
@@ -1506,7 +1506,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "PermissionId")
                         .IsUnique();
 
-                    b.ToTable("UserPermissions");
+                    b.ToTable("UserPermissions", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Wallet", b =>
@@ -1546,7 +1546,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Wallets");
+                    b.ToTable("Wallets", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.WalletTransaction", b =>
@@ -1592,7 +1592,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("WalletId");
 
-                    b.ToTable("WalletTransactions");
+                    b.ToTable("WalletTransactions", (string)null);
                 });
 
             modelBuilder.Entity("Infrastructure.Identity.ApplicationRole", b =>

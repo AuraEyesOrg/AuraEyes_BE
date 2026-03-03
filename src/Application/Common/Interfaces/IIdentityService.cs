@@ -116,6 +116,40 @@ public interface IIdentityService
     /// Get pending approvals count.
     /// </summary>
     Task<int> GetPendingApprovalsCountAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get extended user details for profile display.
+    /// </summary>
+    Task<UserDetailsDto?> GetUserDetailsAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update user profile information (name, phone, address, etc.).
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> UpdateUserProfileAsync(
+        Guid userId,
+        string fullName,
+        string? phone,
+        DateTime? dateOfBirth,
+        int? gender,
+        string? address,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update user avatar URL.
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> UpdateAvatarUrlAsync(
+        Guid userId,
+        string avatarUrl,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Change user password.
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> ChangePasswordAsync(
+        Guid userId,
+        string currentPassword,
+        string newPassword,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -160,3 +194,21 @@ public record UserMetricsDto(
     decimal PatientsScreenedChange,
     int PendingApprovals
 );
+
+/// <summary>
+/// Extended user details DTO for profile display.
+/// </summary>
+public record UserDetailsDto
+{
+    public Guid Id { get; init; }
+    public string Email { get; init; } = string.Empty;
+    public string FullName { get; init; } = string.Empty;
+    public string? PhoneNumber { get; init; }
+    public DateTime? DateOfBirth { get; init; }
+    public Domain.Enums.Gender? Gender { get; init; }
+    public string? Address { get; init; }
+    public string? AvatarUrl { get; init; }
+    public bool EmailConfirmed { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? UpdatedAt { get; init; }
+}
