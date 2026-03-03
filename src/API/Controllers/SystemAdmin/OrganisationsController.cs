@@ -3,7 +3,7 @@ using Application.Common.Models;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisationMetrics;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisations;
 using Domain.Common;
-using Domain.Entities;
+using Domain.Entities.Users;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -32,7 +32,7 @@ public class OrganisationsController : BaseApiController
     /// Get organisation metrics
     /// </summary>
     /// <remarks>
-    /// Screen: 3.4.1-3.4.3 View Clinic & Device Inventory Overview
+    /// Screen: 3.4.1-3.4.3 View Clinic and Device Inventory Overview
     /// </remarks>
     [HttpGet("metrics")]
     [ProducesResponseType(typeof(ApiResponse<OrganisationMetricsDto>), StatusCodes.Status200OK)]

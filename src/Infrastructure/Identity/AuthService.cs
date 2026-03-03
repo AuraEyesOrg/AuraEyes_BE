@@ -4,7 +4,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Common.Models.Auth;
 using Domain.Common;
-using Domain.Entities;
+using Domain.Entities.Users;
 using Domain.Enums;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;

@@ -1,7 +1,7 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
-using Domain.Entities;
+using Domain.Entities.Users;
 using Domain.Enums;
 
 namespace Application.SystemAdmin.Organisations.Queries.GetOrganisationMetrics;

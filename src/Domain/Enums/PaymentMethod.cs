@@ -9,5 +9,6 @@ public enum PaymentMethod
     Cash = 5,
     Momo = 6,
     VNPay = 7,
-    ZaloPay = 8
+    ZaloPay = 8,
+    PayOS = 9
 }

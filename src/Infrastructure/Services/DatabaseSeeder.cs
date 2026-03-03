@@ -1,5 +1,5 @@
 using Application.Common.Constants;
-using Domain.Entities;
+using Domain.Entities.Users;
 using Domain.Enums;
 using Infrastructure.Identity;
 using Infrastructure.Persistence;
