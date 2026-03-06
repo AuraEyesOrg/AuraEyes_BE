@@ -139,6 +139,7 @@ public record UserInfoResponse
     public Guid Id { get; init; }
     public string Email { get; init; } = string.Empty;
     public string FullName { get; init; } = string.Empty;
+    public string? AvatarUrl { get; init; }
     public string[] Roles { get; init; } = Array.Empty<string>();
     public bool EmailConfirmed { get; init; }
     public Guid? OrganizationId { get; init; }
