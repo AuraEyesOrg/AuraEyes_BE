@@ -27,7 +27,7 @@ public class CreateVerificationSessionCommandHandler
         var session = ConsultationSession.CreateVerification(
             request.PatientId,
             request.AiScreeningId,
-            request.Price,
+            request.PlatformFee,
             request.OphthalmologistId);
 
         await _sessionRepository.AddAsync(session, cancellationToken);

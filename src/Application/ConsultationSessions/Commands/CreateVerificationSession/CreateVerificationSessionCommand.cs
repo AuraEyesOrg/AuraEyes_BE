@@ -6,6 +6,6 @@ public record CreateVerificationSessionCommand : ICommand<Guid>
 {
     public Guid PatientId { get; init; }
     public Guid AiScreeningId { get; init; }
-    public decimal Price { get; init; }
+    public decimal PlatformFee { get; init; }
     public Guid? OphthalmologistId { get; init; }
 }

@@ -24,7 +24,8 @@ public record ConsultationSessionDto
     public string StatusName => Status.ToString();
     public ChatStatus ChatStatus { get; init; }
     public string ChatStatusName => ChatStatus.ToString();
-    public decimal Price { get; init; }
+    public decimal PlatformFee { get; init; }
+    public decimal? OfflineClinicFee { get; init; }
     public DateTime? AppointmentTime { get; init; }
     public string? MeetingLink { get; init; }
     public DateTime LastActivityAt { get; init; }
@@ -47,7 +48,7 @@ public record ConsultationSessionListDto
     public string StatusName => Status.ToString();
     public ChatStatus ChatStatus { get; init; }
     public string ChatStatusName => ChatStatus.ToString();
-    public decimal Price { get; init; }
+    public decimal PlatformFee { get; init; }
     public DateTime? AppointmentTime { get; init; }
     public DateTime LastActivityAt { get; init; }
     public DateTime CreatedAt { get; init; }

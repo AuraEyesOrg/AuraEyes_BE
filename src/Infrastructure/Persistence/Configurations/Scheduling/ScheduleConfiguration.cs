@@ -1,5 +1,4 @@
 using Domain.Entities.Scheduling;
-using Domain.Entities.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -23,15 +22,13 @@ public class ScheduleConfiguration : IEntityTypeConfiguration<Schedule>
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
-        // Relationships
-        builder.HasOne<Ophthalmologist>()
-            .WithMany()
-            .HasForeignKey(e => e.OphthalmologistId)
+        // Relationships - FK to Availability (replaces direct doctor/org FKs, satisfies 3NF)
+        builder.HasOne(e => e.Availability)
+            .WithMany(a => a.Schedules)
+            .HasForeignKey(e => e.AvailabilityId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne<Organisation>()
-            .WithMany()
-            .HasForeignKey(e => e.OrganisationId)
-            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(e => e.AvailabilityId);
+        builder.HasIndex(e => e.PatientId);
     }
 }

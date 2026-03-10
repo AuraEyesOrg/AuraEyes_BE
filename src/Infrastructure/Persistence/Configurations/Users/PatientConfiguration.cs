@@ -8,9 +8,11 @@ public class PatientConfiguration : IEntityTypeConfiguration<Patient>
 {
     public void Configure(EntityTypeBuilder<Patient> builder)
     {
-        // JSONB field for medical history
-        builder.Property(e => e.MedicalHistorySummary)
-            .HasColumnType("jsonb");
+        builder.Property(e => e.BMI)
+            .HasPrecision(5, 2);
+
+        builder.Property(e => e.DiseaseHistory)
+            .HasMaxLength(1000);
 
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
@@ -18,12 +20,15 @@ public class PatientConfiguration : IEntityTypeConfiguration<Patient>
         builder.HasIndex(e => e.UserId)
             .IsUnique();
 
-        // Relationships - configure from parent side with navigation properties
+        // Relationships
         builder.HasMany(e => e.RetinalImages)
             .WithOne()
             .HasForeignKey(r => r.PatientId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Consents relationship is configured from ConsentConfiguration
+        builder.HasMany(e => e.AiScreenings)
+            .WithOne()
+            .HasForeignKey(s => s.PatientId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -4,7 +4,8 @@ using Domain.Enums;
 namespace Domain.Entities.Contracts;
 
 /// <summary>
-/// Contract entity - signed contracts between parties
+/// Contract entity - signed B2B contracts between the platform and organisations.
+/// AiQuotaLimit and PlatformCommissionRate replace the Subscription subsystem.
 /// </summary>
 public class Contract : BaseEntity, IAggregateRoot
 {
@@ -16,9 +17,16 @@ public class Contract : BaseEntity, IAggregateRoot
     public string? SignedContent { get; private set; }
     public ContractStatus Status { get; private set; }
 
+    /// <summary>Number of AI screening credits granted under this contract.</summary>
+    public int AiQuotaLimit { get; private set; }
+
+    /// <summary>Platform revenue share, e.g. 0.20 = 20%.</summary>
+    public decimal PlatformCommissionRate { get; private set; }
+
     private Contract() { } // EF Core
 
-    public Contract(Guid userId, Guid templateId, string contractNumber, string? signedContent = null)
+    public Contract(Guid userId, Guid templateId, string contractNumber,
+        int aiQuotaLimit = 0, decimal platformCommissionRate = 0m, string? signedContent = null)
     {
         if (string.IsNullOrWhiteSpace(contractNumber))
             throw new ArgumentException("Contract number cannot be empty", nameof(contractNumber));
@@ -26,6 +34,8 @@ public class Contract : BaseEntity, IAggregateRoot
         UserId = userId;
         TemplateId = templateId;
         ContractNumber = contractNumber;
+        AiQuotaLimit = aiQuotaLimit;
+        PlatformCommissionRate = platformCommissionRate;
         SignedContent = signedContent;
         Status = ContractStatus.Draft;
     }

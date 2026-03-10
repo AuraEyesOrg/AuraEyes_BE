@@ -17,7 +17,18 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     public ConsultationSessionType Type { get; private set; }
     public SessionStatus Status { get; private set; }
     public ChatStatus ChatStatus { get; private set; }
-    public decimal Price { get; private set; }
+
+    /// <summary>Platform fee / deposit charged online (phí nền tảng / tiền cọc).</summary>
+    public decimal PlatformFee { get; private set; }
+
+    /// <summary>Fee paid in cash at the clinic counter (optional for O2O model).</summary>
+    public decimal? OfflineClinicFee { get; private set; }
+
+    /// <summary>Patient consent flag: share retinal images with the assigned doctor.</summary>
+    public bool IsRetinalImagesShared { get; private set; }
+
+    /// <summary>Patient consent flag: share AI screening result with the assigned doctor.</summary>
+    public bool IsAIResultShared { get; private set; }
 
     public DateTime? AppointmentTime { get; private set; }
     public string? MeetingLink { get; private set; }
@@ -44,7 +55,7 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     public static ConsultationSession CreateVerification(
         Guid patientId,
         Guid aiScreeningId,
-        decimal price,
+        decimal platformFee,
         Guid? ophthalmologistId = null)
     {
         return new ConsultationSession
@@ -55,7 +66,7 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
             Type = ConsultationSessionType.Verification,
             Status = SessionStatus.Pending,
             ChatStatus = ChatStatus.Locked,
-            Price = price,
+            PlatformFee = platformFee,
             LastActivityAt = DateTime.UtcNow
         };
     }
@@ -65,7 +76,7 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     /// </summary>
     public static ConsultationSession CreateVideoCall(
         Guid patientId,
-        decimal price,
+        decimal platformFee,
         DateTime appointmentTime,
         Guid? ophthalmologistId = null,
         string? meetingLink = null,
@@ -81,7 +92,7 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
             Type = ConsultationSessionType.VideoCall,
             Status = SessionStatus.Pending,
             ChatStatus = ChatStatus.MemoOnly,
-            Price = price,
+            PlatformFee = platformFee,
             AppointmentTime = appointmentTime,
             MeetingLink = meetingLink,
             CalendarEventId = calendarEventId,
@@ -90,13 +101,14 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     }
 
     /// <summary>
-    /// Factory: create a ClinicBooking session.
+    /// Factory: create a ClinicBooking session (O2O model: deposit online, pay remainder at clinic).
     /// </summary>
     public static ConsultationSession CreateClinicBooking(
         Guid patientId,
         Guid organisationId,
-        decimal price,
+        decimal platformFee,
         DateTime appointmentTime,
+        decimal? offlineClinicFee = null,
         Guid? ophthalmologistId = null)
     {
         if (appointmentTime <= DateTime.UtcNow.AddMinutes(1))
@@ -110,7 +122,8 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
             Type = ConsultationSessionType.ClinicBooking,
             Status = SessionStatus.Pending,
             ChatStatus = ChatStatus.Locked,
-            Price = price,
+            PlatformFee = platformFee,
+            OfflineClinicFee = offlineClinicFee,
             AppointmentTime = appointmentTime,
             LastActivityAt = DateTime.UtcNow
         };

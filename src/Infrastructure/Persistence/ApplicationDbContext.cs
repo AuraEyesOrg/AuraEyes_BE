@@ -56,6 +56,7 @@ public class ApplicationDbContext : IdentityDbContext<
 
     // Scheduling
     public DbSet<Schedule> Schedules => Set<Schedule>();
+    public DbSet<Availability> Availabilities => Set<Availability>();
 
     // Financial
     public DbSet<Wallet> Wallets => Set<Wallet>();
@@ -71,10 +72,12 @@ public class ApplicationDbContext : IdentityDbContext<
     // Authorization
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
 
     // Platform
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
 
     // Identity
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();

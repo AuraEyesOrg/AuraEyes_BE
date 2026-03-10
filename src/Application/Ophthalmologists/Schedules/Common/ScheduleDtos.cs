@@ -2,14 +2,11 @@ using Domain.Enums;
 
 namespace Application.Ophthalmologists.Schedules.Common;
 
-/// <summary>
-/// DTO for schedule list items.
-/// </summary>
 public record ScheduleListDto
 {
     public Guid Id { get; init; }
-    public Guid OphthalmologistId { get; init; }
-    public Guid? OrganisationId { get; init; }
+    public Guid AvailabilityId { get; init; }
+    public Guid PatientId { get; init; }
     public DateOnly Date { get; init; }
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }
@@ -21,16 +18,11 @@ public record ScheduleListDto
     public DateTime CreatedAt { get; init; }
 }
 
-/// <summary>
-/// DTO for schedule details.
-/// </summary>
 public record ScheduleDto
 {
     public Guid Id { get; init; }
-    public Guid OphthalmologistId { get; init; }
-    public string? OphthalmologistName { get; init; }
-    public Guid? OrganisationId { get; init; }
-    public string? OrganisationName { get; init; }
+    public Guid AvailabilityId { get; init; }
+    public Guid PatientId { get; init; }
     public DateOnly Date { get; init; }
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }
@@ -43,9 +35,6 @@ public record ScheduleDto
     public DateTime? UpdatedAt { get; init; }
 }
 
-/// <summary>
-/// DTO for schedule statistics.
-/// </summary>
 public record ScheduleStatsDto
 {
     public int TotalCount { get; init; }
@@ -55,3 +44,4 @@ public record ScheduleStatsDto
     public int CancelledCount { get; init; }
     public int NoShowCount { get; init; }
 }
+

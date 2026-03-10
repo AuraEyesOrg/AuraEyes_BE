@@ -87,7 +87,7 @@ public class ConsultationSessionsController : BaseApiController
         {
             PatientId = request.PatientId,
             AiScreeningId = request.AiScreeningId,
-            Price = request.Price,
+            PlatformFee = request.PlatformFee,
             OphthalmologistId = request.OphthalmologistId
         };
 
@@ -117,7 +117,7 @@ public class ConsultationSessionsController : BaseApiController
         var command = new CreateVideoCallSessionCommand
         {
             PatientId = request.PatientId,
-            Price = request.Price,
+            PlatformFee = request.PlatformFee,
             AppointmentTime = request.AppointmentTime,
             OphthalmologistId = request.OphthalmologistId
         };
@@ -237,14 +237,14 @@ public record CreateVerificationSessionRequest
 {
     public Guid PatientId { get; init; }
     public Guid AiScreeningId { get; init; }
-    public decimal Price { get; init; }
+    public decimal PlatformFee { get; init; }
     public Guid? OphthalmologistId { get; init; }
 }
 
 public record CreateVideoCallSessionRequest
 {
     public Guid PatientId { get; init; }
-    public decimal Price { get; init; }
+    public decimal PlatformFee { get; init; }
     public DateTime AppointmentTime { get; init; }
     public Guid? OphthalmologistId { get; init; }
 }

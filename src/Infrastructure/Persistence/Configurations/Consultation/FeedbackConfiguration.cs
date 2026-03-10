@@ -8,11 +8,17 @@ public class FeedbackConfiguration : IEntityTypeConfiguration<Feedback>
 {
     public void Configure(EntityTypeBuilder<Feedback> builder)
     {
+        builder.Property(e => e.TargetType)
+            .HasMaxLength(50)
+            .IsRequired();
+
         builder.Property(e => e.Content)
             .HasMaxLength(2000)
             .IsRequired();
 
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
+
+        builder.HasIndex(e => new { e.TargetType, e.TargetId });
     }
 }
