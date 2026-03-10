@@ -137,6 +137,7 @@ public static class DependencyInjection
         services.AddScoped<IConsultationSessionRepository, ConsultationSessionRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IContractTemplateRepository, ContractTemplateRepository>();
+        services.AddScoped<IContractRepository, ContractRepository>();
 
         // Register Identity Services
         services.AddScoped<IIdentityService, IdentityService>();
