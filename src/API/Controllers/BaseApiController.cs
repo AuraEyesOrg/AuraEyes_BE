@@ -42,6 +42,11 @@ public abstract class BaseApiController : ControllerBase
             return Conflict(ApiResponseFactory.Conflict(result.ErrorMessage));
         }
 
+        if (result.IsPaymentRequired)
+        {
+            return StatusCode(402, ApiResponseFactory.Error(result.ErrorMessage, result.Errors));
+        }
+
         return BadRequest(ApiResponseFactory.Error(result.ErrorMessage, result.Errors));
     }
 
@@ -73,6 +78,11 @@ public abstract class BaseApiController : ControllerBase
         if (result.IsConflict)
         {
             return Conflict(ApiResponseFactory.Conflict(result.ErrorMessage));
+        }
+
+        if (result.IsPaymentRequired)
+        {
+            return StatusCode(402, ApiResponseFactory.Error(result.ErrorMessage, result.Errors));
         }
 
         return BadRequest(ApiResponseFactory.Error(result.ErrorMessage, result.Errors));
