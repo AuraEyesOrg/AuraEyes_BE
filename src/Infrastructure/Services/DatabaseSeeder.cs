@@ -1,4 +1,5 @@
 using Application.Common.Constants;
+using Domain.Entities.Authorization;
 using Domain.Entities.Users;
 using Domain.Enums;
 using Infrastructure.Identity;
@@ -43,11 +44,11 @@ public static class DatabaseSeeder
 
         // Check if any roles exist - only seed if database is completely empty
         var hasRoles = await roleManager.Roles.AnyAsync();
-        
+
         if (!hasRoles)
         {
             logger?.LogInformation("No roles found in database. Starting initial seed...");
-            
+
             // Step 1: Seed roles first
             await SeedRolesAsync(roleManager, logger);
 
@@ -59,8 +60,13 @@ public static class DatabaseSeeder
         }
         else
         {
-            logger?.LogInformation("Roles already exist. Skipping seed process.");
+            logger?.LogInformation("Roles already exist. Skipping initial account seed.");
         }
+
+        // Step 4: Seed permissions + default role assignments
+        // Idempotent — runs on every startup so new permissions defined in code
+        // are automatically added to the database on next deployment.
+        await SeedPermissionsAsync(context, roleManager, logger);
     }
 
     private static async Task SeedRolesAsync(RoleManager<ApplicationRole> roleManager, ILogger? logger)
@@ -73,16 +79,16 @@ public static class DatabaseSeeder
             {
                 Description = GetRoleDescription(roleName)
             };
-            
+
             var result = await roleManager.CreateAsync(role);
-            
+
             if (result.Succeeded)
             {
                 logger?.LogInformation("✓ Created role: {RoleName} → AspNetRoles", roleName);
             }
             else
             {
-                logger?.LogError("✗ Failed to create role {RoleName}: {Errors}", 
+                logger?.LogError("✗ Failed to create role {RoleName}: {Errors}",
                     roleName, string.Join(", ", result.Errors.Select(e => e.Description)));
             }
         }
@@ -217,7 +223,7 @@ public static class DatabaseSeeder
                 await context.Ophthalmologists.AddAsync(ophthalmologist);
                 await context.SaveChangesAsync();
 
-                logger?.LogInformation("✓ Created ophthalmologist profile for {Email} → Ophthalmologists table", 
+                logger?.LogInformation("✓ Created ophthalmologist profile for {Email} → Ophthalmologists table",
                     ophthalmologistUser.Email);
             }
             else
@@ -246,7 +252,7 @@ public static class DatabaseSeeder
                 await context.Patients.AddAsync(patient);
                 await context.SaveChangesAsync();
 
-                logger?.LogInformation("✓ Created patient profile for {Email} → Patients table", 
+                logger?.LogInformation("✓ Created patient profile for {Email} → Patients table",
                     patientUser.Email);
             }
             else
@@ -256,5 +262,99 @@ public static class DatabaseSeeder
         }
 
         logger?.LogInformation("Domain entity seeding completed.");
+    }
+
+    /// <summary>
+    /// Idempotent permission + default role-permission seeder.
+    /// Safe to run on every startup: inserts missing permissions, skips existing ones.
+    /// New permissions added to <see cref="Permissions.All"/> will be created automatically
+    /// on the next deployment without requiring a migration.
+    /// </summary>
+    private static async Task SeedPermissionsAsync(
+        ApplicationDbContext context,
+        RoleManager<ApplicationRole> roleManager,
+        ILogger? logger)
+    {
+        logger?.LogInformation("Seeding permissions (idempotent)...");
+
+        // 1. Upsert permissions ------------------------------------------------
+        var existingNames = await context.Permissions
+            .Select(p => p.Name)
+            .ToListAsync();
+
+        var existingSet = new HashSet<string>(existingNames, StringComparer.OrdinalIgnoreCase);
+        var newPermissions = new List<Permission>();
+
+        foreach (var def in Permissions.All)
+        {
+            if (existingSet.Contains(def.Name))
+                continue;
+
+            newPermissions.Add(new Permission(def.Name, def.DisplayName, def.Description, def.Category));
+            logger?.LogInformation("  ✓ New permission: [{Category}] {Name}", def.Category, def.Name);
+        }
+
+        if (newPermissions.Count > 0)
+        {
+            await context.Permissions.AddRangeAsync(newPermissions);
+            await context.SaveChangesAsync();
+            logger?.LogInformation("Seeded {Count} new permissions.", newPermissions.Count);
+        }
+        else
+        {
+            logger?.LogInformation("All permissions already exist. Skipping permission insert.");
+        }
+
+        // 2. Seed default role-permission assignments --------------------------
+        // Load fresh from DB so we have IDs for both existing + newly inserted
+        var allPermissions = await context.Permissions
+            .ToDictionaryAsync(p => p.Name, StringComparer.OrdinalIgnoreCase);
+
+        int assignmentsCreated = 0;
+
+        foreach (var (roleName, permissionNames) in Permissions.DefaultRolePermissions)
+        {
+            var role = await roleManager.FindByNameAsync(roleName);
+            if (role is null)
+            {
+                logger?.LogWarning("  Role '{Role}' not found — skipping its permission assignments.", roleName);
+                continue;
+            }
+
+            // Only fetch assignments for this role to avoid N+1
+            var existingRolePermissionIds = await context.RolePermissions
+                .Where(rp => rp.RoleId == role.Id)
+                .Select(rp => rp.PermissionId)
+                .ToListAsync();
+
+            var existingRolePermSet = new HashSet<Guid>(existingRolePermissionIds);
+
+            foreach (var permName in permissionNames)
+            {
+                if (!allPermissions.TryGetValue(permName, out var permission))
+                {
+                    logger?.LogWarning("  Permission '{Perm}' not found — skipping.", permName);
+                    continue;
+                }
+
+                if (existingRolePermSet.Contains(permission.Id))
+                    continue;
+
+                await context.RolePermissions.AddAsync(new RolePermission(role.Id, permission.Id));
+                assignmentsCreated++;
+            }
+        }
+
+        if (assignmentsCreated > 0)
+        {
+            await context.SaveChangesAsync();
+            logger?.LogInformation("Seeded {Count} new role-permission assignments.", assignmentsCreated);
+        }
+        else
+        {
+            logger?.LogInformation("All default role-permission assignments already exist. Skipping.");
+        }
+
+        logger?.LogInformation("Permission seeding completed.");
     }
 }
