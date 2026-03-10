@@ -1,4 +1,4 @@
-using Application.Common.Interfaces;
+using Application.SystemAdmin.Interfaces;
 using Application.Common.Models;
 using Application.SystemAdmin.Ophthalmologists.Queries.GetOphthalmologists;
 using Application.SystemAdmin.Patients.Queries.GetPatients;

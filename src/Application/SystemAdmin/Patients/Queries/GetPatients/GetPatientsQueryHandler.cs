@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.SystemAdmin.Interfaces;
 
 namespace Application.SystemAdmin.Patients.Queries.GetPatients;
 

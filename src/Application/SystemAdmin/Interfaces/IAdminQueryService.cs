@@ -2,7 +2,7 @@ using Application.Common.Models;
 using Application.SystemAdmin.Ophthalmologists.Queries.GetOphthalmologists;
 using Application.SystemAdmin.Patients.Queries.GetPatients;
 
-namespace Application.Common.Interfaces;
+namespace Application.SystemAdmin.Interfaces;
 
 /// <summary>
 /// Service interface for admin queries that require cross-layer joins
