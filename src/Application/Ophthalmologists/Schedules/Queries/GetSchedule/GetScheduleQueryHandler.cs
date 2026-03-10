@@ -25,7 +25,7 @@ public class GetScheduleQueryHandler : IQueryHandler<GetScheduleQuery, ScheduleD
         var dto = new ScheduleDto
         {
             Id = schedule.Id,
-            AvailabilityId = schedule.AvailabilityId,
+            AvailableSlotId = schedule.AvailableSlotId,
             PatientId = schedule.PatientId,
             Date = schedule.Date,
             StartTime = schedule.StartTime,

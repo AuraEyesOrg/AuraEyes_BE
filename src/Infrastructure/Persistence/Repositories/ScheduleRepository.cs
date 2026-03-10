@@ -19,8 +19,8 @@ public class ScheduleRepository : Repository<Schedule>, IScheduleRepository
         CancellationToken cancellationToken = default)
     {
         return await _dbSet
-            .Include(s => s.Availability)
-            .Where(s => s.Availability != null && s.Availability.OphthalmologistId == ophthalmologistId)
+            .Include(s => s.AvailableSlot)
+            .Where(s => s.AvailableSlot != null && s.AvailableSlot.OphthalmologistId == ophthalmologistId)
             .OrderBy(s => s.Date)
             .ThenBy(s => s.StartTime)
             .ToListAsync(cancellationToken);
@@ -33,8 +33,8 @@ public class ScheduleRepository : Repository<Schedule>, IScheduleRepository
         CancellationToken cancellationToken = default)
     {
         var query = _dbSet
-            .Include(s => s.Availability)
-            .Where(s => s.Availability != null && s.Availability.OphthalmologistId == ophthalmologistId)
+            .Include(s => s.AvailableSlot)
+            .Where(s => s.AvailableSlot != null && s.AvailableSlot.OphthalmologistId == ophthalmologistId)
             .Where(s => s.Status == ScheduleStatus.Available);
 
         if (fromDate.HasValue)
@@ -55,8 +55,8 @@ public class ScheduleRepository : Repository<Schedule>, IScheduleRepository
         CancellationToken cancellationToken = default)
     {
         return await _dbSet
-            .Include(s => s.Availability)
-            .Where(s => s.Availability != null && s.Availability.OphthalmologistId == ophthalmologistId && s.Date == date)
+            .Include(s => s.AvailableSlot)
+            .Where(s => s.AvailableSlot != null && s.AvailableSlot.OphthalmologistId == ophthalmologistId && s.Date == date)
             .OrderBy(s => s.StartTime)
             .ToListAsync(cancellationToken);
     }
@@ -70,8 +70,8 @@ public class ScheduleRepository : Repository<Schedule>, IScheduleRepository
         CancellationToken cancellationToken = default)
     {
         var query = _dbSet
-            .Include(s => s.Availability)
-            .Where(s => s.Availability != null && s.Availability.OphthalmologistId == ophthalmologistId)
+            .Include(s => s.AvailableSlot)
+            .Where(s => s.AvailableSlot != null && s.AvailableSlot.OphthalmologistId == ophthalmologistId)
             .Where(s => s.Date == date)
             .Where(s => s.Status != ScheduleStatus.Cancelled);
 
@@ -94,8 +94,8 @@ public class ScheduleRepository : Repository<Schedule>, IScheduleRepository
         CancellationToken cancellationToken = default)
     {
         var query = _dbSet
-            .Include(s => s.Availability)
-            .Where(s => s.Availability != null && s.Availability.OphthalmologistId == ophthalmologistId);
+            .Include(s => s.AvailableSlot)
+            .Where(s => s.AvailableSlot != null && s.AvailableSlot.OphthalmologistId == ophthalmologistId);
 
         if (status.HasValue)
             query = query.Where(s => s.Status == status.Value);

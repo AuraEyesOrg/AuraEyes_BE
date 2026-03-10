@@ -25,7 +25,7 @@ public class CreateScheduleCommandHandler : ICommandHandler<CreateScheduleComman
     public async Task<Result<Guid>> Handle(CreateScheduleCommand request, CancellationToken cancellationToken)
     {
         var schedule = new Schedule(
-            request.AvailabilityId,
+            request.AvailableSlotId,
             request.PatientId,
             request.Date,
             request.StartTime,

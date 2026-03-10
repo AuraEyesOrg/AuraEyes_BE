@@ -5,7 +5,7 @@ namespace Application.Ophthalmologists.Schedules.Common;
 public record ScheduleListDto
 {
     public Guid Id { get; init; }
-    public Guid AvailabilityId { get; init; }
+    public Guid AvailableSlotId { get; init; }
     public Guid PatientId { get; init; }
     public DateOnly Date { get; init; }
     public TimeOnly StartTime { get; init; }
@@ -21,7 +21,7 @@ public record ScheduleListDto
 public record ScheduleDto
 {
     public Guid Id { get; init; }
-    public Guid AvailabilityId { get; init; }
+    public Guid AvailableSlotId { get; init; }
     public Guid PatientId { get; init; }
     public DateOnly Date { get; init; }
     public TimeOnly StartTime { get; init; }

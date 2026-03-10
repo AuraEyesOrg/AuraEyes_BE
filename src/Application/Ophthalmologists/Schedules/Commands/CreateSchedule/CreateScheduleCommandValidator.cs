@@ -9,9 +9,9 @@ public class CreateScheduleCommandValidator : AbstractValidator<CreateScheduleCo
 {
     public CreateScheduleCommandValidator()
     {
-        RuleFor(x => x.AvailabilityId)
+        RuleFor(x => x.AvailableSlotId)
             .NotEmpty()
-            .WithMessage("Availability ID is required.");
+            .WithMessage("AvailableSlot ID is required.");
 
         RuleFor(x => x.PatientId)
             .NotEmpty()

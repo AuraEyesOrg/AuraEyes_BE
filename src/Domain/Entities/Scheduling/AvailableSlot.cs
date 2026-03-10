@@ -6,7 +6,7 @@ namespace Domain.Entities.Scheduling;
 /// Availability - a working slot opened by a clinic or doctor before any booking.
 /// Bệnh nhân đặt lịch vào một khung giờ rảnh; từ đó truy vết được bác sĩ / phòng khám.
 /// </summary>
-public class Availability : BaseEntity, IAggregateRoot
+public class AvailableSlot : BaseEntity, IAggregateRoot
 {
     /// <summary>FK to Organisation (nullable - can be a solo doctor slot).</summary>
     public Guid? OrganisationId { get; private set; }
@@ -24,9 +24,9 @@ public class Availability : BaseEntity, IAggregateRoot
     private readonly List<Schedule> _schedules = new();
     public IReadOnlyCollection<Schedule> Schedules => _schedules.AsReadOnly();
 
-    private Availability() { } // EF Core
+    private AvailableSlot() { } // EF Core
 
-    public Availability(DateTime startTime, DateTime endTime, int maxCapacity,
+    public AvailableSlot(DateTime startTime, DateTime endTime, int maxCapacity,
         Guid? organisationId = null, Guid? ophthalmologistId = null)
     {
         if (endTime <= startTime)

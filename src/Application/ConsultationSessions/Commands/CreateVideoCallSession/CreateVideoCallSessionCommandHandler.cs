@@ -72,7 +72,7 @@ public class CreateVideoCallSessionCommandHandler
 
         var session = ConsultationSession.CreateVideoCall(
             request.PatientId,
-            request.PlatformFee,
+            request.Price,
             request.AppointmentTime,
             request.OphthalmologistId,
             meetingInfo.MeetingLink,

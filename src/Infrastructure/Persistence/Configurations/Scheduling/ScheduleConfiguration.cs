@@ -22,13 +22,13 @@ public class ScheduleConfiguration : IEntityTypeConfiguration<Schedule>
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
-        // Relationships - FK to Availability (replaces direct doctor/org FKs, satisfies 3NF)
-        builder.HasOne(e => e.Availability)
+        // Relationships - FK to AvailableSlot (replaces direct doctor/org FKs, satisfies 3NF)
+        builder.HasOne(e => e.AvailableSlot)
             .WithMany(a => a.Schedules)
-            .HasForeignKey(e => e.AvailabilityId)
+            .HasForeignKey(e => e.AvailableSlotId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(e => e.AvailabilityId);
+        builder.HasIndex(e => e.AvailableSlotId);
         builder.HasIndex(e => e.PatientId);
     }
 }

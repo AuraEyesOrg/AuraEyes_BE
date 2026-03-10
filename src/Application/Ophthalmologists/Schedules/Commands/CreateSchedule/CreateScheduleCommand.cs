@@ -8,8 +8,8 @@ namespace Application.Ophthalmologists.Schedules.Commands.CreateSchedule;
 /// </summary>
 public record CreateScheduleCommand : ICommand<Guid>
 {
-    /// <summary>Availability slot the patient is booking into.</summary>
-    public Guid AvailabilityId { get; init; }
+    /// <summary>AvailableSlot the patient is booking into.</summary>
+    public Guid AvailableSlotId { get; init; }
 
     /// <summary>Patient making the booking.</summary>
     public Guid PatientId { get; init; }

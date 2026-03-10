@@ -98,7 +98,7 @@ public class OphthalmologistSchedulesController : BaseApiController
     {
         var command = new CreateScheduleCommand
         {
-            AvailabilityId = request.AvailabilityId,
+            AvailableSlotId = request.AvailableSlotId,
             PatientId = request.PatientId,
             Date = request.Date,
             StartTime = request.StartTime,
@@ -153,7 +153,7 @@ public class OphthalmologistSchedulesController : BaseApiController
 /// </summary>
 public record CreateScheduleRequest
 {
-    public Guid AvailabilityId { get; init; }
+    public Guid AvailableSlotId { get; init; }
     public Guid PatientId { get; init; }
     public DateOnly Date { get; init; }
     public TimeOnly StartTime { get; init; }

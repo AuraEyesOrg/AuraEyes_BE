@@ -56,7 +56,7 @@ public class ApplicationDbContext : IdentityDbContext<
 
     // Scheduling
     public DbSet<Schedule> Schedules => Set<Schedule>();
-    public DbSet<Availability> Availabilities => Set<Availability>();
+    public DbSet<AvailableSlot> AvailableSlots => Set<AvailableSlot>();
 
     // Financial
     public DbSet<Wallet> Wallets => Set<Wallet>();

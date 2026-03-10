@@ -27,10 +27,7 @@ public class ConsultationSessionConfiguration : IEntityTypeConfiguration<Consult
             .HasMaxLength(20)
             .IsRequired();
 
-        builder.Property(e => e.PlatformFee)
-            .HasPrecision(18, 2);
-
-        builder.Property(e => e.OfflineClinicFee)
+        builder.Property(e => e.Price)
             .HasPrecision(18, 2);
 
         builder.Property(e => e.IsRetinalImagesShared)

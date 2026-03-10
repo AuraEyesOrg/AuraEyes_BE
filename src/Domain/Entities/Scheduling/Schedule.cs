@@ -9,8 +9,8 @@ namespace Domain.Entities.Scheduling;
 /// </summary>
 public class Schedule : BaseEntity, IAggregateRoot
 {
-    /// <summary>FK to Availability — the opening slot this booking fills.</summary>
-    public Guid AvailabilityId { get; private set; }
+    /// <summary>FK to AvailableSlot — the opening slot this booking fills.</summary>
+    public Guid AvailableSlotId { get; private set; }
     public Guid PatientId { get; private set; }
     public DateOnly Date { get; private set; }
     public TimeOnly StartTime { get; private set; }
@@ -20,16 +20,16 @@ public class Schedule : BaseEntity, IAggregateRoot
     public decimal? Cost { get; private set; }
 
     /// <summary>Navigation property — resolves doctor/clinic without extra FKs.</summary>
-    public Availability? Availability { get; private set; }
+    public AvailableSlot? AvailableSlot { get; private set; }
 
     private Schedule() { } // EF Core
 
-    public Schedule(Guid availabilityId, Guid patientId, DateOnly date, TimeOnly startTime, TimeOnly endTime, SlotType slotType, decimal? cost = null)
+    public Schedule(Guid availableSlotId, Guid patientId, DateOnly date, TimeOnly startTime, TimeOnly endTime, SlotType slotType, decimal? cost = null)
     {
         if (endTime <= startTime)
             throw new ArgumentException("End time must be after start time");
 
-        AvailabilityId = availabilityId;
+        AvailableSlotId = availableSlotId;
         PatientId = patientId;
         Date = date;
         StartTime = startTime;

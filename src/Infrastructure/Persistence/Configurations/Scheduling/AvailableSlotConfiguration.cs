@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Infrastructure.Persistence.Configurations;
 
-public class AvailabilityConfiguration : IEntityTypeConfiguration<Availability>
+public class AvailableSlotConfiguration : IEntityTypeConfiguration<AvailableSlot>
 {
-    public void Configure(EntityTypeBuilder<Availability> builder)
+    public void Configure(EntityTypeBuilder<AvailableSlot> builder)
     {
         builder.Property(e => e.MaxCapacity)
             .IsRequired();

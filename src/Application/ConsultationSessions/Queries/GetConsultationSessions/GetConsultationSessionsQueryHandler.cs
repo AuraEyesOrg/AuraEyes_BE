@@ -46,7 +46,7 @@ public class GetConsultationSessionsQueryHandler
             Type = s.Type,
             Status = s.Status,
             ChatStatus = s.ChatStatus,
-            PlatformFee = s.PlatformFee,
+            Price = s.Price,
             AppointmentTime = s.AppointmentTime,
             LastActivityAt = s.LastActivityAt,
             CreatedAt = s.CreatedAt

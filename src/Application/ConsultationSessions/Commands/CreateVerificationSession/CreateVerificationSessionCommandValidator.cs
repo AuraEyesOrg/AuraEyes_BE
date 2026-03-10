@@ -13,7 +13,7 @@ public class CreateVerificationSessionCommandValidator
         RuleFor(x => x.AiScreeningId)
             .NotEmpty().WithMessage("AI Screening ID is required.");
 
-        RuleFor(x => x.PlatformFee)
-            .GreaterThanOrEqualTo(0).WithMessage("PlatformFee cannot be negative.");
+        RuleFor(x => x.Price)
+            .GreaterThanOrEqualTo(0).WithMessage("Price cannot be negative.");
     }
 }
