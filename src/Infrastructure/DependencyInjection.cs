@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Text;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
@@ -9,7 +8,6 @@ using Infrastructure.Persistence;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.Services;
 using Infrastructure.Settings;
-using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -30,12 +28,6 @@ public static class DependencyInjection
                 b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<ApplicationDbContext>());
-
-        // Register MediatR handlers from Infrastructure assembly
-        services.AddMediatR(cfg =>
-        {
-            cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly());
-        });
 
         // JWT Settings
         var jwtSettings = new JwtSettings();
@@ -148,6 +140,7 @@ public static class DependencyInjection
         services.AddScoped<IFileStorageService, SupabaseStorageService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IGoogleMeetService, GoogleMeetService>();
+        services.AddScoped<IAdminQueryService, AdminQueryService>();
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
