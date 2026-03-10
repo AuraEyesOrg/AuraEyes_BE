@@ -240,42 +240,6 @@ namespace Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "DepositRequests",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    WalletId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Amount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
-                    PaymentMethod = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    Status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    PaymentOrderCode = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
-                    PaymentUrl = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    ProviderTxnRef = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
-                    ProviderResponse = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
-                    CompletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    FailureReason = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    ReturnUrl = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    CancelUrl = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    Description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    CreatedBy = table.Column<string>(type: "text", nullable: true),
-                    UpdatedBy = table.Column<string>(type: "text", nullable: true),
-                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_DepositRequests", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_DepositRequests_Wallets_WalletId",
-                        column: x => x.WalletId,
-                        principalTable: "Wallets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "RolePermissions",
                 columns: table => new
                 {
@@ -366,21 +330,6 @@ namespace Infrastructure.Persistence.Migrations
                 columns: new[] { "OrganisationId", "StartTime", "EndTime" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_DepositRequests_PaymentOrderCode",
-                table: "DepositRequests",
-                column: "PaymentOrderCode");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_DepositRequests_UserId",
-                table: "DepositRequests",
-                column: "UserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_DepositRequests_WalletId",
-                table: "DepositRequests",
-                column: "WalletId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_RolePermissions_PermissionId",
                 table: "RolePermissions",
                 column: "PermissionId");
@@ -390,6 +339,13 @@ namespace Infrastructure.Persistence.Migrations
                 table: "RolePermissions",
                 columns: new[] { "RoleId", "PermissionId" },
                 unique: true);
+
+            // Clear existing Schedules — they reference old OphthalmologistId/OrganisationId
+            // which are no longer valid after this schema redesign.
+            migrationBuilder.Sql("DELETE FROM \"Schedules\";");
+            // Also clear AiScreenings (and Consents via cascade) that have invalid default PatientId.
+            migrationBuilder.Sql("DELETE FROM \"Consents\" WHERE \"AiScreeningId\" IN (SELECT \"Id\" FROM \"AiScreenings\" WHERE \"PatientId\" = '00000000-0000-0000-0000-000000000000');");
+            migrationBuilder.Sql("DELETE FROM \"AiScreenings\" WHERE \"PatientId\" = '00000000-0000-0000-0000-000000000000';");
 
             migrationBuilder.AddForeignKey(
                 name: "FK_AiScreenings_Patients_PatientId",
@@ -433,9 +389,6 @@ namespace Infrastructure.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "Availabilities");
-
-            migrationBuilder.DropTable(
-                name: "DepositRequests");
 
             migrationBuilder.DropTable(
                 name: "RolePermissions");
