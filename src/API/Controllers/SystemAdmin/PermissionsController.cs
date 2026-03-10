@@ -8,6 +8,7 @@ using Application.SystemAdmin.Permissions.Commands.RemovePermissionFromRole;
 using Application.SystemAdmin.Permissions.Commands.RevokeUserPermission;
 using Application.SystemAdmin.Permissions.Commands.UpdatePermission;
 using Application.SystemAdmin.Permissions.Common;
+using Application.SystemAdmin.Permissions.Queries.GetAllRoles;
 using Application.SystemAdmin.Permissions.Queries.GetPermissionById;
 using Application.SystemAdmin.Permissions.Queries.GetPermissions;
 using Application.SystemAdmin.Permissions.Queries.GetRolePermissions;
@@ -129,9 +130,18 @@ public class PermissionsController : BaseApiController
     // ROLE PERMISSIONS
     // =========================================================================
 
+    /// <summary>List all Identity roles available in the system (id + name).</summary>
+    [HttpGet("roles")]
+    [ProducesResponseType(typeof(ApiResponse<List<ApplicationRoleDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAllRoles()
+    {
+        var result = await _mediator.Send(new GetAllRolesQuery());
+        return HandleResult(result);
+    }
+
     /// <summary>
     /// Get all permissions assigned to an Identity role.
-    /// Use the role's GUID ID (visible in GET /api/system-admin/users).
+    /// Use the role's GUID ID returned by GET /roles.
     /// </summary>
     [HttpGet("roles/{roleId:guid}")]
     [ProducesResponseType(typeof(ApiResponse<List<RolePermissionDto>>), StatusCodes.Status200OK)]
