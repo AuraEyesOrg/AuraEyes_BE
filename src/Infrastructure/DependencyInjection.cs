@@ -1,4 +1,5 @@
 using System.Text;
+using Application.AiQuota.Interfaces;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.SystemAdmin.Interfaces;
@@ -143,6 +144,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IGoogleMeetService, GoogleMeetService>();
         services.AddScoped<IAdminQueryService, AdminQueryService>();
+        services.AddScoped<IAiQuotaService, AiQuotaService>();
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
