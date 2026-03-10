@@ -17,7 +17,15 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     public ConsultationSessionType Type { get; private set; }
     public SessionStatus Status { get; private set; }
     public ChatStatus ChatStatus { get; private set; }
+
+    /// <summary>Fee charged for this consultation session.</summary>
     public decimal Price { get; private set; }
+
+    /// <summary>Patient consent flag: share retinal images with the assigned doctor.</summary>
+    public bool IsRetinalImagesShared { get; private set; }
+
+    /// <summary>Patient consent flag: share AI screening result with the assigned doctor.</summary>
+    public bool IsAIResultShared { get; private set; }
 
     public DateTime? AppointmentTime { get; private set; }
     public string? MeetingLink { get; private set; }
@@ -90,7 +98,7 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     }
 
     /// <summary>
-    /// Factory: create a ClinicBooking session.
+    /// Factory: create a ClinicBooking session (O2O model: deposit online, pay remainder at clinic).
     /// </summary>
     public static ConsultationSession CreateClinicBooking(
         Guid patientId,

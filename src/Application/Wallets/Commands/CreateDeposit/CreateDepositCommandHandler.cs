@@ -45,7 +45,7 @@ public class CreateDepositCommandHandler : ICommandHandler<CreateDepositCommand,
 
             if (wallet is null)
             {
-                wallet = new Wallet(request.UserId, 0);
+                wallet = new Wallet(request.UserId, "Patient", 0);
                 await _walletRepository.AddAsync(wallet, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 

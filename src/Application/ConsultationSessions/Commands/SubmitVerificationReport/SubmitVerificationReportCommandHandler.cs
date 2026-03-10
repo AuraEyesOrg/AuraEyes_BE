@@ -45,18 +45,13 @@ public class SubmitVerificationReportCommandHandler
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            var diagnosis = request.TreatmentPlan is not null
-                ? new MedicalDiagnosis(
+            var diagnosis = new MedicalDiagnosis(
                     session.AiScreeningId.Value,
                     request.DoctorId,
+                    session.Id,
                     request.DiagnosesCode,
                     request.DiagnosesText,
-                    request.TreatmentPlan)
-                : new MedicalDiagnosis(
-                    session.AiScreeningId.Value,
-                    request.DoctorId,
-                    request.DiagnosesCode,
-                    request.DiagnosesText);
+                    request.TreatmentPlan);
             
             await _diagnosisRepository.AddAsync(diagnosis, cancellationToken);
 

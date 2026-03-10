@@ -46,8 +46,8 @@ public class GetSchedulesQueryHandler : IQueryHandler<GetSchedulesQuery, PagedRe
         var dtoList = items.Select(schedule => new ScheduleListDto
         {
             Id = schedule.Id,
-            OphthalmologistId = schedule.OphthalmologistId,
-            OrganisationId = schedule.OrganisationId,
+            AvailableSlotId = schedule.AvailableSlotId,
+            PatientId = schedule.PatientId,
             Date = schedule.Date,
             StartTime = schedule.StartTime,
             EndTime = schedule.EndTime,

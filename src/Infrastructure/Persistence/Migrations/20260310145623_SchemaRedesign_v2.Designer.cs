@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260310145623_SchemaRedesign_v2")]
+    partial class SchemaRedesign_v2
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -284,6 +287,10 @@ namespace Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<decimal?>("OfflineClinicFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<Guid?>("OphthalmologistId")
                         .HasColumnType("uuid");
 
@@ -293,7 +300,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid");
 
-                    b.Property<decimal>("Price")
+                    b.Property<decimal>("PlatformFee")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
@@ -1287,7 +1294,7 @@ namespace Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Domain.Entities.Scheduling.AvailableSlot", b =>
+            modelBuilder.Entity("Domain.Entities.Scheduling.Availability", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1331,7 +1338,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrganisationId", "StartTime", "EndTime");
 
-                    b.ToTable("AvailableSlots");
+                    b.ToTable("Availabilities");
                 });
 
             modelBuilder.Entity("Domain.Entities.Scheduling.Schedule", b =>
@@ -1340,7 +1347,7 @@ namespace Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("AvailableSlotId")
+                    b.Property<Guid>("AvailabilityId")
                         .HasColumnType("uuid");
 
                     b.Property<decimal?>("Cost")
@@ -1388,7 +1395,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AvailableSlotId");
+                    b.HasIndex("AvailabilityId");
 
                     b.HasIndex("PatientId");
 
@@ -2381,7 +2388,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.Navigation("Post");
                 });
 
-            modelBuilder.Entity("Domain.Entities.Scheduling.AvailableSlot", b =>
+            modelBuilder.Entity("Domain.Entities.Scheduling.Availability", b =>
                 {
                     b.HasOne("Domain.Entities.Users.Ophthalmologist", null)
                         .WithMany()
@@ -2396,13 +2403,13 @@ namespace Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Domain.Entities.Scheduling.Schedule", b =>
                 {
-                    b.HasOne("Domain.Entities.Scheduling.AvailableSlot", "AvailableSlot")
+                    b.HasOne("Domain.Entities.Scheduling.Availability", "Availability")
                         .WithMany("Schedules")
-                        .HasForeignKey("AvailableSlotId")
+                        .HasForeignKey("AvailabilityId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("AvailableSlot");
+                    b.Navigation("Availability");
                 });
 
             modelBuilder.Entity("Domain.Entities.Screening.AiScreening", b =>
@@ -2570,7 +2577,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.Navigation("Reposts");
                 });
 
-            modelBuilder.Entity("Domain.Entities.Scheduling.AvailableSlot", b =>
+            modelBuilder.Entity("Domain.Entities.Scheduling.Availability", b =>
                 {
                     b.Navigation("Schedules");
                 });

@@ -30,6 +30,12 @@ public class ConsultationSessionConfiguration : IEntityTypeConfiguration<Consult
         builder.Property(e => e.Price)
             .HasPrecision(18, 2);
 
+        builder.Property(e => e.IsRetinalImagesShared)
+            .HasDefaultValue(false);
+
+        builder.Property(e => e.IsAIResultShared)
+            .HasDefaultValue(false);
+
         builder.Property(e => e.MeetingLink)
             .HasMaxLength(500);
 

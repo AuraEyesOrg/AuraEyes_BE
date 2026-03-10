@@ -14,12 +14,19 @@ public class UserPermission : BaseEntity
     public DateTime? ExpiresAt { get; private set; }
     public bool IsActive { get; private set; }
 
+    /// <summary>
+    /// True = grant extra permission on top of role. False = revoke a permission the role already has.
+    /// Hybrid RBAC exception mechanism.
+    /// </summary>
+    public bool IsGranted { get; private set; }
+
     private UserPermission() { } // EF Core
 
-    public UserPermission(Guid userId, Guid permissionId, Guid? grantedBy = null, DateTime? expiresAt = null)
+    public UserPermission(Guid userId, Guid permissionId, bool isGranted = true, Guid? grantedBy = null, DateTime? expiresAt = null)
     {
         UserId = userId;
         PermissionId = permissionId;
+        IsGranted = isGranted;
         GrantedBy = grantedBy;
         GrantedAt = DateTime.UtcNow;
         ExpiresAt = expiresAt;

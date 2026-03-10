@@ -240,8 +240,7 @@ public static class DatabaseSeeder
             if (existingPatient == null)
             {
                 var patient = new Patient(
-                    userId: patientUser.Id,
-                    medicalHistorySummary: "No significant medical history. First-time screening for diabetic retinopathy."
+                    userId: patientUser.Id
                 );
 
                 await context.Patients.AddAsync(patient);
