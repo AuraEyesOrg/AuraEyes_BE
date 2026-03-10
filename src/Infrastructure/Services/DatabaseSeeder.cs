@@ -44,11 +44,11 @@ public static class DatabaseSeeder
 
         // Check if any roles exist - only seed if database is completely empty
         var hasRoles = await roleManager.Roles.AnyAsync();
-        
+
         if (!hasRoles)
         {
             logger?.LogInformation("No roles found in database. Starting initial seed...");
-            
+
             // Step 1: Seed roles first
             await SeedRolesAsync(roleManager, logger);
 
@@ -79,16 +79,16 @@ public static class DatabaseSeeder
             {
                 Description = GetRoleDescription(roleName)
             };
-            
+
             var result = await roleManager.CreateAsync(role);
-            
+
             if (result.Succeeded)
             {
                 logger?.LogInformation("✓ Created role: {RoleName} → AspNetRoles", roleName);
             }
             else
             {
-                logger?.LogError("✗ Failed to create role {RoleName}: {Errors}", 
+                logger?.LogError("✗ Failed to create role {RoleName}: {Errors}",
                     roleName, string.Join(", ", result.Errors.Select(e => e.Description)));
             }
         }
@@ -223,7 +223,7 @@ public static class DatabaseSeeder
                 await context.Ophthalmologists.AddAsync(ophthalmologist);
                 await context.SaveChangesAsync();
 
-                logger?.LogInformation("✓ Created ophthalmologist profile for {Email} → Ophthalmologists table", 
+                logger?.LogInformation("✓ Created ophthalmologist profile for {Email} → Ophthalmologists table",
                     ophthalmologistUser.Email);
             }
             else
@@ -252,7 +252,7 @@ public static class DatabaseSeeder
                 await context.Patients.AddAsync(patient);
                 await context.SaveChangesAsync();
 
-                logger?.LogInformation("✓ Created patient profile for {Email} → Patients table", 
+                logger?.LogInformation("✓ Created patient profile for {Email} → Patients table",
                     patientUser.Email);
             }
             else

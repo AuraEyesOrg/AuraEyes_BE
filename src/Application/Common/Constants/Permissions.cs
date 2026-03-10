@@ -14,41 +14,41 @@ namespace Application.Common.Constants;
 public static class Permissions
 {
     // ─── Users ────────────────────────────────────────────────────────────────
-    public const string UsersRead   = "users:read";
+    public const string UsersRead = "users:read";
     public const string UsersCreate = "users:create";
     public const string UsersUpdate = "users:update";
     public const string UsersDelete = "users:delete";
     public const string UsersManageRoles = "users:manage-roles";
 
     // ─── Permissions ──────────────────────────────────────────────────────────
-    public const string PermissionsRead   = "permissions:read";
+    public const string PermissionsRead = "permissions:read";
     public const string PermissionsManage = "permissions:manage";
 
     // ─── Patients ─────────────────────────────────────────────────────────────
-    public const string PatientsRead   = "patients:read";
+    public const string PatientsRead = "patients:read";
     public const string PatientsCreate = "patients:create";
     public const string PatientsUpdate = "patients:update";
     public const string PatientsDelete = "patients:delete";
 
     // ─── Ophthalmologists ─────────────────────────────────────────────────────
-    public const string OphthalmologistsRead   = "ophthalmologists:read";
+    public const string OphthalmologistsRead = "ophthalmologists:read";
     public const string OphthalmologistsCreate = "ophthalmologists:create";
     public const string OphthalmologistsUpdate = "ophthalmologists:update";
     public const string OphthalmologistsVerify = "ophthalmologists:verify";
 
     // ─── Organisations ────────────────────────────────────────────────────────
-    public const string OrganisationsRead   = "organisations:read";
+    public const string OrganisationsRead = "organisations:read";
     public const string OrganisationsCreate = "organisations:create";
     public const string OrganisationsUpdate = "organisations:update";
     public const string OrganisationsDelete = "organisations:delete";
 
     // ─── Screening ────────────────────────────────────────────────────────────
-    public const string ScreeningRead    = "screening:read";
-    public const string ScreeningCreate  = "screening:create";
+    public const string ScreeningRead = "screening:read";
+    public const string ScreeningCreate = "screening:create";
     public const string ScreeningApprove = "screening:approve";
 
     // ─── Consultations ────────────────────────────────────────────────────────
-    public const string ConsultationsRead   = "consultations:read";
+    public const string ConsultationsRead = "consultations:read";
     public const string ConsultationsCreate = "consultations:create";
     public const string ConsultationsUpdate = "consultations:update";
 
