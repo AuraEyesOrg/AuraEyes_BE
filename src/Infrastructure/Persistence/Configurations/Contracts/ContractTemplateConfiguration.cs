@@ -20,6 +20,10 @@ public class ContractTemplateConfiguration : IEntityTypeConfiguration<ContractTe
             .HasMaxLength(20)
             .IsRequired();
 
+        builder.Property(e => e.ContentTemplate)
+            .HasColumnType("text")
+            .IsRequired();
+
         builder.Property(e => e.IsActive)
             .HasDefaultValue(true);
 
@@ -28,5 +32,12 @@ public class ContractTemplateConfiguration : IEntityTypeConfiguration<ContractTe
 
         builder.HasIndex(e => new { e.Type, e.ContractVersion })
             .IsUnique();
+
+        // Navigation to variable metadata via backing field
+        builder.HasMany<ContractTemplateVariable>("_variables")
+            .WithOne()
+            .HasForeignKey(v => v.TemplateId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
+

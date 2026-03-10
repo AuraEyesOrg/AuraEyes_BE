@@ -68,6 +68,7 @@ public class ApplicationDbContext : IdentityDbContext<
     // Contracts
     public DbSet<Contract> Contracts => Set<Contract>();
     public DbSet<ContractTemplate> ContractTemplates => Set<ContractTemplate>();
+    public DbSet<ContractTemplateVariable> ContractTemplateVariables => Set<ContractTemplateVariable>();
 
     // Authorization
     public DbSet<Permission> Permissions => Set<Permission>();
