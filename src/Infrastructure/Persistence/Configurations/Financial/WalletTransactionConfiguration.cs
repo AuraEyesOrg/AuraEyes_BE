@@ -19,8 +19,13 @@ public class WalletTransactionConfiguration : IEntityTypeConfiguration<WalletTra
         builder.Property(e => e.Description)
             .HasMaxLength(500);
 
+        builder.Property(e => e.ReferenceType)
+            .HasMaxLength(50);
+
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
+
+        builder.HasIndex(e => new { e.ReferenceType, e.ReferenceId });
 
         // Relationships - Restrict delete for financial data
         builder.HasOne<Wallet>()

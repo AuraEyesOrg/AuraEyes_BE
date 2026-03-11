@@ -9,9 +9,13 @@ public class CreateScheduleCommandValidator : AbstractValidator<CreateScheduleCo
 {
     public CreateScheduleCommandValidator()
     {
-        RuleFor(x => x.OphthalmologistId)
+        RuleFor(x => x.AvailableSlotId)
             .NotEmpty()
-            .WithMessage("Ophthalmologist ID is required.");
+            .WithMessage("AvailableSlot ID is required.");
+
+        RuleFor(x => x.PatientId)
+            .NotEmpty()
+            .WithMessage("Patient ID is required.");
 
         RuleFor(x => x.Date)
             .NotEmpty()

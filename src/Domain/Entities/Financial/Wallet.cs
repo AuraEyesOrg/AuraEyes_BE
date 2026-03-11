@@ -3,12 +3,16 @@ using Domain.Common;
 namespace Domain.Entities.Financial;
 
 /// <summary>
-/// Wallet entity - user's digital wallet
-/// One-to-one relationship with User
+/// Wallet entity - digital wallet for any actor in the system.
+/// OwnerType distinguishes Patient | Ophthalmologist | Organisation | System wallets.
 /// </summary>
 public class Wallet : BaseEntity, IAggregateRoot
 {
     public Guid UserId { get; private set; }
+
+    /// <summary>"Patient" | "Ophthalmologist" | "Organisation" | "System"</summary>
+    public string OwnerType { get; private set; } = string.Empty;
+
     public decimal Balance { get; private set; }
 
     // Navigation properties
@@ -17,12 +21,15 @@ public class Wallet : BaseEntity, IAggregateRoot
 
     private Wallet() { } // EF Core
 
-    public Wallet(Guid userId, decimal initialBalance = 0)
+    public Wallet(Guid userId, string ownerType, decimal initialBalance = 0)
     {
+        if (string.IsNullOrWhiteSpace(ownerType))
+            throw new ArgumentException("OwnerType cannot be empty", nameof(ownerType));
         if (initialBalance < 0)
             throw new ArgumentException("Initial balance cannot be negative", nameof(initialBalance));
 
         UserId = userId;
+        OwnerType = ownerType;
         Balance = initialBalance;
     }
 

@@ -19,7 +19,8 @@ public class ScheduleRepository : Repository<Schedule>, IScheduleRepository
         CancellationToken cancellationToken = default)
     {
         return await _dbSet
-            .Where(s => s.OphthalmologistId == ophthalmologistId)
+            .Include(s => s.AvailableSlot)
+            .Where(s => s.AvailableSlot != null && s.AvailableSlot.OphthalmologistId == ophthalmologistId)
             .OrderBy(s => s.Date)
             .ThenBy(s => s.StartTime)
             .ToListAsync(cancellationToken);
@@ -32,7 +33,8 @@ public class ScheduleRepository : Repository<Schedule>, IScheduleRepository
         CancellationToken cancellationToken = default)
     {
         var query = _dbSet
-            .Where(s => s.OphthalmologistId == ophthalmologistId)
+            .Include(s => s.AvailableSlot)
+            .Where(s => s.AvailableSlot != null && s.AvailableSlot.OphthalmologistId == ophthalmologistId)
             .Where(s => s.Status == ScheduleStatus.Available);
 
         if (fromDate.HasValue)
@@ -53,7 +55,8 @@ public class ScheduleRepository : Repository<Schedule>, IScheduleRepository
         CancellationToken cancellationToken = default)
     {
         return await _dbSet
-            .Where(s => s.OphthalmologistId == ophthalmologistId && s.Date == date)
+            .Include(s => s.AvailableSlot)
+            .Where(s => s.AvailableSlot != null && s.AvailableSlot.OphthalmologistId == ophthalmologistId && s.Date == date)
             .OrderBy(s => s.StartTime)
             .ToListAsync(cancellationToken);
     }
@@ -67,16 +70,16 @@ public class ScheduleRepository : Repository<Schedule>, IScheduleRepository
         CancellationToken cancellationToken = default)
     {
         var query = _dbSet
-            .Where(s => s.OphthalmologistId == ophthalmologistId)
+            .Include(s => s.AvailableSlot)
+            .Where(s => s.AvailableSlot != null && s.AvailableSlot.OphthalmologistId == ophthalmologistId)
             .Where(s => s.Date == date)
             .Where(s => s.Status != ScheduleStatus.Cancelled);
 
         if (excludeScheduleId.HasValue)
             query = query.Where(s => s.Id != excludeScheduleId.Value);
 
-        // Check for overlap: new slot starts before existing ends AND new slot ends after existing starts
-        return await query.AnyAsync(s => 
-            startTime < s.EndTime && endTime > s.StartTime, 
+        return await query.AnyAsync(s =>
+            startTime < s.EndTime && endTime > s.StartTime,
             cancellationToken);
     }
 
@@ -90,7 +93,9 @@ public class ScheduleRepository : Repository<Schedule>, IScheduleRepository
         int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.Where(s => s.OphthalmologistId == ophthalmologistId);
+        var query = _dbSet
+            .Include(s => s.AvailableSlot)
+            .Where(s => s.AvailableSlot != null && s.AvailableSlot.OphthalmologistId == ophthalmologistId);
 
         if (status.HasValue)
             query = query.Where(s => s.Status == status.Value);

@@ -19,6 +19,13 @@ public class ContractConfiguration : IEntityTypeConfiguration<Contract>
         builder.Property(e => e.ScannedDocumentUrl)
             .HasMaxLength(500);
 
+        builder.Property(e => e.AiQuotaLimit)
+            .HasDefaultValue(0);
+
+        builder.Property(e => e.PlatformCommissionRate)
+            .HasPrecision(5, 4)
+            .HasDefaultValue(0m);
+
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 

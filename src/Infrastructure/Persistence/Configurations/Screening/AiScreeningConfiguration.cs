@@ -22,7 +22,8 @@ public class AiScreeningConfiguration : IEntityTypeConfiguration<AiScreening>
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
-        // Relationships - configure from parent side with navigation properties
+        // PatientId FK — configured from Patient side (PatientConfiguration)
+        // 1:1 Consent configured from ConsentConfiguration
         builder.HasMany(e => e.RetinalImages)
             .WithOne()
             .HasForeignKey(r => r.AiScreeningId)
@@ -32,5 +33,7 @@ public class AiScreeningConfiguration : IEntityTypeConfiguration<AiScreening>
             .WithOne()
             .HasForeignKey(s => s.AiScreeningId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(e => e.PatientId);
     }
 }

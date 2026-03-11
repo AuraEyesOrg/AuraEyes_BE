@@ -8,6 +8,10 @@ public class WalletConfiguration : IEntityTypeConfiguration<Wallet>
 {
     public void Configure(EntityTypeBuilder<Wallet> builder)
     {
+        builder.Property(e => e.OwnerType)
+            .HasMaxLength(30)
+            .IsRequired();
+
         builder.Property(e => e.Balance)
             .HasPrecision(18, 2)
             .HasDefaultValue(0m);

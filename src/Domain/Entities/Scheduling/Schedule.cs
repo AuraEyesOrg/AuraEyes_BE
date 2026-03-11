@@ -4,12 +4,14 @@ using Domain.Enums;
 namespace Domain.Entities.Scheduling;
 
 /// <summary>
-/// Schedule entity - doctor's available time slots
+/// Schedule entity - a patient booking against an Availability slot.
+/// Doctor and Clinic are now resolved via the parent Availability (3NF).
 /// </summary>
 public class Schedule : BaseEntity, IAggregateRoot
 {
-    public Guid OphthalmologistId { get; private set; }
-    public Guid? OrganisationId { get; private set; }
+    /// <summary>FK to AvailableSlot — the opening slot this booking fills.</summary>
+    public Guid AvailableSlotId { get; private set; }
+    public Guid PatientId { get; private set; }
     public DateOnly Date { get; private set; }
     public TimeOnly StartTime { get; private set; }
     public TimeOnly EndTime { get; private set; }
@@ -17,15 +19,18 @@ public class Schedule : BaseEntity, IAggregateRoot
     public SlotType SlotType { get; private set; }
     public decimal? Cost { get; private set; }
 
+    /// <summary>Navigation property — resolves doctor/clinic without extra FKs.</summary>
+    public AvailableSlot? AvailableSlot { get; private set; }
+
     private Schedule() { } // EF Core
 
-    public Schedule(Guid ophthalmologistId, DateOnly date, TimeOnly startTime, TimeOnly endTime, SlotType slotType, Guid? organisationId = null, decimal? cost = null)
+    public Schedule(Guid availableSlotId, Guid patientId, DateOnly date, TimeOnly startTime, TimeOnly endTime, SlotType slotType, decimal? cost = null)
     {
         if (endTime <= startTime)
             throw new ArgumentException("End time must be after start time");
 
-        OphthalmologistId = ophthalmologistId;
-        OrganisationId = organisationId;
+        AvailableSlotId = availableSlotId;
+        PatientId = patientId;
         Date = date;
         StartTime = startTime;
         EndTime = endTime;

@@ -1,20 +1,23 @@
 using Domain.Common;
+using Domain.Entities.Users;
 
 namespace Domain.Entities.Screening;
 
 /// <summary>
-/// AI Screening entity - contains AI processing results
+/// AI Screening entity - contains AI processing results.
+/// Each session is owned by a Patient and requires exactly one Consent record.
 /// </summary>
 public class AiScreening : BaseEntity, IAggregateRoot
 {
+    public Guid PatientId { get; private set; }
     public string ModelVersion { get; private set; } = string.Empty;
     public DateTime? ProcessedAt { get; private set; }
-    
+
     /// <summary>
     /// Raw JSON output from AI model - stored as JSONB in PostgreSQL
     /// </summary>
     public string? RawJsonOutput { get; private set; }
-    
+
     public bool IsActive { get; private set; }
 
     // Navigation properties
@@ -24,13 +27,17 @@ public class AiScreening : BaseEntity, IAggregateRoot
     private readonly List<ScreeningResult> _screeningResults = new();
     public IReadOnlyCollection<ScreeningResult> ScreeningResults => _screeningResults.AsReadOnly();
 
+    /// <summary>1:1 consent that must accompany every AI session.</summary>
+    public Consent? Consent { get; private set; }
+
     private AiScreening() { } // EF Core
 
-    public AiScreening(string modelVersion)
+    public AiScreening(Guid patientId, string modelVersion)
     {
         if (string.IsNullOrWhiteSpace(modelVersion))
             throw new ArgumentException("Model version cannot be empty", nameof(modelVersion));
 
+        PatientId = patientId;
         ModelVersion = modelVersion;
         IsActive = true;
     }

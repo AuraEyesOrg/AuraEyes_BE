@@ -18,21 +18,24 @@ public class MedicalDiagnosisConfiguration : IEntityTypeConfiguration<MedicalDia
         builder.Property(e => e.TreatmentPlan)
             .HasMaxLength(2000);
 
-        builder.Property(e => e.ReferralRequired)
+        builder.Property(e => e.LifestyleAdvice)
+            .HasMaxLength(2000);
+
+        builder.Property(e => e.IsReferralNeeded)
             .HasDefaultValue(false);
 
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
-        // Relationships - Restrict delete for medical data
-        builder.HasOne<AiScreening>()
-            .WithMany()
-            .HasForeignKey(e => e.AiScreeningId)
-            .OnDelete(DeleteBehavior.Restrict);
-
+        // ConsultationSessionId is now required (non-nullable)
         builder.HasOne<ConsultationSession>()
             .WithMany(s => s.MedicalDiagnoses)
             .HasForeignKey(e => e.ConsultationSessionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<AiScreening>()
+            .WithMany()
+            .HasForeignKey(e => e.AiScreeningId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -11,6 +11,9 @@ public class UserPermissionConfiguration : IEntityTypeConfiguration<UserPermissi
         builder.Property(e => e.IsActive)
             .HasDefaultValue(true);
 
+        builder.Property(e => e.IsGranted)
+            .HasDefaultValue(true);
+
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
