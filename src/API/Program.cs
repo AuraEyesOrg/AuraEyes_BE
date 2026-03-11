@@ -2,7 +2,10 @@ using API.Middleware;
 using API.Services;
 using Application;
 using Application.Common.Interfaces;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Infrastructure;
+using Infrastructure.Services;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using System.Reflection;
@@ -125,6 +128,16 @@ builder.Services.AddCors(options =>
 // Add Health Checks
 builder.Services.AddHealthChecks();
 
+// Hangfire - Background job processing
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UsePostgreSqlStorage(options =>
+        options.UseNpgsqlConnection(
+            builder.Configuration.GetConnectionString("DefaultConnection"))));
+builder.Services.AddHangfireServer();
+
 var app = builder.Build();
 
 // Seed domain entities (Organisation, Ophthalmologist, Patient)
@@ -179,5 +192,18 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.MapHealthChecks("/health");
+
+// Hangfire Dashboard (development only for security)
+if (app.Environment.IsDevelopment())
+{
+    app.UseHangfireDashboard("/hangfire");
+}
+
+// Register recurring jobs
+RecurringJob.AddOrUpdate<DailyQuotaResetJob>(
+    "daily-quota-reset",
+    job => job.ExecuteAsync(),
+    "0 0 * * *", // 00:00 UTC = 07:00 AM Vietnam
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
 app.Run();
