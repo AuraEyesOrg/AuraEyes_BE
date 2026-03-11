@@ -2,6 +2,7 @@ using Application.Common.Constants;
 using Application.Common.Models;
 using Application.SystemAdmin.ContractTemplates.Commands.CreateContractTemplate;
 using Application.SystemAdmin.ContractTemplates.Commands.DeleteContractTemplate;
+using Application.SystemAdmin.ContractTemplates.Commands.DuplicateContractTemplate;
 using Application.SystemAdmin.ContractTemplates.Commands.SetContractTemplateStatus;
 using Application.SystemAdmin.ContractTemplates.Commands.UpdateContractTemplate;
 using Application.SystemAdmin.ContractTemplates.Common;
@@ -107,6 +108,16 @@ public class ContractTemplatesController : BaseApiController
     {
         var result = await _mediator.Send(new DeleteContractTemplateCommand(id));
         return HandleResult(result, "Contract template deleted successfully.");
+    }
+
+    /// <summary>Duplicate a contract template including all variable definitions.</summary>
+    [HttpPost("{id:guid}/duplicate")]
+    [ProducesResponseType(typeof(ApiResponse<ContractTemplateDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DuplicateContractTemplate(Guid id)
+    {
+        var result = await _mediator.Send(new DuplicateContractTemplateCommand(id));
+        return HandleResult(result, "Contract template duplicated successfully.");
     }
 
     /// <summary>Activate or deactivate a contract template.</summary>

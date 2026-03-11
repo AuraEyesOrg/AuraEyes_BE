@@ -139,13 +139,39 @@ public class ApplicationDbContext : IdentityDbContext<
     private void UpdateAuditFields()
     {
         var entries = ChangeTracker.Entries<BaseEntity>()
-            .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified);
+            .Where(e => e.State == EntityState.Added
+                     || e.State == EntityState.Modified
+                     || e.State == EntityState.Deleted);
 
         foreach (var entry in entries)
         {
-            if (entry.State == EntityState.Modified)
+            if (entry.State == EntityState.Deleted)
             {
-                entry.Entity.GetType().GetProperty("UpdatedAt")?.SetValue(entry.Entity, DateTime.UtcNow);
+                // ContractTemplateVariable has a non-partial unique index on (TemplateId, Key).
+                // Soft-deleting a variable while a new one with the same key is being inserted
+                // triggers EF Core's circular-dependency detection.  Hard deletes are correct
+                // for child config items — they are managed exclusively through SetVariables.
+                if (entry.Entity is Domain.Entities.Contracts.ContractTemplateVariable)
+                    continue;
+
+                // For all other BaseEntity types: convert hard delete → soft delete.
+                entry.State = EntityState.Modified;
+                entry.Property(nameof(BaseEntity.IsDeleted)).CurrentValue = true;
+                entry.Property(nameof(BaseEntity.UpdatedAt)).CurrentValue = DateTime.UtcNow;
+            }
+            else if (entry.State == EntityState.Modified)
+            {
+                // When a new entity with a pre-set GUID key is added to a tracked
+                // navigation collection, EF Core may track it as Modified instead of
+                // Added.  Detect this by checking whether immutable columns (CreatedAt)
+                // are flagged as modified — that never happens for genuine updates.
+                if (entry.Property(nameof(BaseEntity.CreatedAt)).IsModified)
+                {
+                    entry.State = EntityState.Added;
+                    continue;
+                }
+
+                entry.Property(nameof(BaseEntity.UpdatedAt)).CurrentValue = DateTime.UtcNow;
             }
         }
     }

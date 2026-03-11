@@ -58,12 +58,34 @@ public class ContractTemplate : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
-    /// <summary>Replace all variable definitions with a new set (full-replace from editor save).</summary>
+    /// <summary>
+    /// Merge <paramref name="variables"/> into the template's variable collection.
+    /// Existing keys are updated in-place (preserving their row Id), keys absent from the
+    /// incoming set are removed, and brand-new keys are inserted.  Using merge rather than
+    /// Clear+AddAll avoids EF Core circular-dependency errors caused by the unique index on
+    /// (TemplateId, Key) when both a deletion and an insertion for the same key land in the
+    /// same SaveChanges call.
+    /// </summary>
     public void SetVariables(IEnumerable<ContractTemplateVariable> variables)
     {
-        _variables.Clear();
-        foreach (var v in variables)
-            _variables.Add(v);
+        var incoming = variables.ToList();
+        var incomingKeys = incoming.Select(v => v.Key).ToHashSet(StringComparer.Ordinal);
+
+        // Remove variables whose keys are no longer present
+        foreach (var stale in _variables.Where(v => !incomingKeys.Contains(v.Key)).ToList())
+            _variables.Remove(stale);
+
+        // Update existing entries in-place; add truly new ones
+        foreach (var v in incoming)
+        {
+            var existing = _variables.FirstOrDefault(e => e.Key == v.Key);
+            if (existing is null)
+                _variables.Add(v);
+            else
+                existing.Update(v.Label, v.VariableType, v.Description, v.DefaultValue,
+                                v.SelectOptions, v.Unit, v.IsRequired, v.SortOrder);
+        }
+
         UpdatedAt = DateTime.UtcNow;
     }
 
