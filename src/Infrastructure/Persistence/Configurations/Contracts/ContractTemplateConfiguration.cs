@@ -20,6 +20,10 @@ public class ContractTemplateConfiguration : IEntityTypeConfiguration<ContractTe
             .HasMaxLength(20)
             .IsRequired();
 
+        builder.Property(e => e.ContentTemplate)
+            .HasColumnType("text")
+            .IsRequired();
+
         builder.Property(e => e.IsActive)
             .HasDefaultValue(true);
 
@@ -28,5 +32,16 @@ public class ContractTemplateConfiguration : IEntityTypeConfiguration<ContractTe
 
         builder.HasIndex(e => new { e.Type, e.ContractVersion })
             .IsUnique();
+
+        // Navigation to variable metadata — EF maps Variables → _variables via convention
+        builder.HasMany(t => t.Variables)
+            .WithOne()
+            .HasForeignKey(v => v.TemplateId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Use the backing field _variables for EF to populate when loading
+        builder.Navigation(t => t.Variables)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }
+
