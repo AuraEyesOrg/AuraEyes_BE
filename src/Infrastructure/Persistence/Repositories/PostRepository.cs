@@ -19,7 +19,8 @@ public class PostRepository : Repository<ProfessionalPost>, IPostRepository
         string? searchTerm = null,
         int pageNumber = 1,
         int pageSize = 10,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? authorId = null)
     {
         var query = _dbSet
             .AsNoTracking()
@@ -29,6 +30,9 @@ public class PostRepository : Repository<ProfessionalPost>, IPostRepository
 
         if (category.HasValue)
             query = query.Where(p => p.Category == category.Value);
+
+        if (authorId.HasValue)
+            query = query.Where(p => p.AuthorId == authorId.Value);
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
@@ -202,5 +206,14 @@ public class PostRepository : Repository<ProfessionalPost>, IPostRepository
             .ToListAsync(cancellationToken);
 
         return savedIds.ToHashSet();
+    }
+
+    public async Task<int> GetPostCountByAuthorAsync(
+        Guid authorId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .AsNoTracking()
+            .CountAsync(p => p.AuthorId == authorId, cancellationToken);
     }
 }

@@ -29,7 +29,8 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
             request.SearchTerm,
             request.PageNumber,
             request.PageSize,
-            cancellationToken);
+            cancellationToken,
+            request.AuthorId);
 
         var postIds = posts.Select(p => p.Id).ToList();
 

@@ -9,6 +9,7 @@ using Application.Network.Posts.Commands.DeletePost;
 using Application.Network.Posts.Commands.UpdatePost;
 using Application.Network.Posts.Queries.GetFeed;
 using Application.Network.Posts.Queries.GetPostById;
+using Application.Network.Profile.Queries.GetUserProfile;
 using Application.Network.Reactions.Commands.ToggleReaction;
 using Application.Network.SavedPosts.Commands.ToggleSavePost;
 using Application.Network.SavedPosts.Queries.GetSavedPosts;
@@ -48,7 +49,8 @@ public class NetworkController : BaseApiController
         [FromQuery] PostCategory? category = null,
         [FromQuery] string? searchTerm = null,
         [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 10)
+        [FromQuery] int pageSize = 10,
+        [FromQuery] Guid? authorId = null)
     {
         var query = new GetFeedQuery
         {
@@ -56,7 +58,8 @@ public class NetworkController : BaseApiController
             Category = category,
             SearchTerm = searchTerm,
             PageNumber = pageNumber,
-            PageSize = pageSize
+            PageSize = pageSize,
+            AuthorId = authorId
         };
 
         var result = await _mediator.Send(query);
@@ -83,11 +86,12 @@ public class NetworkController : BaseApiController
 
     /// <summary>
     /// Create a new professional post.
+    /// Accepts multipart/form-data to support file attachments.
     /// </summary>
     [HttpPost("posts")]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CreatePost([FromBody] CreatePostRequest request)
+    public async Task<IActionResult> CreatePost([FromForm] CreatePostRequest request)
     {
         var command = new CreatePostCommand
         {
@@ -97,7 +101,9 @@ public class NetworkController : BaseApiController
             Category = request.Category,
             OrganisationId = request.OrganisationId,
             Visibility = request.Visibility,
-            AllowComments = request.AllowComments
+            AllowComments = request.AllowComments,
+            Attachments = request.Attachments,
+            IsAnonymizationConfirmed = request.IsAnonymizationConfirmed
         };
 
         var result = await _mediator.Send(command);
@@ -294,6 +300,24 @@ public class NetworkController : BaseApiController
     }
 
     #endregion
+
+    #region Profile
+
+    /// <summary>
+    /// Get public profile of a network user by their UserId.
+    /// Returns name, avatar, bio, post count and verification status.
+    /// </summary>
+    [HttpGet("profile/{userId:guid}")]
+    [ProducesResponseType(typeof(ApiResponse<UserProfileDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetUserProfile(Guid userId)
+    {
+        var query = new GetUserProfileQuery { UserId = userId };
+        var result = await _mediator.Send(query);
+        return HandleResult(result);
+    }
+
+    #endregion
 }
 
 #region Request DTOs
@@ -306,6 +330,8 @@ public class CreatePostRequest
     public Guid? OrganisationId { get; set; }
     public PostVisibility Visibility { get; set; } = PostVisibility.Public;
     public bool AllowComments { get; set; } = true;
+    public List<IFormFile>? Attachments { get; set; }
+    public bool IsAnonymizationConfirmed { get; set; }
 }
 
 public class UpdatePostRequest

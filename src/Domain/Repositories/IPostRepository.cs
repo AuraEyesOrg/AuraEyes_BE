@@ -17,7 +17,8 @@ public interface IPostRepository : IRepository<ProfessionalPost>
         string? searchTerm = null,
         int pageNumber = 1,
         int pageSize = 10,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? authorId = null);
 
     /// <summary>
     /// Get post by ID with attachments included.
@@ -25,6 +26,11 @@ public interface IPostRepository : IRepository<ProfessionalPost>
     Task<ProfessionalPost?> GetByIdWithAttachmentsAsync(
         Guid id,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get total number of posts by a specific author.
+    /// </summary>
+    Task<int> GetPostCountByAuthorAsync(Guid authorId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get reaction by user for a specific post.
