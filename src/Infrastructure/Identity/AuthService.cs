@@ -223,6 +223,39 @@ public class AuthService : IAuthService
                     request.Email);
             }
 
+            // Best-effort: Notify System Admin about new ophthalmologist registration
+            try
+            {
+                var adminUsers = await _userManager.GetUsersInRoleAsync(Roles.SystemAdmin);
+                foreach (var admin in adminUsers)
+                {
+                    if (!string.IsNullOrEmpty(admin.Email))
+                    {
+                        await _emailService.SendAsync(
+                            admin.Email,
+                            "[AURA] New Ophthalmologist Registration - Credential Review Required",
+                            $"""
+                            <h2>New Ophthalmologist Registration</h2>
+                            <p>A new ophthalmologist has registered on the AURA screening system and requires credential verification.</p>
+                            <ul>
+                                <li><strong>Name:</strong> {request.FullName}</li>
+                                <li><strong>Email:</strong> {request.Email}</li>
+                                <li><strong>Years of Experience:</strong> {request.YearsOfExperience}</li>
+                            </ul>
+                            <p>Please review their credentials (license and degree documents) in the System Admin panel.</p>
+                            <p>— AURA System</p>
+                            """,
+                            isHtml: true,
+                            cancellationToken);
+                    }
+                }
+            }
+            catch (Exception adminEmailEx)
+            {
+                _logger.LogWarning(adminEmailEx,
+                    "Failed to send admin notification email for new ophthalmologist: {Email}", request.Email);
+            }
+
             _logger.LogInformation("Ophthalmologist registered: {Email}", request.Email);
 
             return Result<RegisterResponse>.Success(new RegisterResponse
@@ -284,6 +317,19 @@ public class AuthService : IAuthService
             if (!user.EmailConfirmed)
             {
                 return Result<LoginResponse>.Unauthorized("Please confirm your email before logging in.");
+            }
+
+            // Check ophthalmologist verification status — reject if credentials were denied
+            var userRoles = await _userManager.GetRolesAsync(user);
+            if (userRoles.Contains(Roles.Ophthalmologist))
+            {
+                var doctors = await _ophthalmologistRepository.FindAsync(
+                    o => o.UserId == user.Id, cancellationToken);
+                if (doctors.Count > 0 && doctors[0].VerificationStatus == VerificationStatus.Rejected)
+                {
+                    return Result<LoginResponse>.Unauthorized(
+                        "Your credential verification has been rejected. Please contact support for more information.");
+                }
             }
 
             // Check if 2FA is enabled
@@ -391,6 +437,20 @@ public class AuthService : IAuthService
 
         _logger.LogInformation("User logged in: {Email}", user.Email);
 
+        // Enrich UserInfoResponse with ophthalmologist verification status
+        bool? isVerified = null;
+        string? verificationStatus = null;
+        if (roles.Contains(Roles.Ophthalmologist))
+        {
+            var doctors = await _ophthalmologistRepository.FindAsync(
+                o => o.UserId == user.Id, cancellationToken);
+            if (doctors.Count > 0)
+            {
+                isVerified = doctors[0].IsVerified;
+                verificationStatus = doctors[0].VerificationStatus.ToString();
+            }
+        }
+
         return new AuthResponse
         {
             Succeeded = true,
@@ -405,7 +465,9 @@ public class AuthService : IAuthService
                 Roles = roles.ToArray(),
                 EmailConfirmed = user.EmailConfirmed,
                 OrganizationId = user.OrganizationId,
-                TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user)
+                TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
+                IsVerified = isVerified,
+                VerificationStatus = verificationStatus
             }
         };
     }
@@ -477,6 +539,20 @@ public class AuthService : IAuthService
 
             _logger.LogInformation("Token refreshed for user: {UserId}", user.Id);
 
+            // Enrich UserInfoResponse with ophthalmologist verification status
+            bool? isVerified = null;
+            string? verificationStatus = null;
+            if (roles.Contains(Roles.Ophthalmologist))
+            {
+                var doctors = await _ophthalmologistRepository.FindAsync(
+                    o => o.UserId == user.Id, cancellationToken);
+                if (doctors.Count > 0)
+                {
+                    isVerified = doctors[0].IsVerified;
+                    verificationStatus = doctors[0].VerificationStatus.ToString();
+                }
+            }
+
             return Result<AuthResponse>.Success(new AuthResponse
             {
                 Succeeded = true,
@@ -491,7 +567,9 @@ public class AuthService : IAuthService
                     Roles = roles.ToArray(),
                     EmailConfirmed = user.EmailConfirmed,
                     OrganizationId = user.OrganizationId,
-                    TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user)
+                    TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
+                    IsVerified = isVerified,
+                    VerificationStatus = verificationStatus
                 }
             });
         }
@@ -654,6 +732,20 @@ public class AuthService : IAuthService
             var roles = await _identityService.GetUserRolesAsync(userId);
             var twoFactorEnabled = await _identityService.IsTwoFactorEnabledAsync(userId);
 
+            // Enrich with ophthalmologist verification status
+            bool? isVerified = null;
+            string? verificationStatus = null;
+            if (roles.Contains(Roles.Ophthalmologist))
+            {
+                var doctors = await _ophthalmologistRepository.FindAsync(
+                    o => o.UserId == userId, cancellationToken);
+                if (doctors.Count > 0)
+                {
+                    isVerified = doctors[0].IsVerified;
+                    verificationStatus = doctors[0].VerificationStatus.ToString();
+                }
+            }
+
             return Result<UserInfoResponse>.Success(new UserInfoResponse
             {
                 Id = userDto.Id,
@@ -663,7 +755,9 @@ public class AuthService : IAuthService
                 Roles = roles.ToArray(),
                 EmailConfirmed = userDto.EmailConfirmed,
                 OrganizationId = userDto.OrganizationId,
-                TwoFactorEnabled = twoFactorEnabled
+                TwoFactorEnabled = twoFactorEnabled,
+                IsVerified = isVerified,
+                VerificationStatus = verificationStatus
             });
         }
         catch (Exception ex)
@@ -715,7 +809,11 @@ public class AuthService : IAuthService
             var doctors = await _ophthalmologistRepository.FindAsync(
                 o => o.UserId == userId, cancellationToken);
             if (doctors.Count > 0)
+            {
                 claims.Add(new Claim("profile_id", doctors[0].Id.ToString()));
+                claims.Add(new Claim("IsVerified", doctors[0].IsVerified.ToString()));
+                claims.Add(new Claim("verification_status", doctors[0].VerificationStatus.ToString()));
+            }
         }
 
         return claims;
