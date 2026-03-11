@@ -1,10 +1,14 @@
 using Application.Common.Constants;
 using Application.Common.Models;
+using Application.Ophthalmologists.Schedules.Commands.BookSchedule;
 using Application.Ophthalmologists.Schedules.Commands.CreateSchedule;
+using Application.Ophthalmologists.Schedules.Commands.DeleteSchedule;
+using Application.Ophthalmologists.Schedules.Commands.UpdateScheduleCost;
 using Application.Ophthalmologists.Schedules.Commands.UpdateScheduleStatus;
 using Application.Ophthalmologists.Schedules.Common;
 using Application.Ophthalmologists.Schedules.Queries.GetSchedule;
 using Application.Ophthalmologists.Schedules.Queries.GetSchedules;
+using Application.Ophthalmologists.Schedules.Queries.GetScheduleStats;
 using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -146,6 +150,94 @@ public class OphthalmologistSchedulesController : BaseApiController
         var result = await _mediator.Send(command);
         return HandleResult(result, "Schedule status updated successfully.");
     }
+
+    /// <summary>
+    /// Get schedule statistics for an ophthalmologist.
+    /// </summary>
+    /// <param name="ophthalmologistId">Ophthalmologist ID.</param>
+    /// <returns>Schedule statistics grouped by status.</returns>
+    [HttpGet("stats")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponse<ScheduleStatsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetScheduleStats(Guid ophthalmologistId)
+    {
+        var result = await _mediator.Send(new GetScheduleStatsQuery(ophthalmologistId));
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Book a schedule slot as a patient.
+    /// </summary>
+    /// <param name="ophthalmologistId">Ophthalmologist ID.</param>
+    /// <param name="scheduleId">Schedule ID to book.</param>
+    /// <param name="request">Book schedule request.</param>
+    /// <returns>Success status.</returns>
+    [HttpPost("{scheduleId:guid}/book")]
+    [Authorize(Policy = Policies.PatientOnly)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> BookSchedule(
+        Guid ophthalmologistId,
+        Guid scheduleId,
+        [FromBody] BookScheduleRequest request)
+    {
+        var command = new BookScheduleCommand
+        {
+            ScheduleId = scheduleId,
+            PatientId = request.PatientId
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result, "Schedule booked successfully.");
+    }
+
+    /// <summary>
+    /// Delete (cancel) a schedule slot.
+    /// </summary>
+    /// <param name="ophthalmologistId">Ophthalmologist ID.</param>
+    /// <param name="scheduleId">Schedule ID to delete.</param>
+    /// <returns>Success status.</returns>
+    [HttpDelete("{scheduleId:guid}")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteSchedule(Guid ophthalmologistId, Guid scheduleId)
+    {
+        var result = await _mediator.Send(new DeleteScheduleCommand { ScheduleId = scheduleId });
+        return HandleResult(result, "Schedule deleted successfully.");
+    }
+
+    /// <summary>
+    /// Update the cost of a schedule slot.
+    /// </summary>
+    /// <param name="ophthalmologistId">Ophthalmologist ID.</param>
+    /// <param name="scheduleId">Schedule ID.</param>
+    /// <param name="request">Update cost request.</param>
+    /// <returns>Success status.</returns>
+    [HttpPatch("{scheduleId:guid}/cost")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateScheduleCost(
+        Guid ophthalmologistId,
+        Guid scheduleId,
+        [FromBody] UpdateScheduleCostRequest request)
+    {
+        var command = new UpdateScheduleCostCommand
+        {
+            ScheduleId = scheduleId,
+            Cost = request.Cost
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result, "Schedule cost updated successfully.");
+    }
 }
 
 /// <summary>
@@ -168,4 +260,20 @@ public record CreateScheduleRequest
 public record UpdateScheduleStatusRequest
 {
     public ScheduleStatus NewStatus { get; init; }
+}
+
+/// <summary>
+/// Request model for booking a schedule.
+/// </summary>
+public record BookScheduleRequest
+{
+    public Guid PatientId { get; init; }
+}
+
+/// <summary>
+/// Request model for updating schedule cost.
+/// </summary>
+public record UpdateScheduleCostRequest
+{
+    public decimal? Cost { get; init; }
 }
