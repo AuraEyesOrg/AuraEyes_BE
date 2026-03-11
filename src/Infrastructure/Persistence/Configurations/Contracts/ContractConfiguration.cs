@@ -30,7 +30,7 @@ public class ContractConfiguration : IEntityTypeConfiguration<Contract>
             .HasDefaultValue(false);
 
         // Relationships - Restrict delete for financial data
-        builder.HasOne<ContractTemplate>()
+        builder.HasOne(e => e.Template)
             .WithMany()
             .HasForeignKey(e => e.TemplateId)
             .OnDelete(DeleteBehavior.Restrict);

@@ -130,6 +130,8 @@ public static class DependencyInjection
         services.AddScoped<IScheduleRepository, ScheduleRepository>();
         services.AddScoped<IConsultationSessionRepository, ConsultationSessionRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
+        services.AddScoped<IContractTemplateRepository, ContractTemplateRepository>();
+        services.AddScoped<IContractRepository, ContractRepository>();
         services.AddScoped<IPostRepository, PostRepository>();
 
         // Register Identity Services
