@@ -5,6 +5,7 @@ using Application.Network.Comments.Commands.CreateComment;
 using Application.Network.Comments.Commands.DeleteComment;
 using Application.Network.Comments.Queries.GetComments;
 using Application.Network.Posts.Commands.CreatePost;
+using Application.Network.Posts.Commands.CreateRepost;
 using Application.Network.Posts.Commands.DeletePost;
 using Application.Network.Posts.Commands.UpdatePost;
 using Application.Network.Posts.Queries.GetFeed;
@@ -173,6 +174,28 @@ public class NetworkController : BaseApiController
 
         var result = await _mediator.Send(command);
         return HandleResult(result, "Post deleted successfully");
+    }
+
+    /// <summary>
+    /// Repost (share/quote) an existing professional post.
+    /// Creates a new post entry with IsRepost = true linked to the original.
+    /// </summary>
+    [HttpPost("posts/{postId:guid}/repost")]
+    [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RepostPost(Guid postId, [FromBody] CreateRepostRequest request)
+    {
+        var command = new CreateRepostCommand
+        {
+            AuthorId = _currentUserService.UserId!.Value,
+            AuthorType = request.AuthorType,
+            OriginalPostId = postId,
+            RepostComment = request.RepostComment
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result, "Post shared successfully");
     }
 
     #endregion
@@ -429,6 +452,12 @@ public class UpdatePostRequest
 {
     public string Content { get; set; } = string.Empty;
     public bool? AllowComments { get; set; }
+}
+
+public class CreateRepostRequest
+{
+    public AuthorType AuthorType { get; set; }
+    public string? RepostComment { get; set; }
 }
 
 public class CreateCommentRequest

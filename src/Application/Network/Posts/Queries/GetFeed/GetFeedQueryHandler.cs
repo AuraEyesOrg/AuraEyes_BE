@@ -41,16 +41,26 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
         var savedPostIds = await _postRepository.GetUserSavedPostIdsAsync(
             request.CurrentUserId, postIds, cancellationToken);
 
-        // Build author info
-        var authorIds = posts.Select(p => p.AuthorId).Distinct().ToList();
+        // Build author info — gather both post authors and original-post authors
+        var authorIds = posts
+            .SelectMany(p => p.OriginalPost is not null
+                ? new[] { p.AuthorId, p.OriginalPost.AuthorId }
+                : new[] { p.AuthorId })
+            .Distinct()
+            .ToList();
+
         var authors = new Dictionary<Guid, AuthorDto>();
         foreach (var authorId in authorIds)
         {
             var user = await _identityService.GetUserByIdAsync(authorId, cancellationToken);
+            var matchingPost = posts.FirstOrDefault(p => p.AuthorId == authorId)
+                               ?? posts.FirstOrDefault(p => p.OriginalPost?.AuthorId == authorId);
             authors[authorId] = new AuthorDto
             {
                 Id = authorId,
-                AuthorType = posts.First(p => p.AuthorId == authorId).AuthorType,
+                AuthorType = matchingPost?.AuthorId == authorId
+                    ? matchingPost.AuthorType
+                    : matchingPost!.OriginalPost!.AuthorType,
                 FullName = user?.FullName ?? "Unknown",
                 AvatarUrl = null
             };
@@ -65,6 +75,27 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
             IsRepost = p.IsRepost,
             RepostComment = p.RepostComment,
             OriginalPostId = p.OriginalPostId,
+            OriginalPost = p.IsRepost && p.OriginalPost is not null
+                ? new OriginalPostDto
+                {
+                    Id = p.OriginalPost.Id,
+                    Author = authors.GetValueOrDefault(p.OriginalPost.AuthorId)
+                             ?? new AuthorDto { Id = p.OriginalPost.AuthorId, FullName = "Unknown" },
+                    Content = p.OriginalPost.Content,
+                    Category = p.OriginalPost.Category,
+                    Attachments = p.OriginalPost.Attachments.Select(a => new AttachmentDto
+                    {
+                        Id = a.Id,
+                        Type = a.Type,
+                        FileName = a.FileName,
+                        FileUrl = a.FileUrl,
+                        MimeType = a.MimeType,
+                        FileSize = a.FileSize,
+                        DisplayOrder = a.DisplayOrder
+                    }).OrderBy(a => a.DisplayOrder).ToList(),
+                    CreatedAt = p.OriginalPost.CreatedAt
+                }
+                : null,
             ReactionCount = p.ReactionCount,
             CommentCount = p.CommentCount,
             RepostCount = p.RepostCount,

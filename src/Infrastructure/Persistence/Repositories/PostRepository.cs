@@ -26,6 +26,8 @@ public class PostRepository : Repository<ProfessionalPost>, IPostRepository
         var query = _dbSet
             .AsNoTracking()
             .Include(p => p.Attachments)
+            .Include(p => p.OriginalPost)
+                .ThenInclude(op => op!.Attachments)
             .AsQueryable();
 
         if (category.HasValue)
