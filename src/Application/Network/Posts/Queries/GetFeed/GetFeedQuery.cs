@@ -18,4 +18,8 @@ public record GetFeedQuery : IQuery<PagedResult<PostFeedDto>>
     /// Optional: filter posts by a specific author (used on profile pages)
     /// </summary>
     public Guid? AuthorId { get; init; }
+    /// <summary>
+    /// Optional: filter by author type (Ophthalmologist or Organisation)
+    /// </summary>
+    public AuthorType? AuthorType { get; init; }
 }

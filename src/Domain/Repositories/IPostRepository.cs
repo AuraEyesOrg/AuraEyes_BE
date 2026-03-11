@@ -18,7 +18,8 @@ public interface IPostRepository : IRepository<ProfessionalPost>
         int pageNumber = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default,
-        Guid? authorId = null);
+        Guid? authorId = null,
+        AuthorType? authorType = null);
 
     /// <summary>
     /// Get post by ID with attachments included.

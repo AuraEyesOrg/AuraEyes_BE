@@ -69,6 +69,32 @@ public class NetworkController : BaseApiController
     }
 
     /// <summary>
+    /// Discover posts filtered by author type (Ophthalmologist / Organisation), category and keyword.
+    /// </summary>
+    [HttpGet("discover")]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<PostFeedDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> DiscoverPosts(
+        [FromQuery] AuthorType? authorType = null,
+        [FromQuery] PostCategory? category = null,
+        [FromQuery] string? searchTerm = null,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var query = new GetFeedQuery
+        {
+            CurrentUserId = _currentUserService.UserId!.Value,
+            AuthorType = authorType,
+            Category = category,
+            SearchTerm = searchTerm,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+
+        var result = await _mediator.Send(query);
+        return HandleResult(result);
+    }
+
+    /// <summary>
     /// Get a single post by ID with full details.
     /// </summary>
     [HttpGet("posts/{postId:guid}")]

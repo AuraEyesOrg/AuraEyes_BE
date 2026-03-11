@@ -20,7 +20,8 @@ public class PostRepository : Repository<ProfessionalPost>, IPostRepository
         int pageNumber = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default,
-        Guid? authorId = null)
+        Guid? authorId = null,
+        AuthorType? authorType = null)
     {
         var query = _dbSet
             .AsNoTracking()
@@ -32,6 +33,9 @@ public class PostRepository : Repository<ProfessionalPost>, IPostRepository
 
         if (authorId.HasValue)
             query = query.Where(p => p.AuthorId == authorId.Value);
+
+        if (authorType.HasValue)
+            query = query.Where(p => p.AuthorType == authorType.Value);
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {

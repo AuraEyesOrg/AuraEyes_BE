@@ -30,7 +30,8 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
             request.PageNumber,
             request.PageSize,
             cancellationToken,
-            request.AuthorId);
+            request.AuthorId,
+            request.AuthorType);
 
         var postIds = posts.Select(p => p.Id).ToList();
 
