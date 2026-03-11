@@ -1,3 +1,4 @@
+using Application.AiQuota.Commands.BuyAiQuota;
 using Application.AiQuota.Queries.GetQuotaBalance;
 using Application.Common.Constants;
 using MediatR;
@@ -27,4 +28,27 @@ public class QuotasController : BaseApiController
         var result = await _mediator.Send(new GetQuotaBalanceQuery(), cancellationToken);
         return HandleResult(result, "Quota balance retrieved successfully.");
     }
+
+    /// <summary>
+    /// Buy AI quota bundles using internal wallet balance.
+    /// Deducts money from wallet and adds quota credits.
+    /// </summary>
+    [HttpPost("buy")]
+    public async Task<IActionResult> BuyQuota(
+        [FromBody] BuyAiQuotaRequest request,
+        CancellationToken cancellationToken)
+    {
+        var command = new BuyAiQuotaCommand
+        {
+            NumberOfBundles = request.NumberOfBundles
+        };
+
+        var result = await _mediator.Send(command, cancellationToken);
+        return HandleResult(result, "AI quota purchased successfully.");
+    }
+}
+
+public record BuyAiQuotaRequest
+{
+    public int NumberOfBundles { get; init; } = 1;
 }
