@@ -32,11 +32,6 @@ public class ProfessionalPostConfiguration : IEntityTypeConfiguration<Profession
         builder.Property(e => e.RepostComment)
             .HasMaxLength(500);
 
-        builder.Property(e => e.Visibility)
-            .HasConversion<string>()
-            .HasMaxLength(50)
-            .HasDefaultValue(Domain.Enums.Network.PostVisibility.Public);
-
         builder.Property(e => e.AllowComments)
             .HasDefaultValue(true);
 

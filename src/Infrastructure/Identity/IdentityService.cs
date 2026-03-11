@@ -247,7 +247,8 @@ public class IdentityService : IIdentityService
             user.IsActive,
             user.IsDeleted,
             user.OrganizationId,
-            user.TwoFactorEnabled
+            user.TwoFactorEnabled,
+            user.AvatarUrl
         );
     }
 

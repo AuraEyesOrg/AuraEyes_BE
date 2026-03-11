@@ -163,7 +163,8 @@ public record UserDto(
     bool IsActive,
     bool IsDeleted,
     Guid? OrganizationId,
-    bool TwoFactorEnabled = false
+    bool TwoFactorEnabled = false,
+    string? AvatarUrl = null
 );
 
 /// <summary>
