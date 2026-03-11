@@ -152,6 +152,9 @@ public static class DependencyInjection
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
 
+        // Register Hangfire daily job
+        services.AddScoped<DailyQuotaResetJob>();
+
         // Configure PayOS Settings
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));
         services.AddScoped<IPayOSService, PayOSService>();
