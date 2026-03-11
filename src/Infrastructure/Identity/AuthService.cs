@@ -6,8 +6,11 @@ using Application.Common.Models.Auth;
 using Domain.Common;
 using Domain.Entities.Users;
 using Domain.Enums;
+using Google.Apis.Auth;
+using Infrastructure.Settings;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Infrastructure.Identity;
 
@@ -29,6 +32,7 @@ public class AuthService : IAuthService
     private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly GoogleAuthSettings _googleAuthSettings;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
@@ -41,6 +45,7 @@ public class AuthService : IAuthService
         IRepository<Ophthalmologist> ophthalmologistRepository,
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager,
+        IOptions<GoogleAuthSettings> googleAuthSettings,
         ILogger<AuthService> logger)
     {
         _identityService = identityService;
@@ -52,6 +57,7 @@ public class AuthService : IAuthService
         _ophthalmologistRepository = ophthalmologistRepository;
         _unitOfWork = unitOfWork;
         _userManager = userManager;
+        _googleAuthSettings = googleAuthSettings.Value;
         _logger = logger;
     }
 
@@ -258,6 +264,114 @@ public class AuthService : IAuthService
     }
 
     /// <inheritdoc />
+    public async Task<Result<LoginResponse>> GoogleLoginAsync(
+        GoogleLoginRequest request,
+        string? ipAddress,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Validate Google ID token
+            var settings = new GoogleJsonWebSignature.ValidationSettings
+            {
+                Audience = new[] { _googleAuthSettings.ClientId }
+            };
+
+            GoogleJsonWebSignature.Payload payload;
+            try
+            {
+                payload = await GoogleJsonWebSignature.ValidateAsync(request.Credential, settings);
+            }
+            catch (InvalidJwtException)
+            {
+                return Result<LoginResponse>.Unauthorized("Invalid Google token");
+            }
+
+            if (string.IsNullOrEmpty(payload.Email))
+            {
+                return Result<LoginResponse>.Failure("Google account does not have an email address");
+            }
+
+            var user = await _userManager.FindByEmailAsync(payload.Email);
+
+            if (user != null)
+            {
+                // Existing user
+                if (user.IsDeleted)
+                {
+                    return Result<LoginResponse>.Unauthorized("Account has been deleted");
+                }
+
+                if (!user.IsActive)
+                {
+                    return Result<LoginResponse>.Unauthorized("Account is deactivated. Please contact support.");
+                }
+
+                // Auto-confirm email for Google users if not yet confirmed
+                if (!user.EmailConfirmed)
+                {
+                    user.EmailConfirmed = true;
+                    await _userManager.UpdateAsync(user);
+                }
+
+                // Check if 2FA is enabled
+                if (await _userManager.GetTwoFactorEnabledAsync(user))
+                {
+                    _logger.LogInformation("2FA required for Google user: {Email}", payload.Email);
+                    return Result<LoginResponse>.Success(LoginResponse.TwoFactorRequired(user.Id));
+                }
+
+                var authResponse = await CompleteLoginAsync(user, request.DeviceInfo, ipAddress, cancellationToken);
+                return Result<LoginResponse>.Success(LoginResponse.Success(authResponse));
+            }
+
+            // New user — create Patient account
+            await _unitOfWork.BeginTransactionAsync(cancellationToken);
+
+            var newUser = new ApplicationUser
+            {
+                UserName = payload.Email,
+                Email = payload.Email,
+                FullName = payload.Name ?? payload.Email,
+                AvatarUrl = payload.Picture,
+                EmailConfirmed = true // Google already verified the email
+            };
+
+            var createResult = await _userManager.CreateAsync(newUser);
+            if (!createResult.Succeeded)
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                return Result<LoginResponse>.Failure(createResult.Errors.Select(e => e.Description));
+            }
+
+            // Add Google login provider info
+            var loginInfo = new UserLoginInfo("Google", payload.Subject, "Google");
+            await _userManager.AddLoginAsync(newUser, loginInfo);
+
+            await _identityService.AddToRoleAsync(newUser.Id, Roles.Patient);
+
+            var patient = new Patient(newUser.Id, null);
+            await _patientRepository.AddAsync(patient, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+            _logger.LogInformation("New patient registered via Google: {Email}", payload.Email);
+
+            var newAuthResponse = await CompleteLoginAsync(newUser, request.DeviceInfo, ipAddress, cancellationToken);
+            return Result<LoginResponse>.Success(LoginResponse.Success(newAuthResponse));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during Google login");
+
+            try { await _unitOfWork.RollbackTransactionAsync(cancellationToken); }
+            catch { /* transaction may not have started */ }
+
+            return Result<LoginResponse>.Failure("An error occurred during Google login");
+        }
+    }
+
+    /// <inheritdoc />
     public async Task<Result<LoginResponse>> LoginAsync(
         LoginRequest request,
         string? ipAddress,
@@ -402,6 +516,7 @@ public class AuthService : IAuthService
                 Id = user.Id,
                 Email = user.Email!,
                 FullName = user.FullName,
+                AvatarUrl = user.AvatarUrl,
                 Roles = roles.ToArray(),
                 EmailConfirmed = user.EmailConfirmed,
                 OrganizationId = user.OrganizationId,

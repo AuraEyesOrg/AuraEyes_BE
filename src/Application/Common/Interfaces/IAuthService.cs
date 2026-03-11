@@ -26,6 +26,10 @@ public interface IAuthService
         CancellationToken cancellationToken = default);
 
 
+    Task<Result<LoginResponse>> GoogleLoginAsync(
+        GoogleLoginRequest request,
+        string? ipAddress,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Authenticate user with email and password.

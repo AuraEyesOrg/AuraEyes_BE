@@ -204,6 +204,16 @@ public record ConfirmEmailRequest
     public string Token { get; init; } = string.Empty;
 }
 
+#region Google Login
+public record GoogleLoginRequest
+{
+    [Required]
+    public string Credential { get; init; } = string.Empty;
+    public string? DeviceInfo { get; init; }
+}
+
+#endregion
+
 #region Two-Factor Authentication DTOs
 
 /// <summary>
