@@ -12,7 +12,6 @@ public class PostFeedDto
     public AuthorDto Author { get; set; } = null!;
     public string Content { get; set; } = string.Empty;
     public PostCategory Category { get; set; }
-    public PostVisibility Visibility { get; set; }
     public bool IsRepost { get; set; }
     public string? RepostComment { get; set; }
     public Guid? OriginalPostId { get; set; }

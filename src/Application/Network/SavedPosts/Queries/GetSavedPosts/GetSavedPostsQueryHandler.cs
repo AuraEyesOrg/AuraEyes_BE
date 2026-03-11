@@ -57,7 +57,6 @@ public class GetSavedPostsQueryHandler : IQueryHandler<GetSavedPostsQuery, Paged
                 Author = authors.GetValueOrDefault(s.Post.AuthorId) ?? new AuthorDto { Id = s.Post.AuthorId, FullName = "Unknown" },
                 Content = s.Post.Content,
                 Category = s.Post.Category,
-                Visibility = s.Post.Visibility,
                 IsRepost = s.Post.IsRepost,
                 RepostComment = s.Post.RepostComment,
                 OriginalPostId = s.Post.OriginalPostId,

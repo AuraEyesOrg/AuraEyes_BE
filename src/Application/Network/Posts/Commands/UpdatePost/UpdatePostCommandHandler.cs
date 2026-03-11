@@ -32,11 +32,9 @@ public class UpdatePostCommandHandler : ICommandHandler<UpdatePostCommand>
 
         post.UpdateContent(request.Content);
 
-        if (request.Visibility.HasValue || request.AllowComments.HasValue)
+        if (request.AllowComments.HasValue)
         {
-            post.UpdateVisibility(
-                request.Visibility ?? post.Visibility,
-                request.AllowComments ?? post.AllowComments);
+            post.UpdateAllowComments(request.AllowComments.Value);
         }
 
         await _postRepository.UpdateAsync(post, cancellationToken);

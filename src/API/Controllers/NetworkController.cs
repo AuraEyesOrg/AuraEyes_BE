@@ -31,11 +31,13 @@ public class NetworkController : BaseApiController
 {
     private readonly IMediator _mediator;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IIdentityService _identityService;
 
-    public NetworkController(IMediator mediator, ICurrentUserService currentUserService)
+    public NetworkController(IMediator mediator, ICurrentUserService currentUserService, IIdentityService identityService)
     {
         _mediator = mediator;
         _currentUserService = currentUserService;
+        _identityService = identityService;
     }
 
     #region Posts
@@ -100,7 +102,6 @@ public class NetworkController : BaseApiController
             Content = request.Content,
             Category = request.Category,
             OrganisationId = request.OrganisationId,
-            Visibility = request.Visibility,
             AllowComments = request.AllowComments,
             Attachments = request.Attachments,
             IsAnonymizationConfirmed = request.IsAnonymizationConfirmed
@@ -123,7 +124,6 @@ public class NetworkController : BaseApiController
             PostId = postId,
             AuthorId = _currentUserService.UserId!.Value,
             Content = request.Content,
-            Visibility = request.Visibility,
             AllowComments = request.AllowComments
         };
 
@@ -285,6 +285,72 @@ public class NetworkController : BaseApiController
 
     #endregion
 
+    #region Professionals & Organisations
+
+    /// <summary>
+    /// Get list of professionals (ophthalmologists) in the network.
+    /// </summary>
+    [HttpGet("professionals")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetProfessionals(
+        [FromQuery] string? searchTerm = null,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var (users, totalCount) = await _identityService.GetUsersAsync(
+            searchTerm, Roles.Ophthalmologist, null, pageNumber, pageSize, cancellationToken);
+
+        var items = users.Select(u => new
+        {
+            id = u.Id,
+            fullName = u.FullName,
+            email = u.Email,
+            isActive = u.IsActive,
+            createdAt = u.CreatedAt
+        });
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = "Professionals retrieved",
+            Data = new { items, totalCount, pageNumber, pageSize }
+        });
+    }
+
+    /// <summary>
+    /// Get list of organisations (OrgAdmin users) in the network.
+    /// </summary>
+    [HttpGet("organisations")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOrganisations(
+        [FromQuery] string? searchTerm = null,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var (users, totalCount) = await _identityService.GetUsersAsync(
+            searchTerm, Roles.OrgAdmin, null, pageNumber, pageSize, cancellationToken);
+
+        var items = users.Select(u => new
+        {
+            id = u.Id,
+            fullName = u.FullName,
+            email = u.Email,
+            isActive = u.IsActive,
+            createdAt = u.CreatedAt
+        });
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = "Organisations retrieved",
+            Data = new { items, totalCount, pageNumber, pageSize }
+        });
+    }
+
+    #endregion
+
     #region Trending
 
     /// <summary>
@@ -328,7 +394,6 @@ public class CreatePostRequest
     public string Content { get; set; } = string.Empty;
     public PostCategory Category { get; set; }
     public Guid? OrganisationId { get; set; }
-    public PostVisibility Visibility { get; set; } = PostVisibility.Public;
     public bool AllowComments { get; set; } = true;
     public List<IFormFile>? Attachments { get; set; }
     public bool IsAnonymizationConfirmed { get; set; }
@@ -337,7 +402,6 @@ public class CreatePostRequest
 public class UpdatePostRequest
 {
     public string Content { get; set; } = string.Empty;
-    public PostVisibility? Visibility { get; set; }
     public bool? AllowComments { get; set; }
 }
 

@@ -1,5 +1,4 @@
 using Application.Common.Interfaces;
-using Domain.Enums.Network;
 
 namespace Application.Network.Posts.Commands.UpdatePost;
 
@@ -11,6 +10,5 @@ public record UpdatePostCommand : ICommand
     public Guid PostId { get; init; }
     public Guid AuthorId { get; init; }
     public string Content { get; init; } = string.Empty;
-    public PostVisibility? Visibility { get; init; }
     public bool? AllowComments { get; init; }
 }

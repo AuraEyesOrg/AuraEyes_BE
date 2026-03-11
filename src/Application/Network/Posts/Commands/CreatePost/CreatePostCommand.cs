@@ -14,7 +14,6 @@ public class CreatePostCommand : ICommand<Guid>
     public string Content { get; set; } = string.Empty;
     public PostCategory Category { get; set; }
     public Guid? OrganisationId { get; set; }
-    public PostVisibility Visibility { get; set; } = PostVisibility.Public;
     public bool AllowComments { get; set; } = true;
     public List<IFormFile>? Attachments { get; set; }
     public bool IsAnonymizationConfirmed { get; set; }

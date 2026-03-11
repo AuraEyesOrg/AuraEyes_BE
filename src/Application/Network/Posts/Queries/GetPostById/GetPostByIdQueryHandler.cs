@@ -54,7 +54,6 @@ public class GetPostByIdQueryHandler : IQueryHandler<GetPostByIdQuery, PostDetai
             Author = author,
             Content = post.Content,
             Category = post.Category,
-            Visibility = post.Visibility,
             IsRepost = post.IsRepost,
             RepostComment = post.RepostComment,
             OriginalPostId = post.OriginalPostId,

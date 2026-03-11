@@ -42,7 +42,6 @@ public class CreatePostCommandHandler : ICommandHandler<CreatePostCommand, Guid>
             request.Content,
             request.Category,
             request.OrganisationId,
-            request.Visibility,
             request.AllowComments);
 
         // Handle file uploads

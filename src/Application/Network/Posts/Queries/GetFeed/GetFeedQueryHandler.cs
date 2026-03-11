@@ -61,7 +61,6 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
             Author = authors.GetValueOrDefault(p.AuthorId) ?? new AuthorDto { Id = p.AuthorId, FullName = "Unknown" },
             Content = p.Content,
             Category = p.Category,
-            Visibility = p.Visibility,
             IsRepost = p.IsRepost,
             RepostComment = p.RepostComment,
             OriginalPostId = p.OriginalPostId,
