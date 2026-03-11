@@ -118,6 +118,11 @@ public static class DependencyInjection
             .AddPolicy(Policies.SystemAdminOnly, policy => policy.RequireRole(Roles.SystemAdmin))
             .AddPolicy(Policies.AdminsOnly, policy => policy.RequireRole(Roles.Admins))
             .AddPolicy(Policies.MedicalStaff, policy => policy.RequireRole(Roles.Medical))
+            .AddPolicy(Policies.VerifiedOphthalmologist, policy =>
+            {
+                policy.RequireRole(Roles.Ophthalmologist);
+                policy.RequireClaim("IsVerified", "True");
+            })
             .AddPolicy(Policies.OrganizationMember, policy =>
                 policy.RequireAssertion(context =>
                     context.User.HasClaim(c => c.Type == "org_id" && !string.IsNullOrEmpty(c.Value))));
