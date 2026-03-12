@@ -45,6 +45,9 @@ public static class DependencyInjection
         // Google Meet Settings
         services.Configure<GoogleMeetSettings>(configuration.GetSection(GoogleMeetSettings.SectionName));
 
+        // Google Auth Settings (for Google Login)
+        services.Configure<GoogleAuthSettings>(configuration.GetSection(GoogleAuthSettings.SectionName));
+
         // ASP.NET Core Identity configuration
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
         {
