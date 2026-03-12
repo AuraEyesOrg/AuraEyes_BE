@@ -200,10 +200,11 @@ if (app.Environment.IsDevelopment())
 }
 
 // Register recurring jobs
+// TODO: Revert to "0 0 * * *" (Daily at 00:00 UTC) before deploying to production.
 RecurringJob.AddOrUpdate<DailyQuotaResetJob>(
     "daily-quota-reset",
     job => job.ExecuteAsync(),
-    "0 0 * * *", // 00:00 UTC = 07:00 AM Vietnam
+    "*/2 * * * *", // Every 2 minutes - LOCAL TESTING ONLY
     new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
 app.Run();
