@@ -17,6 +17,10 @@ public sealed class SupabaseStorageService : IFileStorageService
     private readonly SupabaseStorageSettings _settings;
     private readonly ILogger<SupabaseStorageService> _logger;
 
+    // Lazily initialised – reused across all calls within the same DI scope so
+    // concurrent uploads (e.g. licenseImage + degreeImage) share one connection.
+    private Client? _supabaseClient;
+
     public SupabaseStorageService(
         IOptions<SupabaseStorageSettings> settings,
         ILogger<SupabaseStorageService> logger)
@@ -28,6 +32,30 @@ public sealed class SupabaseStorageService : IFileStorageService
             "SupabaseStorageService initialised – Url={Url}, Bucket={Bucket}, HasKey={HasKey}",
             _settings.Url, _settings.BucketName, !string.IsNullOrEmpty(_settings.ServiceKey));
     }
+
+    // ── Lazy async initialisation ───────────────────────────────────────────
+
+    private async Task<Client> GetSupabaseClientAsync()
+    {
+        if (_supabaseClient is not null)
+            return _supabaseClient;
+
+        var client = new Client(_settings.Url, _settings.ServiceKey, new SupabaseOptions
+        {
+            AutoConnectRealtime = false
+        });
+        await client.InitializeAsync();
+        _supabaseClient = client;
+        return _supabaseClient;
+    }
+
+    /// <summary>
+    /// Sync helper used by <see cref="DeleteFile"/> and <see cref="FileExists"/>
+    /// which cannot be made async without changing the <see cref="IFileStorageService"/> contract.
+    /// Runs the async init on the thread pool to avoid ASP.NET sync-context deadlocks.
+    /// </summary>
+    private Client GetSupabaseClientSync()
+        => _supabaseClient ?? Task.Run(GetSupabaseClientAsync).GetAwaiter().GetResult();
 
     /// <inheritdoc />
     public async Task<string> SaveFileAsync(
@@ -59,12 +87,7 @@ public sealed class SupabaseStorageService : IFileStorageService
             "Uploading to Supabase Storage – Bucket={Bucket}, Path={Path}, Size={Size} bytes",
             _settings.BucketName, storagePath, fileBytes.Length);
 
-        // Initialise Supabase client with service_role key (bypasses RLS)
-        var supabase = new Client(_settings.Url, _settings.ServiceKey, new SupabaseOptions
-        {
-            AutoConnectRealtime = false
-        });
-        await supabase.InitializeAsync();
+        var supabase = await GetSupabaseClientAsync();
 
         // Upload file
         await supabase.Storage
@@ -98,11 +121,7 @@ public sealed class SupabaseStorageService : IFileStorageService
             var filePath = ExtractStoragePath(relativePath);
             if (string.IsNullOrEmpty(filePath)) return false;
 
-            var supabase = new Client(_settings.Url, _settings.ServiceKey, new SupabaseOptions
-            {
-                AutoConnectRealtime = false
-            });
-            supabase.InitializeAsync().GetAwaiter().GetResult();
+            var supabase = GetSupabaseClientSync();
 
             supabase.Storage
                 .From(_settings.BucketName)
@@ -130,6 +149,7 @@ public sealed class SupabaseStorageService : IFileStorageService
             var filePath = ExtractStoragePath(relativePath);
             if (string.IsNullOrEmpty(filePath)) return false;
 
+            // Use public URL check – no need to init Supabase SDK for a HEAD request.
             using var httpClient = new HttpClient();
             var url = $"{_settings.Url}/storage/v1/object/public/{_settings.BucketName}/{filePath}";
             var response = httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, url)).GetAwaiter().GetResult();

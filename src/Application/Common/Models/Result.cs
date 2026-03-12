@@ -12,6 +12,7 @@ public class Result<T>
     public bool IsForbidden { get; protected set; }
     public bool IsNotFound { get; protected set; }
     public bool IsConflict { get; protected set; }
+    public bool IsPaymentRequired { get; protected set; }
     
     public List<string> Errors { get; protected set; } = new();
     public string ErrorMessage => string.Join(", ", Errors);
@@ -59,6 +60,12 @@ public class Result<T>
         IsConflict = true, 
         Errors = new() { message } 
     };
+
+    public static Result<T> PaymentRequired(string message = "Payment required") => new()
+    {
+        IsPaymentRequired = true,
+        Errors = new() { message }
+    };
 }
 
 /// <summary>
@@ -71,6 +78,7 @@ public class Result
     public bool IsForbidden { get; protected set; }
     public bool IsNotFound { get; protected set; }
     public bool IsConflict { get; protected set; }
+    public bool IsPaymentRequired { get; protected set; }
     
     public List<string> Errors { get; protected set; } = new();
     public string ErrorMessage => string.Join(", ", Errors);
@@ -113,5 +121,11 @@ public class Result
     { 
         IsConflict = true, 
         Errors = new() { message } 
+    };
+
+    public static Result PaymentRequired(string message = "Payment required") => new()
+    {
+        IsPaymentRequired = true,
+        Errors = new() { message }
     };
 }

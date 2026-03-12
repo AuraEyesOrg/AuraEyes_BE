@@ -11,6 +11,7 @@ public class Contract : BaseEntity, IAggregateRoot
 {
     public Guid UserId { get; private set; }
     public Guid TemplateId { get; private set; }
+    public ContractTemplate? Template { get; private set; }  // navigation
     public DateTime? SignedDate { get; private set; }
     public string ContractNumber { get; private set; } = string.Empty;
     public string? ScannedDocumentUrl { get; private set; }
@@ -85,6 +86,18 @@ public class Contract : BaseEntity, IAggregateRoot
             throw new InvalidOperationException("Cannot cancel active, expired or terminated contracts");
 
         Status = ContractStatus.Cancelled;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Update commercial terms — only allowed while the contract is still in Draft.</summary>
+    public void Update(Guid templateId, int aiQuotaLimit, decimal platformCommissionRate)
+    {
+        if (Status != ContractStatus.Draft)
+            throw new InvalidOperationException("Only draft contracts can be updated.");
+
+        TemplateId = templateId;
+        AiQuotaLimit = aiQuotaLimit;
+        PlatformCommissionRate = platformCommissionRate;
         UpdatedAt = DateTime.UtcNow;
     }
 }

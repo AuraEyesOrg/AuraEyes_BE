@@ -1,7 +1,8 @@
-using System.Reflection;
 using System.Text;
+using Application.AiQuota.Interfaces;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
+using Application.SystemAdmin.Interfaces;
 using Domain.Common;
 using Domain.Repositories;
 using Infrastructure.Identity;
@@ -9,7 +10,6 @@ using Infrastructure.Persistence;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.Services;
 using Infrastructure.Settings;
-using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -30,12 +30,6 @@ public static class DependencyInjection
                 b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<ApplicationDbContext>());
-
-        // Register MediatR handlers from Infrastructure assembly
-        services.AddMediatR(cfg =>
-        {
-            cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly());
-        });
 
         // JWT Settings
         var jwtSettings = new JwtSettings();
@@ -127,6 +121,11 @@ public static class DependencyInjection
             .AddPolicy(Policies.SystemAdminOnly, policy => policy.RequireRole(Roles.SystemAdmin))
             .AddPolicy(Policies.AdminsOnly, policy => policy.RequireRole(Roles.Admins))
             .AddPolicy(Policies.MedicalStaff, policy => policy.RequireRole(Roles.Medical))
+            .AddPolicy(Policies.VerifiedOphthalmologist, policy =>
+            {
+                policy.RequireRole(Roles.Ophthalmologist);
+                policy.RequireClaim("IsVerified", "True");
+            })
             .AddPolicy(Policies.OrganizationMember, policy =>
                 policy.RequireAssertion(context =>
                     context.User.HasClaim(c => c.Type == "org_id" && !string.IsNullOrEmpty(c.Value))));
@@ -139,6 +138,9 @@ public static class DependencyInjection
         services.AddScoped<IScheduleRepository, ScheduleRepository>();
         services.AddScoped<IConsultationSessionRepository, ConsultationSessionRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
+        services.AddScoped<IContractTemplateRepository, ContractTemplateRepository>();
+        services.AddScoped<IContractRepository, ContractRepository>();
+        services.AddScoped<IPostRepository, PostRepository>();
 
         // Register Identity Services
         services.AddScoped<IIdentityService, IdentityService>();
@@ -152,9 +154,14 @@ public static class DependencyInjection
         services.AddScoped<IFileStorageService, SupabaseStorageService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IGoogleMeetService, GoogleMeetService>();
+        services.AddScoped<IAdminQueryService, AdminQueryService>();
+        services.AddScoped<IAiQuotaService, AiQuotaService>();
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
+
+        // Register Hangfire daily job
+        services.AddScoped<DailyQuotaResetJob>();
 
         // Configure PayOS Settings
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));

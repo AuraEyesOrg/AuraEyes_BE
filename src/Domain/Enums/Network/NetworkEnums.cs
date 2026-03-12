@@ -87,41 +87,4 @@ public enum AttachmentType
     Research
 }
 
-/// <summary>
-/// Visibility of posts
-/// </summary>
-public enum PostVisibility
-{
-    /// <summary>
-    /// Visible to everyone
-    /// </summary>
-    Public,
-    
-    /// <summary>
-    /// Visible to followers only
-    /// </summary>
-    FollowersOnly,
-    
-    /// <summary>
-    /// Visible to organisation members only
-    /// </summary>
-    OrganisationOnly
-}
 
-/// <summary>
-/// Type of entity that can follow
-/// </summary>
-public enum FollowerType
-{
-    Ophthalmologist,
-    Organisation
-}
-
-/// <summary>
-/// Type of entity that can be followed
-/// </summary>
-public enum FollowingType
-{
-    Ophthalmologist,
-    Organisation
-}

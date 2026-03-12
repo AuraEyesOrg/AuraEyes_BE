@@ -15,15 +15,18 @@ public class AuthController : BaseApiController
     private readonly IAuthService _authService;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<AuthController> _logger;
+    private readonly string _frontendUrl;
 
     public AuthController(
         IAuthService authService,
         ICurrentUserService currentUserService,
-        ILogger<AuthController> logger)
+        ILogger<AuthController> logger,
+        IConfiguration configuration)
     {
         _authService = authService;
         _currentUserService = currentUserService;
         _logger = logger;
+        _frontendUrl = configuration["FrontendUrl"] ?? "http://localhost:5173";
     }
 
     /// <summary>
@@ -37,7 +40,7 @@ public class AuthController : BaseApiController
         [FromBody] RegisterPatientRequest request,
         CancellationToken cancellationToken)
     {
-        var confirmationUrlBase = Url.Action(nameof(ConfirmEmail), "Auth", null, Request.Scheme);
+        var confirmationUrlBase = $"{_frontendUrl}/confirm-email";
         var result = await _authService.RegisterPatientAsync(request, confirmationUrlBase!, cancellationToken);
 
         return HandleResult(result, result.Data?.Message ?? "Registration successful");
@@ -56,7 +59,7 @@ public class AuthController : BaseApiController
         [FromForm] RegisterOphthalmologistRequest request,
         CancellationToken cancellationToken)
     {
-        var confirmationUrlBase = Url.Action(nameof(ConfirmEmail), "Auth", null, Request.Scheme);
+        var confirmationUrlBase = $"{_frontendUrl}/confirm-email";
         var result = await _authService.RegisterOphthalmologistAsync(request, confirmationUrlBase!, cancellationToken);
 
         return HandleResult(result, result.Data?.Message ?? "Registration successful");
@@ -315,7 +318,7 @@ public class AuthController : BaseApiController
         [FromBody] ForgotPasswordRequest request,
         CancellationToken cancellationToken)
     {
-        var confirmationUrlBase = Url.Action(nameof(ConfirmEmail), "Auth", null, Request.Scheme);
+        var confirmationUrlBase = $"{_frontendUrl}/confirm-email";
         await _authService.ResendConfirmationAsync(request.Email, confirmationUrlBase!, cancellationToken);
 
         return OkResponse("If your email exists and is not confirmed, you will receive a confirmation link.");

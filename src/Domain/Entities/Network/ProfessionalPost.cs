@@ -74,11 +74,6 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
     /// </summary>
     public bool AllowComments { get; private set; } = true;
     
-    /// <summary>
-    /// Post visibility
-    /// </summary>
-    public PostVisibility Visibility { get; private set; } = PostVisibility.Public;
-
     // Navigation properties (within network module only)
     public virtual ProfessionalPost? OriginalPost { get; private set; }
     
@@ -105,7 +100,6 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
         string content,
         PostCategory category,
         Guid? organisationId = null,
-        PostVisibility visibility = PostVisibility.Public,
         bool allowComments = true)
     {
         if (string.IsNullOrWhiteSpace(content))
@@ -116,7 +110,6 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
         Content = content;
         Category = category;
         OrganisationId = organisationId;
-        Visibility = visibility;
         AllowComments = allowComments;
         IsRepost = false;
     }
@@ -139,7 +132,6 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
             OriginalPostId = originalPost.Id,
             IsRepost = true,
             RepostComment = comment,
-            Visibility = PostVisibility.Public,
             AllowComments = true
         };
 
@@ -159,11 +151,10 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
     }
 
     /// <summary>
-    /// Update visibility settings
+    /// Update comment settings
     /// </summary>
-    public void UpdateVisibility(PostVisibility visibility, bool allowComments)
+    public void UpdateAllowComments(bool allowComments)
     {
-        Visibility = visibility;
         AllowComments = allowComments;
         UpdatedAt = DateTime.UtcNow;
     }
