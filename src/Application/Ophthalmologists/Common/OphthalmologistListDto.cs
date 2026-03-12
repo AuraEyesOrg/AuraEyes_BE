@@ -9,6 +9,7 @@ public class OphthalmologistListDto
     public Guid UserId { get; set; }
     public string? UserFullName { get; set; }
     public string? UserEmail { get; set; }
+    public string? UserAvatarUrl { get; set; }
     public string? Bio { get; set; }
     public int YearsOfExperience { get; set; }
     public bool IsVerified { get; set; }
