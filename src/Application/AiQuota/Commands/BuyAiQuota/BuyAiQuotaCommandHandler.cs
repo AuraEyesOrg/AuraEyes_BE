@@ -80,7 +80,10 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
                 await _walletRepository.AddTransactionAsync(transaction, cancellationToken);
             }
 
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            // Add purchased quota credits to the entity (Patient or Organisation)
+            var totalCredits = request.NumberOfBundles * currentQuota.BundleSize.Value;
+            await _quotaService.AddPurchasedQuotaAsync(userId, role, totalCredits, cancellationToken);
+
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
             _logger.LogInformation(
