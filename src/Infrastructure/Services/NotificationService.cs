@@ -1,6 +1,7 @@
 using Application.Common.Interfaces;
 using Domain.Entities.Platform;
 using Domain.Common;
+using Domain.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Services;
@@ -27,7 +28,12 @@ public class NotificationService : INotificationService
 
     public async Task SendAsync(Guid userId, string message, CancellationToken cancellationToken = default)
     {
-        var notification = new Notification(userId, "Session Reminder", message);
+        // Temporary implementation - will be replaced with full SignalR support in Phase 2
+        var notification = new Notification(
+            userId, 
+            "Session Reminder", 
+            message, 
+            NotificationType.NewConsultationRequest);
 
         await _notificationRepository.AddAsync(notification, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
