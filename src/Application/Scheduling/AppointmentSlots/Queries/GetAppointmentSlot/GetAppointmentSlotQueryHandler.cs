@@ -28,6 +28,8 @@ public class GetAppointmentSlotQueryHandler : IQueryHandler<GetAppointmentSlotQu
         {
             Id = slot.Id,
             ScheduleTemplateId = slot.ScheduleTemplateId,
+            OphthalId = slot.ScheduleTemplate?.OphthalId,
+            OrgId = slot.ScheduleTemplate?.OrgId,
             Date = slot.Date,
             StartTime = slot.StartTime,
             EndTime = slot.EndTime,
@@ -36,6 +38,8 @@ public class GetAppointmentSlotQueryHandler : IQueryHandler<GetAppointmentSlotQu
             MaxCapacity = slot.MaxCapacity,
             BookedCount = slot.BookedCount,
             AvailableCapacity = availableCapacity,
+            ReservedBy = slot.ReservedBy,
+            ReservationExpireAt = slot.ReservationExpireAt,
             CreatedAt = slot.CreatedAt,
             UpdatedAt = slot.UpdatedAt
         };

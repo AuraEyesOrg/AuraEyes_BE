@@ -44,6 +44,8 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
             {
                 Id = slot.Id,
                 ScheduleTemplateId = slot.ScheduleTemplateId,
+                OphthalId = slotWithTemplate?.ScheduleTemplate?.OphthalId,
+                OrgId = slotWithTemplate?.ScheduleTemplate?.OrgId,
                 Date = slot.Date,
                 StartTime = slot.StartTime,
                 EndTime = slot.EndTime,
