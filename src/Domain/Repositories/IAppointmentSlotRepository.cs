@@ -105,4 +105,14 @@ public interface IAppointmentSlotRepository : IRepository<AppointmentSlot>
     Task<AppointmentSlot?> GetByIdWithLockAsync(
         Guid id,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get available slots for organisation with capacity (booked_count < max_capacity).
+    /// For patient booking flow.
+    /// </summary>
+    Task<IReadOnlyList<AppointmentSlot>> GetAvailableByOrganisationWithCapacityAsync(
+        Guid organisationId,
+        DateOnly? fromDate = null,
+        DateOnly? toDate = null,
+        CancellationToken cancellationToken = default);
 }

@@ -6,6 +6,7 @@ namespace Domain.Entities.Scheduling;
 /// <summary>
 /// AppointmentSlot - A specific time slot for a specific date, generated from a ScheduleTemplate.
 /// Tracks bookings, reservations, and availability.
+/// Supports capacity-based booking for organisation clinic appointments.
 /// </summary>
 public class AppointmentSlot : BaseEntity, IAggregateRoot
 {
@@ -30,6 +31,9 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     /// <summary>Type of appointment slot.</summary>
     public SlotType SlotType { get; private set; }
 
+    /// <summary>Maximum number of patients that can book this slot (copied from template).</summary>
+    public int MaxCapacity { get; private set; }
+
     /// <summary>Number of patients currently booked in this slot.</summary>
     public int BookedCount { get; private set; }
 
@@ -42,6 +46,10 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     /// <summary>Navigation property to the template.</summary>
     public ScheduleTemplate? ScheduleTemplate { get; private set; }
 
+    // Navigation to clinic appointments
+    private readonly List<ClinicAppointment> _clinicAppointments = new();
+    public IReadOnlyCollection<ClinicAppointment> ClinicAppointments => _clinicAppointments.AsReadOnly();
+
     private AppointmentSlot() { } // EF Core
 
     public AppointmentSlot(
@@ -50,16 +58,20 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
         TimeOnly startTime,
         TimeOnly endTime,
         SlotType slotType,
+        int maxCapacity = 1,
         decimal? cost = null)
     {
         if (endTime <= startTime)
             throw new ArgumentException("End time must be after start time");
+        if (maxCapacity < 1)
+            throw new ArgumentException("Max capacity must be at least 1", nameof(maxCapacity));
 
         ScheduleTemplateId = scheduleTemplateId;
         Date = date;
         StartTime = startTime;
         EndTime = endTime;
         SlotType = slotType;
+        MaxCapacity = maxCapacity;
         Cost = cost;
         Status = ScheduleStatus.Available;
         BookedCount = 0;
@@ -154,25 +166,86 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// Check if the slot has available capacity for more bookings.
+    /// </summary>
+    public bool HasCapacity()
+    {
+        return Status == ScheduleStatus.Available && BookedCount < MaxCapacity;
+    }
+
+    /// <summary>
+    /// Get remaining capacity.
+    /// </summary>
+    public int RemainingCapacity => Math.Max(0, MaxCapacity - BookedCount);
+
+    /// <summary>
+    /// Book for capacity-based slots (organisation clinic appointments).
+    /// Increments booked count if capacity available.
+    /// </summary>
+    public void BookWithCapacity()
+    {
+        if (Status == ScheduleStatus.Blocked)
+            throw new InvalidOperationException("Slot is blocked and not available for booking");
+
+        if (Status != ScheduleStatus.Available)
+            throw new InvalidOperationException($"Slot is not available for booking. Current status: {Status}");
+
+        if (BookedCount >= MaxCapacity)
+            throw new InvalidOperationException("Slot has reached maximum capacity");
+
+        BookedCount++;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Legacy book method for single-capacity slots (online consultation).
+    /// </summary>
     public void Book()
     {
         if (Status != ScheduleStatus.Available)
             throw new InvalidOperationException("Slot is not available for booking");
 
         BookedCount++;
+        if (MaxCapacity == 1)
+        {
+            Status = ScheduleStatus.Booked;
+        }
         UpdatedAt = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// Cancel a booking and decrement the booked count.
+    /// For capacity-based slots, slot remains available if count > 0.
+    /// </summary>
     public void CancelBooking()
     {
         if (BookedCount <= 0)
             throw new InvalidOperationException("No bookings to cancel");
 
         BookedCount--;
-        if (BookedCount == 0 && Status == ScheduleStatus.Booked)
+        
+        // For single-capacity slots (online consultation)
+        if (MaxCapacity == 1 && BookedCount == 0 && Status == ScheduleStatus.Booked)
         {
             Status = ScheduleStatus.Available;
         }
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Update the maximum capacity of this slot.
+    /// Can only increase capacity (not below current booked count).
+    /// </summary>
+    public void UpdateCapacity(int newCapacity)
+    {
+        if (newCapacity < 1)
+            throw new ArgumentException("Capacity must be at least 1", nameof(newCapacity));
+
+        if (newCapacity < BookedCount)
+            throw new InvalidOperationException($"Cannot reduce capacity below current booked count ({BookedCount})");
+
+        MaxCapacity = newCapacity;
         UpdatedAt = DateTime.UtcNow;
     }
 

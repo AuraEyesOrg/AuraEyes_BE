@@ -57,6 +57,7 @@ public class ApplicationDbContext : IdentityDbContext<
     // Scheduling
     public DbSet<ScheduleTemplate> ScheduleTemplates => Set<ScheduleTemplate>();
     public DbSet<AppointmentSlot> AppointmentSlots => Set<AppointmentSlot>();
+    public DbSet<ClinicAppointment> ClinicAppointments => Set<ClinicAppointment>();
 
     // Financial
     public DbSet<Wallet> Wallets => Set<Wallet>();

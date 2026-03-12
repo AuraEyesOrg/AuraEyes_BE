@@ -19,6 +19,9 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
         builder.Property(e => e.Cost)
             .HasPrecision(18, 2);
 
+        builder.Property(e => e.MaxCapacity)
+            .HasDefaultValue(1);
+
         builder.Property(e => e.BookedCount)
             .HasDefaultValue(0);
 
@@ -38,10 +41,18 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
             .HasForeignKey(e => e.ScheduleTemplateId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // ClinicAppointments relationship
+        builder.HasMany(e => e.ClinicAppointments)
+            .WithOne(a => a.AppointmentSlot)
+            .HasForeignKey(a => a.AppointmentSlotId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(e => e.ScheduleTemplateId);
         builder.HasIndex(e => e.Date);
         builder.HasIndex(e => e.Status);
         builder.HasIndex(e => new { e.Status, e.ReservationExpireAt })
             .HasFilter("\"Status\" = 'Reserved'");
+        builder.HasIndex(e => new { e.Status, e.BookedCount, e.MaxCapacity })
+            .HasDatabaseName("IX_AppointmentSlots_Capacity");
     }
 }

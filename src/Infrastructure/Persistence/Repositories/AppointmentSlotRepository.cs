@@ -237,4 +237,28 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
 
         return slot;
     }
+
+    public async Task<IReadOnlyList<AppointmentSlot>> GetAvailableByOrganisationWithCapacityAsync(
+        Guid organisationId,
+        DateOnly? fromDate = null,
+        DateOnly? toDate = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbSet
+            .Include(s => s.ScheduleTemplate)
+            .Where(s => s.ScheduleTemplate != null && s.ScheduleTemplate.OrgId == organisationId)
+            .Where(s => s.Status == ScheduleStatus.Available)
+            .Where(s => s.BookedCount < s.MaxCapacity);
+
+        if (fromDate.HasValue)
+            query = query.Where(s => s.Date >= fromDate.Value);
+
+        if (toDate.HasValue)
+            query = query.Where(s => s.Date <= toDate.Value);
+
+        return await query
+            .OrderBy(s => s.Date)
+            .ThenBy(s => s.StartTime)
+            .ToListAsync(cancellationToken);
+    }
 }
