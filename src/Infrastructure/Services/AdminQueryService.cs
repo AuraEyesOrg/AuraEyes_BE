@@ -1,5 +1,6 @@
 using Application.SystemAdmin.Interfaces;
 using Application.Common.Models;
+using Application.SystemAdmin.AuditLogs.Queries.GetAuditLogs;
 using Application.SystemAdmin.Ophthalmologists.Queries.GetOphthalmologists;
 using Application.SystemAdmin.Patients.Queries.GetPatients;
 using Domain.Enums;
@@ -136,5 +137,81 @@ public class AdminQueryService : IAdminQueryService
 
         return new PagedResult<PatientListDto>(
             items, totalCount, pageNumber, pageSize);
+    }
+
+    public async Task<PagedResult<AuditLogDto>> GetAuditLogsAsync(
+        string? searchTerm,
+        string? action,
+        string? entityName,
+        Guid? userId,
+        DateTime? fromDate,
+        DateTime? toDate,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var query = from log in _context.AuditLogs.AsNoTracking()
+                    join u in _context.Users.AsNoTracking() on log.UserId equals u.Id into userJoin
+                    from u in userJoin.DefaultIfEmpty()
+                    select new { Log = log, User = u };
+
+        // Apply filters
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var term = searchTerm.ToLower();
+            query = query.Where(x =>
+                x.Log.Action.ToLower().Contains(term) ||
+                x.Log.EntityName.ToLower().Contains(term) ||
+                (x.Log.EntityId != null && x.Log.EntityId.ToLower().Contains(term)) ||
+                (x.User != null && x.User.Email!.ToLower().Contains(term)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(action))
+        {
+            query = query.Where(x => x.Log.Action == action);
+        }
+
+        if (!string.IsNullOrWhiteSpace(entityName))
+        {
+            query = query.Where(x => x.Log.EntityName == entityName);
+        }
+
+        if (userId.HasValue)
+        {
+            query = query.Where(x => x.Log.UserId == userId.Value);
+        }
+
+        if (fromDate.HasValue)
+        {
+            query = query.Where(x => x.Log.CreatedAt >= fromDate.Value);
+        }
+
+        if (toDate.HasValue)
+        {
+            query = query.Where(x => x.Log.CreatedAt <= toDate.Value);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderByDescending(x => x.Log.CreatedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new AuditLogDto
+            {
+                Id = x.Log.Id,
+                UserId = x.Log.UserId,
+                UserName = x.User != null ? x.User.Email : null,
+                Action = x.Log.Action,
+                EntityName = x.Log.EntityName,
+                EntityId = x.Log.EntityId,
+                OldValue = x.Log.OldValue,
+                NewValue = x.Log.NewValue,
+                IpAddress = x.Log.IpAddress,
+                CreatedAt = x.Log.CreatedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<AuditLogDto>(items, totalCount, pageNumber, pageSize);
     }
 }
