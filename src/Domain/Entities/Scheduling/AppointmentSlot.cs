@@ -5,7 +5,7 @@ namespace Domain.Entities.Scheduling;
 
 /// <summary>
 /// AppointmentSlot - A specific time slot for a specific date, generated from a ScheduleTemplate.
-/// Tracks bookings and availability.
+/// Tracks bookings, reservations, and availability.
 /// </summary>
 public class AppointmentSlot : BaseEntity, IAggregateRoot
 {
@@ -33,6 +33,12 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     /// <summary>Number of patients currently booked in this slot.</summary>
     public int BookedCount { get; private set; }
 
+    /// <summary>Patient who has reserved this slot (pending payment).</summary>
+    public Guid? ReservedBy { get; private set; }
+
+    /// <summary>When the reservation expires (auto-release after this time).</summary>
+    public DateTime? ReservationExpireAt { get; private set; }
+
     /// <summary>Navigation property to the template.</summary>
     public ScheduleTemplate? ScheduleTemplate { get; private set; }
 
@@ -57,6 +63,95 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
         Cost = cost;
         Status = ScheduleStatus.Available;
         BookedCount = 0;
+    }
+
+    /// <summary>
+    /// Reserve the slot for a patient (pending payment).
+    /// </summary>
+    public void Reserve(Guid patientId, DateTime expirationTime)
+    {
+        if (Status != ScheduleStatus.Available)
+            throw new InvalidOperationException($"Slot is not available for reservation. Current status: {Status}");
+
+        if (expirationTime <= DateTime.UtcNow)
+            throw new ArgumentException("Expiration time must be in the future", nameof(expirationTime));
+
+        Status = ScheduleStatus.Reserved;
+        ReservedBy = patientId;
+        ReservationExpireAt = expirationTime;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Confirm the reservation after payment - transitions to Booked.
+    /// </summary>
+    public void ConfirmReservation(Guid patientId)
+    {
+        if (Status != ScheduleStatus.Reserved)
+            throw new InvalidOperationException($"Slot is not in reserved state. Current status: {Status}");
+
+        if (ReservedBy != patientId)
+            throw new InvalidOperationException("Only the patient who reserved this slot can confirm it");
+
+        if (ReservationExpireAt.HasValue && ReservationExpireAt.Value < DateTime.UtcNow)
+            throw new InvalidOperationException("Reservation has expired");
+
+        Status = ScheduleStatus.Booked;
+        BookedCount = 1;
+        ReservedBy = null;
+        ReservationExpireAt = null;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Release the reservation (manual or timeout) - returns to Available.
+    /// </summary>
+    public void ReleaseReservation()
+    {
+        if (Status != ScheduleStatus.Reserved)
+            throw new InvalidOperationException($"Slot is not in reserved state. Current status: {Status}");
+
+        Status = ScheduleStatus.Available;
+        ReservedBy = null;
+        ReservationExpireAt = null;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Check if the reservation has expired.
+    /// </summary>
+    public bool IsReservationExpired()
+    {
+        return Status == ScheduleStatus.Reserved &&
+               ReservationExpireAt.HasValue &&
+               ReservationExpireAt.Value < DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Block the slot (doctor unavailable).
+    /// </summary>
+    public void Block()
+    {
+        if (Status == ScheduleStatus.Booked)
+            throw new InvalidOperationException("Cannot block a slot that is already booked. Cancel the booking first.");
+
+        if (Status == ScheduleStatus.Reserved)
+            throw new InvalidOperationException("Cannot block a slot that is reserved. Wait for reservation to expire or release it first.");
+
+        Status = ScheduleStatus.Blocked;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Unblock the slot (make available again).
+    /// </summary>
+    public void Unblock()
+    {
+        if (Status != ScheduleStatus.Blocked)
+            throw new InvalidOperationException($"Slot is not blocked. Current status: {Status}");
+
+        Status = ScheduleStatus.Available;
+        UpdatedAt = DateTime.UtcNow;
     }
 
     public void Book()
@@ -114,6 +209,8 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     public void Cancel()
     {
         Status = ScheduleStatus.Cancelled;
+        ReservedBy = null;
+        ReservationExpireAt = null;
         UpdatedAt = DateTime.UtcNow;
     }
 }

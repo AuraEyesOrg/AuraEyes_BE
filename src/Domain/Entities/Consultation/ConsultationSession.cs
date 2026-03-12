@@ -1,4 +1,5 @@
 using Domain.Common;
+using Domain.Entities.Scheduling;
 using Domain.Entities.Screening;
 using Domain.Enums;
 
@@ -13,6 +14,9 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     public Guid? OphthalmologistId { get; private set; }
     public Guid? OrganisationId { get; private set; }
     public Guid? AiScreeningId { get; private set; }
+    
+    /// <summary>FK to AppointmentSlot - links this session to a specific appointment slot.</summary>
+    public Guid? AppointmentSlotId { get; private set; }
 
     public ConsultationSessionType Type { get; private set; }
     public SessionStatus Status { get; private set; }
@@ -43,6 +47,9 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
 
     private readonly List<MedicalDiagnosis> _medicalDiagnoses = new();
     public IReadOnlyCollection<MedicalDiagnosis> MedicalDiagnoses => _medicalDiagnoses.AsReadOnly();
+    
+    /// <summary>Navigation property to the appointment slot.</summary>
+    public AppointmentSlot? AppointmentSlot { get; private set; }
 
     private ConsultationSession() { } // EF Core
 
@@ -76,6 +83,7 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
         decimal price,
         DateTime appointmentTime,
         Guid? ophthalmologistId = null,
+        Guid? appointmentSlotId = null,
         string? meetingLink = null,
         string? calendarEventId = null)
     {
@@ -86,6 +94,7 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
         {
             PatientId = patientId,
             OphthalmologistId = ophthalmologistId,
+            AppointmentSlotId = appointmentSlotId,
             Type = ConsultationSessionType.VideoCall,
             Status = SessionStatus.Pending,
             ChatStatus = ChatStatus.MemoOnly,

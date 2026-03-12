@@ -25,6 +25,13 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
+        // Reservation tracking
+        builder.Property(e => e.ReservedBy)
+            .IsRequired(false);
+
+        builder.Property(e => e.ReservationExpireAt)
+            .IsRequired(false);
+
         // Relationships
         builder.HasOne(e => e.ScheduleTemplate)
             .WithMany(t => t.AppointmentSlots)
@@ -34,5 +41,7 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
         builder.HasIndex(e => e.ScheduleTemplateId);
         builder.HasIndex(e => e.Date);
         builder.HasIndex(e => e.Status);
+        builder.HasIndex(e => new { e.Status, e.ReservationExpireAt })
+            .HasFilter("\"Status\" = 'Reserved'");
     }
 }

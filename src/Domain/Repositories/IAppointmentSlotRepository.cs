@@ -92,4 +92,17 @@ public interface IAppointmentSlotRepository : IRepository<AppointmentSlot>
         TimeOnly endTime,
         Guid? excludeSlotId = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get all expired reservations (Reserved status and ReservationExpireAt &lt; now).
+    /// </summary>
+    Task<IReadOnlyList<AppointmentSlot>> GetExpiredReservationsAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get slot with pessimistic lock for thread-safe booking operations.
+    /// </summary>
+    Task<AppointmentSlot?> GetByIdWithLockAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
 }

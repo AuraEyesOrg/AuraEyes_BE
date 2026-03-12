@@ -206,4 +206,35 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
             startTime < s.EndTime && endTime > s.StartTime,
             cancellationToken);
     }
+
+    public async Task<IReadOnlyList<AppointmentSlot>> GetExpiredReservationsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        return await _dbSet
+            .Where(s => s.Status == ScheduleStatus.Reserved)
+            .Where(s => s.ReservationExpireAt.HasValue && s.ReservationExpireAt.Value < now)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<AppointmentSlot?> GetByIdWithLockAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        // Use raw SQL for row-level locking in PostgreSQL
+        // Note: Template will be loaded separately if needed
+        var slot = await _dbSet
+            .FromSqlRaw("SELECT * FROM \"AppointmentSlots\" WHERE \"Id\" = {0} FOR UPDATE", id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (slot != null)
+        {
+            // Load the template separately
+            await _context.Entry(slot)
+                .Reference(s => s.ScheduleTemplate)
+                .LoadAsync(cancellationToken);
+        }
+
+        return slot;
+    }
 }

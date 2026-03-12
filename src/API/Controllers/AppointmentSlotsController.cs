@@ -1,8 +1,14 @@
 using Application.Common.Constants;
 using Application.Common.Models;
+using Application.Scheduling.AppointmentSlots.Commands.BlockSlot;
 using Application.Scheduling.AppointmentSlots.Commands.BookAppointmentSlot;
+using Application.Scheduling.AppointmentSlots.Commands.ConfirmReservation;
 using Application.Scheduling.AppointmentSlots.Commands.CreateAppointmentSlot;
 using Application.Scheduling.AppointmentSlots.Commands.DeleteAppointmentSlot;
+using Application.Scheduling.AppointmentSlots.Commands.GenerateSlots;
+using Application.Scheduling.AppointmentSlots.Commands.ReleaseReservation;
+using Application.Scheduling.AppointmentSlots.Commands.ReserveSlot;
+using Application.Scheduling.AppointmentSlots.Commands.UnblockSlot;
 using Application.Scheduling.AppointmentSlots.Commands.UpdateAppointmentSlot;
 using Application.Scheduling.AppointmentSlots.Commands.UpdateAppointmentSlotCost;
 using Application.Scheduling.AppointmentSlots.Commands.UpdateAppointmentSlotStatus;
@@ -230,6 +236,140 @@ public class AppointmentSlotsController : BaseApiController
         var result = await _mediator.Send(command);
         return HandleResult(result);
     }
+
+    /// <summary>
+    /// Generate appointment slots from a schedule template for a date range.
+    /// </summary>
+    [HttpPost("generate")]
+    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
+    [ProducesResponseType(typeof(ApiResponse<int>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GenerateSlots([FromBody] GenerateSlotsRequest request)
+    {
+        var command = new GenerateSlotsCommand
+        {
+            ScheduleTemplateId = request.ScheduleTemplateId,
+            FromDate = request.FromDate,
+            ToDate = request.ToDate,
+            SkipExistingDates = request.SkipExistingDates
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Reserve an appointment slot for a patient (starts reservation timer).
+    /// </summary>
+    [HttpPost("{slotId:guid}/reserve")]
+    [Authorize(Policy = Policies.PatientOnly)]
+    [ProducesResponseType(typeof(ApiResponse<ReserveSlotResult>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ReserveSlot(Guid slotId, [FromBody] ReserveSlotRequest request)
+    {
+        var command = new ReserveSlotCommand
+        {
+            AppointmentSlotId = slotId,
+            PatientId = request.PatientId,
+            ReservationMinutes = request.ReservationMinutes
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Confirm a slot reservation after payment (creates consultation session).
+    /// </summary>
+    [HttpPost("{slotId:guid}/confirm")]
+    [Authorize(Policy = Policies.PatientOnly)]
+    [ProducesResponseType(typeof(ApiResponse<ConfirmReservationResult>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ConfirmReservation(Guid slotId, [FromBody] ConfirmReservationRequest request)
+    {
+        var command = new ConfirmReservationCommand
+        {
+            AppointmentSlotId = slotId,
+            PatientId = request.PatientId,
+            AiScreeningId = request.AiScreeningId,
+            ShareRetinalImages = request.ShareRetinalImages,
+            ShareAiResults = request.ShareAiResults
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Release a slot reservation (cancel before payment).
+    /// </summary>
+    [HttpPost("{slotId:guid}/release")]
+    [Authorize(Policy = Policies.PatientOnly)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ReleaseReservation(Guid slotId, [FromBody] ReleaseReservationRequest request)
+    {
+        var command = new ReleaseReservationCommand
+        {
+            AppointmentSlotId = slotId,
+            PatientId = request.PatientId,
+            IsSystemRelease = false
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Block an appointment slot (doctor not available).
+    /// </summary>
+    [HttpPost("{slotId:guid}/block")]
+    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> BlockSlot(Guid slotId, [FromBody] BlockSlotRequest request)
+    {
+        var command = new BlockSlotCommand
+        {
+            AppointmentSlotId = slotId,
+            OphthalmologistId = request.OphthalmologistId,
+            Reason = request.Reason
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Unblock an appointment slot (make available again).
+    /// </summary>
+    [HttpPost("{slotId:guid}/unblock")]
+    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UnblockSlot(Guid slotId, [FromBody] UnblockSlotRequest request)
+    {
+        var command = new UnblockSlotCommand
+        {
+            AppointmentSlotId = slotId,
+            OphthalmologistId = request.OphthalmologistId
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result);
+    }
 }
 
 public record CreateAppointmentSlotRequest
@@ -264,4 +404,42 @@ public record UpdateAppointmentSlotStatusRequest
 public record UpdateAppointmentSlotCostRequest
 {
     public decimal? Cost { get; init; }
+}
+
+public record GenerateSlotsRequest
+{
+    public Guid ScheduleTemplateId { get; init; }
+    public DateOnly FromDate { get; init; }
+    public DateOnly ToDate { get; init; }
+    public bool SkipExistingDates { get; init; } = true;
+}
+
+public record ReserveSlotRequest
+{
+    public Guid PatientId { get; init; }
+    public int ReservationMinutes { get; init; } = 5;
+}
+
+public record ConfirmReservationRequest
+{
+    public Guid PatientId { get; init; }
+    public Guid? AiScreeningId { get; init; }
+    public bool ShareRetinalImages { get; init; }
+    public bool ShareAiResults { get; init; }
+}
+
+public record ReleaseReservationRequest
+{
+    public Guid PatientId { get; init; }
+}
+
+public record BlockSlotRequest
+{
+    public Guid OphthalmologistId { get; init; }
+    public string? Reason { get; init; }
+}
+
+public record UnblockSlotRequest
+{
+    public Guid OphthalmologistId { get; init; }
 }

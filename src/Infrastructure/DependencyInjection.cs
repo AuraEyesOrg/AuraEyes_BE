@@ -162,6 +162,7 @@ public static class DependencyInjection
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
+        services.AddHostedService<ReservationExpirationWorker>();
 
         // Register Hangfire daily job
         services.AddScoped<DailyQuotaResetJob>();
