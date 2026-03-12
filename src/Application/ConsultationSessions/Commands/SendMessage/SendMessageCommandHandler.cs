@@ -11,15 +11,18 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
 {
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly IRepository<Conversation> _conversationRepository;
+    private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
 
     public SendMessageCommandHandler(
         IConsultationSessionRepository sessionRepository,
         IRepository<Conversation> conversationRepository,
+        INotificationService notificationService,
         IUnitOfWork unitOfWork)
     {
         _sessionRepository = sessionRepository;
         _conversationRepository = conversationRepository;
+        _notificationService = notificationService;
         _unitOfWork = unitOfWork;
     }
 
@@ -67,6 +70,23 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         session.RecordActivity();
         await _sessionRepository.UpdateAsync(session, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Send real-time notification to the other party [FR-47]
+        if (isPatient && session.OphthalmologistId.HasValue)
+        {
+            // Patient sent message -> Notify Doctor
+            var messagePreview = request.Message.Length > 50 
+                ? request.Message[..50] + "..." 
+                : request.Message;
+
+            await _notificationService.SendAsync(
+                session.OphthalmologistId.Value,
+                "Tin nhắn mới từ bệnh nhân",
+                $"Bạn có tin nhắn mới: \"{messagePreview}\"",
+                NotificationType.NewPatientMessage,
+                new { ConsultationId = session.Id, PatientId = session.PatientId },
+                cancellationToken);
+        }
 
         return Result.Success();
     }

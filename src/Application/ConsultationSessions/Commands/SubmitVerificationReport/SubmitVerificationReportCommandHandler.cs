@@ -13,15 +13,18 @@ public class SubmitVerificationReportCommandHandler
 {
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly IRepository<MedicalDiagnosis> _diagnosisRepository;
+    private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
 
     public SubmitVerificationReportCommandHandler(
         IConsultationSessionRepository sessionRepository,
         IRepository<MedicalDiagnosis> diagnosisRepository,
+        INotificationService notificationService,
         IUnitOfWork unitOfWork)
     {
         _sessionRepository = sessionRepository;
         _diagnosisRepository = diagnosisRepository;
+        _notificationService = notificationService;
         _unitOfWork = unitOfWork;
     }
 
@@ -60,6 +63,15 @@ public class SubmitVerificationReportCommandHandler
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+            // Send real-time notification to Patient [FR-46]
+            await _notificationService.SendAsync(
+                session.PatientId,
+                "Kết quả tư vấn đã sẵn sàng",
+                "Bác sĩ đã hoàn tất báo cáo xác minh kết quả sàng lọc của bạn. Bạn có thể xem chi tiết và trao đổi trực tiếp với bác sĩ.",
+                NotificationType.ConsultationResultProvided,
+                new { ConsultationId = session.Id, DoctorId = request.DoctorId },
+                cancellationToken);
 
             return Result.Success();
         }

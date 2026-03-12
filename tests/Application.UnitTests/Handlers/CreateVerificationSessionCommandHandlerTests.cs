@@ -1,3 +1,4 @@
+using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.ConsultationSessions.Commands.CreateVerificationSession;
 using Domain.Common;
@@ -12,14 +13,19 @@ namespace Application.UnitTests.Handlers;
 public class CreateVerificationSessionCommandHandlerTests
 {
     private readonly IConsultationSessionRepository _sessionRepository;
+    private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly CreateVerificationSessionCommandHandler _handler;
 
     public CreateVerificationSessionCommandHandlerTests()
     {
         _sessionRepository = Substitute.For<IConsultationSessionRepository>();
+        _notificationService = Substitute.For<INotificationService>();
         _unitOfWork = Substitute.For<IUnitOfWork>();
-        _handler = new CreateVerificationSessionCommandHandler(_sessionRepository, _unitOfWork);
+        _handler = new CreateVerificationSessionCommandHandler(
+            _sessionRepository, 
+            _notificationService, 
+            _unitOfWork);
     }
 
     [Fact]
