@@ -2,6 +2,7 @@ using Application.AiQuota.Common;
 using Application.AiQuota.Interfaces;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Services;
 
@@ -13,20 +14,25 @@ namespace Infrastructure.Services;
 public class AiQuotaService : IAiQuotaService
 {
     private readonly ApplicationDbContext _context;
+    private readonly ILogger<AiQuotaService> _logger;
 
-    public AiQuotaService(ApplicationDbContext context)
+    public AiQuotaService(ApplicationDbContext context, ILogger<AiQuotaService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task<AiQuotaDto> GetQuotaAsync(Guid userId, string role, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("[AiQuotaService] GetQuotaAsync called — UserId: {UserId}, Role: {Role}", userId, role);
+
         if (string.Equals(role, "Patient", StringComparison.OrdinalIgnoreCase))
             return await GetPatientQuotaAsync(userId, cancellationToken);
 
         if (string.Equals(role, "Ophthalmologist", StringComparison.OrdinalIgnoreCase))
             return await GetOrgQuotaAsync(userId, cancellationToken);
 
+        _logger.LogWarning("[AiQuotaService] Unrecognized role '{Role}' for user {UserId} — returning None quota", role, userId);
         return new AiQuotaDto
         {
             TotalQuota = 0,
@@ -48,12 +54,43 @@ public class AiQuotaService : IAiQuotaService
         var bundleSize = await GetSettingIntAsync("AI_QUOTA_BUNDLE", 5, cancellationToken);
         var bundlePrice = await GetSettingDecimalAsync("AI_QUOTA_PRICE", 50000m, cancellationToken);
 
+        // Also try with IgnoreQueryFilters to detect if record exists but is soft-deleted
         var patient = await _context.Patients
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
 
         if (patient is null)
-            return new AiQuotaDto { TotalQuota = 0, UsedQuota = 0, RemainingQuota = 0, QuotaSource = "None" };
+        {
+            // Check if soft-deleted record exists for diagnostics
+            var softDeleted = await _context.Patients
+                .AsNoTracking()
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
+
+            if (softDeleted is not null)
+                _logger.LogWarning(
+                    "[AiQuotaService] Patient profile for UserId {UserId} exists but IsDeleted=true — returning free quota fallback",
+                    userId);
+            else
+                _logger.LogWarning(
+                    "[AiQuotaService] No Patient profile found for UserId {UserId} — returning free quota fallback",
+                    userId);
+
+            // Fallback: even without a Patient record, give the user their free daily quota
+            return new AiQuotaDto
+            {
+                TotalQuota = freeQuota,
+                UsedQuota = 0,
+                RemainingQuota = freeQuota,
+                QuotaSource = "Free",
+                BundlePrice = bundlePrice,
+                BundleSize = bundleSize
+            };
+        }
+
+        _logger.LogInformation(
+            "[AiQuotaService] Patient {PatientId} found — PurchasedAiQuota: {Purchased}, UsedAiQuota: {Used}, FreeQuota: {Free}",
+            patient.Id, patient.PurchasedAiQuota, patient.UsedAiQuota, freeQuota);
 
         var totalQuota = freeQuota + patient.PurchasedAiQuota;
         var remaining = Math.Max(0, totalQuota - patient.UsedAiQuota);
