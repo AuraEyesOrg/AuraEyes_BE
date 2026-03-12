@@ -136,7 +136,11 @@ builder.Services.AddHangfire(config => config
     .UsePostgreSqlStorage(options =>
         options.UseNpgsqlConnection(
             builder.Configuration.GetConnectionString("DefaultConnection"))));
-builder.Services.AddHangfireServer();
+builder.Services.AddHangfireServer(options =>
+{
+    // Limit workers to prevent Supabase connection pool exhaustion (MaxClientsInSessionMode)
+    options.WorkerCount = 2;
+});
 
 var app = builder.Build();
 
