@@ -81,7 +81,7 @@ public class AvailableSlotsController : BaseApiController
     /// <param name="request">Create available slot request.</param>
     /// <returns>Created available slot ID.</returns>
     [HttpPost]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
@@ -116,7 +116,7 @@ public class AvailableSlotsController : BaseApiController
     /// <param name="request">Update available slot request.</param>
     /// <returns>Success status.</returns>
     [HttpPut("{slotId:guid}")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -143,7 +143,7 @@ public class AvailableSlotsController : BaseApiController
     /// <param name="slotId">Available slot ID.</param>
     /// <returns>Success status.</returns>
     [HttpDelete("{slotId:guid}")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]

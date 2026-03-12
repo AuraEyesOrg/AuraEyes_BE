@@ -91,7 +91,7 @@ public class OphthalmologistSchedulesController : BaseApiController
     /// <param name="request">Create schedule request.</param>
     /// <returns>Created schedule ID.</returns>
     [HttpPost]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -132,7 +132,7 @@ public class OphthalmologistSchedulesController : BaseApiController
     /// <param name="request">Update status request.</param>
     /// <returns>Success status.</returns>
     [HttpPatch("{scheduleId:guid}/status")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -202,7 +202,7 @@ public class OphthalmologistSchedulesController : BaseApiController
     /// <param name="scheduleId">Schedule ID to delete.</param>
     /// <returns>Success status.</returns>
     [HttpDelete("{scheduleId:guid}")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -220,7 +220,7 @@ public class OphthalmologistSchedulesController : BaseApiController
     /// <param name="request">Update cost request.</param>
     /// <returns>Success status.</returns>
     [HttpPatch("{scheduleId:guid}/cost")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
