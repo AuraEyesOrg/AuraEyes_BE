@@ -160,6 +160,12 @@ public record UserInfoResponse
     /// Null for non-ophthalmologist roles.
     /// </summary>
     public string? VerificationStatus { get; init; }
+    
+    /// <summary>
+    /// Contract status for the ophthalmologist (Draft, PendingSignature, Active, etc.).
+    /// Null for non-ophthalmologist roles or if no contract exists.
+    /// </summary>
+    public string? ContractStatus { get; init; }
 }
 
 /// <summary>
