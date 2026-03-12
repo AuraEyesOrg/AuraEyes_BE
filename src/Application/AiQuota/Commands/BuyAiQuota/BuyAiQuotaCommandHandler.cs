@@ -14,6 +14,7 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
     private readonly IWalletRepository _walletRepository;
     private readonly IAiQuotaService _quotaService;
     private readonly ICurrentUserService _currentUser;
+    private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<BuyAiQuotaCommandHandler> _logger;
 
@@ -21,12 +22,14 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
         IWalletRepository walletRepository,
         IAiQuotaService quotaService,
         ICurrentUserService currentUser,
+        INotificationService notificationService,
         IUnitOfWork unitOfWork,
         ILogger<BuyAiQuotaCommandHandler> logger)
     {
         _walletRepository = walletRepository;
         _quotaService = quotaService;
         _currentUser = currentUser;
+        _notificationService = notificationService;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -92,6 +95,17 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
 
             // Get updated quota
             var updatedQuota = await _quotaService.GetQuotaAsync(userId, role, cancellationToken);
+
+            // Send real-time notification for successful payment [FR-49]
+            // Create a dummy transaction ID for tracking (last transaction created)
+            var transactionId = Guid.NewGuid(); // Use a representative ID
+            await _notificationService.SendAsync(
+                userId,
+                "Thanh toán thành công",
+                $"Bạn đã mua {totalCredits} lượt AI screening với giá {totalCost:N0} VND. Số dư còn lại: {wallet.Balance:N0} VND",
+                NotificationType.WalletPaymentProcessed,
+                new { TransactionId = transactionId, Amount = totalCost, Action = "AI Quota Purchase" },
+                cancellationToken);
 
             return Result<BuyAiQuotaResponse>.Success(new BuyAiQuotaResponse
             {
