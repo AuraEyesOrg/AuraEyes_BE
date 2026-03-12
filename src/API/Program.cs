@@ -1,3 +1,4 @@
+using API.Hubs;
 using API.Middleware;
 using API.Services;
 using Application;
@@ -114,19 +115,31 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// Add CORS
+// Add CORS with SignalR support
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.SetIsOriginAllowed(_ => true)  // Allow any origin for SignalR
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials();  // Required for SignalR
     });
 });
 
 // Add Health Checks
 builder.Services.AddHealthChecks();
+
+// Add SignalR for real-time notifications
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = true;
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+});
+
+// Register SignalR hub service for notification broadcasting
+builder.Services.AddScoped<INotificationHubService, NotificationHubService>();
 
 // Hangfire - Background job processing
 builder.Services.AddHangfire(config => config
@@ -194,6 +207,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map SignalR hubs for real-time notifications
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.MapHealthChecks("/health");
 
