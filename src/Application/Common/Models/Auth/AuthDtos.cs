@@ -148,6 +148,18 @@ public record UserInfoResponse
     /// Indicates if 2FA is enabled for this user.
     /// </summary>
     public bool TwoFactorEnabled { get; init; }
+    
+    /// <summary>
+    /// Indicates if the ophthalmologist's credentials have been verified.
+    /// Null for non-ophthalmologist roles.
+    /// </summary>
+    public bool? IsVerified { get; init; }
+    
+    /// <summary>
+    /// Ophthalmologist verification status (PendingVerification, Approved, Rejected).
+    /// Null for non-ophthalmologist roles.
+    /// </summary>
+    public string? VerificationStatus { get; init; }
 }
 
 /// <summary>
@@ -203,6 +215,16 @@ public record ConfirmEmailRequest
     [Required]
     public string Token { get; init; } = string.Empty;
 }
+
+#region Google Login
+public record GoogleLoginRequest
+{
+    [Required]
+    public string Credential { get; init; } = string.Empty;
+    public string? DeviceInfo { get; init; }
+}
+
+#endregion
 
 #region Two-Factor Authentication DTOs
 

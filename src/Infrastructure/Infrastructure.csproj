@@ -16,7 +16,8 @@
 
   <ItemGroup>
     <!-- EF Core -->
-	<PackageReference Include="Google.Apis.Calendar.v3" Version="1.73.0.3993" />
+	<PackageReference Include="Google.Apis.Auth" Version="1.73.0" />
+	<PackageReference Include="Google.Apis.Calendar.v3" Version="1.73.0.4073" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0">
       <PrivateAssets>all</PrivateAssets>
@@ -48,6 +49,10 @@
     
     <!-- Payment (PayOS) -->
     <PackageReference Include="payOS" Version="1.0.8" />
+    
+    <!-- Background Jobs (Hangfire) -->
+    <PackageReference Include="Hangfire.Core" Version="1.8.17" />
+    <PackageReference Include="Hangfire.PostgreSql" Version="1.20.10" />
   </ItemGroup>
 
   <!-- Contract Templates - Copy to output directory -->

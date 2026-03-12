@@ -139,7 +139,7 @@ public class ConsultationSessionsController : BaseApiController
     /// Doctor submits a verification report. Opens the 2-way chat.
     /// </summary>
     [HttpPost("{sessionId:guid}/verification-report")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [Authorize(Policy = Policies.VerifiedOphthalmologist)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
@@ -211,7 +211,7 @@ public class ConsultationSessionsController : BaseApiController
     /// Doctor manually ends/closes a session. Archives the chat.
     /// </summary>
     [HttpPost("{sessionId:guid}/end")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [Authorize(Policy = Policies.VerifiedOphthalmologist)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]

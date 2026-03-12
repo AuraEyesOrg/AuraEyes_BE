@@ -45,6 +45,9 @@ public static class DependencyInjection
         // Google Meet Settings
         services.Configure<GoogleMeetSettings>(configuration.GetSection(GoogleMeetSettings.SectionName));
 
+        // Google Auth Settings (for Google Login)
+        services.Configure<GoogleAuthSettings>(configuration.GetSection(GoogleAuthSettings.SectionName));
+
         // ASP.NET Core Identity configuration
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
         {
@@ -120,6 +123,11 @@ public static class DependencyInjection
             .AddPolicy(Policies.SystemAdminOnly, policy => policy.RequireRole(Roles.SystemAdmin))
             .AddPolicy(Policies.AdminsOnly, policy => policy.RequireRole(Roles.Admins))
             .AddPolicy(Policies.MedicalStaff, policy => policy.RequireRole(Roles.Medical))
+            .AddPolicy(Policies.VerifiedOphthalmologist, policy =>
+            {
+                policy.RequireRole(Roles.Ophthalmologist);
+                policy.RequireClaim("IsVerified", "True");
+            })
             .AddPolicy(Policies.OrganizationMember, policy =>
                 policy.RequireAssertion(context =>
                     context.User.HasClaim(c => c.Type == "org_id" && !string.IsNullOrEmpty(c.Value))));
@@ -154,6 +162,9 @@ public static class DependencyInjection
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
+
+        // Register Hangfire daily job
+        services.AddScoped<DailyQuotaResetJob>();
 
         // Configure PayOS Settings
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));

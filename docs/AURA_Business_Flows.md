@@ -121,6 +121,7 @@
 * **Main Flow:** Cấu hình tỷ lệ hoa hồng -> Giám sát AI (Accuracy, Inference Time) -> Quản lý phân quyền (RBAC) -> Xem Audit Logs.
 
 ---
+
 ## 5. Global Technical Constraints (Dành cho AI Coder)
 * **Architecure:** Clean Architecture (API, Application, Domain, Infrastructure).
 * **Database:** PostgreSQL (Core) + MongoDB (Logs/Chats).
