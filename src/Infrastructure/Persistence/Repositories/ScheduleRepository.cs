@@ -120,4 +120,37 @@ public class ScheduleRepository : Repository<Schedule>, IScheduleRepository
 
         return (items, totalCount);
     }
+
+    public async Task<int> GetActiveCountByAvailableSlotAsync(
+        Guid availableSlotId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Where(s => s.AvailableSlotId == availableSlotId &&
+                        s.Status != ScheduleStatus.Cancelled)
+            .CountAsync(cancellationToken);
+    }
+
+    public async Task<Schedule?> GetByIdWithSlotAsync(
+        Guid scheduleId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Include(s => s.AvailableSlot)
+            .FirstOrDefaultAsync(s => s.Id == scheduleId, cancellationToken);
+    }
+
+    public async Task<Dictionary<ScheduleStatus, int>> GetStatusCountsAsync(
+        Guid ophthalmologistId,
+        CancellationToken cancellationToken = default)
+    {
+        var counts = await _dbSet
+            .Include(s => s.AvailableSlot)
+            .Where(s => s.AvailableSlot != null && s.AvailableSlot.OphthalmologistId == ophthalmologistId)
+            .GroupBy(s => s.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        return counts.ToDictionary(x => x.Status, x => x.Count);
+    }
 }

@@ -118,6 +118,8 @@ public static class DependencyInjection
             .AddPolicy(Policies.PatientOnly, policy => policy.RequireRole(Roles.Patient))
             .AddPolicy(Policies.OphthalmologistOnly, policy => policy.RequireRole(Roles.Ophthalmologist))
             .AddPolicy(Policies.OrgAdminOnly, policy => policy.RequireRole(Roles.OrgAdmin))
+            .AddPolicy(Policies.OphthalmologistOrOrgAdmin, policy => 
+                policy.RequireRole(Roles.Ophthalmologist, Roles.OrgAdmin))
             .AddPolicy(Policies.SystemAdminOnly, policy => policy.RequireRole(Roles.SystemAdmin))
             .AddPolicy(Policies.AdminsOnly, policy => policy.RequireRole(Roles.Admins))
             .AddPolicy(Policies.MedicalStaff, policy => policy.RequireRole(Roles.Medical))
@@ -136,6 +138,7 @@ public static class DependencyInjection
         services.AddScoped<IWalletRepository, WalletRepository>();
         services.AddScoped<IDepositRequestRepository, DepositRequestRepository>();
         services.AddScoped<IScheduleRepository, ScheduleRepository>();
+        services.AddScoped<IAvailableSlotRepository, AvailableSlotRepository>();
         services.AddScoped<IConsultationSessionRepository, ConsultationSessionRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IContractTemplateRepository, ContractTemplateRepository>();

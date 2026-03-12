@@ -57,4 +57,25 @@ public interface IScheduleRepository : IRepository<Schedule>
         int pageNumber = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Count existing booked/available bookings against an AvailableSlot (capacity check).
+    /// </summary>
+    Task<int> GetActiveCountByAvailableSlotAsync(
+        Guid availableSlotId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get a schedule by ID including its AvailableSlot navigation (for capacity checks).
+    /// </summary>
+    Task<Schedule?> GetByIdWithSlotAsync(
+        Guid scheduleId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get schedule counts grouped by status for an ophthalmologist (stats).
+    /// </summary>
+    Task<Dictionary<ScheduleStatus, int>> GetStatusCountsAsync(
+        Guid ophthalmologistId,
+        CancellationToken cancellationToken = default);
 }
