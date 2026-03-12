@@ -24,10 +24,6 @@ public class CreateAppointmentSlotCommandValidator : AbstractValidator<CreateApp
             .GreaterThan(x => x.StartTime)
             .WithMessage("End time must be after start time.");
 
-        RuleFor(x => x.SlotType)
-            .IsInEnum()
-            .WithMessage("Invalid slot type.");
-
         RuleFor(x => x.Cost)
             .GreaterThanOrEqualTo(0)
             .When(x => x.Cost.HasValue)

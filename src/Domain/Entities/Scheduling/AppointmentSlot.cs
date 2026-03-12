@@ -6,7 +6,10 @@ namespace Domain.Entities.Scheduling;
 /// <summary>
 /// AppointmentSlot - A specific time slot for a specific date, generated from a ScheduleTemplate.
 /// Tracks bookings, reservations, and availability.
-/// Supports capacity-based booking for organisation clinic appointments.
+/// 
+/// Slot ownership is determined by the parent ScheduleTemplate:
+/// - If template has OphthalId → Online consultation slot (capacity = 1)
+/// - If template has OrgId only → Clinic visit slot (capacity >= 1)
 /// </summary>
 public class AppointmentSlot : BaseEntity, IAggregateRoot
 {
@@ -28,16 +31,13 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     /// <summary>Cost of the appointment (optional).</summary>
     public decimal? Cost { get; private set; }
 
-    /// <summary>Type of appointment slot.</summary>
-    public SlotType SlotType { get; private set; }
-
     /// <summary>Maximum number of patients that can book this slot (copied from template).</summary>
     public int MaxCapacity { get; private set; }
 
     /// <summary>Number of patients currently booked in this slot.</summary>
     public int BookedCount { get; private set; }
 
-    /// <summary>Patient who has reserved this slot (pending payment).</summary>
+    /// <summary>Patient who has reserved this slot (pending payment) - for online consultations.</summary>
     public Guid? ReservedBy { get; private set; }
 
     /// <summary>When the reservation expires (auto-release after this time).</summary>
@@ -46,9 +46,9 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     /// <summary>Navigation property to the template.</summary>
     public ScheduleTemplate? ScheduleTemplate { get; private set; }
 
-    // Navigation to clinic appointments
-    private readonly List<ClinicAppointment> _clinicAppointments = new();
-    public IReadOnlyCollection<ClinicAppointment> ClinicAppointments => _clinicAppointments.AsReadOnly();
+    // Navigation to appointments
+    private readonly List<Appointment> _appointments = new();
+    public IReadOnlyCollection<Appointment> Appointments => _appointments.AsReadOnly();
 
     private AppointmentSlot() { } // EF Core
 
@@ -57,7 +57,6 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
         DateOnly date,
         TimeOnly startTime,
         TimeOnly endTime,
-        SlotType slotType,
         int maxCapacity = 1,
         decimal? cost = null)
     {
@@ -70,7 +69,6 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
         Date = date;
         StartTime = startTime;
         EndTime = endTime;
-        SlotType = slotType;
         MaxCapacity = maxCapacity;
         Cost = cost;
         Status = ScheduleStatus.Available;

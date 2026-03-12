@@ -12,10 +12,6 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
             .HasConversion<string>()
             .HasMaxLength(20);
 
-        builder.Property(e => e.SlotType)
-            .HasConversion<string>()
-            .HasMaxLength(20);
-
         builder.Property(e => e.Cost)
             .HasPrecision(18, 2);
 
@@ -28,7 +24,7 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
-        // Reservation tracking
+        // Reservation tracking (for online consultations with capacity = 1)
         builder.Property(e => e.ReservedBy)
             .IsRequired(false);
 
@@ -41,8 +37,8 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
             .HasForeignKey(e => e.ScheduleTemplateId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // ClinicAppointments relationship
-        builder.HasMany(e => e.ClinicAppointments)
+        // Appointments relationship
+        builder.HasMany(e => e.Appointments)
             .WithOne(a => a.AppointmentSlot)
             .HasForeignKey(a => a.AppointmentSlotId)
             .OnDelete(DeleteBehavior.Restrict);

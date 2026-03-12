@@ -81,7 +81,6 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
     public async Task<(IReadOnlyList<AppointmentSlot> Items, int TotalCount)> GetPagedAsync(
         Guid? scheduleTemplateId,
         ScheduleStatus? status = null,
-        SlotType? slotType = null,
         DateOnly? fromDate = null,
         DateOnly? toDate = null,
         int pageNumber = 1,
@@ -95,9 +94,6 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
 
         if (status.HasValue)
             query = query.Where(s => s.Status == status.Value);
-
-        if (slotType.HasValue)
-            query = query.Where(s => s.SlotType == slotType.Value);
 
         if (fromDate.HasValue)
             query = query.Where(s => s.Date >= fromDate.Value);

@@ -48,7 +48,6 @@ public interface IAppointmentSlotRepository : IRepository<AppointmentSlot>
     Task<(IReadOnlyList<AppointmentSlot> Items, int TotalCount)> GetPagedAsync(
         Guid? scheduleTemplateId,
         ScheduleStatus? status = null,
-        SlotType? slotType = null,
         DateOnly? fromDate = null,
         DateOnly? toDate = null,
         int pageNumber = 1,

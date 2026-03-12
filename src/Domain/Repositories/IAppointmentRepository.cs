@@ -5,15 +5,15 @@ using Domain.Enums;
 namespace Domain.Repositories;
 
 /// <summary>
-/// Repository interface for ClinicAppointment aggregate root.
-/// Contains domain-specific query methods for organisation clinic appointments.
+/// Repository interface for unified Appointment aggregate root.
+/// Supports both ONLINE_CONSULTATION and CLINIC_VISIT appointment types.
 /// </summary>
-public interface IClinicAppointmentRepository : IRepository<ClinicAppointment>
+public interface IAppointmentRepository : IRepository<Appointment>
 {
     /// <summary>
-    /// Get appointments for a specific organisation.
+    /// Get appointments for a specific organisation (clinic visits).
     /// </summary>
-    Task<IReadOnlyList<ClinicAppointment>> GetByOrganisationAsync(
+    Task<IReadOnlyList<Appointment>> GetByOrganisationAsync(
         Guid organisationId,
         DateOnly? fromDate = null,
         DateOnly? toDate = null,
@@ -21,24 +21,36 @@ public interface IClinicAppointmentRepository : IRepository<ClinicAppointment>
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Get appointments for a specific doctor (online consultations or assigned clinic).
+    /// </summary>
+    Task<IReadOnlyList<Appointment>> GetByDoctorAsync(
+        Guid doctorId,
+        DateOnly? fromDate = null,
+        DateOnly? toDate = null,
+        AppointmentStatus? status = null,
+        AppointmentType? type = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get appointments for a specific patient.
     /// </summary>
-    Task<IReadOnlyList<ClinicAppointment>> GetByPatientAsync(
+    Task<IReadOnlyList<Appointment>> GetByPatientAsync(
         Guid patientId,
+        AppointmentType? type = null,
         AppointmentStatus? status = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get appointments for a specific slot.
     /// </summary>
-    Task<IReadOnlyList<ClinicAppointment>> GetBySlotAsync(
+    Task<IReadOnlyList<Appointment>> GetBySlotAsync(
         Guid slotId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get appointment with all navigation properties included.
     /// </summary>
-    Task<ClinicAppointment?> GetByIdWithDetailsAsync(
+    Task<Appointment?> GetByIdWithDetailsAsync(
         Guid id,
         CancellationToken cancellationToken = default);
 
@@ -53,7 +65,7 @@ public interface IClinicAppointmentRepository : IRepository<ClinicAppointment>
     /// <summary>
     /// Get appointments for a specific date at an organisation.
     /// </summary>
-    Task<IReadOnlyList<ClinicAppointment>> GetByOrganisationAndDateAsync(
+    Task<IReadOnlyList<Appointment>> GetByOrganisationAndDateAsync(
         Guid organisationId,
         DateOnly date,
         CancellationToken cancellationToken = default);
@@ -61,9 +73,11 @@ public interface IClinicAppointmentRepository : IRepository<ClinicAppointment>
     /// <summary>
     /// Get paginated appointments with filters.
     /// </summary>
-    Task<(IReadOnlyList<ClinicAppointment> Items, int TotalCount)> GetPagedAsync(
+    Task<(IReadOnlyList<Appointment> Items, int TotalCount)> GetPagedAsync(
         Guid? organisationId = null,
+        Guid? doctorId = null,
         Guid? patientId = null,
+        AppointmentType? type = null,
         AppointmentStatus? status = null,
         DateOnly? fromDate = null,
         DateOnly? toDate = null,
@@ -75,14 +89,29 @@ public interface IClinicAppointmentRepository : IRepository<ClinicAppointment>
     /// Get status counts for reporting.
     /// </summary>
     Task<Dictionary<AppointmentStatus, int>> GetStatusCountsAsync(
-        Guid organisationId,
+        Guid? organisationId = null,
+        Guid? doctorId = null,
         DateOnly? date = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get upcoming appointments for a patient (confirmed, not completed/cancelled).
     /// </summary>
-    Task<IReadOnlyList<ClinicAppointment>> GetUpcomingByPatientAsync(
+    Task<IReadOnlyList<Appointment>> GetUpcomingByPatientAsync(
         Guid patientId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get upcoming appointments for a doctor.
+    /// </summary>
+    Task<IReadOnlyList<Appointment>> GetUpcomingByDoctorAsync(
+        Guid doctorId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get appointment by consultation session ID.
+    /// </summary>
+    Task<Appointment?> GetByConsultationSessionIdAsync(
+        Guid consultationSessionId,
         CancellationToken cancellationToken = default);
 }

@@ -1359,6 +1359,111 @@ namespace Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Domain.Entities.Scheduling.Appointment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AppointmentSlotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("CancelledBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CheckedInAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ConsultationSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("DoctorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsAiResultShared")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsRetinalImagesShared")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid?>("OrganisationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("VisitReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentSlotId");
+
+                    b.HasIndex("ConsultationSessionId");
+
+                    b.HasIndex("DoctorId");
+
+                    b.HasIndex("OrganisationId");
+
+                    b.HasIndex("PatientId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("Type");
+
+                    b.HasIndex("PatientId", "AppointmentSlotId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Appointments_Patient_Slot_Unique")
+                        .HasFilter("\"IsDeleted\" = false AND \"Status\" NOT IN ('Cancelled', 'NoShow')");
+
+                    b.HasIndex("Type", "Status")
+                        .HasDatabaseName("IX_Appointments_Type_Status");
+
+                    b.ToTable("Appointments");
+                });
+
             modelBuilder.Entity("Domain.Entities.Scheduling.AppointmentSlot", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1405,11 +1510,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ScheduleTemplateId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("SlotType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
                     b.Property<TimeOnly>("StartTime")
                         .HasColumnType("time without time zone");
 
@@ -1439,87 +1539,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasDatabaseName("IX_AppointmentSlots_Capacity");
 
                     b.ToTable("AppointmentSlots");
-                });
-
-            modelBuilder.Entity("Domain.Entities.Scheduling.ClinicAppointment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("AppointmentSlotId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("AssignedDoctorId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CancellationReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<Guid?>("CancelledBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("CheckedInAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<Guid>("OrganisationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("PatientId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<string>("VisitReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AppointmentSlotId");
-
-                    b.HasIndex("AssignedDoctorId");
-
-                    b.HasIndex("OrganisationId");
-
-                    b.HasIndex("PatientId");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("PatientId", "AppointmentSlotId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_ClinicAppointments_Patient_Slot_Unique")
-                        .HasFilter("\"IsDeleted\" = false AND \"Status\" != 'Cancelled'");
-
-                    b.ToTable("ClinicAppointments");
                 });
 
             modelBuilder.Entity("Domain.Entities.Scheduling.ScheduleTemplate", b =>
@@ -2583,35 +2602,28 @@ namespace Infrastructure.Persistence.Migrations
                     b.Navigation("Post");
                 });
 
-            modelBuilder.Entity("Domain.Entities.Scheduling.AppointmentSlot", b =>
-                {
-                    b.HasOne("Domain.Entities.Scheduling.ScheduleTemplate", "ScheduleTemplate")
-                        .WithMany("AppointmentSlots")
-                        .HasForeignKey("ScheduleTemplateId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ScheduleTemplate");
-                });
-
-            modelBuilder.Entity("Domain.Entities.Scheduling.ClinicAppointment", b =>
+            modelBuilder.Entity("Domain.Entities.Scheduling.Appointment", b =>
                 {
                     b.HasOne("Domain.Entities.Scheduling.AppointmentSlot", "AppointmentSlot")
-                        .WithMany("ClinicAppointments")
+                        .WithMany("Appointments")
                         .HasForeignKey("AppointmentSlotId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Domain.Entities.Users.Ophthalmologist", "AssignedDoctor")
+                    b.HasOne("Domain.Entities.Consultation.ConsultationSession", "ConsultationSession")
                         .WithMany()
-                        .HasForeignKey("AssignedDoctorId")
+                        .HasForeignKey("ConsultationSessionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Entities.Users.Ophthalmologist", "Doctor")
+                        .WithMany()
+                        .HasForeignKey("DoctorId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Domain.Entities.Users.Organisation", "Organisation")
                         .WithMany()
                         .HasForeignKey("OrganisationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Domain.Entities.Users.Patient", "Patient")
                         .WithMany()
@@ -2621,11 +2633,24 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.Navigation("AppointmentSlot");
 
-                    b.Navigation("AssignedDoctor");
+                    b.Navigation("ConsultationSession");
+
+                    b.Navigation("Doctor");
 
                     b.Navigation("Organisation");
 
                     b.Navigation("Patient");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Scheduling.AppointmentSlot", b =>
+                {
+                    b.HasOne("Domain.Entities.Scheduling.ScheduleTemplate", "ScheduleTemplate")
+                        .WithMany("AppointmentSlots")
+                        .HasForeignKey("ScheduleTemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ScheduleTemplate");
                 });
 
             modelBuilder.Entity("Domain.Entities.Screening.AiScreening", b =>
@@ -2800,7 +2825,7 @@ namespace Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Domain.Entities.Scheduling.AppointmentSlot", b =>
                 {
-                    b.Navigation("ClinicAppointments");
+                    b.Navigation("Appointments");
                 });
 
             modelBuilder.Entity("Domain.Entities.Scheduling.ScheduleTemplate", b =>

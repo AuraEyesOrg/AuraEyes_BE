@@ -47,7 +47,6 @@ public class AppointmentSlotsController : BaseApiController
         [FromQuery] Guid? ophthalId = null,
         [FromQuery] Guid? orgId = null,
         [FromQuery] ScheduleStatus? status = null,
-        [FromQuery] SlotType? slotType = null,
         [FromQuery] DateOnly? fromDate = null,
         [FromQuery] DateOnly? toDate = null,
         [FromQuery] int pageNumber = 1,
@@ -59,7 +58,6 @@ public class AppointmentSlotsController : BaseApiController
             OphthalId = ophthalId,
             OrgId = orgId,
             Status = status,
-            SlotType = slotType,
             FromDate = fromDate,
             ToDate = toDate,
             PageNumber = pageNumber,
@@ -99,7 +97,6 @@ public class AppointmentSlotsController : BaseApiController
             Date = request.Date,
             StartTime = request.StartTime,
             EndTime = request.EndTime,
-            SlotType = request.SlotType,
             Cost = request.Cost
         };
 
@@ -154,7 +151,6 @@ public class AppointmentSlotsController : BaseApiController
             Date = request.Date,
             StartTime = request.StartTime,
             EndTime = request.EndTime,
-            SlotType = request.SlotType,
             Cost = request.Cost
         };
 
@@ -378,7 +374,6 @@ public record CreateAppointmentSlotRequest
     public DateOnly Date { get; init; }
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }
-    public SlotType SlotType { get; init; }
     public decimal? Cost { get; init; }
 }
 
@@ -387,7 +382,6 @@ public record UpdateAppointmentSlotRequest
     public DateOnly Date { get; init; }
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }
-    public SlotType SlotType { get; init; }
     public decimal? Cost { get; init; }
 }
 

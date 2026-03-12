@@ -25,7 +25,6 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
         var (items, totalCount) = await _repository.GetPagedAsync(
             request.ScheduleTemplateId,
             request.Status,
-            request.SlotType,
             request.FromDate,
             request.ToDate,
             request.PageNumber,
@@ -50,7 +49,7 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
                 EndTime = slot.EndTime,
                 Status = slot.Status.ToString(),
                 Cost = slot.Cost,
-                SlotType = slot.SlotType.ToString(),
+                MaxCapacity = slot.MaxCapacity,
                 BookedCount = slot.BookedCount,
                 AvailableCapacity = availableCapacity,
                 CreatedAt = slot.CreatedAt

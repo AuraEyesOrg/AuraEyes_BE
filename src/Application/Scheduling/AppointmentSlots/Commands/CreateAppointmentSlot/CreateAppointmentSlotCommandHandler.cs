@@ -36,7 +36,6 @@ public class CreateAppointmentSlotCommandHandler : ICommandHandler<CreateAppoint
             request.Date,
             request.StartTime,
             request.EndTime,
-            request.SlotType,
             template.MaxCapacity,  // Copy maxCapacity from template
             request.Cost);
 

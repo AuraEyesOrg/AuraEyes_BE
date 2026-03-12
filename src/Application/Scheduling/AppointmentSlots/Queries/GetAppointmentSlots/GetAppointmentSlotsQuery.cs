@@ -11,7 +11,6 @@ public record GetAppointmentSlotsQuery : IQuery<PagedResult<AppointmentSlotListD
     public Guid? OphthalId { get; init; }
     public Guid? OrgId { get; init; }
     public ScheduleStatus? Status { get; init; }
-    public SlotType? SlotType { get; init; }
     public DateOnly? FromDate { get; init; }
     public DateOnly? ToDate { get; init; }
     public int PageNumber { get; init; } = 1;
