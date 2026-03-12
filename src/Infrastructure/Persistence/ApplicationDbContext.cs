@@ -55,8 +55,6 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<Feedback> Feedbacks => Set<Feedback>();
 
     // Scheduling
-    public DbSet<Schedule> Schedules => Set<Schedule>();
-    public DbSet<AvailableSlot> AvailableSlots => Set<AvailableSlot>();
     public DbSet<ScheduleTemplate> ScheduleTemplates => Set<ScheduleTemplate>();
     public DbSet<AppointmentSlot> AppointmentSlots => Set<AppointmentSlot>();
 
