@@ -31,6 +31,11 @@ public interface ICurrentUserService
     /// Check if current user is authenticated.
     /// </summary>
     bool IsAuthenticated { get; }
+
+    /// <summary>
+    /// Client IP address from the current HTTP request.
+    /// </summary>
+    string? IpAddress { get; }
     
     /// <summary>
     /// Check if current user is in a specific role.
