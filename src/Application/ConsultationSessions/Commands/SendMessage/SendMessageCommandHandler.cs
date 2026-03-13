@@ -11,29 +11,37 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
 {
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly IRepository<Conversation> _conversationRepository;
+    private readonly ICurrentUserService _currentUser;
     private readonly IUnitOfWork _unitOfWork;
 
     public SendMessageCommandHandler(
         IConsultationSessionRepository sessionRepository,
         IRepository<Conversation> conversationRepository,
+        ICurrentUserService currentUser,
         IUnitOfWork unitOfWork)
     {
         _sessionRepository = sessionRepository;
         _conversationRepository = conversationRepository;
+        _currentUser = currentUser;
         _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(SendMessageCommand request, CancellationToken cancellationToken)
     {
+        if (!_currentUser.ProfileId.HasValue)
+            return Result.Unauthorized("Authenticated profile is required to send messages.");
+
+        var senderProfileId = _currentUser.ProfileId.Value;
+
         var session = await _sessionRepository.GetByIdWithConversationsAsync(
             request.SessionId, cancellationToken);
 
         if (session is null)
             return Result.NotFound($"Session '{request.SessionId}' not found.");
 
-        bool isPatient = request.SenderUserId == session.PatientId;
+        bool isPatient = senderProfileId == session.PatientId;
         bool isDoctor = session.OphthalmologistId.HasValue
-                        && request.SenderUserId == session.OphthalmologistId.Value;
+                && senderProfileId == session.OphthalmologistId.Value;
 
         if (!isPatient && !isDoctor)
             return Result.Forbidden("You are not a participant of this session.");
@@ -61,7 +69,7 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
             await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
-        var chatMessage = new ChatMessage(conversation.Id, request.SenderUserId, request.Message);
+        var chatMessage = new ChatMessage(conversation.Id, senderProfileId, request.Message);
         conversation.AddMessage(chatMessage);
 
         session.RecordActivity();

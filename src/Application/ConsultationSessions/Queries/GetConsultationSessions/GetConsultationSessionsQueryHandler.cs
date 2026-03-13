@@ -2,6 +2,8 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.ConsultationSessions.Common;
+using Domain.Common;
+using Domain.Entities.Users;
 using Domain.Repositories;
 
 namespace Application.ConsultationSessions.Queries.GetConsultationSessions;
@@ -11,13 +13,22 @@ public class GetConsultationSessionsQueryHandler
 {
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly ICurrentUserService _currentUser;
+    private readonly IRepository<Patient> _patientRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IIdentityService _identityService;
 
     public GetConsultationSessionsQueryHandler(
         IConsultationSessionRepository sessionRepository,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        IRepository<Patient> patientRepository,
+        IOphthalmologistRepository ophthalmologistRepository,
+        IIdentityService identityService)
     {
         _sessionRepository = sessionRepository;
         _currentUser = currentUser;
+        _patientRepository = patientRepository;
+        _ophthalmologistRepository = ophthalmologistRepository;
+        _identityService = identityService;
     }
 
     public async Task<Result<PagedResult<ConsultationSessionListDto>>> Handle(
@@ -38,22 +49,15 @@ public class GetConsultationSessionsQueryHandler
             request.PageSize,
             cancellationToken);
 
-        var dtoList = items.Select(s => new ConsultationSessionListDto
-        {
-            Id = s.Id,
-            PatientId = s.PatientId,
-            OphthalmologistId = s.OphthalmologistId,
-            Type = s.Type,
-            Status = s.Status,
-            ChatStatus = s.ChatStatus,
-            Price = s.Price,
-            AppointmentTime = s.AppointmentTime,
-            LastActivityAt = s.LastActivityAt,
-            CreatedAt = s.CreatedAt
-        }).ToList();
+        var dtoList = await ConsultationSessionMapping.ToListDtosAsync(
+            items,
+            _patientRepository,
+            _ophthalmologistRepository,
+            _identityService,
+            cancellationToken);
 
         var pagedResult = new PagedResult<ConsultationSessionListDto>(
-            dtoList, totalCount, request.PageNumber, request.PageSize);
+            dtoList.ToList(), totalCount, request.PageNumber, request.PageSize);
 
         return Result<PagedResult<ConsultationSessionListDto>>.Success(pagedResult);
     }

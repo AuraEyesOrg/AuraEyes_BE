@@ -2,6 +2,8 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.ConsultationSessions.Common;
+using Domain.Common;
+using Domain.Entities.Users;
 using Domain.Repositories;
 
 namespace Application.ConsultationSessions.Queries.GetConsultationSession;
@@ -11,13 +13,22 @@ public class GetConsultationSessionQueryHandler
 {
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly ICurrentUserService _currentUser;
+    private readonly IRepository<Patient> _patientRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IIdentityService _identityService;
 
     public GetConsultationSessionQueryHandler(
         IConsultationSessionRepository sessionRepository,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        IRepository<Patient> patientRepository,
+        IOphthalmologistRepository ophthalmologistRepository,
+        IIdentityService identityService)
     {
         _sessionRepository = sessionRepository;
         _currentUser = currentUser;
+        _patientRepository = patientRepository;
+        _ophthalmologistRepository = ophthalmologistRepository;
+        _identityService = identityService;
     }
 
     public async Task<Result<ConsultationSessionDto>> Handle(
@@ -57,27 +68,13 @@ public class GetConsultationSessionQueryHandler
             })
             .ToList();
 
-        var dto = new ConsultationSessionDto
-        {
-            Id = session.Id,
-            PatientId = session.PatientId,
-            OphthalmologistId = session.OphthalmologistId,
-            OrganisationId = session.OrganisationId,
-            AiScreeningId = session.AiScreeningId,
-            Type = session.Type,
-            Status = session.Status,
-            ChatStatus = session.ChatStatus,
-            Price = session.Price,
-            AppointmentTime = session.AppointmentTime,
-            MeetingLink = session.MeetingLink,
-            LastActivityAt = session.LastActivityAt,
-            ClosedAt = session.ClosedAt,
-            ClosedBy = session.ClosedBy,
-            ClosingReason = session.ClosingReason,
-            CreatedAt = session.CreatedAt,
-            UpdatedAt = session.UpdatedAt,
-            Messages = messages
-        };
+        var dto = await ConsultationSessionMapping.ToDetailDtoAsync(
+            session,
+            _patientRepository,
+            _ophthalmologistRepository,
+            _identityService,
+            messages,
+            cancellationToken);
 
         return Result<ConsultationSessionDto>.Success(dto);
     }

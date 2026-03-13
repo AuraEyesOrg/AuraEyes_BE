@@ -18,6 +18,10 @@ public record ConsultationSessionDto
     public Guid? OphthalmologistId { get; init; }
     public Guid? OrganisationId { get; init; }
     public Guid? AiScreeningId { get; init; }
+    public string? PatientName { get; init; }
+    public string? OphthalmologistName { get; init; }
+    public string? OrganisationName { get; init; }
+    public string? OphthalmologistAvatarUrl { get; init; }
     public ConsultationSessionType Type { get; init; }
     public string TypeName => Type.ToString();
     public SessionStatus Status { get; init; }
@@ -41,6 +45,10 @@ public record ConsultationSessionListDto
     public Guid Id { get; init; }
     public Guid PatientId { get; init; }
     public Guid? OphthalmologistId { get; init; }
+    public string? PatientName { get; init; }
+    public string? OphthalmologistName { get; init; }
+    public string? OrganisationName { get; init; }
+    public string? OphthalmologistAvatarUrl { get; init; }
     public ConsultationSessionType Type { get; init; }
     public string TypeName => Type.ToString();
     public SessionStatus Status { get; init; }
@@ -49,6 +57,7 @@ public record ConsultationSessionListDto
     public string ChatStatusName => ChatStatus.ToString();
     public decimal Price { get; init; }
     public DateTime? AppointmentTime { get; init; }
+    public string? MeetingLink { get; init; }
     public DateTime LastActivityAt { get; init; }
     public DateTime CreatedAt { get; init; }
 }
