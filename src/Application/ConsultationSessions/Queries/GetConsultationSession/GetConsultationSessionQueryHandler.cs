@@ -2,8 +2,7 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.ConsultationSessions.Common;
-using Domain.Common;
-using Domain.Entities.Users;
+using AutoMapper;
 using Domain.Repositories;
 
 namespace Application.ConsultationSessions.Queries.GetConsultationSession;
@@ -13,22 +12,19 @@ public class GetConsultationSessionQueryHandler
 {
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly ICurrentUserService _currentUser;
-    private readonly IRepository<Patient> _patientRepository;
-    private readonly IOphthalmologistRepository _ophthalmologistRepository;
-    private readonly IIdentityService _identityService;
+    private readonly IMapper _mapper;
+    private readonly IConsultationParticipantEnrichmentService _participantEnrichmentService;
 
     public GetConsultationSessionQueryHandler(
         IConsultationSessionRepository sessionRepository,
         ICurrentUserService currentUser,
-        IRepository<Patient> patientRepository,
-        IOphthalmologistRepository ophthalmologistRepository,
-        IIdentityService identityService)
+        IMapper mapper,
+        IConsultationParticipantEnrichmentService participantEnrichmentService)
     {
         _sessionRepository = sessionRepository;
         _currentUser = currentUser;
-        _patientRepository = patientRepository;
-        _ophthalmologistRepository = ophthalmologistRepository;
-        _identityService = identityService;
+        _mapper = mapper;
+        _participantEnrichmentService = participantEnrichmentService;
     }
 
     public async Task<Result<ConsultationSessionDto>> Handle(
@@ -58,22 +54,17 @@ public class GetConsultationSessionQueryHandler
         var messages = session.Conversations
             .SelectMany(c => c.Messages)
             .OrderBy(m => m.SentAt)
-            .Select(m => new ChatMessageDto
-            {
-                Id = m.Id,
-                SenderUserId = m.SenderUserId,
-                Message = m.Message,
-                IsRead = m.IsRead,
-                SentAt = m.SentAt,
-            })
+            .Select(m => _mapper.Map<ChatMessageDto>(m))
             .ToList();
 
-        var dto = await ConsultationSessionMapping.ToDetailDtoAsync(
+        var baseDto = _mapper.Map<ConsultationSessionDto>(session) with
+        {
+            Messages = messages
+        };
+
+        var dto = await _participantEnrichmentService.EnrichDetailAsync(
+            baseDto,
             session,
-            _patientRepository,
-            _ophthalmologistRepository,
-            _identityService,
-            messages,
             cancellationToken);
 
         return Result<ConsultationSessionDto>.Success(dto);

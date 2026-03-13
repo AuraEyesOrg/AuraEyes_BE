@@ -2,8 +2,7 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.ConsultationSessions.Common;
-using Domain.Common;
-using Domain.Entities.Users;
+using AutoMapper;
 using Domain.Repositories;
 
 namespace Application.ConsultationSessions.Queries.GetConsultationSessions;
@@ -13,22 +12,19 @@ public class GetConsultationSessionsQueryHandler
 {
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly ICurrentUserService _currentUser;
-    private readonly IRepository<Patient> _patientRepository;
-    private readonly IOphthalmologistRepository _ophthalmologistRepository;
-    private readonly IIdentityService _identityService;
+    private readonly IMapper _mapper;
+    private readonly IConsultationParticipantEnrichmentService _participantEnrichmentService;
 
     public GetConsultationSessionsQueryHandler(
         IConsultationSessionRepository sessionRepository,
         ICurrentUserService currentUser,
-        IRepository<Patient> patientRepository,
-        IOphthalmologistRepository ophthalmologistRepository,
-        IIdentityService identityService)
+        IMapper mapper,
+        IConsultationParticipantEnrichmentService participantEnrichmentService)
     {
         _sessionRepository = sessionRepository;
         _currentUser = currentUser;
-        _patientRepository = patientRepository;
-        _ophthalmologistRepository = ophthalmologistRepository;
-        _identityService = identityService;
+        _mapper = mapper;
+        _participantEnrichmentService = participantEnrichmentService;
     }
 
     public async Task<Result<PagedResult<ConsultationSessionListDto>>> Handle(
@@ -49,11 +45,10 @@ public class GetConsultationSessionsQueryHandler
             request.PageSize,
             cancellationToken);
 
-        var dtoList = await ConsultationSessionMapping.ToListDtosAsync(
+        var baseDtos = _mapper.Map<List<ConsultationSessionListDto>>(items);
+        var dtoList = await _participantEnrichmentService.EnrichListAsync(
+            baseDtos,
             items,
-            _patientRepository,
-            _ophthalmologistRepository,
-            _identityService,
             cancellationToken);
 
         var pagedResult = new PagedResult<ConsultationSessionListDto>(
