@@ -231,6 +231,9 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("AiScreeningId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("AppointmentSlotId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("AppointmentTime")
                         .HasColumnType("timestamp with time zone");
 
@@ -317,6 +320,8 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("AiScreeningId");
 
+                    b.HasIndex("AppointmentSlotId");
+
                     b.HasIndex("OphthalmologistId");
 
                     b.HasIndex("OrganisationId");
@@ -367,53 +372,201 @@ namespace Infrastructure.Persistence.Migrations
                     b.ToTable("Conversations");
                 });
 
-            modelBuilder.Entity("Domain.Entities.Consultation.Feedback", b =>
+            modelBuilder.Entity("Domain.Entities.Consultation.OphthalmologistFeedback", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Content")
-                        .IsRequired()
+                    b.Property<string>("Comment")
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("comment");
+
+                    b.Property<Guid>("ConsultationSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("consultation_session_id");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(false);
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid>("OphthalmologistId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ophthalmologist_id");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
 
                     b.Property<int>("Rating")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("TargetId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("TargetType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasColumnType("integer")
+                        .HasColumnName("rating");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
 
                     b.Property<string>("UpdatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("updated_by");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TargetType", "TargetId");
+                    b.HasIndex("ConsultationSessionId");
 
-                    b.ToTable("Feedbacks");
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("OphthalmologistId");
+
+                    b.HasIndex("PatientId", "ConsultationSessionId")
+                        .IsUnique();
+
+                    b.ToTable("OphthalmologistFeedback", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OphthalmologistFeedback_Rating", "rating >= 1 AND rating <= 5");
+                        });
+                });
+
+            modelBuilder.Entity("Domain.Entities.Consultation.OrganisationFeedback", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AppointmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("appointment_id");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("comment");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organisation_id");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("integer")
+                        .HasColumnName("rating");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("OrganisationId");
+
+                    b.HasIndex("PatientId", "AppointmentId")
+                        .IsUnique();
+
+                    b.ToTable("OrganisationFeedback", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrganisationFeedback_Rating", "rating >= 1 AND rating <= 5");
+                        });
+                });
+
+            modelBuilder.Entity("Domain.Entities.Consultation.WebsiteFeedback", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("category");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("comment");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("integer")
+                        .HasColumnName("rating");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("PatientId");
+
+                    b.ToTable("WebsiteFeedback", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_WebsiteFeedback_Rating", "rating >= 1 AND rating <= 5");
+                        });
                 });
 
             modelBuilder.Entity("Domain.Entities.Contracts.Contract", b =>
@@ -1259,6 +1412,14 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Action");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("EntityName");
+
+                    b.HasIndex("UserId");
+
                     b.ToTable("AuditLogs");
                 });
 
@@ -1267,11 +1428,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1289,10 +1445,21 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Payload")
+                        .HasColumnType("jsonb");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1304,6 +1471,12 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Type");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "IsRead");
 
                     b.ToTable("Notifications");
                 });
@@ -1354,10 +1527,29 @@ namespace Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Domain.Entities.Scheduling.AvailableSlot", b =>
+            modelBuilder.Entity("Domain.Entities.Scheduling.Appointment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AppointmentSlotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("CancelledBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CheckedInAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ConsultationSessionId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -1366,25 +1558,42 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
 
-                    b.Property<DateTime>("EndTime")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<Guid?>("DoctorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsAiResultShared")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
-                    b.Property<int>("MaxCapacity")
-                        .HasColumnType("integer");
+                    b.Property<bool>("IsRetinalImagesShared")
+                        .HasColumnType("boolean");
 
-                    b.Property<Guid?>("OphthalmologistId")
-                        .HasColumnType("uuid");
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<Guid?>("OrganisationId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("StartTime")
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1392,23 +1601,50 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("text");
 
+                    b.Property<string>("VisitReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("OphthalmologistId", "StartTime", "EndTime");
+                    b.HasIndex("AppointmentSlotId");
 
-                    b.HasIndex("OrganisationId", "StartTime", "EndTime");
+                    b.HasIndex("ConsultationSessionId");
 
-                    b.ToTable("AvailableSlots");
+                    b.HasIndex("DoctorId");
+
+                    b.HasIndex("OrganisationId");
+
+                    b.HasIndex("PatientId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("Type");
+
+                    b.HasIndex("PatientId", "AppointmentSlotId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Appointments_Patient_Slot_Unique")
+                        .HasFilter("\"IsDeleted\" = false AND \"Status\" NOT IN ('Cancelled', 'NoShow')");
+
+                    b.HasIndex("Type", "Status")
+                        .HasDatabaseName("IX_Appointments_Type_Status");
+
+                    b.ToTable("Appointments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Appointments_ClinicVisit_DoctorId_Null", "\"Type\" <> 'ClinicVisit' OR \"DoctorId\" IS NULL");
+                        });
                 });
 
-            modelBuilder.Entity("Domain.Entities.Scheduling.Schedule", b =>
+            modelBuilder.Entity("Domain.Entities.Scheduling.AppointmentSlot", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("AvailableSlotId")
-                        .HasColumnType("uuid");
+                    b.Property<int>("BookedCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<decimal?>("Cost")
                         .HasPrecision(18, 2)
@@ -1431,13 +1667,19 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
-                    b.Property<Guid>("PatientId")
+                    b.Property<int>("MaxCapacity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<DateTime?>("ReservationExpireAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReservedBy")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("SlotType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                    b.Property<Guid>("ScheduleTemplateId")
+                        .HasColumnType("uuid");
 
                     b.Property<TimeOnly>("StartTime")
                         .HasColumnType("time without time zone");
@@ -1455,11 +1697,76 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AvailableSlotId");
+                    b.HasIndex("Date");
 
-                    b.HasIndex("PatientId");
+                    b.HasIndex("ScheduleTemplateId");
 
-                    b.ToTable("Schedules");
+                    b.HasIndex("Status");
+
+                    b.HasIndex("Status", "ReservationExpireAt")
+                        .HasFilter("\"Status\" = 'Reserved'");
+
+                    b.HasIndex("Status", "BookedCount", "MaxCapacity")
+                        .HasDatabaseName("IX_AppointmentSlots_Capacity");
+
+                    b.ToTable("AppointmentSlots");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Scheduling.ScheduleTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("DayOfWeek")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("MaxCapacity")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("OphthalId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("OrgId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SlotDuration")
+                        .HasColumnType("integer");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DayOfWeek");
+
+                    b.HasIndex("OphthalId");
+
+                    b.HasIndex("OrgId");
+
+                    b.ToTable("ScheduleTemplates");
                 });
 
             modelBuilder.Entity("Domain.Entities.Screening.AiScreening", b =>
@@ -1825,6 +2132,17 @@ namespace Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<decimal>("RatingAverage")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(4, 2)
+                        .HasColumnType("numeric(4,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<int>("RatingCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<string>("RejectionReason")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -1896,11 +2214,32 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("RatingAverage")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(4, 2)
+                        .HasColumnType("numeric(4,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<int>("RatingCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("PurchasedAiQuota")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("text");
+
+                    b.Property<int>("UsedAiQuota")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.HasKey("Id");
 
@@ -1932,11 +2271,21 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<int>("PurchasedAiQuota")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("text");
+
+                    b.Property<int>("UsedAiQuota")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
@@ -2317,6 +2666,11 @@ namespace Infrastructure.Persistence.Migrations
                         .HasForeignKey("AiScreeningId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Domain.Entities.Scheduling.AppointmentSlot", "AppointmentSlot")
+                        .WithMany()
+                        .HasForeignKey("AppointmentSlotId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Domain.Entities.Users.Ophthalmologist", null)
                         .WithMany()
                         .HasForeignKey("OphthalmologistId")
@@ -2332,6 +2686,8 @@ namespace Infrastructure.Persistence.Migrations
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("AppointmentSlot");
                 });
 
             modelBuilder.Entity("Domain.Entities.Consultation.Conversation", b =>
@@ -2345,6 +2701,57 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasOne("Domain.Entities.Users.Ophthalmologist", null)
                         .WithMany()
                         .HasForeignKey("OphthalmologistId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.Entities.Consultation.OphthalmologistFeedback", b =>
+                {
+                    b.HasOne("Domain.Entities.Consultation.ConsultationSession", null)
+                        .WithMany()
+                        .HasForeignKey("ConsultationSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Users.Ophthalmologist", null)
+                        .WithMany()
+                        .HasForeignKey("OphthalmologistId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Users.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.Entities.Consultation.OrganisationFeedback", b =>
+                {
+                    b.HasOne("Domain.Entities.Scheduling.Appointment", null)
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Users.Organisation", null)
+                        .WithMany()
+                        .HasForeignKey("OrganisationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Users.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.Entities.Consultation.WebsiteFeedback", b =>
+                {
+                    b.HasOne("Domain.Entities.Users.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -2459,28 +2866,55 @@ namespace Infrastructure.Persistence.Migrations
                     b.Navigation("Post");
                 });
 
-            modelBuilder.Entity("Domain.Entities.Scheduling.AvailableSlot", b =>
+            modelBuilder.Entity("Domain.Entities.Scheduling.Appointment", b =>
                 {
-                    b.HasOne("Domain.Entities.Users.Ophthalmologist", null)
-                        .WithMany()
-                        .HasForeignKey("OphthalmologistId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Domain.Entities.Users.Organisation", null)
-                        .WithMany()
-                        .HasForeignKey("OrganisationId")
-                        .OnDelete(DeleteBehavior.Restrict);
-                });
-
-            modelBuilder.Entity("Domain.Entities.Scheduling.Schedule", b =>
-                {
-                    b.HasOne("Domain.Entities.Scheduling.AvailableSlot", "AvailableSlot")
-                        .WithMany("Schedules")
-                        .HasForeignKey("AvailableSlotId")
+                    b.HasOne("Domain.Entities.Scheduling.AppointmentSlot", "AppointmentSlot")
+                        .WithMany("Appointments")
+                        .HasForeignKey("AppointmentSlotId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("AvailableSlot");
+                    b.HasOne("Domain.Entities.Consultation.ConsultationSession", "ConsultationSession")
+                        .WithMany()
+                        .HasForeignKey("ConsultationSessionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Entities.Users.Ophthalmologist", "Doctor")
+                        .WithMany()
+                        .HasForeignKey("DoctorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Entities.Users.Organisation", "Organisation")
+                        .WithMany()
+                        .HasForeignKey("OrganisationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Entities.Users.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AppointmentSlot");
+
+                    b.Navigation("ConsultationSession");
+
+                    b.Navigation("Doctor");
+
+                    b.Navigation("Organisation");
+
+                    b.Navigation("Patient");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Scheduling.AppointmentSlot", b =>
+                {
+                    b.HasOne("Domain.Entities.Scheduling.ScheduleTemplate", "ScheduleTemplate")
+                        .WithMany("AppointmentSlots")
+                        .HasForeignKey("ScheduleTemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ScheduleTemplate");
                 });
 
             modelBuilder.Entity("Domain.Entities.Screening.AiScreening", b =>
@@ -2653,9 +3087,14 @@ namespace Infrastructure.Persistence.Migrations
                     b.Navigation("Reposts");
                 });
 
-            modelBuilder.Entity("Domain.Entities.Scheduling.AvailableSlot", b =>
+            modelBuilder.Entity("Domain.Entities.Scheduling.AppointmentSlot", b =>
                 {
-                    b.Navigation("Schedules");
+                    b.Navigation("Appointments");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Scheduling.ScheduleTemplate", b =>
+                {
+                    b.Navigation("AppointmentSlots");
                 });
 
             modelBuilder.Entity("Domain.Entities.Screening.AiScreening", b =>

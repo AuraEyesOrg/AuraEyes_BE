@@ -143,7 +143,7 @@ public record UserInfoResponse
     public string[] Roles { get; init; } = Array.Empty<string>();
     public bool EmailConfirmed { get; init; }
     public Guid? OrganizationId { get; init; }
-    
+    public Guid? RoleId { get; init; }
     /// <summary>
     /// Indicates if 2FA is enabled for this user.
     /// </summary>

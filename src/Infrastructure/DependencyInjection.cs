@@ -7,6 +7,7 @@ using Domain.Common;
 using Domain.Repositories;
 using Infrastructure.Identity;
 using Infrastructure.Persistence;
+using Infrastructure.Persistence.Interceptors;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.Services;
 using Infrastructure.Settings;
@@ -24,15 +25,23 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        // Register audit interceptor
+        services.AddScoped<AuditInterceptor>();
+      
         // Register MediatR handlers that live in this assembly (query handlers, etc.)
         services.AddMediatR(cfg =>
             cfg.RegisterServicesFromAssembly(typeof(DependencyInjection).Assembly));
-
+      
         // Database configuration
-        services.AddDbContext<ApplicationDbContext>(options =>
+        services.AddDbContext<ApplicationDbContext>((sp, options) =>
+        {
             options.UseNpgsql(
                 configuration.GetConnectionString("DefaultConnection"),
-                b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
+                b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
+
+            // Add audit interceptor for automatic audit logging (FR-43)
+            options.AddInterceptors(sp.GetRequiredService<AuditInterceptor>());
+        });
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<ApplicationDbContext>());
 
@@ -123,6 +132,8 @@ public static class DependencyInjection
             .AddPolicy(Policies.PatientOnly, policy => policy.RequireRole(Roles.Patient))
             .AddPolicy(Policies.OphthalmologistOnly, policy => policy.RequireRole(Roles.Ophthalmologist))
             .AddPolicy(Policies.OrgAdminOnly, policy => policy.RequireRole(Roles.OrgAdmin))
+            .AddPolicy(Policies.OphthalmologistOrOrgAdmin, policy => 
+                policy.RequireRole(Roles.Ophthalmologist, Roles.OrgAdmin))
             .AddPolicy(Policies.SystemAdminOnly, policy => policy.RequireRole(Roles.SystemAdmin))
             .AddPolicy(Policies.AdminsOnly, policy => policy.RequireRole(Roles.Admins))
             .AddPolicy(Policies.MedicalStaff, policy => policy.RequireRole(Roles.Medical))
@@ -140,8 +151,12 @@ public static class DependencyInjection
         services.AddScoped<IOphthalmologistRepository, OphthalmologistRepository>();
         services.AddScoped<IWalletRepository, WalletRepository>();
         services.AddScoped<IDepositRequestRepository, DepositRequestRepository>();
-        services.AddScoped<IScheduleRepository, ScheduleRepository>();
+        services.AddScoped<IScheduleTemplateRepository, ScheduleTemplateRepository>();
+        services.AddScoped<IAppointmentSlotRepository, AppointmentSlotRepository>();
+        services.AddScoped<IAppointmentRepository, AppointmentRepository>();
         services.AddScoped<IConsultationSessionRepository, ConsultationSessionRepository>();
+        services.AddScoped<IOrganisationFeedbackRepository, OrganisationFeedbackRepository>();
+        services.AddScoped<IOphthalmologistFeedbackRepository, OphthalmologistFeedbackRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IContractTemplateRepository, ContractTemplateRepository>();
         services.AddScoped<IContractRepository, ContractRepository>();
@@ -164,6 +179,7 @@ public static class DependencyInjection
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
+        services.AddHostedService<ReservationExpirationWorker>();
 
         // Register Hangfire daily job
         services.AddScoped<DailyQuotaResetJob>();

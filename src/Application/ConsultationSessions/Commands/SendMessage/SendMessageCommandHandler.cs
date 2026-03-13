@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Consultation;
+using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
 
@@ -11,29 +12,43 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
 {
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly IRepository<Conversation> _conversationRepository;
+    private readonly ICurrentUserService _currentUser;
+    private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
+    private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
 
     public SendMessageCommandHandler(
         IConsultationSessionRepository sessionRepository,
         IRepository<Conversation> conversationRepository,
+        ICurrentUserService currentUser,
+        IRepository<Ophthalmologist> ophthalmologistRepository,
+        INotificationService notificationService,
         IUnitOfWork unitOfWork)
     {
         _sessionRepository = sessionRepository;
         _conversationRepository = conversationRepository;
+        _currentUser = currentUser;
+        _ophthalmologistRepository = ophthalmologistRepository;
+        _notificationService = notificationService;
         _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(SendMessageCommand request, CancellationToken cancellationToken)
     {
+        if (!_currentUser.ProfileId.HasValue)
+            return Result.Unauthorized("Authenticated profile is required to send messages.");
+
+        var senderProfileId = _currentUser.ProfileId.Value;
+
         var session = await _sessionRepository.GetByIdWithConversationsAsync(
             request.SessionId, cancellationToken);
 
         if (session is null)
             return Result.NotFound($"Session '{request.SessionId}' not found.");
 
-        bool isPatient = request.SenderUserId == session.PatientId;
+        bool isPatient = senderProfileId == session.PatientId;
         bool isDoctor = session.OphthalmologistId.HasValue
-                        && request.SenderUserId == session.OphthalmologistId.Value;
+                && senderProfileId == session.OphthalmologistId.Value;
 
         if (!isPatient && !isDoctor)
             return Result.Forbidden("You are not a participant of this session.");
@@ -61,12 +76,36 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
             await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
-        var chatMessage = new ChatMessage(conversation.Id, request.SenderUserId, request.Message);
+        var chatMessage = new ChatMessage(conversation.Id, senderProfileId, request.Message);
         conversation.AddMessage(chatMessage);
 
         session.RecordActivity();
         await _sessionRepository.UpdateAsync(session, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Send real-time notification to the other party [FR-47]
+        if (isPatient && session.OphthalmologistId.HasValue)
+        {
+            var ophthalmologist = await _ophthalmologistRepository.GetByIdAsync(
+                session.OphthalmologistId.Value,
+                cancellationToken);
+
+            if (ophthalmologist is not null)
+            {
+                // Patient sent message -> Notify Doctor
+                var messagePreview = request.Message.Length > 50
+                    ? request.Message[..50] + "..."
+                    : request.Message;
+
+                await _notificationService.SendAsync(
+                    ophthalmologist.UserId,
+                    "Tin nhắn mới từ bệnh nhân",
+                    $"Bạn có tin nhắn mới: \"{messagePreview}\"",
+                    NotificationType.NewPatientMessage,
+                    new { ConsultationId = session.Id, PatientId = session.PatientId },
+                    cancellationToken);
+            }
+        }
 
         return Result.Success();
     }

@@ -7,7 +7,8 @@ namespace Infrastructure.Services;
 /// <summary>
 /// Hangfire recurring job that resets daily AI screening quota.
 /// Runs at 00:00 UTC (07:00 AM Vietnam time).
-/// Uses ExecuteUpdateAsync for bulk update without loading entities.
+/// Resets UsedAiQuota = 0 on Patients and Organisations using bulk ExecuteUpdateAsync.
+/// Does NOT touch AiScreenings — screening history is preserved.
 /// </summary>
 public class DailyQuotaResetJob
 {
@@ -26,17 +27,17 @@ public class DailyQuotaResetJob
 
         try
         {
-            // Reset active screenings to inactive (this resets the used quota counter)
-            // AiQuotaService counts active screenings as UsedQuota,
-            // so deactivating them effectively resets UsedAiQuota = 0
-            var resetCount = await _context.AiScreenings
-                .Where(s => s.IsActive)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(s => s.IsActive, false)
-                    .SetProperty(s => s.UpdatedAt, DateTime.UtcNow));
+            var patientResetCount = await _context.Patients
+                .Where(p => p.UsedAiQuota > 0)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.UsedAiQuota, 0));
+
+            var orgResetCount = await _context.Organisations
+                .Where(o => o.UsedAiQuota > 0)
+                .ExecuteUpdateAsync(s => s.SetProperty(o => o.UsedAiQuota, 0));
 
             _logger.LogInformation(
-                "Daily quota reset completed. Deactivated {Count} AI screenings", resetCount);
+                "Daily quota reset completed. Reset {PatientCount} patients, {OrgCount} organisations",
+                patientResetCount, orgResetCount);
         }
         catch (Exception ex)
         {

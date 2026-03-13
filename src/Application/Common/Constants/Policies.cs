@@ -27,6 +27,12 @@ public static class Policies
     public const string OrgAdminOnly = nameof(OrgAdminOnly);
     
     /// <summary>
+    /// Requires either Ophthalmologist or OrgAdmin role.
+    /// Used for managing schedules and available slots.
+    /// </summary>
+    public const string OphthalmologistOrOrgAdmin = nameof(OphthalmologistOrOrgAdmin);
+    
+    /// <summary>
     /// Requires SystemAdmin role.
     /// </summary>
     public const string SystemAdminOnly = nameof(SystemAdminOnly);

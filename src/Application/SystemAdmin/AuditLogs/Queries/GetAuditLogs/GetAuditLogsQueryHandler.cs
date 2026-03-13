@@ -1,46 +1,35 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.SystemAdmin.Interfaces;
 
 namespace Application.SystemAdmin.AuditLogs.Queries.GetAuditLogs;
 
 /// <summary>
-/// Handler for GetAuditLogsQuery - Returns mock data
+/// Handler for GetAuditLogsQuery - Queries real audit log data from the database.
+/// FR-43: Log system activities and financial transactions for auditing and compliance.
 /// </summary>
 public class GetAuditLogsQueryHandler : IQueryHandler<GetAuditLogsQuery, PagedResult<AuditLogDto>>
 {
-    public Task<Result<PagedResult<AuditLogDto>>> Handle(GetAuditLogsQuery request, CancellationToken cancellationToken)
+    private readonly IAdminQueryService _adminQueryService;
+
+    public GetAuditLogsQueryHandler(IAdminQueryService adminQueryService)
     {
-        // Mock audit logs
-        var items = new List<AuditLogDto>
-        {
-            new() { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), UserName = "admin@aura.com", Action = "UserLogin", EntityName = "User", EntityId = null, IpAddress = "192.168.1.100", CreatedAt = DateTime.UtcNow.AddHours(-1) },
-            new() { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), UserName = "doctor1@aura.com", Action = "ScreeningCreated", EntityName = "Screening", EntityId = Guid.NewGuid().ToString(), IpAddress = "192.168.1.101", CreatedAt = DateTime.UtcNow.AddHours(-2) },
-            new() { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), UserName = "admin@aura.com", Action = "UserRoleUpdated", EntityName = "User", EntityId = Guid.NewGuid().ToString(), OldValue = "{\"Role\":\"Staff\"}", NewValue = "{\"Role\":\"Doctor\"}", IpAddress = "192.168.1.100", CreatedAt = DateTime.UtcNow.AddHours(-3) },
-            new() { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), UserName = "doctor2@aura.com", Action = "ScreeningApproved", EntityName = "Screening", EntityId = Guid.NewGuid().ToString(), IpAddress = "192.168.1.102", CreatedAt = DateTime.UtcNow.AddHours(-4) },
-            new() { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), UserName = "admin@aura.com", Action = "OrganisationCreated", EntityName = "Organisation", EntityId = Guid.NewGuid().ToString(), IpAddress = "192.168.1.100", CreatedAt = DateTime.UtcNow.AddHours(-5) }
-        };
+        _adminQueryService = adminQueryService;
+    }
 
-        // Apply filters
-        if (!string.IsNullOrWhiteSpace(request.SearchTerm))
-        {
-            items = items.Where(x =>
-                x.Action.Contains(request.SearchTerm, StringComparison.OrdinalIgnoreCase) ||
-                x.EntityName.Contains(request.SearchTerm, StringComparison.OrdinalIgnoreCase) ||
-                (x.UserName?.Contains(request.SearchTerm, StringComparison.OrdinalIgnoreCase) ?? false)
-            ).ToList();
-        }
+    public async Task<Result<PagedResult<AuditLogDto>>> Handle(GetAuditLogsQuery request, CancellationToken cancellationToken)
+    {
+        var pagedResult = await _adminQueryService.GetAuditLogsAsync(
+            request.SearchTerm,
+            request.Action,
+            request.EntityName,
+            request.UserId,
+            request.FromDate,
+            request.ToDate,
+            request.PageNumber,
+            request.PageSize,
+            cancellationToken);
 
-        if (!string.IsNullOrWhiteSpace(request.Action))
-        {
-            items = items.Where(x => x.Action.Equals(request.Action, StringComparison.OrdinalIgnoreCase)).ToList();
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.EntityName))
-        {
-            items = items.Where(x => x.EntityName.Equals(request.EntityName, StringComparison.OrdinalIgnoreCase)).ToList();
-        }
-
-        var pagedResult = new PagedResult<AuditLogDto>(items, 500, request.PageNumber, request.PageSize);
-        return Task.FromResult(Result<PagedResult<AuditLogDto>>.Success(pagedResult));
+        return Result<PagedResult<AuditLogDto>>.Success(pagedResult);
     }
 }

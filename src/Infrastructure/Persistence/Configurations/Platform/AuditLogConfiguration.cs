@@ -31,5 +31,11 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
+
+        // Indexes for admin query performance (filter by Action, EntityName, CreatedAt)
+        builder.HasIndex(e => e.Action);
+        builder.HasIndex(e => e.EntityName);
+        builder.HasIndex(e => e.CreatedAt);
+        builder.HasIndex(e => e.UserId);
     }
 }

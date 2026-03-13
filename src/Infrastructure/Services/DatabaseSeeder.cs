@@ -55,14 +55,17 @@ public static class DatabaseSeeder
 
             // Step 2: Seed default accounts (AspNetUsers + AspNetUserRoles)
             await SeedDefaultAccountsAsync(userManager, logger);
-
-            // Step 3: Seed domain entities (Organisation, Ophthalmologist, Patient)
-            await SeedDomainEntitiesAsync(context, userManager, logger);
         }
         else
         {
             logger?.LogInformation("Roles already exist. Skipping initial account seed.");
         }
+
+        // Step 3: Seed domain entities (Organisation, Ophthalmologist, Patient)
+        // Always runs — idempotent, skips if entities already exist.
+        // This ensures domain profiles are created even if the server was restarted
+        // after roles were seeded but before domain entities were created.
+        await SeedDomainEntitiesAsync(context, userManager, logger);
 
         // Step 4: Seed permissions + default role assignments
         // Idempotent — runs on every startup so new permissions defined in code

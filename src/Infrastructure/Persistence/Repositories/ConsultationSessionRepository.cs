@@ -17,6 +17,7 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
     {
         return await _dbSet
             .Include(s => s.Conversations)
+            .ThenInclude(c => c.Messages)
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
     }
 
@@ -77,7 +78,8 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
-            .OrderByDescending(s => s.CreatedAt)
+            .OrderByDescending(s => s.LastActivityAt)
+            .ThenByDescending(s => s.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);

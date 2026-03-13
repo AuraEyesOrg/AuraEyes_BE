@@ -11,7 +11,7 @@ namespace API.Controllers.SystemAdmin;
 /// System Admin Audit Logs and Compliance endpoints
 /// Provides audit trail access for compliance and security monitoring.
 /// </summary>
-[Route("api/system-admin/[controller]")]
+[Route("api/system-admin/audit-logs")]
 [Authorize(Policy = Policies.SystemAdminOnly)]
 public class AuditLogsController : BaseApiController
 {
