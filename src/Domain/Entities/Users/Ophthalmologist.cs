@@ -17,6 +17,8 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
     public string? LicenseUrl { get; private set; }
     public string? DegreeUrl { get; private set; }
     public string? RejectionReason { get; private set; }
+    public decimal RatingAverage { get; private set; }
+    public int RatingCount { get; private set; }
 
     // Navigation properties
     private readonly List<Certificate> _certificates = new();
@@ -34,6 +36,8 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
         VerificationStatus = VerificationStatus.PendingVerification;
         LicenseUrl = licenseUrl;
         DegreeUrl = degreeUrl;
+        RatingAverage = 0m;
+        RatingCount = 0;
     }
 
     public void UpdateProfile(string? bio, int yearsOfExperience)
@@ -79,6 +83,17 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
     {
         if (licenseUrl != null) LicenseUrl = licenseUrl;
         if (degreeUrl != null) DegreeUrl = degreeUrl;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void ApplyNewRating(int rating)
+    {
+        if (rating < 1 || rating > 5)
+            throw new ArgumentException("Rating must be between 1 and 5", nameof(rating));
+
+        var total = (RatingAverage * RatingCount) + rating;
+        RatingCount += 1;
+        RatingAverage = Math.Round(total / RatingCount, 2, MidpointRounding.AwayFromZero);
         UpdatedAt = DateTime.UtcNow;
     }
 }

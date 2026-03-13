@@ -22,6 +22,13 @@ public class OrganisationConfiguration : IEntityTypeConfiguration<Organisation>
         builder.Property(e => e.LicenseNumber)
             .HasMaxLength(100);
 
+        builder.Property(e => e.RatingAverage)
+            .HasPrecision(4, 2)
+            .HasDefaultValue(0m);
+
+        builder.Property(e => e.RatingCount)
+            .HasDefaultValue(0);
+
         builder.Property(e => e.PurchasedAiQuota)
             .HasDefaultValue(0);
 

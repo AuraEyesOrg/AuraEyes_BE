@@ -146,9 +146,12 @@ public static class DependencyInjection
         services.AddScoped<IOphthalmologistRepository, OphthalmologistRepository>();
         services.AddScoped<IWalletRepository, WalletRepository>();
         services.AddScoped<IDepositRequestRepository, DepositRequestRepository>();
-        services.AddScoped<IScheduleRepository, ScheduleRepository>();
-        services.AddScoped<IAvailableSlotRepository, AvailableSlotRepository>();
+        services.AddScoped<IScheduleTemplateRepository, ScheduleTemplateRepository>();
+        services.AddScoped<IAppointmentSlotRepository, AppointmentSlotRepository>();
+        services.AddScoped<IAppointmentRepository, AppointmentRepository>();
         services.AddScoped<IConsultationSessionRepository, ConsultationSessionRepository>();
+        services.AddScoped<IOrganisationFeedbackRepository, OrganisationFeedbackRepository>();
+        services.AddScoped<IOphthalmologistFeedbackRepository, OphthalmologistFeedbackRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IContractTemplateRepository, ContractTemplateRepository>();
         services.AddScoped<IContractRepository, ContractRepository>();
@@ -171,6 +174,7 @@ public static class DependencyInjection
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
+        services.AddHostedService<ReservationExpirationWorker>();
 
         // Register Hangfire daily job
         services.AddScoped<DailyQuotaResetJob>();
