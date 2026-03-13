@@ -1,11 +1,12 @@
 using Application.Common.Models;
-using Application.Ophthalmologists.AvailableSlots.Common;
-using Application.Ophthalmologists.AvailableSlots.Queries.GetAvailableSlot;
-using Application.Ophthalmologists.AvailableSlots.Queries.GetAvailableSlots;
 using Application.Ophthalmologists.Common;
 using Application.Ophthalmologists.Queries.GetOphthalmologist;
 using Application.Ophthalmologists.Queries.GetOphthalmologists;
+using Application.Scheduling.AppointmentSlots.Common;
+using Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlot;
+using Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlots;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisations;
+using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,7 +15,6 @@ namespace API.Controllers;
 
 /// <summary>
 /// Patient-facing search endpoints for ophthalmologists, organisations and booking slots.
-/// These endpoints are optimized for the facility booking & appointment flow.
 /// </summary>
 [Route("api/patient/search")]
 public class PatientSearchController : BaseApiController
@@ -110,19 +110,20 @@ public class PatientSearchController : BaseApiController
     /// <returns>Paginated list of available slots.</returns>
     [HttpGet("available-slots")]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(ApiResponse<PagedResult<AvailableSlotListDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<AppointmentSlotListDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SearchAvailableSlots(
         [FromQuery] Guid? ophthalmologistId = null,
         [FromQuery] Guid? organisationId = null,
-        [FromQuery] DateTime? fromDate = null,
-        [FromQuery] DateTime? toDate = null,
+        [FromQuery] DateOnly? fromDate = null,
+        [FromQuery] DateOnly? toDate = null,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10)
     {
-        var query = new GetAvailableSlotsQuery
+        var query = new GetAppointmentSlotsQuery
         {
-            OphthalmologistId = ophthalmologistId,
-            OrganisationId = organisationId,
+            OphthalId = ophthalmologistId,
+            OrgId = organisationId,
+            Status = ScheduleStatus.Available,
             FromDate = fromDate,
             ToDate = toDate,
             PageNumber = pageNumber,
@@ -140,11 +141,11 @@ public class PatientSearchController : BaseApiController
     /// <returns>Available slot details.</returns>
     [HttpGet("available-slots/{slotId:guid}")]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(ApiResponse<AvailableSlotDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<AppointmentSlotDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAvailableSlotDetail(Guid slotId)
     {
-        var result = await _mediator.Send(new GetAvailableSlotQuery(slotId));
+        var result = await _mediator.Send(new GetAppointmentSlotQuery(slotId));
         return HandleResult(result);
     }
 }

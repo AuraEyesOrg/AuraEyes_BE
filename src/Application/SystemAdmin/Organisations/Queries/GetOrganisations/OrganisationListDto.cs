@@ -10,6 +10,9 @@ public class OrganisationListDto
     public string? Address { get; set; }
     public string? LicenseNumber { get; set; }
     public string OrgType { get; set; } = string.Empty;
+    public decimal RatingAverage { get; set; }
+    public int RatingCount { get; set; }
+    public string? OwnerAvatarUrl { get; set; }
     public int DeviceCount { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
