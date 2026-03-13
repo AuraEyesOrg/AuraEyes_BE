@@ -1,4 +1,5 @@
 using Domain.Entities.Consultation;
+using Domain.Entities.Scheduling;
 using Domain.Entities.Screening;
 using Domain.Entities.Users;
 using Microsoft.EntityFrameworkCore;
@@ -75,9 +76,15 @@ public class ConsultationSessionConfiguration : IEntityTypeConfiguration<Consult
             .HasForeignKey(e => e.AiScreeningId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(e => e.AppointmentSlot)
+            .WithMany()
+            .HasForeignKey(e => e.AppointmentSlotId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Indexes for common query patterns
         builder.HasIndex(e => e.PatientId);
         builder.HasIndex(e => e.OphthalmologistId);
+        builder.HasIndex(e => e.AppointmentSlotId);
         builder.HasIndex(e => new { e.Status, e.ChatStatus, e.LastActivityAt, e.LastReminderSentAt })
             .HasDatabaseName("IX_ConsultationSessions_StaleSessionLookup");
     }
