@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Consultation;
+using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
 
@@ -12,17 +13,23 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly IRepository<Conversation> _conversationRepository;
     private readonly ICurrentUserService _currentUser;
+    private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
+    private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
 
     public SendMessageCommandHandler(
         IConsultationSessionRepository sessionRepository,
         IRepository<Conversation> conversationRepository,
         ICurrentUserService currentUser,
+        IRepository<Ophthalmologist> ophthalmologistRepository,
+        INotificationService notificationService,
         IUnitOfWork unitOfWork)
     {
         _sessionRepository = sessionRepository;
         _conversationRepository = conversationRepository;
         _currentUser = currentUser;
+        _ophthalmologistRepository = ophthalmologistRepository;
+        _notificationService = notificationService;
         _unitOfWork = unitOfWork;
     }
 
@@ -75,6 +82,30 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         session.RecordActivity();
         await _sessionRepository.UpdateAsync(session, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Send real-time notification to the other party [FR-47]
+        if (isPatient && session.OphthalmologistId.HasValue)
+        {
+            var ophthalmologist = await _ophthalmologistRepository.GetByIdAsync(
+                session.OphthalmologistId.Value,
+                cancellationToken);
+
+            if (ophthalmologist is not null)
+            {
+                // Patient sent message -> Notify Doctor
+                var messagePreview = request.Message.Length > 50
+                    ? request.Message[..50] + "..."
+                    : request.Message;
+
+                await _notificationService.SendAsync(
+                    ophthalmologist.UserId,
+                    "Tin nhắn mới từ bệnh nhân",
+                    $"Bạn có tin nhắn mới: \"{messagePreview}\"",
+                    NotificationType.NewPatientMessage,
+                    new { ConsultationId = session.Id, PatientId = session.PatientId },
+                    cancellationToken);
+            }
+        }
 
         return Result.Success();
     }

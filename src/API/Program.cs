@@ -1,3 +1,4 @@
+using API.Hubs;
 using API.Middleware;
 using API.Services;
 using Application;
@@ -38,6 +39,20 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 builder.Services.AddEndpointsApiExplorer();
+
+var configuredOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>();
+
+var envOrigins = Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS")
+    ?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+var allowedOrigins = (configuredOrigins is { Length: > 0 }
+        ? configuredOrigins
+        : envOrigins) ??
+    (builder.Environment.IsDevelopment()
+        ? new[] { "http://localhost:5173", "http://localhost:4173", "http://localhost:3000" }
+        : Array.Empty<string>());
 
 // Configure Swagger with JWT Bearer authentication
 builder.Services.AddSwaggerGen(options =>
@@ -114,19 +129,35 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// Add CORS
+// Add CORS with SignalR support
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("FrontendCors", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        if (allowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedOrigins);
+        }
+
+        policy.AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 
 // Add Health Checks
 builder.Services.AddHealthChecks();
+
+// Add SignalR for real-time notifications
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+});
+
+// Register SignalR hub service for notification broadcasting
+builder.Services.AddScoped<INotificationHubService, NotificationHubService>();
 
 // Hangfire - Background job processing
 builder.Services.AddHangfire(config => config
@@ -136,7 +167,11 @@ builder.Services.AddHangfire(config => config
     .UsePostgreSqlStorage(options =>
         options.UseNpgsqlConnection(
             builder.Configuration.GetConnectionString("DefaultConnection"))));
-builder.Services.AddHangfireServer();
+builder.Services.AddHangfireServer(options =>
+{
+    // Limit workers to prevent Supabase connection pool exhaustion (MaxClientsInSessionMode)
+    options.WorkerCount = 2;
+});
 
 var app = builder.Build();
 
@@ -183,13 +218,16 @@ app.UseHttpsRedirection();
 // Note: Static files are stored in S3, not wwwroot
 // app.UseStaticFiles(); // Removed - using S3 for file storage
 
-app.UseCors("AllowAll");
+app.UseCors("FrontendCors");
 
 // Add authentication before authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map SignalR hubs for real-time notifications
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.MapHealthChecks("/health");
 
@@ -199,11 +237,21 @@ if (app.Environment.IsDevelopment())
     app.UseHangfireDashboard("/hangfire");
 }
 
+var defaultQuotaResetCron = app.Environment.IsDevelopment()
+    ? "*/2 * * * *"
+    : "0 0 * * *";
+
+var quotaResetCron = Environment.GetEnvironmentVariable("HANGFIRE_DAILY_QUOTA_RESET_CRON");
+if (string.IsNullOrWhiteSpace(quotaResetCron))
+{
+    quotaResetCron = defaultQuotaResetCron;
+}
+
 // Register recurring jobs
 RecurringJob.AddOrUpdate<DailyQuotaResetJob>(
     "daily-quota-reset",
     job => job.ExecuteAsync(),
-    "0 0 * * *", // 00:00 UTC = 07:00 AM Vietnam
+    quotaResetCron,
     new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
 app.Run();
