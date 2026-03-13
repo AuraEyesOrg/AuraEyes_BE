@@ -57,7 +57,7 @@ public class Contract : BaseEntity, IAggregateRoot
 
         SignedDate = DateTime.UtcNow;
         SignedContent = signedContent ?? SignedContent;
-        ScannedDocumentUrl = scannedDocumentUrl;
+        ScannedDocumentUrl = scannedDocumentUrl ?? ScannedDocumentUrl; // preserve doctor's uploaded scan if admin doesn't provide one
         Status = ContractStatus.Active;
         UpdatedAt = DateTime.UtcNow;
     }
