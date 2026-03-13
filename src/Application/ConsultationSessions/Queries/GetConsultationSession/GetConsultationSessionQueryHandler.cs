@@ -2,6 +2,7 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.ConsultationSessions.Common;
+using AutoMapper;
 using Domain.Repositories;
 
 namespace Application.ConsultationSessions.Queries.GetConsultationSession;
@@ -11,13 +12,19 @@ public class GetConsultationSessionQueryHandler
 {
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly ICurrentUserService _currentUser;
+    private readonly IMapper _mapper;
+    private readonly IConsultationParticipantEnrichmentService _participantEnrichmentService;
 
     public GetConsultationSessionQueryHandler(
         IConsultationSessionRepository sessionRepository,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        IMapper mapper,
+        IConsultationParticipantEnrichmentService participantEnrichmentService)
     {
         _sessionRepository = sessionRepository;
         _currentUser = currentUser;
+        _mapper = mapper;
+        _participantEnrichmentService = participantEnrichmentService;
     }
 
     public async Task<Result<ConsultationSessionDto>> Handle(
@@ -47,37 +54,18 @@ public class GetConsultationSessionQueryHandler
         var messages = session.Conversations
             .SelectMany(c => c.Messages)
             .OrderBy(m => m.SentAt)
-            .Select(m => new ChatMessageDto
-            {
-                Id = m.Id,
-                SenderUserId = m.SenderUserId,
-                Message = m.Message,
-                IsRead = m.IsRead,
-                SentAt = m.SentAt,
-            })
+            .Select(m => _mapper.Map<ChatMessageDto>(m))
             .ToList();
 
-        var dto = new ConsultationSessionDto
+        var baseDto = _mapper.Map<ConsultationSessionDto>(session) with
         {
-            Id = session.Id,
-            PatientId = session.PatientId,
-            OphthalmologistId = session.OphthalmologistId,
-            OrganisationId = session.OrganisationId,
-            AiScreeningId = session.AiScreeningId,
-            Type = session.Type,
-            Status = session.Status,
-            ChatStatus = session.ChatStatus,
-            Price = session.Price,
-            AppointmentTime = session.AppointmentTime,
-            MeetingLink = session.MeetingLink,
-            LastActivityAt = session.LastActivityAt,
-            ClosedAt = session.ClosedAt,
-            ClosedBy = session.ClosedBy,
-            ClosingReason = session.ClosingReason,
-            CreatedAt = session.CreatedAt,
-            UpdatedAt = session.UpdatedAt,
             Messages = messages
         };
+
+        var dto = await _participantEnrichmentService.EnrichDetailAsync(
+            baseDto,
+            session,
+            cancellationToken);
 
         return Result<ConsultationSessionDto>.Success(dto);
     }

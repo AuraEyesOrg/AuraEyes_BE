@@ -11,10 +11,14 @@ namespace Application.SystemAdmin.Organisations.Queries.GetOrganisations;
 public class GetOrganisationsQueryHandler : IQueryHandler<GetOrganisationsQuery, PagedResult<OrganisationListDto>>
 {
     private readonly IRepository<Organisation> _organisationRepository;
+    private readonly IIdentityService _identityService;
 
-    public GetOrganisationsQueryHandler(IRepository<Organisation> organisationRepository)
+    public GetOrganisationsQueryHandler(
+        IRepository<Organisation> organisationRepository,
+        IIdentityService identityService)
     {
         _organisationRepository = organisationRepository;
+        _identityService = identityService;
     }
 
     public async Task<Result<PagedResult<OrganisationListDto>>> Handle(
@@ -44,22 +48,32 @@ public class GetOrganisationsQueryHandler : IQueryHandler<GetOrganisationsQuery,
 
         var totalCount = query.Count();
 
-        var items = query
+        var orgPage = query
             .OrderByDescending(x => x.CreatedAt)
             .Skip((request.PageNumber - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(x => new OrganisationListDto
-            {
-                Id = x.Id,
-                Name = x.Name,
-                Address = x.Address,
-                LicenseNumber = x.LicenseNumber,
-                OrgType = x.OrgType.ToString(),
-                DeviceCount = 0, // TODO: join with Device count when available
-                IsActive = !x.IsDeleted,
-                CreatedAt = x.CreatedAt
-            })
             .ToList();
+
+        var items = new List<OrganisationListDto>(orgPage.Count);
+        foreach (var org in orgPage)
+        {
+            var owner = await _identityService.GetUserByIdAsync(org.OwnerId, cancellationToken);
+
+            items.Add(new OrganisationListDto
+            {
+                Id = org.Id,
+                Name = org.Name,
+                Address = org.Address,
+                LicenseNumber = org.LicenseNumber,
+                OrgType = org.OrgType.ToString(),
+                RatingAverage = org.RatingAverage,
+                RatingCount = org.RatingCount,
+                OwnerAvatarUrl = owner?.AvatarUrl,
+                DeviceCount = 0, // TODO: join with Device count when available
+                IsActive = !org.IsDeleted,
+                CreatedAt = org.CreatedAt
+            });
+        }
 
         var pagedResult = new PagedResult<OrganisationListDto>(
             items, totalCount, request.PageNumber, request.PageSize);

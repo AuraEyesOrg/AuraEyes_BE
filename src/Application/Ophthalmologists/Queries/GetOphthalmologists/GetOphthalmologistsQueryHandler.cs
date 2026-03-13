@@ -44,6 +44,7 @@ public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologists
                 UserId = ophthalmologist.UserId,
                 UserFullName = user?.FullName,
                 UserEmail = user?.Email,
+                UserAvatarUrl = user?.AvatarUrl,
                 Bio = ophthalmologist.Bio,
                 YearsOfExperience = ophthalmologist.YearsOfExperience,
                 IsVerified = ophthalmologist.IsVerified,

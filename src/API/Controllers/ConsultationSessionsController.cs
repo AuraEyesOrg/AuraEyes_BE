@@ -13,6 +13,7 @@ using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Application.Common.Interfaces;
 
 namespace API.Controllers;
 
@@ -24,10 +25,14 @@ namespace API.Controllers;
 public class ConsultationSessionsController : BaseApiController
 {
     private readonly IMediator _mediator;
+    private readonly ICurrentUserService _currentUser;
 
-    public ConsultationSessionsController(IMediator mediator)
+    public ConsultationSessionsController(
+        IMediator mediator,
+        ICurrentUserService currentUser)
     {
         _mediator = mediator;
+        _currentUser = currentUser;
     }
 
     /// <summary>
@@ -173,10 +178,15 @@ public class ConsultationSessionsController : BaseApiController
         Guid sessionId,
         [FromBody] SendMessageRequest request)
     {
+        if (!_currentUser.ProfileId.HasValue)
+        {
+            return Unauthorized(ApiResponseFactory.Unauthorized(
+                "Authenticated profile is required to send messages."));
+        }
+
         var command = new SendMessageCommand
         {
             SessionId = sessionId,
-            SenderUserId = request.SenderUserId,
             Message = request.Message
         };
 
@@ -259,7 +269,6 @@ public record SubmitVerificationReportRequest
 
 public record SendMessageRequest
 {
-    public Guid SenderUserId { get; init; }
     public string Message { get; init; } = string.Empty;
 }
 
