@@ -52,7 +52,9 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<ConsultationSession> ConsultationSessions => Set<ConsultationSession>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
-    public DbSet<Feedback> Feedbacks => Set<Feedback>();
+    public DbSet<WebsiteFeedback> WebsiteFeedbacks => Set<WebsiteFeedback>();
+    public DbSet<OrganisationFeedback> OrganisationFeedbacks => Set<OrganisationFeedback>();
+    public DbSet<OphthalmologistFeedback> OphthalmologistFeedbacks => Set<OphthalmologistFeedback>();
 
     // Scheduling
     public DbSet<ScheduleTemplate> ScheduleTemplates => Set<ScheduleTemplate>();
