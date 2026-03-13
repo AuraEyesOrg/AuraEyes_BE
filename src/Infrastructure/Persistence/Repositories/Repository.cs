@@ -39,7 +39,19 @@ public class Repository<T> : IRepository<T> where T : BaseEntity, IAggregateRoot
 
     public virtual Task UpdateAsync(T entity, CancellationToken cancellationToken = default)
     {
-        _dbSet.Update(entity);
+        var entry = _context.Entry(entity);
+
+        if (entry.State == EntityState.Detached)
+        {
+            _dbSet.Attach(entity);
+            entry = _context.Entry(entity);
+        }
+
+        entry.State = EntityState.Modified;
+
+        // Keep immutable audit fields untouched on updates.
+        entry.Property(nameof(BaseEntity.CreatedAt)).IsModified = false;
+        entry.Property(nameof(BaseEntity.CreatedBy)).IsModified = false;
         return Task.CompletedTask;
     }
 
