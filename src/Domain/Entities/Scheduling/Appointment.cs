@@ -17,7 +17,7 @@ namespace Domain.Entities.Scheduling;
 ///   
 /// Flow 2 - CLINIC_VISIT:
 ///   - OrganisationId is required
-///   - DoctorId is NULL (assigned later at clinic)
+///   - DoctorId is NULL
 ///   - Slot capacity may be > 1
 ///   - No ConsultationSession created by platform
 /// </summary>
@@ -41,7 +41,7 @@ public class Appointment : BaseEntity, IAggregateRoot
     /// <summary>
     /// FK to Ophthalmologist.
     /// - ONLINE_CONSULTATION: Required, set at booking time
-    /// - CLINIC_VISIT: Nullable, assigned at check-in
+/// - CLINIC_VISIT: Must remain NULL
     /// </summary>
     public Guid? DoctorId { get; private set; }
 
@@ -131,7 +131,7 @@ public class Appointment : BaseEntity, IAggregateRoot
             PatientId = patientId,
             AppointmentSlotId = appointmentSlotId,
             OrganisationId = organisationId,
-            DoctorId = null, // Assigned later at clinic
+            DoctorId = null,
             VisitReason = visitReason,
             Status = AppointmentStatus.Pending
         };
@@ -180,20 +180,6 @@ public class Appointment : BaseEntity, IAggregateRoot
     }
 
     /// <summary>
-    /// Assign a doctor to this appointment.
-    /// For CLINIC_VISIT: Done at check-in time.
-    /// For ONLINE_CONSULTATION: Should already have a doctor, but can be reassigned.
-    /// </summary>
-    public void AssignDoctor(Guid doctorId)
-    {
-        if (Status == AppointmentStatus.Cancelled || Status == AppointmentStatus.NoShow)
-            throw new InvalidOperationException($"Cannot assign doctor to {Status} appointment.");
-
-        DoctorId = doctorId;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    /// <summary>
     /// Start the consultation.
     /// </summary>
     public void Start()
@@ -204,7 +190,7 @@ public class Appointment : BaseEntity, IAggregateRoot
         if (Type == AppointmentType.OnlineConsultation && Status != AppointmentStatus.Confirmed)
             throw new InvalidOperationException("Online consultation must be confirmed before starting.");
 
-        if (!DoctorId.HasValue)
+        if (Type == AppointmentType.OnlineConsultation && !DoctorId.HasValue)
             throw new InvalidOperationException("Cannot start appointment without assigned doctor.");
 
         Status = AppointmentStatus.InProgress;

@@ -8,6 +8,13 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
 {
     public void Configure(EntityTypeBuilder<Appointment> builder)
     {
+        builder.ToTable("Appointments", tableBuilder =>
+        {
+            tableBuilder.HasCheckConstraint(
+                "CK_Appointments_ClinicVisit_DoctorId_Null",
+                "\"Type\" <> 'ClinicVisit' OR \"DoctorId\" IS NULL");
+        });
+
         builder.Property(e => e.Type)
             .HasConversion<string>()
             .HasMaxLength(30);
