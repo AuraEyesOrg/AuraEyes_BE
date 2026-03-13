@@ -81,7 +81,8 @@ public class CreateDepositCommandHandler : ICommandHandler<CreateDepositCommand,
 
             // Update deposit request with payment link info
             depositRequest.SetPaymentLink(paymentUrl, orderCode);
-            await _depositRequestRepository.UpdateAsync(depositRequest, cancellationToken);
+            // The entity is already tracked after AddAsync + SaveChangesAsync.
+            // Calling Update here can mark immutable audit fields as modified and cause EF to treat it as Added.
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(
