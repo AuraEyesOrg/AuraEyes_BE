@@ -551,15 +551,25 @@ public class AuthService : IAuthService
 
         _logger.LogInformation("User logged in: {Email}", user.Email);
 
-        // Enrich UserInfoResponse with ophthalmologist verification status
+        // Resolve role-specific profile entity (PatientId / OphthalmologistId)
+        Guid? roleId = null;
         bool? isVerified = null;
         string? verificationStatus = null;
-        if (roles.Contains(Roles.Ophthalmologist))
+
+        if (roles.Contains(Roles.Patient))
+        {
+            var patients = await _patientRepository.FindAsync(
+                p => p.UserId == user.Id, cancellationToken);
+            if (patients.Count > 0)
+                roleId = patients[0].Id;
+        }
+        else if (roles.Contains(Roles.Ophthalmologist))
         {
             var doctors = await _ophthalmologistRepository.FindAsync(
                 o => o.UserId == user.Id, cancellationToken);
             if (doctors.Count > 0)
             {
+                roleId = doctors[0].Id;
                 isVerified = doctors[0].IsVerified;
                 verificationStatus = doctors[0].VerificationStatus.ToString();
             }
@@ -580,6 +590,7 @@ public class AuthService : IAuthService
                 Roles = roles.ToArray(),
                 EmailConfirmed = user.EmailConfirmed,
                 OrganizationId = user.OrganizationId,
+                RoleId = roleId,
                 TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus
@@ -654,15 +665,25 @@ public class AuthService : IAuthService
 
             _logger.LogInformation("Token refreshed for user: {UserId}", user.Id);
 
-            // Enrich UserInfoResponse with ophthalmologist verification status
+            // Resolve role-specific profile entity (PatientId / OphthalmologistId)
+            Guid? roleId = null;
             bool? isVerified = null;
             string? verificationStatus = null;
-            if (roles.Contains(Roles.Ophthalmologist))
+
+            if (roles.Contains(Roles.Patient))
+            {
+                var patients = await _patientRepository.FindAsync(
+                    p => p.UserId == user.Id, cancellationToken);
+                if (patients.Count > 0)
+                    roleId = patients[0].Id;
+            }
+            else if (roles.Contains(Roles.Ophthalmologist))
             {
                 var doctors = await _ophthalmologistRepository.FindAsync(
                     o => o.UserId == user.Id, cancellationToken);
                 if (doctors.Count > 0)
                 {
+                    roleId = doctors[0].Id;
                     isVerified = doctors[0].IsVerified;
                     verificationStatus = doctors[0].VerificationStatus.ToString();
                 }
@@ -682,6 +703,7 @@ public class AuthService : IAuthService
                     Roles = roles.ToArray(),
                     EmailConfirmed = user.EmailConfirmed,
                     OrganizationId = user.OrganizationId,
+                    RoleId = roleId,
                     TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
                     IsVerified = isVerified,
                     VerificationStatus = verificationStatus
@@ -847,15 +869,25 @@ public class AuthService : IAuthService
             var roles = await _identityService.GetUserRolesAsync(userId);
             var twoFactorEnabled = await _identityService.IsTwoFactorEnabledAsync(userId);
 
-            // Enrich with ophthalmologist verification status
+            // Resolve role-specific profile entity (PatientId / OphthalmologistId)
+            Guid? roleId = null;
             bool? isVerified = null;
             string? verificationStatus = null;
-            if (roles.Contains(Roles.Ophthalmologist))
+
+            if (roles.Contains(Roles.Patient))
+            {
+                var patients = await _patientRepository.FindAsync(
+                    p => p.UserId == userId, cancellationToken);
+                if (patients.Count > 0)
+                    roleId = patients[0].Id;
+            }
+            else if (roles.Contains(Roles.Ophthalmologist))
             {
                 var doctors = await _ophthalmologistRepository.FindAsync(
                     o => o.UserId == userId, cancellationToken);
                 if (doctors.Count > 0)
                 {
+                    roleId = doctors[0].Id;
                     isVerified = doctors[0].IsVerified;
                     verificationStatus = doctors[0].VerificationStatus.ToString();
                 }
@@ -870,6 +902,7 @@ public class AuthService : IAuthService
                 Roles = roles.ToArray(),
                 EmailConfirmed = userDto.EmailConfirmed,
                 OrganizationId = userDto.OrganizationId,
+                RoleId = roleId,
                 TwoFactorEnabled = twoFactorEnabled,
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus

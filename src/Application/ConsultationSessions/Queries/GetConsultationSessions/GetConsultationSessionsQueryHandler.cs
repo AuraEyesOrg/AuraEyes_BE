@@ -2,6 +2,7 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.ConsultationSessions.Common;
+using AutoMapper;
 using Domain.Repositories;
 
 namespace Application.ConsultationSessions.Queries.GetConsultationSessions;
@@ -11,13 +12,19 @@ public class GetConsultationSessionsQueryHandler
 {
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly ICurrentUserService _currentUser;
+    private readonly IMapper _mapper;
+    private readonly IConsultationParticipantEnrichmentService _participantEnrichmentService;
 
     public GetConsultationSessionsQueryHandler(
         IConsultationSessionRepository sessionRepository,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        IMapper mapper,
+        IConsultationParticipantEnrichmentService participantEnrichmentService)
     {
         _sessionRepository = sessionRepository;
         _currentUser = currentUser;
+        _mapper = mapper;
+        _participantEnrichmentService = participantEnrichmentService;
     }
 
     public async Task<Result<PagedResult<ConsultationSessionListDto>>> Handle(
@@ -38,22 +45,14 @@ public class GetConsultationSessionsQueryHandler
             request.PageSize,
             cancellationToken);
 
-        var dtoList = items.Select(s => new ConsultationSessionListDto
-        {
-            Id = s.Id,
-            PatientId = s.PatientId,
-            OphthalmologistId = s.OphthalmologistId,
-            Type = s.Type,
-            Status = s.Status,
-            ChatStatus = s.ChatStatus,
-            Price = s.Price,
-            AppointmentTime = s.AppointmentTime,
-            LastActivityAt = s.LastActivityAt,
-            CreatedAt = s.CreatedAt
-        }).ToList();
+        var baseDtos = _mapper.Map<List<ConsultationSessionListDto>>(items);
+        var dtoList = await _participantEnrichmentService.EnrichListAsync(
+            baseDtos,
+            items,
+            cancellationToken);
 
         var pagedResult = new PagedResult<ConsultationSessionListDto>(
-            dtoList, totalCount, request.PageNumber, request.PageSize);
+            dtoList.ToList(), totalCount, request.PageNumber, request.PageSize);
 
         return Result<PagedResult<ConsultationSessionListDto>>.Success(pagedResult);
     }
