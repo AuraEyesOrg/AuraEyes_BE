@@ -75,6 +75,7 @@ public class CreateVideoCallSessionCommandHandler
             request.Price,
             request.AppointmentTime,
             request.OphthalmologistId,
+            appointmentSlotId: null,
             meetingInfo.MeetingLink,
             meetingInfo.CalendarEventId);
 

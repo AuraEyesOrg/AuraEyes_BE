@@ -52,11 +52,14 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<ConsultationSession> ConsultationSessions => Set<ConsultationSession>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
-    public DbSet<Feedback> Feedbacks => Set<Feedback>();
+    public DbSet<WebsiteFeedback> WebsiteFeedbacks => Set<WebsiteFeedback>();
+    public DbSet<OrganisationFeedback> OrganisationFeedbacks => Set<OrganisationFeedback>();
+    public DbSet<OphthalmologistFeedback> OphthalmologistFeedbacks => Set<OphthalmologistFeedback>();
 
     // Scheduling
-    public DbSet<Schedule> Schedules => Set<Schedule>();
-    public DbSet<AvailableSlot> AvailableSlots => Set<AvailableSlot>();
+    public DbSet<ScheduleTemplate> ScheduleTemplates => Set<ScheduleTemplate>();
+    public DbSet<AppointmentSlot> AppointmentSlots => Set<AppointmentSlot>();
+    public DbSet<Appointment> Appointments => Set<Appointment>();
 
     // Financial
     public DbSet<Wallet> Wallets => Set<Wallet>();
