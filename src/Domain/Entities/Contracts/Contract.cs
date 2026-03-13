@@ -57,8 +57,20 @@ public class Contract : BaseEntity, IAggregateRoot
 
         SignedDate = DateTime.UtcNow;
         SignedContent = signedContent ?? SignedContent;
-        ScannedDocumentUrl = scannedDocumentUrl;
+        ScannedDocumentUrl = scannedDocumentUrl ?? ScannedDocumentUrl; // preserve doctor's uploaded scan if admin doesn't provide one
         Status = ContractStatus.Active;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Upload the scanned signed document without activating the contract (remains PendingSignature for admin review).</summary>
+    public void UploadScannedDocument(string scannedDocumentUrl)
+    {
+        if (Status != ContractStatus.PendingSignature)
+            throw new InvalidOperationException("Only contracts pending signature can receive uploads.");
+        if (string.IsNullOrWhiteSpace(scannedDocumentUrl))
+            throw new ArgumentException("Scanned document URL cannot be empty.", nameof(scannedDocumentUrl));
+
+        ScannedDocumentUrl = scannedDocumentUrl;
         UpdatedAt = DateTime.UtcNow;
     }
 

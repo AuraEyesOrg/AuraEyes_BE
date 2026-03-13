@@ -21,4 +21,6 @@ public interface IContractRepository : IRepository<Contract>
         string contractNumber,
         Guid? excludeId = null,
         CancellationToken cancellationToken = default);
+
+    Task<Contract?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
 }

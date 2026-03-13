@@ -11,6 +11,7 @@ using Infrastructure.Persistence.Interceptors;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.Services;
 using Infrastructure.Settings;
+using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -26,7 +27,11 @@ public static class DependencyInjection
     {
         // Register audit interceptor
         services.AddScoped<AuditInterceptor>();
-
+      
+        // Register MediatR handlers that live in this assembly (query handlers, etc.)
+        services.AddMediatR(cfg =>
+            cfg.RegisterServicesFromAssembly(typeof(DependencyInjection).Assembly));
+      
         // Database configuration
         services.AddDbContext<ApplicationDbContext>((sp, options) =>
         {
