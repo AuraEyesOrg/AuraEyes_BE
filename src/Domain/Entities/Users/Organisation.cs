@@ -13,6 +13,8 @@ public class Organisation : BaseEntity, IAggregateRoot
     public string? Address { get; private set; }
     public string? LicenseNumber { get; private set; }
     public OrgType OrgType { get; private set; }
+    public decimal RatingAverage { get; private set; }
+    public int RatingCount { get; private set; }
 
     private Organisation() { } // EF Core
 
@@ -26,6 +28,8 @@ public class Organisation : BaseEntity, IAggregateRoot
         OrgType = orgType;
         Address = address;
         LicenseNumber = licenseNumber;
+        RatingAverage = 0m;
+        RatingCount = 0;
     }
 
     public void UpdateDetails(string name, string? address, string? licenseNumber)
@@ -42,6 +46,17 @@ public class Organisation : BaseEntity, IAggregateRoot
     public void ChangeOrgType(OrgType orgType)
     {
         OrgType = orgType;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void ApplyNewRating(int rating)
+    {
+        if (rating < 1 || rating > 5)
+            throw new ArgumentException("Rating must be between 1 and 5", nameof(rating));
+
+        var total = (RatingAverage * RatingCount) + rating;
+        RatingCount += 1;
+        RatingAverage = Math.Round(total / RatingCount, 2, MidpointRounding.AwayFromZero);
         UpdatedAt = DateTime.UtcNow;
     }
 }

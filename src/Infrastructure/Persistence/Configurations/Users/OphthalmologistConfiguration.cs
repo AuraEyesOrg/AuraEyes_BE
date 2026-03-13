@@ -35,6 +35,13 @@ public class OphthalmologistConfiguration : IEntityTypeConfiguration<Ophthalmolo
         builder.Property(e => e.RejectionReason)
             .HasMaxLength(1000);
 
+        builder.Property(e => e.RatingAverage)
+            .HasPrecision(4, 2)
+            .HasDefaultValue(0m);
+
+        builder.Property(e => e.RatingCount)
+            .HasDefaultValue(0);
+
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
