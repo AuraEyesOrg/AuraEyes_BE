@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Platform;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.Notifications.Queries.GetMyNotifications;
 
@@ -30,28 +31,25 @@ public class GetMyNotificationsQueryHandler : IQueryHandler<GetMyNotificationsQu
 
         var userId = _currentUser.UserId.Value;
 
-        // Get all notifications for user
-        var allNotifications = await _notificationRepository.FindAsync(
-            n => n.UserId == userId, 
-            cancellationToken);
+        var baseQuery = _notificationRepository
+            .Query()
+            .AsNoTracking()
+            .Where(n => n.UserId == userId);
 
-        // Order by CreatedAt descending
-        var orderedNotifications = allNotifications
-            .OrderByDescending(n => n.CreatedAt)
-            .ToList();
-
-        // Get total count
-        var totalCount = orderedNotifications.Count;
-
-        // Get unread count
-        var unreadCount = orderedNotifications.Count(n => !n.IsRead);
+        var totalCount = await baseQuery.CountAsync(cancellationToken);
+        var unreadCount = await baseQuery.CountAsync(n => !n.IsRead, cancellationToken);
 
         // Calculate pagination
-        var totalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize);
-        var pageNumber = Math.Max(1, Math.Min(request.PageNumber, Math.Max(1, totalPages)));
+        var totalPages = totalCount == 0
+            ? 0
+            : (int)Math.Ceiling(totalCount / (double)request.PageSize);
+
+        var maxPage = Math.Max(1, totalPages);
+        var pageNumber = Math.Max(1, Math.Min(request.PageNumber, maxPage));
 
         // Get paginated items
-        var items = orderedNotifications
+        var items = await baseQuery
+            .OrderByDescending(n => n.CreatedAt)
             .Skip((pageNumber - 1) * request.PageSize)
             .Take(request.PageSize)
             .Select(n => new NotificationDto
@@ -65,7 +63,7 @@ public class GetMyNotificationsQueryHandler : IQueryHandler<GetMyNotificationsQu
                 Payload = n.Payload,
                 CreatedAt = n.CreatedAt
             })
-            .ToList();
+            .ToListAsync(cancellationToken);
 
         return Result<PaginatedNotificationsResponse>.Success(new PaginatedNotificationsResponse
         {

@@ -71,6 +71,7 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
             await _walletRepository.UpdateAsync(wallet, cancellationToken);
 
             // Create wallet transactions (one per bundle for audit trail)
+            Guid? lastTransactionId = null;
             for (var i = 0; i < request.NumberOfBundles; i++)
             {
                 var transaction = new WalletTransaction(
@@ -81,6 +82,7 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
                     "AiQuota");
 
                 await _walletRepository.AddTransactionAsync(transaction, cancellationToken);
+                lastTransactionId = transaction.Id;
             }
 
             // Add purchased quota credits to the entity (Patient or Organisation)
@@ -97,15 +99,23 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
             var updatedQuota = await _quotaService.GetQuotaAsync(userId, role, cancellationToken);
 
             // Send real-time notification for successful payment [FR-49]
-            // Create a dummy transaction ID for tracking (last transaction created)
-            var transactionId = Guid.NewGuid(); // Use a representative ID
-            await _notificationService.SendAsync(
-                userId,
-                "Thanh toán thành công",
-                $"Bạn đã mua {totalCredits} lượt AI screening với giá {totalCost:N0} VND. Số dư còn lại: {wallet.Balance:N0} VND",
-                NotificationType.WalletPaymentProcessed,
-                new { TransactionId = transactionId, Amount = totalCost, Action = "AI Quota Purchase" },
-                cancellationToken);
+            try
+            {
+                await _notificationService.SendAsync(
+                    userId,
+                    "Thanh toán thành công",
+                    $"Bạn đã mua {totalCredits} lượt AI screening với giá {totalCost:N0} VND. Số dư còn lại: {wallet.Balance:N0} VND",
+                    NotificationType.WalletPaymentProcessed,
+                    new { TransactionId = lastTransactionId, Amount = totalCost, Action = "AI Quota Purchase" },
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to send AI quota purchase notification for user {UserId}",
+                    userId);
+            }
 
             return Result<BuyAiQuotaResponse>.Success(new BuyAiQuotaResponse
             {

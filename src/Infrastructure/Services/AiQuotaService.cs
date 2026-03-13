@@ -24,12 +24,12 @@ public class AiQuotaService : IAiQuotaService
 
     public async Task<AiQuotaDto> GetQuotaAsync(Guid userId, string role, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("[AiQuotaService] GetQuotaAsync called — UserId: {UserId}, Role: {Role}", userId, role);
+        _logger.LogDebug("[AiQuotaService] GetQuotaAsync called — UserId: {UserId}, Role: {Role}", userId, role);
 
         if (string.Equals(role, "Patient", StringComparison.OrdinalIgnoreCase))
             return await GetPatientQuotaAsync(userId, cancellationToken);
 
-        if (string.Equals(role, "Ophthalmologist", StringComparison.OrdinalIgnoreCase))
+        if (IsOrganisationQuotaRole(role))
             return await GetOrgQuotaAsync(userId, cancellationToken);
 
         _logger.LogWarning("[AiQuotaService] Unrecognized role '{Role}' for user {UserId} — returning None quota", role, userId);
@@ -88,7 +88,7 @@ public class AiQuotaService : IAiQuotaService
             };
         }
 
-        _logger.LogInformation(
+        _logger.LogDebug(
             "[AiQuotaService] Patient {PatientId} found — PurchasedAiQuota: {Purchased}, UsedAiQuota: {Used}, FreeQuota: {Free}",
             patient.Id, patient.PurchasedAiQuota, patient.UsedAiQuota, freeQuota);
 
@@ -147,7 +147,7 @@ public class AiQuotaService : IAiQuotaService
 
             patient.IncrementUsedQuota();
         }
-        else if (string.Equals(role, "Ophthalmologist", StringComparison.OrdinalIgnoreCase))
+        else if (IsOrganisationQuotaRole(role))
         {
             var user = await _context.Users
                 .AsNoTracking()
@@ -176,7 +176,7 @@ public class AiQuotaService : IAiQuotaService
 
             patient.AddPurchasedQuota(amount);
         }
-        else if (string.Equals(role, "Ophthalmologist", StringComparison.OrdinalIgnoreCase))
+        else if (IsOrganisationQuotaRole(role))
         {
             var user = await _context.Users
                 .AsNoTracking()
@@ -211,5 +211,11 @@ public class AiQuotaService : IAiQuotaService
             .FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
 
         return setting is not null && decimal.TryParse(setting.Value, out var value) ? value : defaultValue;
+    }
+
+    private static bool IsOrganisationQuotaRole(string role)
+    {
+        return string.Equals(role, "Ophthalmologist", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(role, "OrgAdmin", StringComparison.OrdinalIgnoreCase);
     }
 }

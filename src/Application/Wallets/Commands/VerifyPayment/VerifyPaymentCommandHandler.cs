@@ -140,13 +140,23 @@ public class VerifyPaymentCommandHandler : ICommandHandler<VerifyPaymentCommand,
                     depositRequest.Id, wallet.Id, depositRequest.Amount, wallet.Balance);
 
                 // Send real-time notification for successful deposit [FR-49]
-                await _notificationService.SendAsync(
-                    depositRequest.UserId,
-                    "Nạp tiền thành công",
-                    $"Bạn đã nạp {depositRequest.Amount:N0} VND vào ví. Số dư mới: {wallet.Balance:N0} VND",
-                    NotificationType.WalletDepositSuccess,
-                    new { TransactionId = transaction.Id, Amount = depositRequest.Amount, Action = "Deposit" },
-                    cancellationToken);
+                try
+                {
+                    await _notificationService.SendAsync(
+                        depositRequest.UserId,
+                        "Nạp tiền thành công",
+                        $"Bạn đã nạp {depositRequest.Amount:N0} VND vào ví. Số dư mới: {wallet.Balance:N0} VND",
+                        NotificationType.WalletDepositSuccess,
+                        new { TransactionId = transaction.Id, Amount = depositRequest.Amount, Action = "Deposit" },
+                        cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Failed to send wallet deposit notification for DepositRequest {DepositRequestId}",
+                        depositRequest.Id);
+                }
 
                 return Result<VerifyPaymentResponse>.Success(new VerifyPaymentResponse
                 {

@@ -3,6 +3,7 @@ using Application.Common.Models;
 using Application.ConsultationSessions.Commands.CreateVerificationSession;
 using Domain.Common;
 using Domain.Entities.Consultation;
+using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
 using FluentAssertions;
@@ -13,6 +14,7 @@ namespace Application.UnitTests.Handlers;
 public class CreateVerificationSessionCommandHandlerTests
 {
     private readonly IConsultationSessionRepository _sessionRepository;
+    private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly CreateVerificationSessionCommandHandler _handler;
@@ -20,11 +22,13 @@ public class CreateVerificationSessionCommandHandlerTests
     public CreateVerificationSessionCommandHandlerTests()
     {
         _sessionRepository = Substitute.For<IConsultationSessionRepository>();
+        _ophthalmologistRepository = Substitute.For<IRepository<Ophthalmologist>>();
         _notificationService = Substitute.For<INotificationService>();
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _handler = new CreateVerificationSessionCommandHandler(
-            _sessionRepository, 
-            _notificationService, 
+            _sessionRepository,
+            _ophthalmologistRepository,
+            _notificationService,
             _unitOfWork);
     }
 

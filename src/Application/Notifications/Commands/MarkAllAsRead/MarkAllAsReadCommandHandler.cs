@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Platform;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.Notifications.Commands.MarkAllAsRead;
 
@@ -12,16 +13,13 @@ public class MarkAllAsReadCommandHandler : ICommandHandler<MarkAllAsReadCommand>
 {
     private readonly IRepository<Notification> _notificationRepository;
     private readonly ICurrentUserService _currentUser;
-    private readonly IUnitOfWork _unitOfWork;
 
     public MarkAllAsReadCommandHandler(
         IRepository<Notification> notificationRepository,
-        ICurrentUserService currentUser,
-        IUnitOfWork unitOfWork)
+        ICurrentUserService currentUser)
     {
         _notificationRepository = notificationRepository;
         _currentUser = currentUser;
-        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(
@@ -33,22 +31,14 @@ public class MarkAllAsReadCommandHandler : ICommandHandler<MarkAllAsReadCommand>
 
         var userId = _currentUser.UserId.Value;
 
-        // Get all unread notifications for user
-        var unreadNotifications = await _notificationRepository.FindAsync(
-            n => n.UserId == userId && !n.IsRead,
-            cancellationToken);
-
-        if (unreadNotifications.Count == 0)
-            return Result.Success();
-
-        // Mark each as read
-        foreach (var notification in unreadNotifications)
-        {
-            notification.MarkAsRead();
-            await _notificationRepository.UpdateAsync(notification, cancellationToken);
-        }
-
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _notificationRepository
+            .Query()
+            .Where(n => n.UserId == userId && !n.IsRead)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(n => n.IsRead, true)
+                    .SetProperty(n => n.UpdatedAt, DateTime.UtcNow),
+                cancellationToken);
 
         return Result.Success();
     }

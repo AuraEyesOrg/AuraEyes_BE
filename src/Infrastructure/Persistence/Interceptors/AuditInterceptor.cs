@@ -15,6 +15,25 @@ public class AuditInterceptor : SaveChangesInterceptor
 {
     private readonly ICurrentUserService _currentUserService;
 
+    private static readonly HashSet<string> SensitiveProperties = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "PasswordHash",
+        "SecurityStamp",
+        "ConcurrencyStamp",
+        "TwoFactorEnabled",
+        "AccessFailedCount",
+        "LockoutEnd",
+        "LockoutEnabled",
+        "NormalizedEmail",
+        "NormalizedUserName",
+        "PhoneNumberConfirmed",
+        "EmailConfirmed",
+        "RefreshToken",
+        "Token",
+        "Secret",
+        "SecretKey"
+    };
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = false,
@@ -128,9 +147,13 @@ public class AuditInterceptor : SaveChangesInterceptor
 
     private static string? SerializeProperties(Dictionary<string, object?> properties)
     {
-        if (properties.Count == 0)
+        var sanitizedProperties = properties
+            .Where(x => !SensitiveProperties.Contains(x.Key))
+            .ToDictionary(x => x.Key, x => x.Value);
+
+        if (sanitizedProperties.Count == 0)
             return null;
 
-        return JsonSerializer.Serialize(properties, JsonOptions);
+        return JsonSerializer.Serialize(sanitizedProperties, JsonOptions);
     }
 }

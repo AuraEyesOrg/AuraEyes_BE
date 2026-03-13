@@ -37,11 +37,11 @@ public class AdminQueryService : IAdminQueryService
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
-            var term = searchTerm.ToLower();
+            var term = $"%{searchTerm.Trim()}%";
             query = query.Where(x =>
-                x.User.FullName.ToLower().Contains(term) ||
-                x.User.Email!.ToLower().Contains(term) ||
-                (x.Ophthalmologist.Phone != null && x.Ophthalmologist.Phone.Contains(term)));
+                EF.Functions.ILike(x.User.FullName, term) ||
+                (x.User.Email != null && EF.Functions.ILike(x.User.Email, term)) ||
+                (x.Ophthalmologist.Phone != null && EF.Functions.ILike(x.Ophthalmologist.Phone, term)));
         }
 
         if (!string.IsNullOrWhiteSpace(verificationStatus))
@@ -96,10 +96,10 @@ public class AdminQueryService : IAdminQueryService
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
-            var term = searchTerm.ToLower();
+            var term = $"%{searchTerm.Trim()}%";
             query = query.Where(x =>
-                x.User.FullName.ToLower().Contains(term) ||
-                x.User.Email!.ToLower().Contains(term));
+                EF.Functions.ILike(x.User.FullName, term) ||
+                (x.User.Email != null && EF.Functions.ILike(x.User.Email, term)));
         }
 
         if (!string.IsNullOrWhiteSpace(status))
@@ -158,12 +158,12 @@ public class AdminQueryService : IAdminQueryService
         // Apply filters
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
-            var term = searchTerm.ToLower();
+            var term = $"%{searchTerm.Trim()}%";
             query = query.Where(x =>
-                x.Log.Action.ToLower().Contains(term) ||
-                x.Log.EntityName.ToLower().Contains(term) ||
-                (x.Log.EntityId != null && x.Log.EntityId.ToLower().Contains(term)) ||
-                (x.User != null && x.User.Email!.ToLower().Contains(term)));
+                EF.Functions.ILike(x.Log.Action, term) ||
+                EF.Functions.ILike(x.Log.EntityName, term) ||
+                (x.Log.EntityId != null && EF.Functions.ILike(x.Log.EntityId, term)) ||
+                (x.User != null && x.User.Email != null && EF.Functions.ILike(x.User.Email, term)));
         }
 
         if (!string.IsNullOrWhiteSpace(action))

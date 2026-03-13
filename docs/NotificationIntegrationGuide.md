@@ -40,17 +40,17 @@ This guide explains how to integrate real-time notifications into new features o
 
 All notification types are defined in `Domain/Enums/NotificationType.cs`:
 
-| Enum Value | FR | Description | Expected Payload |
-|------------|-----|-------------|------------------|
-| `AiScreeningCompleted` | FR-45 | Patient receives AI screening result | `{ ScreeningId, ResultStatus }` |
-| `ConsultationAccepted` | FR-46 | Doctor accepts consultation | `{ ConsultationId, DoctorId }` |
-| `ConsultationResultProvided` | FR-46 | Doctor provides consultation result | `{ ConsultationId, DoctorId }` |
-| `NewConsultationRequest` | FR-47 | Doctor receives new consultation | `{ ConsultationId, PatientId }` |
-| `NewPatientMessage` | FR-47 | Doctor receives patient message | `{ ConsultationId, PatientId }` |
-| `NewAppointmentBooked` | FR-48 | Admin receives new appointment | `{ AppointmentId, Action }` |
-| `ScheduleChanged` | FR-48 | Admin receives schedule change | `{ AppointmentId, Action }` |
-| `WalletDepositSuccess` | FR-49 | User successfully deposits | `{ TransactionId, Amount, Action }` |
-| `WalletPaymentProcessed` | FR-49 | User payment processed | `{ TransactionId, Amount, Action }` |
+| Enum Value                   | FR    | Description                          | Expected Payload                    |
+| ---------------------------- | ----- | ------------------------------------ | ----------------------------------- |
+| `AiScreeningCompleted`       | FR-45 | Patient receives AI screening result | `{ ScreeningId, ResultStatus }`     |
+| `ConsultationAccepted`       | FR-46 | Doctor accepts consultation          | `{ ConsultationId, DoctorId }`      |
+| `ConsultationResultProvided` | FR-46 | Doctor provides consultation result  | `{ ConsultationId, DoctorId }`      |
+| `NewConsultationRequest`     | FR-47 | Doctor receives new consultation     | `{ ConsultationId, PatientId }`     |
+| `NewPatientMessage`          | FR-47 | Doctor receives patient message      | `{ ConsultationId, PatientId }`     |
+| `NewAppointmentBooked`       | FR-48 | Admin receives new appointment       | `{ AppointmentId, Action }`         |
+| `ScheduleChanged`            | FR-48 | Admin receives schedule change       | `{ AppointmentId, Action }`         |
+| `WalletDepositSuccess`       | FR-49 | User successfully deposits           | `{ TransactionId, Amount, Action }` |
+| `WalletPaymentProcessed`     | FR-49 | User payment processed               | `{ TransactionId, Amount, Action }` |
 
 ## Integration Steps
 
@@ -122,7 +122,7 @@ For extending to doctor replies:
 public async Task<Result> Handle(DoctorReplyCommand request, CancellationToken ct)
 {
     // ... save message logic ...
-    
+
     await _notificationService.SendAsync(
         session.PatientId,
         "Tin nhắn mới từ bác sĩ",
@@ -169,7 +169,7 @@ public async Task<Result<Guid>> Handle(CreateAppointmentCommand request, Cancell
 public async Task<Result> Handle(RescheduleAppointmentCommand request, CancellationToken ct)
 {
     var appointment = await _appointmentRepository.GetByIdAsync(request.AppointmentId, ct);
-    
+
     appointment.Reschedule(request.NewTime);
     await _unitOfWork.SaveChangesAsync(ct);
 

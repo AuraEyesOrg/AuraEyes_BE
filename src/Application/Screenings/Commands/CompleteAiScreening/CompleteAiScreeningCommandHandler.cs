@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Screening;
+using Domain.Entities.Users;
 using Domain.Enums;
 using Microsoft.Extensions.Logging;
 
@@ -14,17 +15,20 @@ namespace Application.Screenings.Commands.CompleteAiScreening;
 public class CompleteAiScreeningCommandHandler : ICommandHandler<CompleteAiScreeningCommand, CompleteAiScreeningResponse>
 {
     private readonly IRepository<AiScreening> _screeningRepository;
+    private readonly IRepository<Patient> _patientRepository;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CompleteAiScreeningCommandHandler> _logger;
 
     public CompleteAiScreeningCommandHandler(
         IRepository<AiScreening> screeningRepository,
+        IRepository<Patient> patientRepository,
         INotificationService notificationService,
         IUnitOfWork unitOfWork,
         ILogger<CompleteAiScreeningCommandHandler> logger)
     {
         _screeningRepository = screeningRepository;
+        _patientRepository = patientRepository;
         _notificationService = notificationService;
         _unitOfWork = unitOfWork;
         _logger = logger;
@@ -64,17 +68,29 @@ public class CompleteAiScreeningCommandHandler : ICommandHandler<CompleteAiScree
         var notificationTitle = GetNotificationTitle(request.ResultStatus);
         var notificationMessage = GetNotificationMessage(request.ResultStatus);
 
-        await _notificationService.SendAsync(
-            screening.PatientId,
-            notificationTitle,
-            notificationMessage,
-            NotificationType.AiScreeningCompleted,
-            new { ScreeningId = screening.Id, ResultStatus = request.ResultStatus },
-            cancellationToken);
+        var patient = await _patientRepository.GetByIdAsync(screening.PatientId, cancellationToken);
+        if (patient is null)
+        {
+            _logger.LogWarning(
+                "Patient profile {PatientId} not found for screening {ScreeningId}; skipping notification.",
+                screening.PatientId,
+                screening.Id);
+        }
+        else
+        {
+            await _notificationService.SendAsync(
+                patient.UserId,
+                notificationTitle,
+                notificationMessage,
+                NotificationType.AiScreeningCompleted,
+                new { ScreeningId = screening.Id, ResultStatus = request.ResultStatus },
+                cancellationToken);
 
-        _logger.LogInformation(
-            "Real-time notification sent to Patient {PatientId} for screening {ScreeningId}",
-            screening.PatientId, screening.Id);
+            _logger.LogInformation(
+                "Real-time notification sent to User {UserId} for screening {ScreeningId}",
+                patient.UserId,
+                screening.Id);
+        }
 
         return Result<CompleteAiScreeningResponse>.Success(new CompleteAiScreeningResponse
         {

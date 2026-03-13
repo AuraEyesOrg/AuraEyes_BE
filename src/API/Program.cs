@@ -40,6 +40,20 @@ builder.Services.AddControllers()
     });
 builder.Services.AddEndpointsApiExplorer();
 
+var configuredOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>();
+
+var envOrigins = Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS")
+    ?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+var allowedOrigins = (configuredOrigins is { Length: > 0 }
+        ? configuredOrigins
+        : envOrigins) ??
+    (builder.Environment.IsDevelopment()
+        ? new[] { "http://localhost:5173", "http://localhost:4173", "http://localhost:3000" }
+        : Array.Empty<string>());
+
 // Configure Swagger with JWT Bearer authentication
 builder.Services.AddSwaggerGen(options =>
 {
@@ -118,12 +132,16 @@ builder.Services.AddSwaggerGen(options =>
 // Add CORS with SignalR support
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("FrontendCors", policy =>
     {
-        policy.SetIsOriginAllowed(_ => true)  // Allow any origin for SignalR
-              .AllowAnyMethod()
+        if (allowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedOrigins);
+        }
+
+        policy.AllowAnyMethod()
               .AllowAnyHeader()
-              .AllowCredentials();  // Required for SignalR
+              .AllowCredentials();
     });
 });
 
@@ -133,7 +151,7 @@ builder.Services.AddHealthChecks();
 // Add SignalR for real-time notifications
 builder.Services.AddSignalR(options =>
 {
-    options.EnableDetailedErrors = true;
+    options.EnableDetailedErrors = builder.Environment.IsDevelopment();
     options.KeepAliveInterval = TimeSpan.FromSeconds(15);
     options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
 });
@@ -200,7 +218,7 @@ app.UseHttpsRedirection();
 // Note: Static files are stored in S3, not wwwroot
 // app.UseStaticFiles(); // Removed - using S3 for file storage
 
-app.UseCors("AllowAll");
+app.UseCors("FrontendCors");
 
 // Add authentication before authorization
 app.UseAuthentication();
@@ -219,12 +237,21 @@ if (app.Environment.IsDevelopment())
     app.UseHangfireDashboard("/hangfire");
 }
 
+var defaultQuotaResetCron = app.Environment.IsDevelopment()
+    ? "*/2 * * * *"
+    : "0 0 * * *";
+
+var quotaResetCron = Environment.GetEnvironmentVariable("HANGFIRE_DAILY_QUOTA_RESET_CRON");
+if (string.IsNullOrWhiteSpace(quotaResetCron))
+{
+    quotaResetCron = defaultQuotaResetCron;
+}
+
 // Register recurring jobs
-// TODO: Revert to "0 0 * * *" (Daily at 00:00 UTC) before deploying to production.
 RecurringJob.AddOrUpdate<DailyQuotaResetJob>(
     "daily-quota-reset",
     job => job.ExecuteAsync(),
-    "*/2 * * * *", // Every 2 minutes - LOCAL TESTING ONLY
+    quotaResetCron,
     new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
 app.Run();
