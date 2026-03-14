@@ -254,7 +254,8 @@ if (string.IsNullOrWhiteSpace(quotaResetCron))
 }
 
 // Register recurring jobs
-RecurringJob.AddOrUpdate<DailyQuotaResetJob>(
+var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+recurringJobManager.AddOrUpdate<DailyQuotaResetJob>(
     "daily-quota-reset",
     job => job.ExecuteAsync(),
     quotaResetCron,
