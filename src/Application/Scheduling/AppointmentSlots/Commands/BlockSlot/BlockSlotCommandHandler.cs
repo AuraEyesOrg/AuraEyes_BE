@@ -64,7 +64,6 @@ public class BlockSlotCommandHandler : ICommandHandler<BlockSlotCommand>
         try
         {
             slot.Block();
-            await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(
@@ -76,6 +75,15 @@ public class BlockSlotCommandHandler : ICommandHandler<BlockSlotCommand>
         catch (InvalidOperationException ex)
         {
             return Result.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Database error when blocking slot {SlotId} by ophthalmologist {OphthalmologistId}",
+                request.AppointmentSlotId,
+                request.OphthalmologistId);
+
+            return Result.Failure(ex.InnerException?.Message ?? ex.Message);
         }
     }
 }

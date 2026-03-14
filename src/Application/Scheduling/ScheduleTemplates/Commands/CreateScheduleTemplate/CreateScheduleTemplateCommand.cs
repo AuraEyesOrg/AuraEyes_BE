@@ -14,4 +14,5 @@ public record CreateScheduleTemplateCommand : ICommand<Guid>
     public TimeOnly EndTime { get; init; }
     public int SlotDuration { get; init; }
     public int MaxCapacity { get; init; }
+    public decimal? Cost { get; init; }
 }

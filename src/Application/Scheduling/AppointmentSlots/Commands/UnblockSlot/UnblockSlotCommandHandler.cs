@@ -51,7 +51,6 @@ public class UnblockSlotCommandHandler : ICommandHandler<UnblockSlotCommand>
         try
         {
             slot.Unblock();
-            await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(
@@ -63,6 +62,15 @@ public class UnblockSlotCommandHandler : ICommandHandler<UnblockSlotCommand>
         catch (InvalidOperationException ex)
         {
             return Result.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Database error when unblocking slot {SlotId} by ophthalmologist {OphthalmologistId}",
+                request.AppointmentSlotId,
+                request.OphthalmologistId);
+
+            return Result.Failure(ex.InnerException?.Message ?? ex.Message);
         }
     }
 }
