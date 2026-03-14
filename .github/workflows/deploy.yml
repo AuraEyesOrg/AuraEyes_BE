@@ -81,7 +81,7 @@ jobs:
           GoogleMeet__ApplicationName=AURA Telemedicine
           GoogleMeet__DefaultDurationMinutes=30
 
-          API_PORT=8386
+          API_PORT=5060
           BaseUrl=${{ secrets.FRONTEND_URL }}
 
           DOCKER_IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/auraeyes-api
