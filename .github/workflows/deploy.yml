@@ -76,7 +76,7 @@ jobs:
           GoogleMeet__DefaultDurationMinutes=30
 
           API_PORT=8386
-          BaseUrl=https://localhost:3000
+          BaseUrl=${{ secrets.FRONTEND_URL }}
 
           DOCKER_IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/auraeyes-api
           EOF
