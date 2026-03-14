@@ -69,7 +69,6 @@ public class ReserveSlotCommandHandler : ICommandHandler<ReserveSlotCommand, Res
             // Reserve the slot
             slot.Reserve(request.PatientId, expirationTime);
 
-            await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 

@@ -30,6 +30,7 @@ public class GetScheduleTemplateQueryHandler : IQueryHandler<GetScheduleTemplate
             EndTime = template.EndTime,
             SlotDuration = template.SlotDuration,
             MaxCapacity = template.MaxCapacity,
+            Cost = template.Cost,
             CreatedAt = template.CreatedAt,
             UpdatedAt = template.UpdatedAt
         };

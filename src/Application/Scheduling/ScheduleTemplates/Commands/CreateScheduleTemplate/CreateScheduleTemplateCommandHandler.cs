@@ -42,7 +42,8 @@ public class CreateScheduleTemplateCommandHandler : ICommandHandler<CreateSchedu
             request.SlotDuration,
             request.MaxCapacity,
             request.OrgId,
-            request.OphthalId);
+            request.OphthalId,
+            request.Cost);
 
         await _repository.AddAsync(template, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

@@ -23,5 +23,10 @@ public class UpdateScheduleTemplateCommandValidator : AbstractValidator<UpdateSc
 
         RuleFor(x => x.MaxCapacity)
             .GreaterThanOrEqualTo(1).WithMessage("Max capacity must be at least 1.");
+
+        RuleFor(x => x.Cost)
+            .GreaterThanOrEqualTo(0)
+            .When(x => x.Cost.HasValue)
+            .WithMessage("Cost cannot be negative.");
     }
 }

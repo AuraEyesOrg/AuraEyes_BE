@@ -71,7 +71,6 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
             {
                 // Release the reservation
                 slot.ReleaseReservation();
-                await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
                 await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
@@ -100,7 +99,6 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
             // Note: This would need methods on ConsultationSession to set these values
             // For now we rely on the factory defaults
 
-            await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
             await _consultationSessionRepository.AddAsync(session, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);

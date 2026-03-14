@@ -1,3 +1,4 @@
+using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Scheduling.AppointmentSlots.Common;
@@ -9,80 +10,49 @@ namespace Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlots;
 public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlotsQuery, PagedResult<AppointmentSlotListDto>>
 {
     private readonly IAppointmentSlotRepository _repository;
-    private readonly IScheduleTemplateRepository _templateRepository;
+    private readonly ICurrentUserService _currentUser;
 
     public GetAppointmentSlotsQueryHandler(
         IAppointmentSlotRepository repository,
-        IScheduleTemplateRepository templateRepository)
+        ICurrentUserService currentUser)
     {
         _repository = repository;
-        _templateRepository = templateRepository;
+        _currentUser = currentUser;
     }
 
     public async Task<Result<PagedResult<AppointmentSlotListDto>>> Handle(
         GetAppointmentSlotsQuery request,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<Domain.Entities.Scheduling.AppointmentSlot> items;
-        int totalCount;
+        Guid? effectiveOphthalId = request.OphthalId;
 
-        if (request.OphthalId.HasValue || request.OrgId.HasValue)
+        if (_currentUser.IsInRole(Roles.Ophthalmologist))
         {
-            IReadOnlyList<Domain.Entities.Scheduling.AppointmentSlot> scopedItems;
-
-            if (request.OphthalId.HasValue)
+            if (!_currentUser.ProfileId.HasValue)
             {
-                scopedItems = await _repository.GetByOphthalmologistAsync(
-                    request.OphthalId.Value,
-                    request.FromDate,
-                    request.ToDate,
-                    request.Status,
-                    cancellationToken);
-
-                if (request.OrgId.HasValue)
-                {
-                    scopedItems = scopedItems
-                        .Where(slot => slot.ScheduleTemplate?.OrgId == request.OrgId.Value)
-                        .ToList();
-                }
-            }
-            else
-            {
-                scopedItems = await _repository.GetByOrganisationAsync(
-                    request.OrgId!.Value,
-                    request.FromDate,
-                    request.ToDate,
-                    request.Status,
-                    cancellationToken);
+                return Result<PagedResult<AppointmentSlotListDto>>.Forbidden(
+                    "Unable to resolve ophthalmologist profile from current token.");
             }
 
-            if (request.Status == ScheduleStatus.Available)
+            if (request.OphthalId.HasValue && request.OphthalId.Value != _currentUser.ProfileId.Value)
             {
-                scopedItems = scopedItems
-                    .Where(slot => slot.BookedCount < slot.MaxCapacity)
-                    .ToList();
+                return Result<PagedResult<AppointmentSlotListDto>>.Forbidden(
+                    "You are not authorized to view slots of other ophthalmologists.");
             }
 
-            totalCount = scopedItems.Count;
-            items = scopedItems
-                .Skip((request.PageNumber - 1) * request.PageSize)
-                .Take(request.PageSize)
-                .ToList();
+            effectiveOphthalId = _currentUser.ProfileId.Value;
         }
-        else
-        {
-            var pagedResult = await _repository.GetPagedAsync(
-                request.ScheduleTemplateId,
-                request.Status,
-                request.FromDate,
-                request.ToDate,
-                request.PageNumber,
-                request.PageSize,
-                cancellationToken);
 
-            items = pagedResult.Items;
-            totalCount = pagedResult.TotalCount;
-        }
+        var (items, totalCount) = await _repository.GetPagedAsync(
+            request.ScheduleTemplateId,
+            effectiveOphthalId,
+            request.OrgId,
+            request.Status,
+            request.FromDate,
+            request.ToDate,
+            request.PageNumber,
+            request.PageSize,
+            cancellationToken);
 
         // Get templates to calculate available capacity
         var dtoList = new List<AppointmentSlotListDto>();
