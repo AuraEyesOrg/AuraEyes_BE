@@ -73,4 +73,13 @@ public class ContractRepository : Repository<Contract>, IContractRepository
 
         return await query.AnyAsync(cancellationToken);
     }
+
+    public async Task<Contract?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Contracts
+            .Include(c => c.Template)
+            .Where(c => !c.IsDeleted && c.UserId == userId)
+            .OrderByDescending(c => c.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
 }

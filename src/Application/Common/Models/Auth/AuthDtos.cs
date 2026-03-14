@@ -143,7 +143,7 @@ public record UserInfoResponse
     public string[] Roles { get; init; } = Array.Empty<string>();
     public bool EmailConfirmed { get; init; }
     public Guid? OrganizationId { get; init; }
-    
+    public Guid? RoleId { get; init; }
     /// <summary>
     /// Indicates if 2FA is enabled for this user.
     /// </summary>
@@ -160,6 +160,12 @@ public record UserInfoResponse
     /// Null for non-ophthalmologist roles.
     /// </summary>
     public string? VerificationStatus { get; init; }
+    
+    /// <summary>
+    /// Contract status for the ophthalmologist (Draft, PendingSignature, Active, etc.).
+    /// Null for non-ophthalmologist roles or if no contract exists.
+    /// </summary>
+    public string? ContractStatus { get; init; }
 }
 
 /// <summary>

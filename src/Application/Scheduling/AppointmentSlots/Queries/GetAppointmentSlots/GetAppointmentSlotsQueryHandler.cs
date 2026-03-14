@@ -2,6 +2,7 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Scheduling.AppointmentSlots.Common;
+using Domain.Enums;
 using Domain.Repositories;
 
 namespace Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlots;
@@ -80,12 +81,12 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
             });
         }
 
-        var pagedResult = new PagedResult<AppointmentSlotListDto>(
+        var resultPage = new PagedResult<AppointmentSlotListDto>(
             dtoList,
             totalCount,
             request.PageNumber,
             request.PageSize);
 
-        return Result<PagedResult<AppointmentSlotListDto>>.Success(pagedResult);
+        return Result<PagedResult<AppointmentSlotListDto>>.Success(resultPage);
     }
 }

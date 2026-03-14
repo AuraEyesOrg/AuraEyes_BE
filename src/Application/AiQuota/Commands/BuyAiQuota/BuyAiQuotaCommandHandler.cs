@@ -14,6 +14,7 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
     private readonly IWalletRepository _walletRepository;
     private readonly IAiQuotaService _quotaService;
     private readonly ICurrentUserService _currentUser;
+    private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<BuyAiQuotaCommandHandler> _logger;
 
@@ -21,12 +22,14 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
         IWalletRepository walletRepository,
         IAiQuotaService quotaService,
         ICurrentUserService currentUser,
+        INotificationService notificationService,
         IUnitOfWork unitOfWork,
         ILogger<BuyAiQuotaCommandHandler> logger)
     {
         _walletRepository = walletRepository;
         _quotaService = quotaService;
         _currentUser = currentUser;
+        _notificationService = notificationService;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -68,6 +71,7 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
             await _walletRepository.UpdateAsync(wallet, cancellationToken);
 
             // Create wallet transactions (one per bundle for audit trail)
+            Guid? lastTransactionId = null;
             for (var i = 0; i < request.NumberOfBundles; i++)
             {
                 var transaction = new WalletTransaction(
@@ -78,9 +82,13 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
                     "AiQuota");
 
                 await _walletRepository.AddTransactionAsync(transaction, cancellationToken);
+                lastTransactionId = transaction.Id;
             }
 
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            // Add purchased quota credits to the entity (Patient or Organisation)
+            var totalCredits = request.NumberOfBundles * currentQuota.BundleSize.Value;
+            await _quotaService.AddPurchasedQuotaAsync(userId, role, totalCredits, cancellationToken);
+
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
             _logger.LogInformation(
@@ -89,6 +97,25 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
 
             // Get updated quota
             var updatedQuota = await _quotaService.GetQuotaAsync(userId, role, cancellationToken);
+
+            // Send real-time notification for successful payment [FR-49]
+            try
+            {
+                await _notificationService.SendAsync(
+                    userId,
+                    "Thanh toán thành công",
+                    $"Bạn đã mua {totalCredits} lượt AI screening với giá {totalCost:N0} VND. Số dư còn lại: {wallet.Balance:N0} VND",
+                    NotificationType.WalletPaymentProcessed,
+                    new { TransactionId = lastTransactionId, Amount = totalCost, Action = "AI Quota Purchase" },
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to send AI quota purchase notification for user {UserId}",
+                    userId);
+            }
 
             return Result<BuyAiQuotaResponse>.Success(new BuyAiQuotaResponse
             {

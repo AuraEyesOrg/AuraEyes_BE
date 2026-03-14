@@ -17,6 +17,7 @@ public class VerifyPaymentCommandHandler : ICommandHandler<VerifyPaymentCommand,
     private readonly IDepositRequestRepository _depositRequestRepository;
     private readonly IWalletRepository _walletRepository;
     private readonly IPayOSService _payOSService;
+    private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<VerifyPaymentCommandHandler> _logger;
 
@@ -24,12 +25,14 @@ public class VerifyPaymentCommandHandler : ICommandHandler<VerifyPaymentCommand,
         IDepositRequestRepository depositRequestRepository,
         IWalletRepository walletRepository,
         IPayOSService payOSService,
+        INotificationService notificationService,
         IUnitOfWork unitOfWork,
         ILogger<VerifyPaymentCommandHandler> logger)
     {
         _depositRequestRepository = depositRequestRepository;
         _walletRepository = walletRepository;
         _payOSService = payOSService;
+        _notificationService = notificationService;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -135,6 +138,25 @@ public class VerifyPaymentCommandHandler : ICommandHandler<VerifyPaymentCommand,
                 _logger.LogInformation(
                     "Deposit {DepositRequestId} completed. Wallet {WalletId} credited {Amount} VND. New balance: {Balance}",
                     depositRequest.Id, wallet.Id, depositRequest.Amount, wallet.Balance);
+
+                // Send real-time notification for successful deposit [FR-49]
+                try
+                {
+                    await _notificationService.SendAsync(
+                        depositRequest.UserId,
+                        "Nạp tiền thành công",
+                        $"Bạn đã nạp {depositRequest.Amount:N0} VND vào ví. Số dư mới: {wallet.Balance:N0} VND",
+                        NotificationType.WalletDepositSuccess,
+                        new { TransactionId = transaction.Id, Amount = depositRequest.Amount, Action = "Deposit" },
+                        cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Failed to send wallet deposit notification for DepositRequest {DepositRequestId}",
+                        depositRequest.Id);
+                }
 
                 return Result<VerifyPaymentResponse>.Success(new VerifyPaymentResponse
                 {

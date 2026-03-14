@@ -6,6 +6,7 @@ using Application.Common.Models.Auth;
 using Domain.Common;
 using Domain.Entities.Users;
 using Domain.Enums;
+using Domain.Repositories;
 using Google.Apis.Auth;
 using Infrastructure.Settings;
 using Microsoft.AspNetCore.Identity;
@@ -30,6 +31,7 @@ public class AuthService : IAuthService
     private readonly IFileStorageService _fileStorageService;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
+    private readonly IContractRepository _contractRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly GoogleAuthSettings _googleAuthSettings;
@@ -43,6 +45,7 @@ public class AuthService : IAuthService
         IFileStorageService fileStorageService,
         IRepository<Patient> patientRepository,
         IRepository<Ophthalmologist> ophthalmologistRepository,
+        IContractRepository contractRepository,
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager,
         IOptions<GoogleAuthSettings> googleAuthSettings,
@@ -55,6 +58,7 @@ public class AuthService : IAuthService
         _fileStorageService = fileStorageService;
         _patientRepository = patientRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
+        _contractRepository = contractRepository;
         _unitOfWork = unitOfWork;
         _userManager = userManager;
         _googleAuthSettings = googleAuthSettings.Value;
@@ -551,17 +555,34 @@ public class AuthService : IAuthService
 
         _logger.LogInformation("User logged in: {Email}", user.Email);
 
-        // Enrich UserInfoResponse with ophthalmologist verification status
+        // Resolve role-specific profile entity (PatientId / OphthalmologistId)
+        Guid? roleId = null;
         bool? isVerified = null;
         string? verificationStatus = null;
-        if (roles.Contains(Roles.Ophthalmologist))
+        string? contractStatus = null;
+        
+        if (roles.Contains(Roles.Patient))
+        {
+            var patients = await _patientRepository.FindAsync(
+                p => p.UserId == user.Id, cancellationToken);
+            if (patients.Count > 0)
+                roleId = patients[0].Id;
+        }
+        else if (roles.Contains(Roles.Ophthalmologist))
         {
             var doctors = await _ophthalmologistRepository.FindAsync(
                 o => o.UserId == user.Id, cancellationToken);
             if (doctors.Count > 0)
             {
+                roleId = doctors[0].Id;
                 isVerified = doctors[0].IsVerified;
                 verificationStatus = doctors[0].VerificationStatus.ToString();
+            }
+            
+            var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
+            if (contract != null)
+            {
+                contractStatus = contract.Status.ToString();
             }
         }
 
@@ -580,9 +601,11 @@ public class AuthService : IAuthService
                 Roles = roles.ToArray(),
                 EmailConfirmed = user.EmailConfirmed,
                 OrganizationId = user.OrganizationId,
+                RoleId = roleId,
                 TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
                 IsVerified = isVerified,
-                VerificationStatus = verificationStatus
+                VerificationStatus = verificationStatus,
+                ContractStatus = contractStatus
             }
         };
     }
@@ -654,17 +677,34 @@ public class AuthService : IAuthService
 
             _logger.LogInformation("Token refreshed for user: {UserId}", user.Id);
 
-            // Enrich UserInfoResponse with ophthalmologist verification status
+            // Resolve role-specific profile entity (PatientId / OphthalmologistId)
+            Guid? roleId = null;
             bool? isVerified = null;
             string? verificationStatus = null;
-            if (roles.Contains(Roles.Ophthalmologist))
+            string? contractStatus = null;
+            
+            if (roles.Contains(Roles.Patient))
+            {
+                var patients = await _patientRepository.FindAsync(
+                    p => p.UserId == user.Id, cancellationToken);
+                if (patients.Count > 0)
+                    roleId = patients[0].Id;
+            }
+            else if (roles.Contains(Roles.Ophthalmologist))
             {
                 var doctors = await _ophthalmologistRepository.FindAsync(
                     o => o.UserId == user.Id, cancellationToken);
                 if (doctors.Count > 0)
                 {
+                    roleId = doctors[0].Id;
                     isVerified = doctors[0].IsVerified;
                     verificationStatus = doctors[0].VerificationStatus.ToString();
+                }
+                
+                var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
+                if (contract != null)
+                {
+                    contractStatus = contract.Status.ToString();
                 }
             }
 
@@ -682,9 +722,11 @@ public class AuthService : IAuthService
                     Roles = roles.ToArray(),
                     EmailConfirmed = user.EmailConfirmed,
                     OrganizationId = user.OrganizationId,
+                    RoleId = roleId,
                     TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
                     IsVerified = isVerified,
-                    VerificationStatus = verificationStatus
+                    VerificationStatus = verificationStatus,
+                    ContractStatus = contractStatus
                 }
             });
         }
@@ -847,17 +889,34 @@ public class AuthService : IAuthService
             var roles = await _identityService.GetUserRolesAsync(userId);
             var twoFactorEnabled = await _identityService.IsTwoFactorEnabledAsync(userId);
 
-            // Enrich with ophthalmologist verification status
+            // Resolve role-specific profile entity (PatientId / OphthalmologistId)
+            Guid? roleId = null;
             bool? isVerified = null;
             string? verificationStatus = null;
-            if (roles.Contains(Roles.Ophthalmologist))
+            string? contractStatus = null;
+            
+            if (roles.Contains(Roles.Patient))
+            {
+                var patients = await _patientRepository.FindAsync(
+                    p => p.UserId == userId, cancellationToken);
+                if (patients.Count > 0)
+                    roleId = patients[0].Id;
+            }
+            else if (roles.Contains(Roles.Ophthalmologist))
             {
                 var doctors = await _ophthalmologistRepository.FindAsync(
                     o => o.UserId == userId, cancellationToken);
                 if (doctors.Count > 0)
                 {
+                    roleId = doctors[0].Id;
                     isVerified = doctors[0].IsVerified;
                     verificationStatus = doctors[0].VerificationStatus.ToString();
+                }
+                
+                var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
+                if (contract != null)
+                {
+                    contractStatus = contract.Status.ToString();
                 }
             }
 
@@ -870,9 +929,11 @@ public class AuthService : IAuthService
                 Roles = roles.ToArray(),
                 EmailConfirmed = userDto.EmailConfirmed,
                 OrganizationId = userDto.OrganizationId,
+                RoleId = roleId,
                 TwoFactorEnabled = twoFactorEnabled,
                 IsVerified = isVerified,
-                VerificationStatus = verificationStatus
+                VerificationStatus = verificationStatus,
+                ContractStatus = contractStatus
             });
         }
         catch (Exception ex)

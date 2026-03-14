@@ -24,17 +24,20 @@ public class DeductQuotaCommandHandler : ICommandHandler<DeductQuotaCommand, Ded
         if (_currentUser.UserId is null)
             return Result<DeductQuotaResponse>.Failure("User is not authenticated.");
 
+        var userId = _currentUser.UserId.Value;
         var role = _currentUser.Roles.FirstOrDefault() ?? "Patient";
-        var hasQuota = await _quotaService.HasAvailableQuotaAsync(
-            _currentUser.UserId.Value, role, cancellationToken);
+
+        var hasQuota = await _quotaService.HasAvailableQuotaAsync(userId, role, cancellationToken);
 
         if (!hasQuota)
             return Result<DeductQuotaResponse>.PaymentRequired(
                 "AI screening quota exhausted. Please purchase additional credits.");
 
+        // Increment UsedAiQuota on the Patient or Organisation entity
+        await _quotaService.DeductQuotaAsync(userId, role, cancellationToken);
+
         // Re-fetch to get accurate numbers for response
-        var quota = await _quotaService.GetQuotaAsync(
-            _currentUser.UserId.Value, role, cancellationToken);
+        var quota = await _quotaService.GetQuotaAsync(userId, role, cancellationToken);
 
         return Result<DeductQuotaResponse>.Success(new DeductQuotaResponse
         {

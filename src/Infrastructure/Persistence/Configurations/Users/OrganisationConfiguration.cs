@@ -29,6 +29,12 @@ public class OrganisationConfiguration : IEntityTypeConfiguration<Organisation>
         builder.Property(e => e.RatingCount)
             .HasDefaultValue(0);
 
+        builder.Property(e => e.PurchasedAiQuota)
+            .HasDefaultValue(0);
+
+        builder.Property(e => e.UsedAiQuota)
+            .HasDefaultValue(0);
+
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
     }
