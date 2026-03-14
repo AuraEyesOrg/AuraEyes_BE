@@ -1,0 +1,221 @@
+using Application.AiQuota.Common;
+using Application.AiQuota.Interfaces;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+
+namespace Infrastructure.Services;
+
+/// <summary>
+/// AI Quota service — Stored State architecture.
+/// Reads PurchasedAiQuota / UsedAiQuota directly from Patient or Organisation.
+/// No JOINs to AiScreenings or WalletTransactions.
+/// </summary>
+public class AiQuotaService : IAiQuotaService
+{
+    private readonly ApplicationDbContext _context;
+    private readonly ILogger<AiQuotaService> _logger;
+
+    public AiQuotaService(ApplicationDbContext context, ILogger<AiQuotaService> logger)
+    {
+        _context = context;
+        _logger = logger;
+    }
+
+    public async Task<AiQuotaDto> GetQuotaAsync(Guid userId, string role, CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("[AiQuotaService] GetQuotaAsync called — UserId: {UserId}, Role: {Role}", userId, role);
+
+        if (string.Equals(role, "Patient", StringComparison.OrdinalIgnoreCase))
+            return await GetPatientQuotaAsync(userId, cancellationToken);
+
+        if (IsOrganisationQuotaRole(role))
+            return await GetOrgQuotaAsync(userId, cancellationToken);
+
+        _logger.LogWarning("[AiQuotaService] Unrecognized role '{Role}' for user {UserId} — returning None quota", role, userId);
+        return new AiQuotaDto
+        {
+            TotalQuota = 0,
+            UsedQuota = 0,
+            RemainingQuota = 0,
+            QuotaSource = "None"
+        };
+    }
+
+    public async Task<bool> HasAvailableQuotaAsync(Guid userId, string role, CancellationToken cancellationToken = default)
+    {
+        var quota = await GetQuotaAsync(userId, role, cancellationToken);
+        return quota.RemainingQuota > 0;
+    }
+
+    private async Task<AiQuotaDto> GetPatientQuotaAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var freeQuota = await GetSettingIntAsync("FREE_AI_QUOTA", 3, cancellationToken);
+        var bundleSize = await GetSettingIntAsync("AI_QUOTA_BUNDLE", 5, cancellationToken);
+        var bundlePrice = await GetSettingDecimalAsync("AI_QUOTA_PRICE", 50000m, cancellationToken);
+
+        // Also try with IgnoreQueryFilters to detect if record exists but is soft-deleted
+        var patient = await _context.Patients
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
+
+        if (patient is null)
+        {
+            // Check if soft-deleted record exists for diagnostics
+            var softDeleted = await _context.Patients
+                .AsNoTracking()
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
+
+            if (softDeleted is not null)
+                _logger.LogWarning(
+                    "[AiQuotaService] Patient profile for UserId {UserId} exists but IsDeleted=true — returning free quota fallback",
+                    userId);
+            else
+                _logger.LogWarning(
+                    "[AiQuotaService] No Patient profile found for UserId {UserId} — returning free quota fallback",
+                    userId);
+
+            // Fallback: even without a Patient record, give the user their free daily quota
+            return new AiQuotaDto
+            {
+                TotalQuota = freeQuota,
+                UsedQuota = 0,
+                RemainingQuota = freeQuota,
+                QuotaSource = "Free",
+                BundlePrice = bundlePrice,
+                BundleSize = bundleSize
+            };
+        }
+
+        _logger.LogDebug(
+            "[AiQuotaService] Patient {PatientId} found — PurchasedAiQuota: {Purchased}, UsedAiQuota: {Used}, FreeQuota: {Free}",
+            patient.Id, patient.PurchasedAiQuota, patient.UsedAiQuota, freeQuota);
+
+        var totalQuota = freeQuota + patient.PurchasedAiQuota;
+        var remaining = Math.Max(0, totalQuota - patient.UsedAiQuota);
+        var quotaSource = patient.PurchasedAiQuota > 0 ? "Purchased" : "Free";
+
+        return new AiQuotaDto
+        {
+            TotalQuota = totalQuota,
+            UsedQuota = patient.UsedAiQuota,
+            RemainingQuota = remaining,
+            QuotaSource = quotaSource,
+            BundlePrice = bundlePrice,
+            BundleSize = bundleSize
+        };
+    }
+
+    private async Task<AiQuotaDto> GetOrgQuotaAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        // Find the organisation this user belongs to
+        var user = await _context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+
+        if (user?.OrganizationId is null)
+            return new AiQuotaDto { TotalQuota = 0, UsedQuota = 0, RemainingQuota = 0, QuotaSource = "None" };
+
+        var org = await _context.Organisations
+            .AsNoTracking()
+            .FirstOrDefaultAsync(o => o.Id == user.OrganizationId.Value, cancellationToken);
+
+        if (org is null)
+            return new AiQuotaDto { TotalQuota = 0, UsedQuota = 0, RemainingQuota = 0, QuotaSource = "None" };
+
+        var freeQuota = await GetSettingIntAsync("FREE_AI_QUOTA", 3, cancellationToken);
+        var totalQuota = freeQuota + org.PurchasedAiQuota;
+        var remaining = Math.Max(0, totalQuota - org.UsedAiQuota);
+
+        return new AiQuotaDto
+        {
+            TotalQuota = totalQuota,
+            UsedQuota = org.UsedAiQuota,
+            RemainingQuota = remaining,
+            QuotaSource = "Organisation"
+        };
+    }
+
+    public async Task DeductQuotaAsync(Guid userId, string role, CancellationToken cancellationToken = default)
+    {
+        if (string.Equals(role, "Patient", StringComparison.OrdinalIgnoreCase))
+        {
+            var patient = await _context.Patients
+                .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken)
+                ?? throw new InvalidOperationException("Patient not found.");
+
+            patient.IncrementUsedQuota();
+        }
+        else if (IsOrganisationQuotaRole(role))
+        {
+            var user = await _context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+
+            if (user?.OrganizationId is null)
+                throw new InvalidOperationException("Organisation not found for this user.");
+
+            var org = await _context.Organisations
+                .FirstOrDefaultAsync(o => o.Id == user.OrganizationId.Value, cancellationToken)
+                ?? throw new InvalidOperationException("Organisation not found.");
+
+            org.IncrementUsedQuota();
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task AddPurchasedQuotaAsync(Guid userId, string role, int amount, CancellationToken cancellationToken = default)
+    {
+        if (string.Equals(role, "Patient", StringComparison.OrdinalIgnoreCase))
+        {
+            var patient = await _context.Patients
+                .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken)
+                ?? throw new InvalidOperationException("Patient not found.");
+
+            patient.AddPurchasedQuota(amount);
+        }
+        else if (IsOrganisationQuotaRole(role))
+        {
+            var user = await _context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+
+            if (user?.OrganizationId is null)
+                throw new InvalidOperationException("Organisation not found for this user.");
+
+            var org = await _context.Organisations
+                .FirstOrDefaultAsync(o => o.Id == user.OrganizationId.Value, cancellationToken)
+                ?? throw new InvalidOperationException("Organisation not found.");
+
+            org.AddPurchasedQuota(amount);
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<int> GetSettingIntAsync(string key, int defaultValue, CancellationToken cancellationToken)
+    {
+        var setting = await _context.Set<Domain.Entities.Platform.SystemSetting>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
+
+        return setting is not null && int.TryParse(setting.Value, out var value) ? value : defaultValue;
+    }
+
+    private async Task<decimal> GetSettingDecimalAsync(string key, decimal defaultValue, CancellationToken cancellationToken)
+    {
+        var setting = await _context.Set<Domain.Entities.Platform.SystemSetting>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
+
+        return setting is not null && decimal.TryParse(setting.Value, out var value) ? value : defaultValue;
+    }
+
+    private static bool IsOrganisationQuotaRole(string role)
+    {
+        return string.Equals(role, "Ophthalmologist", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(role, "OrgAdmin", StringComparison.OrdinalIgnoreCase);
+    }
+}

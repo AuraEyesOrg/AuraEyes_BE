@@ -4,6 +4,7 @@ namespace Domain.Common;
 
 public interface IRepository<T> where T : BaseEntity, IAggregateRoot
 {
+    IQueryable<T> Query();
     Task<T?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<T>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default);

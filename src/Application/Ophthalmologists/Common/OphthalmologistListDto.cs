@@ -1,0 +1,18 @@
+namespace Application.Ophthalmologists.Common;
+
+/// <summary>
+/// DTO for Ophthalmologist list item (lightweight version for lists).
+/// </summary>
+public class OphthalmologistListDto
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public string? UserFullName { get; set; }
+    public string? UserEmail { get; set; }
+    public string? UserAvatarUrl { get; set; }
+    public string? Bio { get; set; }
+    public int YearsOfExperience { get; set; }
+    public bool IsVerified { get; set; }
+    public int CertificateCount { get; set; }
+    public DateTime CreatedAt { get; set; }
+}

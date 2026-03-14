@@ -1,0 +1,214 @@
+using Application.Common.Interfaces;
+using Infrastructure.Services.Email;
+using Infrastructure.Settings;
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using MimeKit;
+
+namespace Infrastructure.Services;
+
+/// <summary>
+/// SMTP email service implementation using MailKit + MimeKit.
+/// Sends professional, healthcare-appropriate HTML emails for the Aura system.
+/// </summary>
+public class EmailService : IEmailService
+{
+    private readonly SmtpSettings _settings;
+    private readonly ILogger<EmailService> _logger;
+
+    public EmailService(IOptions<SmtpSettings> settings, ILogger<EmailService> logger)
+    {
+        _settings = settings.Value;
+        _logger = logger;
+    }
+
+    /// <inheritdoc />
+    public async Task SendEmailConfirmationAsync(string email, string confirmationLink, CancellationToken cancellationToken = default)
+    {
+        var subject = EmailTemplates.EmailConfirmationSubject;
+        var body = EmailTemplates.GetEmailConfirmationBody(confirmationLink);
+
+        await SendAsync(email, subject, body, isHtml: true, cancellationToken);
+        
+        _logger.LogInformation(
+            "Email confirmation sent to {Email}",
+            MaskEmail(email));
+    }
+
+    /// <inheritdoc />
+    public async Task SendPasswordResetAsync(string email, string resetLink, CancellationToken cancellationToken = default)
+    {
+        var subject = EmailTemplates.PasswordResetSubject;
+        var body = EmailTemplates.GetPasswordResetBody(resetLink);
+
+        await SendAsync(email, subject, body, isHtml: true, cancellationToken);
+        
+        _logger.LogInformation(
+            "Password reset email sent to {Email}",
+            MaskEmail(email));
+    }
+
+    /// <inheritdoc />
+    public async Task SendWelcomeEmailAsync(string email, string fullName, CancellationToken cancellationToken = default)
+    {
+        var subject = EmailTemplates.WelcomeSubject;
+        var body = EmailTemplates.GetWelcomeBody(fullName);
+
+        await SendAsync(email, subject, body, isHtml: true, cancellationToken);
+        
+        _logger.LogInformation(
+            "Welcome email sent to {Email}",
+            MaskEmail(email));
+    }
+
+    /// <inheritdoc />
+    public async Task SendAsync(string to, string subject, string body, bool isHtml = true, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(to, nameof(to));
+        ArgumentException.ThrowIfNullOrWhiteSpace(subject, nameof(subject));
+        ArgumentException.ThrowIfNullOrWhiteSpace(body, nameof(body));
+
+        var message = CreateMessage(to, subject, body, isHtml);
+
+        try
+        {
+            await SendMessageAsync(message, cancellationToken);
+            
+            _logger.LogDebug(
+                "Email sent successfully - To: {To}, Subject: {Subject}",
+                MaskEmail(to),
+                subject);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to send email - To: {To}, Subject: {Subject}, Error: {Error}",
+                MaskEmail(to),
+                subject,
+                ex.Message);
+            throw;
+        }
+    }
+
+    #region Private Methods
+
+    private MimeMessage CreateMessage(string to, string subject, string body, bool isHtml)
+    {
+        var message = new MimeMessage();
+
+        // From address with display name
+        message.From.Add(new MailboxAddress(_settings.FromName, _settings.FromEmail));
+
+        // To address
+        message.To.Add(MailboxAddress.Parse(to));
+
+        // Subject
+        message.Subject = subject;
+
+        // Body (HTML or plain text)
+        var bodyBuilder = new BodyBuilder();
+        if (isHtml)
+        {
+            bodyBuilder.HtmlBody = body;
+        }
+        else
+        {
+            bodyBuilder.TextBody = body;
+        }
+        message.Body = bodyBuilder.ToMessageBody();
+
+        return message;
+    }
+
+    private async Task SendMessageAsync(MimeMessage message, CancellationToken cancellationToken)
+    {
+        using var client = new SmtpClient();
+
+        try
+        {
+            // Determine secure socket options
+            var secureSocketOptions = DetermineSecureSocketOptions();
+
+            _logger.LogDebug(
+                "Connecting to SMTP server {Host}:{Port} with {SecurityOption}",
+                _settings.Host,
+                _settings.Port,
+                secureSocketOptions);
+
+            // Connect to SMTP server
+            await client.ConnectAsync(
+                _settings.Host,
+                _settings.Port,
+                secureSocketOptions,
+                cancellationToken);
+
+            // Authenticate if credentials provided
+            if (!string.IsNullOrWhiteSpace(_settings.Username) && 
+                !string.IsNullOrWhiteSpace(_settings.Password))
+            {
+                await client.AuthenticateAsync(
+                    _settings.Username,
+                    _settings.Password,
+                    cancellationToken);
+            }
+
+            // Send the message
+            await client.SendAsync(message, cancellationToken);
+        }
+        finally
+        {
+            // Disconnect gracefully
+            if (client.IsConnected)
+            {
+                await client.DisconnectAsync(quit: true, cancellationToken);
+            }
+        }
+    }
+
+    private SecureSocketOptions DetermineSecureSocketOptions()
+    {
+        // StartTLS is preferred for port 587
+        if (_settings.UseStartTls)
+        {
+            return SecureSocketOptions.StartTls;
+        }
+
+        // SSL/TLS for port 465
+        if (_settings.UseSsl)
+        {
+            return SecureSocketOptions.SslOnConnect;
+        }
+
+        // Auto-detect (not recommended for production)
+        return SecureSocketOptions.Auto;
+    }
+
+    /// <summary>
+    /// Masks email for logging (privacy protection).
+    /// Example: jo***@example.com
+    /// </summary>
+    private static string MaskEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return "[empty]";
+
+        var parts = email.Split('@');
+        if (parts.Length != 2)
+            return "[invalid]";
+
+        var localPart = parts[0];
+        var domain = parts[1];
+
+        var maskedLocal = localPart.Length <= 2
+            ? new string('*', localPart.Length)
+            : $"{localPart[..2]}{new string('*', Math.Min(localPart.Length - 2, 3))}";
+
+        return $"{maskedLocal}@{domain}";
+    }
+
+    #endregion
+}
+

@@ -214,3 +214,8 @@ node_modules/
 
 ## BeatPulse healthcheck temp database
 healthchecksdb
+
+.cursor/
+
+**/aura-google-meet-token/
+/src/API/credentials.json

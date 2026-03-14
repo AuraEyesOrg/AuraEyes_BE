@@ -16,6 +16,11 @@ public class Repository<T> : IRepository<T> where T : BaseEntity, IAggregateRoot
         _dbSet = context.Set<T>();
     }
 
+    public virtual IQueryable<T> Query()
+    {
+        return _dbSet.AsQueryable();
+    }
+
     public virtual async Task<T?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _dbSet.FindAsync(new object[] { id }, cancellationToken);
@@ -39,7 +44,19 @@ public class Repository<T> : IRepository<T> where T : BaseEntity, IAggregateRoot
 
     public virtual Task UpdateAsync(T entity, CancellationToken cancellationToken = default)
     {
-        _dbSet.Update(entity);
+        var entry = _context.Entry(entity);
+
+        if (entry.State == EntityState.Detached)
+        {
+            _dbSet.Attach(entity);
+            entry = _context.Entry(entity);
+        }
+
+        entry.State = EntityState.Modified;
+
+        // Keep immutable audit fields untouched on updates.
+        entry.Property(nameof(BaseEntity.CreatedAt)).IsModified = false;
+        entry.Property(nameof(BaseEntity.CreatedBy)).IsModified = false;
         return Task.CompletedTask;
     }
 
