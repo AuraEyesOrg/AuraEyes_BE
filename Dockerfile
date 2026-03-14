@@ -1,31 +1,41 @@
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-WORKDIR /app
-EXPOSE 80
-EXPOSE 443
-
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+# =====================
+# Build stage
+# =====================
+FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build
 WORKDIR /src
 
-# Copy project files
-COPY ["src/API/API.csproj", "src/API/"]
-COPY ["src/Application/Application.csproj", "src/Application/"]
-COPY ["src/Domain/Domain.csproj", "src/Domain/"]
-COPY ["src/Infrastructure/Infrastructure.csproj", "src/Infrastructure/"]
+COPY src/Domain/Domain.csproj src/Domain/
+COPY src/Application/Application.csproj src/Application/
+COPY src/Infrastructure/Infrastructure.csproj src/Infrastructure/
+COPY src/API/API.csproj src/API/
 
-# Restore dependencies
-RUN dotnet restore "src/API/API.csproj"
+RUN dotnet restore "src/API/API.csproj" /p:Configuration=Release
 
-# Copy everything else
 COPY . .
+WORKDIR /src/src/API
+RUN dotnet publish -c Release -o /app/publish --no-restore
 
-# Build
-WORKDIR "/src/src/API"
-RUN dotnet build "API.csproj" -c Release -o /app/build
+# =====================
+# Runtime stage
+# =====================
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine
 
-FROM build AS publish
-RUN dotnet publish "API.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN apk add --no-cache icu-libs curl
 
-FROM base AS final
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    DOTNET_GC_SERVER=1 \
+    DOTNET_RUNNING_IN_CONTAINER=true
+
+RUN addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser
+
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build --chown=appuser:appuser /app/publish .
+
+USER appuser
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/health || exit 1
+
 ENTRYPOINT ["dotnet", "API.dll"]

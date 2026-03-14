@@ -1,0 +1,123 @@
+name: Deploy Aura Eyes API (Production)
+
+on:
+  workflow_run:
+    workflows: ["Build & Push Aura Eyes API Image"]
+    types:
+      - completed
+  workflow_dispatch:
+
+concurrency:
+  group: production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    runs-on: self-hosted
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      
+      - name: Setup Deploy Folder
+        run: |
+          mkdir -p /dulieu/phuoc/AuraEyes
+          cp docker-compose.yml /dulieu/phuoc/AuraEyes/docker-compose.yml
+      
+      - name: Create .env file
+        run: |
+          cat > /dulieu/phuoc/AuraEyes/.env << 'EOF'
+          ASPNETCORE_ENVIRONMENT=Production
+          ASPNETCORE_URLS=http://0.0.0.0:8080
+
+          ConnectionStrings__DefaultConnection=${{ secrets.SUPABASE_CONNECTION_STRING }}
+
+          JwtSettings__SecretKey=${{ secrets.JWT_SECRET_KEY }}
+          JwtSettings__Issuer=${{ secrets.JWT_ISSUER }}
+          JwtSettings__Audience=${{ secrets.JWT_AUDIENCE }}
+          JwtSettings__AccessTokenExpiryMinutes=${{ secrets.JWT_ACCESS_TOKEN_EXPIRY_MINUTES }}
+          JwtSettings__RefreshTokenExpiryDays=${{ secrets.JWT_REFRESH_TOKEN_EXPIRY_DAYS }}
+          JwtSettings__ClockSkewSeconds=30
+
+          Smtp__Host=smtp.gmail.com
+          Smtp__Port=587
+          Smtp__Username=${{ secrets.SMTP_USERNAME }}
+          Smtp__Password=${{ secrets.SMTP_PASSWORD }}
+          Smtp__FromEmail=${{ secrets.SMTP_FROM_EMAIL }}
+          Smtp__FromName=Aura Eyes Support
+          Smtp__UseSsl=false
+          Smtp__UseStartTls=true
+
+          Cors__AllowedOrigins__0=${{ secrets.FRONTEND_URL }}
+
+          Swagger__Username=${{ secrets.SWAGGER_USERNAME }}
+          Swagger__Password=${{ secrets.SWAGGER_PASSWORD }}
+
+          PayOS__ClientId=${{ secrets.PAYOS_CLIENT_ID }}
+          PayOS__ApiKey=${{ secrets.PAYOS_API_KEY }}
+          PayOS__ChecksumKey=${{ secrets.PAYOS_CHECKSUM_KEY }}
+          PayOS__DefaultReturnUrl=${{ secrets.PAYOS_DEFAULT_RETURN_URL }}
+          PayOS__DefaultCancelUrl=${{ secrets.PAYOS_DEFAULT_CANCEL_URL }}
+
+          SupabaseStorage__Url=${{ secrets.SUPABASE_STORAGE_URL }}
+          SupabaseStorage__ServiceKey=${{ secrets.SUPABASE_STORAGE_KEY }}
+          SupabaseStorage__BucketName=${{ secrets.SUPABASE_STORAGE_BUCKET }}
+
+          GoogleAuth__ClientId=${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GoogleMeet__ClientId=${{ secrets.GOOGLE_MEET_CLIENT_ID }}
+          GoogleMeet__ClientSecret=${{ secrets.GOOGLE_MEET_CLIENT_SECRET }}
+          GoogleMeet__RefreshToken=${{ secrets.GOOGLE_MEET_REFRESH_TOKEN }}
+          GoogleMeet__CalendarId=primary
+          GoogleMeet__ApplicationName=AURA Telemedicine
+          GoogleMeet__DefaultDurationMinutes=30
+
+          API_PORT=8386
+          BaseUrl=https://localhost:3000
+
+          DOCKER_IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/auraeyes-api
+          EOF
+
+      - name: Pull & run containers
+        run: |
+          cd /dulieu/phuoc/AuraEyes
+          docker compose -f docker-compose.yml pull
+          docker compose -f docker-compose.yml up -d
+
+      - name: Health check
+        run: |
+          for i in {1..30}; do
+            if curl -fs http://localhost:8386/health; then
+              echo "✅ API healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "❌ Health check failed"
+          docker compose -f docker-compose.yml logs --tail=50
+          exit 1
+
+      - name: Cleanup unused Docker images
+        if: success()
+        run: |
+          echo "🧹 Cleaning up unused Docker images..."
+
+          # Remove dangling images
+          docker image prune -f
+
+          # Remove unused images older than 7 days
+          docker image prune -a -f --filter "until=168h"
+
+          echo "✅ Docker image cleanup completed"
+
+      - name: Clean up sensitive files
+        if: always()
+        run: |
+          echo "🧹 Cleaning up .env file..."
+          rm -f /dulieu/phuoc/AuraEyes/.env
+          echo "✅ Cleanup completed"
+

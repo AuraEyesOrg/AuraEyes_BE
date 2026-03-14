@@ -1,38 +1,44 @@
-version: '3.8'
-
 services:
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "5000:80"
-      - "5001:443"
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:80
-      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=MicroserviceBoilerplateDb;User Id=sa;Password=YourStrong@Password123;TrustServerCertificate=True
-    depends_on:
-      - sqlserver
-    networks:
-      - microservice-network
+    image: ${DOCKER_IMAGE_NAME}:latest
+    container_name: auraeye_api
+    restart: unless-stopped
 
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    environment:
-      - ACCEPT_EULA=Y
-      - SA_PASSWORD=YourStrong@Password123
-      - MSSQL_PID=Express
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+    env_file:
+      - .env
+
     ports:
-      - "1433:1433"
-    volumes:
-      - sqlserver-data:/var/opt/mssql
-    networks:
-      - microservice-network
+      - "${API_PORT}:8080"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.00"
+        reservations:
+          memory: 1G
+          cpus: "1.00"
 
 networks:
-  microservice-network:
+  default:
     driver: bridge
-
-volumes:
-  sqlserver-data:
