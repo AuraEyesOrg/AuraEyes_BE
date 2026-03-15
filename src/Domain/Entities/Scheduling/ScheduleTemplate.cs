@@ -29,6 +29,9 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
     /// <summary>Maximum concurrent patients per slot.</summary>
     public int MaxCapacity { get; private set; }
 
+    /// <summary>Default cost for slots generated from this template (optional).</summary>
+    public decimal? Cost { get; private set; }
+
     // Navigation
     private readonly List<AppointmentSlot> _appointmentSlots = new();
     public IReadOnlyCollection<AppointmentSlot> AppointmentSlots => _appointmentSlots.AsReadOnly();
@@ -42,7 +45,8 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         int slotDuration,
         int maxCapacity,
         Guid? orgId = null,
-        Guid? ophthalId = null)
+        Guid? ophthalId = null,
+        decimal? cost = null)
     {
         if (endTime <= startTime)
             throw new ArgumentException("End time must be after start time");
@@ -52,12 +56,17 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
             throw new ArgumentException("Max capacity must be at least 1", nameof(maxCapacity));
         if (orgId is null && ophthalId is null)
             throw new ArgumentException("At least one of OrgId or OphthalId must be provided");
+        if (orgId.HasValue && ophthalId.HasValue)
+            throw new ArgumentException("OrgId must be null when OphthalId is provided.");
+        if (cost.HasValue && cost.Value < 0)
+            throw new ArgumentException("Cost cannot be negative", nameof(cost));
 
         DayOfWeek = dayOfWeek;
         StartTime = startTime;
         EndTime = endTime;
         SlotDuration = slotDuration;
         MaxCapacity = maxCapacity;
+        Cost = cost;
         OrgId = orgId;
         OphthalId = ophthalId;
     }
@@ -67,7 +76,8 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         TimeOnly startTime,
         TimeOnly endTime,
         int slotDuration,
-        int maxCapacity)
+        int maxCapacity,
+        decimal? cost)
     {
         if (endTime <= startTime)
             throw new ArgumentException("End time must be after start time");
@@ -75,12 +85,15 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
             throw new ArgumentException("Slot duration must be at least 1 minute", nameof(slotDuration));
         if (maxCapacity < 1)
             throw new ArgumentException("Max capacity must be at least 1", nameof(maxCapacity));
+        if (cost.HasValue && cost.Value < 0)
+            throw new ArgumentException("Cost cannot be negative", nameof(cost));
 
         DayOfWeek = dayOfWeek;
         StartTime = startTime;
         EndTime = endTime;
         SlotDuration = slotDuration;
         MaxCapacity = maxCapacity;
+        Cost = cost;
         UpdatedAt = DateTime.UtcNow;
     }
 }

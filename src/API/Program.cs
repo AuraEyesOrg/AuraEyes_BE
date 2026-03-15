@@ -44,12 +44,7 @@ var configuredOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>();
 
-var envOrigins = Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS")
-    ?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-var allowedOrigins = (configuredOrigins is { Length: > 0 }
-        ? configuredOrigins
-        : envOrigins) ??
+var allowedOrigins = configuredOrigins ??
     (builder.Environment.IsDevelopment()
         ? new[] { "http://localhost:5173", "http://localhost:4173", "http://localhost:3000" }
         : Array.Empty<string>());
@@ -209,6 +204,17 @@ if (app.Environment.IsDevelopment())
         options.DisplayRequestDuration();
     });
 }
+else
+{
+    app.UseMiddleware<SwaggerBasicAuthMiddleware>();
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "AURA API v1");
+        options.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.None);
+        options.DisplayRequestDuration();
+    });
+}
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
@@ -248,7 +254,8 @@ if (string.IsNullOrWhiteSpace(quotaResetCron))
 }
 
 // Register recurring jobs
-RecurringJob.AddOrUpdate<DailyQuotaResetJob>(
+var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+recurringJobManager.AddOrUpdate<DailyQuotaResetJob>(
     "daily-quota-reset",
     job => job.ExecuteAsync(),
     quotaResetCron,
