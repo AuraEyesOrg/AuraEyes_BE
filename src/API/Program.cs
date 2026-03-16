@@ -7,6 +7,7 @@ using Hangfire;
 using Hangfire.PostgreSql;
 using Infrastructure;
 using Infrastructure.Services;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using System.Reflection;
@@ -153,6 +154,7 @@ builder.Services.AddSignalR(options =>
 
 // Register SignalR hub service for notification broadcasting
 builder.Services.AddScoped<INotificationHubService, NotificationHubService>();
+builder.Services.AddSingleton<IUserIdProvider, SignalRUserIdProvider>();
 
 // Hangfire - Background job processing
 builder.Services.AddHangfire(config => config
