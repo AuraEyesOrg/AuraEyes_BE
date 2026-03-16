@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.Common.Constants;
 using Domain.Common;
 using Domain.Enums;
 using Domain.Repositories;
@@ -15,15 +16,18 @@ public class ReserveSlotCommandHandler : ICommandHandler<ReserveSlotCommand, Res
 {
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICurrentUserService _currentUser;
     private readonly ILogger<ReserveSlotCommandHandler> _logger;
 
     public ReserveSlotCommandHandler(
         IAppointmentSlotRepository appointmentSlotRepository,
         IUnitOfWork unitOfWork,
+        ICurrentUserService currentUser,
         ILogger<ReserveSlotCommandHandler> logger)
     {
         _appointmentSlotRepository = appointmentSlotRepository;
         _unitOfWork = unitOfWork;
+        _currentUser = currentUser;
         _logger = logger;
     }
 
@@ -34,6 +38,20 @@ public class ReserveSlotCommandHandler : ICommandHandler<ReserveSlotCommand, Res
 
         try
         {
+            Guid effectivePatientProfileId = request.PatientId;
+
+            if (_currentUser.IsInRole(Roles.Patient))
+            {
+                if (!_currentUser.ProfileId.HasValue)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<ReserveSlotResult>.Forbidden(
+                        "Unable to resolve patient profile from current token.");
+                }
+
+                effectivePatientProfileId = _currentUser.ProfileId.Value;
+            }
+
             // Get the slot with a row lock to prevent concurrent modifications
             var slot = await _appointmentSlotRepository.GetByIdWithLockAsync(
                 request.AppointmentSlotId, cancellationToken);
@@ -42,6 +60,41 @@ public class ReserveSlotCommandHandler : ICommandHandler<ReserveSlotCommand, Res
             {
                 await _unitOfWork.RollbackTransactionAsync(cancellationToken);
                 return Result<ReserveSlotResult>.NotFound($"Appointment slot '{request.AppointmentSlotId}' not found.");
+            }
+
+            // Handle reserved slots first to avoid false conflicts for the same patient.
+            if (slot.Status == ScheduleStatus.Reserved)
+            {
+                if (slot.IsReservationExpired())
+                {
+                    slot.ReleaseReservation();
+                }
+                else
+                {
+                    var reservedByMatchesProfile = slot.ReservedBy == effectivePatientProfileId;
+                    var reservedByMatchesUser = _currentUser.UserId.HasValue && slot.ReservedBy == _currentUser.UserId.Value;
+
+                    if (reservedByMatchesProfile || reservedByMatchesUser)
+                    {
+                        var expiresAt = slot.ReservationExpireAt ?? DateTime.UtcNow.AddMinutes(request.ReservationMinutes);
+                        var remainingSeconds = Math.Max(
+                            0,
+                            (int)Math.Floor((expiresAt - DateTime.UtcNow).TotalSeconds));
+
+                        await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+
+                        return Result<ReserveSlotResult>.Success(new ReserveSlotResult
+                        {
+                            SlotId = slot.Id,
+                            ExpiresAt = expiresAt,
+                            RemainingSeconds = remainingSeconds
+                        });
+                    }
+
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<ReserveSlotResult>.Conflict(
+                        "This slot is already reserved by another patient. Please try a different slot.");
+                }
             }
 
             // Check if slot is available for reservation
@@ -67,14 +120,14 @@ public class ReserveSlotCommandHandler : ICommandHandler<ReserveSlotCommand, Res
             var expirationTime = DateTime.UtcNow.AddMinutes(request.ReservationMinutes);
 
             // Reserve the slot
-            slot.Reserve(request.PatientId, expirationTime);
+            slot.Reserve(effectivePatientProfileId, expirationTime);
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
             _logger.LogInformation(
                 "Slot {SlotId} reserved by patient {PatientId}, expires at {ExpiresAt}",
-                request.AppointmentSlotId, request.PatientId, expirationTime);
+                request.AppointmentSlotId, effectivePatientProfileId, expirationTime);
 
             return Result<ReserveSlotResult>.Success(new ReserveSlotResult
             {
