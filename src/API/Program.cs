@@ -233,7 +233,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Map SignalR hubs for real-time notifications
-app.MapHub<NotificationHub>("/hubs/notifications");
+app.MapHub<NotificationHub>("/api/hubs/notifications");
 
 app.MapHealthChecks("/health");
 
