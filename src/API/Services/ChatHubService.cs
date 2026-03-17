@@ -45,4 +45,32 @@ public class ChatHubService : IChatHubService
             throw;
         }
     }
+
+    /// <inheritdoc />
+    public async Task BroadcastRoomStateChangedAsync(
+        IEnumerable<Guid> userIds,
+        RoomStateChangedDto payload,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = userIds.Select(id => id.ToString()).ToList();
+        if (ids.Count == 0) return;
+
+        try
+        {
+            await _hubContext.Clients
+                .Users(ids)
+                .SendAsync("RoomStateChanged", payload, cancellationToken);
+
+            _logger.LogInformation(
+                "Room state {Event} broadcast for session {SessionId} to {Count} user(s)",
+                payload.Event, payload.SessionId, ids.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to broadcast {Event} for session {SessionId}",
+                payload.Event, payload.SessionId);
+            throw;
+        }
+    }
 }
