@@ -212,6 +212,22 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// System-initiated closure when the grace period expires.
+    /// No doctor validation — called exclusively by background workers.
+    /// </summary>
+    public void CompleteBySystem(string reason = "GracePeriodExpired")
+    {
+        if (Status == SessionStatus.Completed || Status == SessionStatus.Cancelled)
+            return;
+
+        Status = SessionStatus.Completed;
+        ChatStatus = ChatStatus.Archived;
+        ClosedAt = DateTime.UtcNow;
+        ClosingReason = reason;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void Cancel(Guid cancelledBy, string reason = "UserCancelled")
     {
         if (Status == SessionStatus.Completed)

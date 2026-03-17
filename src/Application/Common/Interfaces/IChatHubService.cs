@@ -10,8 +10,10 @@ public interface IChatHubService
     /// <summary>
     /// Broadcasts a realtime chat event to a specific user.
     /// </summary>
-    /// <param name="userId">Target user ID</param>
-    /// <param name="chatMessage">Realtime chat payload</param>
-    /// <param name="cancellationToken">Cancellation token</param>
     Task BroadcastChatMessageAsync(Guid userId, ChatMessageRealtimeDto chatMessage, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Broadcasts a room state change (ROOM_OPENED / ROOM_CLOSED) to multiple users.
+    /// </summary>
+    Task BroadcastRoomStateChangedAsync(IEnumerable<Guid> userIds, RoomStateChangedDto payload, CancellationToken cancellationToken = default);
 }

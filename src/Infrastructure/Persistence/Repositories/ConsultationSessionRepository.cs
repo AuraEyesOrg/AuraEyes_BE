@@ -105,4 +105,36 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ConsultationSession>> GetSessionsReadyToOpenAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+
+        return await _dbSet
+            .Where(s =>
+                s.Type == ConsultationSessionType.VideoCall &&
+                s.ChatStatus == ChatStatus.MemoOnly &&
+                s.Status != SessionStatus.Cancelled &&
+                s.AppointmentTime != null &&
+                s.AppointmentTime <= now)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ConsultationSession>> GetSessionsPastGracePeriodAsync(
+        TimeSpan slotDuration,
+        TimeSpan gracePeriod,
+        CancellationToken cancellationToken = default)
+    {
+        var cutoff = DateTime.UtcNow - slotDuration - gracePeriod;
+
+        return await _dbSet
+            .Where(s =>
+                s.Type == ConsultationSessionType.VideoCall &&
+                s.ChatStatus == ChatStatus.Open &&
+                s.Status != SessionStatus.Completed &&
+                s.Status != SessionStatus.Cancelled &&
+                s.AppointmentTime != null &&
+                s.AppointmentTime <= cutoff)
+            .ToListAsync(cancellationToken);
+    }
 }

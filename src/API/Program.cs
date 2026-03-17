@@ -276,6 +276,12 @@ if (string.IsNullOrWhiteSpace(quotaResetCron))
     quotaResetCron = defaultQuotaResetCron;
 }
 
+var slotMaintenanceCron = Environment.GetEnvironmentVariable("HANGFIRE_SLOT_MAINTENANCE_CRON");
+if (string.IsNullOrWhiteSpace(slotMaintenanceCron))
+{
+    slotMaintenanceCron = "*/5 * * * *";
+}
+
 if (enableHangfireServer)
 {
     // Register recurring jobs
@@ -285,22 +291,16 @@ if (enableHangfireServer)
         job => job.ExecuteAsync(),
         quotaResetCron,
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+    recurringJobManager.AddOrUpdate<SlotMaintenanceJob>(
+        "slot-maintenance-expire-unused",
+        job => job.ExpireUnusedSlotsAsync(CancellationToken.None),
+        slotMaintenanceCron,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 }
 else
 {
     Log.Warning("Hangfire server is disabled. Recurring jobs are not running in this environment.");
 }
-
-var slotMaintenanceCron = Environment.GetEnvironmentVariable("HANGFIRE_SLOT_MAINTENANCE_CRON");
-if (string.IsNullOrWhiteSpace(slotMaintenanceCron))
-{
-    slotMaintenanceCron = "*/5 * * * *";
-}
-
-recurringJobManager.AddOrUpdate<SlotMaintenanceJob>(
-    "slot-maintenance-expire-unused",
-    job => job.ExpireUnusedSlotsAsync(CancellationToken.None),
-    slotMaintenanceCron,
-    new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
 app.Run();
