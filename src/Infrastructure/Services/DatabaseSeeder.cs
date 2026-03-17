@@ -1,5 +1,6 @@
 using Application.Common.Constants;
 using Domain.Entities.Authorization;
+using Domain.Entities.Contracts;
 using Domain.Entities.Users;
 using Domain.Enums;
 using Infrastructure.Identity;
@@ -70,8 +71,6 @@ public static class DatabaseSeeder
         // Idempotent — runs on every startup so new permissions defined in code
         // are automatically added to the database on next deployment.
         await SeedPermissionsAsync(context, roleManager, logger);
-
-        // Contract templates are managed by upload endpoints and are not seeded.
     }
 
     private static async Task SeedRolesAsync(RoleManager<ApplicationRole> roleManager, ILogger? logger)

@@ -53,7 +53,7 @@ public class ContractTemplateRepository : Repository<ContractTemplate>, IContrac
     {
         var query = _context.ContractTemplates
             .AsNoTracking()
-            .Where(t => !t.IsDeleted && t.Type == type && t.ContractVersion == version);
+            .Where(t => t.Type == type && t.ContractVersion == version);
 
         if (excludeId.HasValue)
             query = query.Where(t => t.Id != excludeId.Value);

@@ -5,6 +5,7 @@ using Application.SystemAdmin.ContractTemplates.Common;
 using Domain.Common;
 using Domain.Repositories;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.SystemAdmin.ContractTemplates.Commands.UpdateContractTemplate;
 
@@ -41,9 +42,19 @@ public class UpdateContractTemplateCommandHandler
             return Result<ContractTemplateDetailDto>.Conflict(
                 $"A template of type '{request.Type}' with version '{request.ContractVersion}' already exists.");
 
-        template.Update(request.Title, request.Type, request.ContractVersion, request.ContentTemplate, request.EffectiveDate);
+        var effectiveDateUtc = NormalizeToUtc(request.EffectiveDate);
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        template.Update(request.Title, request.Type, request.ContractVersion, request.ContentTemplate, effectiveDateUtc);
+
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsVersionUniqueConstraintViolation(ex))
+        {
+            return Result<ContractTemplateDetailDto>.Conflict(
+                $"A template of type '{request.Type}' with version '{request.ContractVersion}' already exists.");
+        }
 
         _logger.LogInformation(
             "Contract template {Id} updated to version '{Version}'",
@@ -52,4 +63,20 @@ public class UpdateContractTemplateCommandHandler
         return Result<ContractTemplateDetailDto>.Success(
             CreateContractTemplateCommandHandler.ToDetailDto(template));
     }
+
+    private static DateTime? NormalizeToUtc(DateTime? value)
+    {
+        if (!value.HasValue)
+            return null;
+
+        return value.Value.Kind switch
+        {
+            DateTimeKind.Utc => value.Value,
+            DateTimeKind.Local => value.Value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+        };
+    }
+
+    private static bool IsVersionUniqueConstraintViolation(DbUpdateException ex)
+        => ex.InnerException?.Message.Contains("IX_ContractTemplates_Type_ContractVersion", StringComparison.OrdinalIgnoreCase) == true;
 }

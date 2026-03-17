@@ -192,8 +192,9 @@ public partial class ContractTemplatesController
             return new TemplateUploadResult(false, ErrorMessage: "Template DOCX file is required.");
 
         var extension = Path.GetExtension(templateFile.FileName);
-        if (!string.Equals(extension, ".docx", StringComparison.OrdinalIgnoreCase))
-            return new TemplateUploadResult(false, ErrorMessage: "Only .docx files are allowed for contract templates.");
+        if (!string.Equals(extension, ".docx", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(extension, ".doc", StringComparison.OrdinalIgnoreCase))
+            return new TemplateUploadResult(false, ErrorMessage: "Only .doc and .docx files are allowed for contract templates.");
 
         const long maxSizeBytes = 20 * 1024 * 1024;
         if (templateFile.Length > maxSizeBytes)

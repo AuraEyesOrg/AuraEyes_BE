@@ -6,6 +6,7 @@ using Domain.Common;
 using Domain.Entities.Contracts;
 using Domain.Repositories;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.SystemAdmin.ContractTemplates.Commands.DuplicateContractTemplate;
 
@@ -54,7 +55,15 @@ public class DuplicateContractTemplateCommandHandler
             source.EffectiveDate);
 
         await _repository.AddAsync(clone, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsVersionUniqueConstraintViolation(ex))
+        {
+            return Result<ContractTemplateDetailDto>.Conflict(
+                $"A template of type '{source.Type}' with version '{candidateVersion}' already exists.");
+        }
 
         _logger.LogInformation(
             "Contract template {SourceId} duplicated as {NewId} (v{Version})",
@@ -63,4 +72,7 @@ public class DuplicateContractTemplateCommandHandler
         return Result<ContractTemplateDetailDto>.Success(
             CreateContractTemplateCommandHandler.ToDetailDto(clone));
     }
+
+    private static bool IsVersionUniqueConstraintViolation(DbUpdateException ex)
+        => ex.InnerException?.Message.Contains("IX_ContractTemplates_Type_ContractVersion", StringComparison.OrdinalIgnoreCase) == true;
 }
