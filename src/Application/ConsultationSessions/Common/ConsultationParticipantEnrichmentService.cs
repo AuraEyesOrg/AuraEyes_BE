@@ -125,34 +125,19 @@ public class ConsultationParticipantEnrichmentService : IConsultationParticipant
             return [];
         }
 
-        var profileTasks = distinctProfileIds.ToDictionary(
-            profileId => profileId,
-            profileId => getProfileAsync(profileId, cancellationToken));
-
-        await Task.WhenAll(profileTasks.Values);
-
-        var userTasks = new Dictionary<Guid, Task<UserDto?>>();
-
+        var displayLookup = new Dictionary<Guid, ConsultationParticipantDisplayData>();
         foreach (var profileId in distinctProfileIds)
         {
-            var profile = await profileTasks[profileId];
+            var profile = await getProfileAsync(profileId, cancellationToken);
             if (profile is null)
             {
                 continue;
             }
 
-            userTasks[profileId] = _identityService.GetUserByIdAsync(
+            var user = await _identityService.GetUserByIdAsync(
                 getUserId(profile),
                 cancellationToken);
-        }
 
-        await Task.WhenAll(userTasks.Values);
-
-        var displayLookup = new Dictionary<Guid, ConsultationParticipantDisplayData>();
-
-        foreach (var profileId in userTasks.Keys)
-        {
-            var user = await userTasks[profileId];
             displayLookup[profileId] = new ConsultationParticipantDisplayData(
                 user?.FullName,
                 user?.AvatarUrl);

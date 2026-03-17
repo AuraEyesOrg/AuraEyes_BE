@@ -26,7 +26,7 @@ public class AuthController : BaseApiController
         _authService = authService;
         _currentUserService = currentUserService;
         _logger = logger;
-        _frontendUrl = configuration["FrontendUrl"] ?? "http://localhost:5173";
+        _frontendUrl = configuration["FrontendUrl"] ?? "http://localhost:3000";
     }
 
     /// <summary>
@@ -63,6 +63,22 @@ public class AuthController : BaseApiController
         var result = await _authService.RegisterOphthalmologistAsync(request, confirmationUrlBase!, cancellationToken);
 
         return HandleResult(result, result.Data?.Message ?? "Registration successful");
+    }
+
+    /// <summary>
+    /// Submit a new organisation onboarding request.
+    /// </summary>
+    [HttpPost("register/organisation")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<OrganisationRegistrationResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RegisterOrganisation(
+        [FromBody] RegisterOrganisationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _authService.RegisterOrganisationAsync(request, cancellationToken);
+        return HandleResult(result, result.Data?.Message ?? "Organisation registration submitted successfully");
     }
 
     [HttpPost("google-login")]

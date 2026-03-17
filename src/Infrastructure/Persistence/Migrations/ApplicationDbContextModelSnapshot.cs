@@ -697,80 +697,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.ToTable("ContractTemplates");
                 });
 
-            modelBuilder.Entity("Domain.Entities.Contracts.ContractTemplateVariable", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<string>("DefaultValue")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("IsRequired")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<string>("Key")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Label")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("SelectOptions")
-                        .HasColumnType("text");
-
-                    b.Property<int>("SortOrder")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<Guid>("TemplateId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Unit")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<string>("VariableType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TemplateId", "Key")
-                        .IsUnique();
-
-                    b.ToTable("ContractTemplateVariables", (string)null);
-                });
-
             modelBuilder.Entity("Domain.Entities.Financial.DepositRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1770,7 +1696,10 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrgId");
 
-                    b.ToTable("ScheduleTemplates");
+                    b.ToTable("ScheduleTemplates", t =>
+                        {
+                            t.HasCheckConstraint("CK_ScheduleTemplates_OphthalWithoutOrg", "\"OphthalId\" IS NULL OR \"OrgId\" IS NULL");
+                        });
                 });
 
             modelBuilder.Entity("Domain.Entities.Screening.AiScreening", b =>
@@ -2218,6 +2147,11 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("PurchasedAiQuota")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<decimal>("RatingAverage")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(4, 2)
@@ -2225,11 +2159,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasDefaultValue(0m);
 
                     b.Property<int>("RatingCount")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<int>("PurchasedAiQuota")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
@@ -2248,6 +2177,88 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Organisations");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Users.OrganisationOnboardingRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContactEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ContactFullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("LicenseNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("OrgAdminUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OrgType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid?>("OrganisationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OrganisationName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContactEmail", "Status");
+
+                    b.ToTable("OrganisationOnboardingRequests");
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.Patient", b =>
@@ -2771,15 +2782,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Navigation("Template");
                 });
 
-            modelBuilder.Entity("Domain.Entities.Contracts.ContractTemplateVariable", b =>
-                {
-                    b.HasOne("Domain.Entities.Contracts.ContractTemplate", null)
-                        .WithMany("Variables")
-                        .HasForeignKey("TemplateId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Domain.Entities.Financial.DepositRequest", b =>
                 {
                     b.HasOne("Domain.Entities.Financial.Wallet", "Wallet")
@@ -3058,11 +3060,6 @@ namespace Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Domain.Entities.Consultation.Conversation", b =>
                 {
                     b.Navigation("Messages");
-                });
-
-            modelBuilder.Entity("Domain.Entities.Contracts.ContractTemplate", b =>
-                {
-                    b.Navigation("Variables");
                 });
 
             modelBuilder.Entity("Domain.Entities.Financial.Order", b =>

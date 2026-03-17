@@ -4,8 +4,7 @@ using Domain.Enums;
 namespace Domain.Entities.Contracts;
 
 /// <summary>
-/// Contract Template entity — stores an HTML layout with <c>{{variable}}</c> placeholders
-/// plus structured variable metadata (key, type, label, options) used by the editor UI.
+/// Contract Template entity.
 /// </summary>
 public class ContractTemplate : BaseEntity, IAggregateRoot
 {
@@ -15,11 +14,6 @@ public class ContractTemplate : BaseEntity, IAggregateRoot
     public string ContentTemplate { get; private set; } = string.Empty;
     public bool IsActive { get; private set; }
     public DateTime? EffectiveDate { get; private set; }
-
-    private readonly List<ContractTemplateVariable> _variables = new();
-
-    /// <summary>Structured definition of every <c>{{key}}</c> placeholder in <see cref="ContentTemplate"/>.</summary>
-    public IReadOnlyCollection<ContractTemplateVariable> Variables => _variables.AsReadOnly();
 
     private ContractTemplate() { } // EF Core
 
@@ -55,46 +49,6 @@ public class ContractTemplate : BaseEntity, IAggregateRoot
         ContractVersion = contractVersion;
         ContentTemplate = contentTemplate;
         EffectiveDate = effectiveDate;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// Merge <paramref name="variables"/> into the template's variable collection.
-    /// Existing keys are updated in-place (preserving their row Id), keys absent from the
-    /// incoming set are removed, and brand-new keys are inserted.  Using merge rather than
-    /// Clear+AddAll avoids EF Core circular-dependency errors caused by the unique index on
-    /// (TemplateId, Key) when both a deletion and an insertion for the same key land in the
-    /// same SaveChanges call.
-    /// </summary>
-    public void SetVariables(IEnumerable<ContractTemplateVariable> variables)
-    {
-        var incoming = variables.ToList();
-        var incomingKeys = incoming.Select(v => v.Key).ToHashSet(StringComparer.Ordinal);
-
-        // Remove variables whose keys are no longer present
-        foreach (var stale in _variables.Where(v => !incomingKeys.Contains(v.Key)).ToList())
-            _variables.Remove(stale);
-
-        // Update existing entries in-place; add truly new ones
-        foreach (var v in incoming)
-        {
-            var existing = _variables.FirstOrDefault(e => e.Key == v.Key);
-            if (existing is null)
-                _variables.Add(v);
-            else
-                existing.Update(v.Label, v.VariableType, v.Description, v.DefaultValue,
-                                v.SelectOptions, v.Unit, v.IsRequired, v.SortOrder);
-        }
-
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    /// <summary>Add a single variable definition.</summary>
-    public void AddVariable(ContractTemplateVariable variable)
-    {
-        if (_variables.Any(v => v.Key == variable.Key))
-            throw new InvalidOperationException($"Variable key '{variable.Key}' already exists in this template.");
-        _variables.Add(variable);
         UpdatedAt = DateTime.UtcNow;
     }
 

@@ -6,6 +6,7 @@ using Domain.Common;
 using Domain.Entities.Contracts;
 using Domain.Repositories;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.SystemAdmin.ContractTemplates.Commands.DuplicateContractTemplate;
 
@@ -30,7 +31,7 @@ public class DuplicateContractTemplateCommandHandler
         DuplicateContractTemplateCommand request,
         CancellationToken cancellationToken)
     {
-        var source = await _repository.GetByIdWithVariablesAsync(request.SourceId, cancellationToken);
+        var source = await _repository.GetByIdAsync(request.SourceId, cancellationToken);
         if (source is null)
             return Result<ContractTemplateDetailDto>.NotFound(
                 $"Source contract template {request.SourceId} not found.");
@@ -53,25 +54,16 @@ public class DuplicateContractTemplateCommandHandler
             source.ContentTemplate,
             source.EffectiveDate);
 
-        // Copy all variable definitions
-        var clonedVariables = source.Variables
-            .OrderBy(v => v.SortOrder)
-            .Select(v => new ContractTemplateVariable(
-                clone.Id,
-                v.Key,
-                v.Label,
-                v.VariableType,
-                v.Description,
-                v.DefaultValue,
-                v.SelectOptions,
-                v.Unit,
-                v.IsRequired,
-                v.SortOrder));
-
-        clone.SetVariables(clonedVariables);
-
         await _repository.AddAsync(clone, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsVersionUniqueConstraintViolation(ex))
+        {
+            return Result<ContractTemplateDetailDto>.Conflict(
+                $"A template of type '{source.Type}' with version '{candidateVersion}' already exists.");
+        }
 
         _logger.LogInformation(
             "Contract template {SourceId} duplicated as {NewId} (v{Version})",
@@ -80,4 +72,7 @@ public class DuplicateContractTemplateCommandHandler
         return Result<ContractTemplateDetailDto>.Success(
             CreateContractTemplateCommandHandler.ToDetailDto(clone));
     }
+
+    private static bool IsVersionUniqueConstraintViolation(DbUpdateException ex)
+        => ex.InnerException?.Message.Contains("IX_ContractTemplates_Type_ContractVersion", StringComparison.OrdinalIgnoreCase) == true;
 }

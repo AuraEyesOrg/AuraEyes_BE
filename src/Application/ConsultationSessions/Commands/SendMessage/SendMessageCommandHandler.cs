@@ -14,7 +14,9 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
     private readonly IRepository<Conversation> _conversationRepository;
     private readonly ICurrentUserService _currentUser;
     private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
+    private readonly IRepository<Patient> _patientRepository;
     private readonly INotificationService _notificationService;
+    private readonly IChatHubService _chatHubService;
     private readonly IUnitOfWork _unitOfWork;
 
     public SendMessageCommandHandler(
@@ -22,14 +24,18 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         IRepository<Conversation> conversationRepository,
         ICurrentUserService currentUser,
         IRepository<Ophthalmologist> ophthalmologistRepository,
+        IRepository<Patient> patientRepository,
         INotificationService notificationService,
+        IChatHubService chatHubService,
         IUnitOfWork unitOfWork)
     {
         _sessionRepository = sessionRepository;
         _conversationRepository = conversationRepository;
         _currentUser = currentUser;
         _ophthalmologistRepository = ophthalmologistRepository;
+        _patientRepository = patientRepository;
         _notificationService = notificationService;
+        _chatHubService = chatHubService;
         _unitOfWork = unitOfWork;
     }
 
@@ -82,6 +88,38 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         session.RecordActivity();
         await _sessionRepository.UpdateAsync(session, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Push realtime chat event to the other participant.
+        Guid? recipientUserId = null;
+
+        if (isPatient && session.OphthalmologistId.HasValue)
+        {
+            var ophthalmologist = await _ophthalmologistRepository.GetByIdAsync(
+                session.OphthalmologistId.Value,
+                cancellationToken);
+            recipientUserId = ophthalmologist?.UserId;
+        }
+        else if (isDoctor)
+        {
+            var patient = await _patientRepository.GetByIdAsync(
+                session.PatientId,
+                cancellationToken);
+            recipientUserId = patient?.UserId;
+        }
+
+        if (recipientUserId.HasValue)
+        {
+            await _chatHubService.BroadcastChatMessageAsync(
+                recipientUserId.Value,
+                new ChatMessageRealtimeDto
+                {
+                    SessionId = session.Id,
+                    MessageId = chatMessage.Id,
+                    SenderProfileId = senderProfileId,
+                    SentAt = chatMessage.SentAt
+                },
+                cancellationToken);
+        }
 
         // Send real-time notification to the other party [FR-47]
         if (isPatient && session.OphthalmologistId.HasValue)

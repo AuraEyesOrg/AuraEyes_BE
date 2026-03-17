@@ -27,11 +27,11 @@ public static class DependencyInjection
     {
         // Register audit interceptor
         services.AddScoped<AuditInterceptor>();
-      
+
         // Register MediatR handlers that live in this assembly (query handlers, etc.)
         services.AddMediatR(cfg =>
             cfg.RegisterServicesFromAssembly(typeof(DependencyInjection).Assembly));
-      
+
         // Database configuration
         services.AddDbContext<ApplicationDbContext>((sp, options) =>
         {
@@ -52,6 +52,9 @@ public static class DependencyInjection
 
         // SMTP Settings
         services.Configure<SmtpSettings>(configuration.GetSection(SmtpSettings.SectionName));
+
+        // Admin notification settings
+        services.Configure<AdminNotificationSettings>(configuration.GetSection(AdminNotificationSettings.SectionName));
 
         // Supabase Storage Settings
         services.Configure<SupabaseStorageSettings>(configuration.GetSection(SupabaseStorageSettings.SectionName));
@@ -132,7 +135,7 @@ public static class DependencyInjection
             .AddPolicy(Policies.PatientOnly, policy => policy.RequireRole(Roles.Patient))
             .AddPolicy(Policies.OphthalmologistOnly, policy => policy.RequireRole(Roles.Ophthalmologist))
             .AddPolicy(Policies.OrgAdminOnly, policy => policy.RequireRole(Roles.OrgAdmin))
-            .AddPolicy(Policies.OphthalmologistOrOrgAdmin, policy => 
+            .AddPolicy(Policies.OphthalmologistOrOrgAdmin, policy =>
                 policy.RequireRole(Roles.Ophthalmologist, Roles.OrgAdmin))
             .AddPolicy(Policies.SystemAdminOnly, policy => policy.RequireRole(Roles.SystemAdmin))
             .AddPolicy(Policies.AdminsOnly, policy => policy.RequireRole(Roles.Admins))
@@ -171,11 +174,13 @@ public static class DependencyInjection
         // Register other services
         services.AddTransient<IDateTime, DateTimeService>();
         services.AddTransient<IEmailService, EmailService>();
+        services.AddScoped<IOrganisationOnboardingService, OrganisationOnboardingService>();
         services.AddScoped<IFileStorageService, SupabaseStorageService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IGoogleMeetService, GoogleMeetService>();
         services.AddScoped<IAdminQueryService, AdminQueryService>();
         services.AddScoped<IAiQuotaService, AiQuotaService>();
+        services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
@@ -183,6 +188,7 @@ public static class DependencyInjection
 
         // Register Hangfire daily job
         services.AddScoped<DailyQuotaResetJob>();
+        services.AddScoped<SlotMaintenanceJob>();
 
         // Configure PayOS Settings
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));

@@ -16,7 +16,7 @@ public class Organisation : BaseEntity, IAggregateRoot
     public decimal RatingAverage { get; private set; }
     public int RatingCount { get; private set; }
 
-    /// <summary>Total AI screening credits purchased (cumulative, never reset).</summary>
+    /// <summary>Current purchased AI screening credits balance.</summary>
     public int PurchasedAiQuota { get; private set; }
 
     /// <summary>AI screening credits used today (reset to 0 daily by Hangfire job).</summary>
@@ -75,9 +75,27 @@ public class Organisation : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void IncrementUsedQuota()
+    public bool HasAvailableQuota(int freeQuota)
     {
-        UsedAiQuota++;
+        return UsedAiQuota < freeQuota || PurchasedAiQuota > 0;
+    }
+
+    public void ConsumeQuota(int freeQuota)
+    {
+        if (freeQuota < 0)
+            throw new ArgumentOutOfRangeException(nameof(freeQuota));
+
+        if (UsedAiQuota < freeQuota)
+        {
+            UsedAiQuota++;
+            UpdatedAt = DateTime.UtcNow;
+            return;
+        }
+
+        if (PurchasedAiQuota <= 0)
+            throw new InvalidOperationException("No AI quota available.");
+
+        PurchasedAiQuota--;
         UpdatedAt = DateTime.UtcNow;
     }
 

@@ -17,6 +17,7 @@ public class CreateClinicAppointmentCommandHandler
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IRepository<Organisation> _organisationRepository;
     private readonly ICurrentUserService _currentUser;
+    private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CreateClinicAppointmentCommandHandler> _logger;
 
@@ -25,6 +26,7 @@ public class CreateClinicAppointmentCommandHandler
         IAppointmentRepository appointmentRepository,
         IRepository<Organisation> organisationRepository,
         ICurrentUserService currentUser,
+        INotificationService notificationService,
         IUnitOfWork unitOfWork,
         ILogger<CreateClinicAppointmentCommandHandler> logger)
     {
@@ -32,6 +34,7 @@ public class CreateClinicAppointmentCommandHandler
         _appointmentRepository = appointmentRepository;
         _organisationRepository = organisationRepository;
         _currentUser = currentUser;
+        _notificationService = notificationService;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -118,6 +121,33 @@ public class CreateClinicAppointmentCommandHandler
                 patientId,
                 request.SlotId,
                 request.OrganisationId);
+
+            if (_currentUser.UserId.HasValue)
+            {
+                try
+                {
+                    await _notificationService.SendAsync(
+                        _currentUser.UserId.Value,
+                        "Đặt lịch khám thành công",
+                        $"Lịch khám tại {organisation.Name} đã được xác nhận cho {slot.Date:dd/MM/yyyy} lúc {slot.StartTime.ToString("HH:mm")}.",
+                        NotificationType.NewAppointmentBooked,
+                        new
+                        {
+                            AppointmentId = appointment.Id,
+                            AppointmentTime = $"{slot.Date:yyyy-MM-dd}T{slot.StartTime.ToString("HH:mm")}:00",
+                            Reason = request.VisitReason,
+                            OrganisationId = request.OrganisationId
+                        },
+                        cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Failed to send appointment booking notification for appointment {AppointmentId}",
+                        appointment.Id);
+                }
+            }
 
             return Result<CreateClinicAppointmentResult>.Success(new CreateClinicAppointmentResult
             {

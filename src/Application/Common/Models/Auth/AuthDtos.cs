@@ -11,11 +11,11 @@ public record LoginRequest
     [Required]
     [EmailAddress]
     public string Email { get; init; } = string.Empty;
-    
+
     [Required]
     [MinLength(8)]
     public string Password { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// Optional: Device information for refresh token tracking.
     /// </summary>
@@ -30,23 +30,23 @@ public record RegisterPatientRequest
     [Required]
     [EmailAddress]
     public string Email { get; init; } = string.Empty;
-    
+
     [Required]
     [MinLength(8)]
     public string Password { get; init; } = string.Empty;
-    
+
     [Required]
     [Compare(nameof(Password))]
     public string ConfirmPassword { get; init; } = string.Empty;
-    
+
     [Required]
     [MaxLength(200)]
     public string FullName { get; init; } = string.Empty;
-    
+
     public string? Address { get; init; }
-    
+
     public DateTime? DateOfBirth { get; init; }
-    
+
     public int? Gender { get; init; }
 }
 
@@ -59,38 +59,65 @@ public class RegisterOphthalmologistRequest
     [Required]
     [EmailAddress]
     public string Email { get; set; } = string.Empty;
-    
+
     [Required]
     [MinLength(8)]
     public string Password { get; set; } = string.Empty;
-    
+
     [Required]
     [Compare(nameof(Password))]
     public string ConfirmPassword { get; set; } = string.Empty;
-    
+
     [Required]
     [MaxLength(200)]
     public string FullName { get; set; } = string.Empty;
-    
+
     [Phone]
     public string? Phone { get; set; }
-    
+
     public string? Bio { get; set; }
-    
+
     [Range(0, 70)]
     public int YearsOfExperience { get; set; }
-    
+
     public Guid? OrganizationId { get; set; }
-    
+
     /// <summary>
     /// Medical license image. Accepts PDF, JPG, PNG.
     /// </summary>
     public IFormFile? LicenseImage { get; set; }
-    
+
     /// <summary>
     /// Medical degree image. Accepts PDF, JPG, PNG.
     /// </summary>
     public IFormFile? DegreeImage { get; set; }
+}
+
+public record RegisterOrganisationRequest
+{
+    [Required]
+    [EmailAddress]
+    public string ContactEmail { get; init; } = string.Empty;
+
+    [Required]
+    [MaxLength(200)]
+    public string ContactFullName { get; init; } = string.Empty;
+
+    [Required]
+    [MaxLength(200)]
+    public string OrganisationName { get; init; } = string.Empty;
+
+    [Required]
+    public int OrgType { get; init; }
+
+    [Phone]
+    public string? ContactPhone { get; init; }
+
+    public string? Address { get; init; }
+
+    public string? LicenseNumber { get; init; }
+
+    public string? Notes { get; init; }
 }
 
 /// <summary>
@@ -104,10 +131,10 @@ public record AuthResponse
     public DateTime? ExpiresAt { get; init; }
     public UserInfoResponse? User { get; init; }
     public string[] Errors { get; init; } = Array.Empty<string>();
-    
+
     public static AuthResponse Success(
-        string accessToken, 
-        string refreshToken, 
+        string accessToken,
+        string refreshToken,
         DateTime expiresAt,
         UserInfoResponse user)
     {
@@ -120,7 +147,7 @@ public record AuthResponse
             User = user
         };
     }
-    
+
     public static AuthResponse Failure(params string[] errors)
     {
         return new AuthResponse
@@ -148,19 +175,19 @@ public record UserInfoResponse
     /// Indicates if 2FA is enabled for this user.
     /// </summary>
     public bool TwoFactorEnabled { get; init; }
-    
+
     /// <summary>
     /// Indicates if the ophthalmologist's credentials have been verified.
     /// Null for non-ophthalmologist roles.
     /// </summary>
     public bool? IsVerified { get; init; }
-    
+
     /// <summary>
     /// Ophthalmologist verification status (PendingVerification, Approved, Rejected).
     /// Null for non-ophthalmologist roles.
     /// </summary>
     public string? VerificationStatus { get; init; }
-    
+
     /// <summary>
     /// Contract status for the ophthalmologist (Draft, PendingSignature, Active, etc.).
     /// Null for non-ophthalmologist roles or if no contract exists.
@@ -175,7 +202,7 @@ public record RefreshTokenRequest
 {
     [Required]
     public string AccessToken { get; init; } = string.Empty;
-    
+
     [Required]
     public string RefreshToken { get; init; } = string.Empty;
 }
@@ -197,14 +224,14 @@ public record ResetPasswordRequest
 {
     [Required]
     public string UserId { get; init; } = string.Empty;
-    
+
     [Required]
     public string Token { get; init; } = string.Empty;
-    
+
     [Required]
     [MinLength(8)]
     public string NewPassword { get; init; } = string.Empty;
-    
+
     [Required]
     [Compare(nameof(NewPassword))]
     public string ConfirmPassword { get; init; } = string.Empty;
@@ -217,7 +244,7 @@ public record ConfirmEmailRequest
 {
     [Required]
     public string UserId { get; init; } = string.Empty;
-    
+
     [Required]
     public string Token { get; init; } = string.Empty;
 }
@@ -274,11 +301,11 @@ public record VerifyTwoFactorRequest
 {
     [Required]
     public Guid UserId { get; init; }
-    
+
     [Required]
     [StringLength(10, MinimumLength = 6)]
     public string Code { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// Set to true if the code is a recovery code instead of TOTP.
     /// </summary>

@@ -10,5 +10,7 @@ public enum ScheduleStatus
     /// <summary>Slot is temporarily reserved by a patient (pending payment).</summary>
     Reserved = 6,
     /// <summary>Slot is blocked by doctor (not available for booking).</summary>
-    Blocked = 7
+    Blocked = 7,
+    /// <summary>Slot start time has passed and it was never booked.</summary>
+    Expired = 8
 }

@@ -9,6 +9,7 @@ using Application.Ophthalmologists.Commands.VerifyOphthalmologist;
 using Application.Ophthalmologists.Common;
 using Application.Ophthalmologists.Contracts.GetMyContract;
 using Application.Ophthalmologists.Contracts.UploadSignedContract;
+using Application.Ophthalmologists.Queries.GetDashboardMetrics;
 using Application.Ophthalmologists.Queries.GetOphthalmologist;
 using Application.Ophthalmologists.Queries.GetOphthalmologists;
 using Application.SystemAdmin.Contracts.Common;
@@ -195,6 +196,18 @@ public class OphthalmologistsController : BaseApiController
             return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
 
         var result = await _mediator.Send(new GetMyContractQuery(userId.Value));
+        return HandleResult(result);
+    }
+
+    [HttpGet("dashboard-metrics")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<OphthalmologistDashboardMetricsDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDashboardMetrics()
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
+
+        var result = await _mediator.Send(new GetDashboardMetricsQuery(_currentUserService.UserId.Value));
         return HandleResult(result);
     }
 

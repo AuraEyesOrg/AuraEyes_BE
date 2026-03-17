@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using Npgsql;
 using System.Net;
 
 namespace API.Middleware;
@@ -70,6 +71,18 @@ public class ExceptionHandlingMiddleware
                     Status = (int)code,
                     Title = "Unauthorized",
                     Detail = exception.Message
+                });
+                break;
+
+            case PostgresException postgresException
+                when postgresException.SqlState is "XX000" or "53300" &&
+                     postgresException.MessageText.Contains("max clients", StringComparison.OrdinalIgnoreCase):
+                code = HttpStatusCode.ServiceUnavailable;
+                result = System.Text.Json.JsonSerializer.Serialize(new ProblemDetails
+                {
+                    Status = (int)code,
+                    Title = "Database is temporarily busy",
+                    Detail = "Database connection pool is exhausted. Please retry in a moment."
                 });
                 break;
 
