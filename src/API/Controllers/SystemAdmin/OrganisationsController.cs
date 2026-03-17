@@ -1,5 +1,7 @@
 using Application.Common.Constants;
 using Application.Common.Models;
+using Application.Common.Interfaces;
+using Application.SystemAdmin.Organisations.Common;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisationMetrics;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisations;
 using Domain.Common;
@@ -21,11 +23,19 @@ public class OrganisationsController : BaseApiController
 {
     private readonly IMediator _mediator;
     private readonly IRepository<Organisation> _organisationRepository;
+    private readonly IOrganisationOnboardingService _organisationOnboardingService;
+    private readonly ICurrentUserService _currentUserService;
 
-    public OrganisationsController(IMediator mediator, IRepository<Organisation> organisationRepository)
+    public OrganisationsController(
+        IMediator mediator,
+        IRepository<Organisation> organisationRepository,
+        IOrganisationOnboardingService organisationOnboardingService,
+        ICurrentUserService currentUserService)
     {
         _mediator = mediator;
         _organisationRepository = organisationRepository;
+        _organisationOnboardingService = organisationOnboardingService;
+        _currentUserService = currentUserService;
     }
 
     /// <summary>
@@ -101,5 +111,29 @@ public class OrganisationsController : BaseApiController
         };
 
         return Ok(ApiResponseFactory.Success(dto));
+    }
+
+    [HttpGet("onboarding-requests")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<OrganisationOnboardingRequestDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOnboardingRequests(CancellationToken cancellationToken)
+    {
+        var result = await _organisationOnboardingService.GetRequestsAsync(cancellationToken);
+        return HandleResult(result);
+    }
+
+    [HttpPost("onboarding-requests/{id:guid}/approve")]
+    [ProducesResponseType(typeof(ApiResponse<ApproveOrganisationOnboardingResult>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ApproveOnboardingRequest(Guid id, CancellationToken cancellationToken)
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated."));
+
+        var result = await _organisationOnboardingService.ApproveRequestAsync(
+            id,
+            _currentUserService.UserId.Value,
+            cancellationToken);
+        return HandleResult(result, "Organisation onboarding request approved successfully.");
     }
 }

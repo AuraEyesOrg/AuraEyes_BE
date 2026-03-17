@@ -25,6 +25,10 @@ public interface IAuthService
         string confirmationUrlBase,
         CancellationToken cancellationToken = default);
 
+    Task<Result<OrganisationRegistrationResponse>> RegisterOrganisationAsync(
+        RegisterOrganisationRequest request,
+        CancellationToken cancellationToken = default);
+
 
     Task<Result<LoginResponse>> GoogleLoginAsync(
         GoogleLoginRequest request,
@@ -128,13 +132,13 @@ public record LoginResponse
     public bool RequiresTwoFactor { get; init; }
     public Guid? TwoFactorUserId { get; init; }
     public AuthResponse? AuthResponse { get; init; }
-    
+
     public static LoginResponse TwoFactorRequired(Guid userId) => new()
     {
         RequiresTwoFactor = true,
         TwoFactorUserId = userId
     };
-    
+
     public static LoginResponse Success(AuthResponse authResponse) => new()
     {
         RequiresTwoFactor = false,

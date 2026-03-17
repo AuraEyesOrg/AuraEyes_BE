@@ -35,6 +35,8 @@ internal static class EmailTemplates
     public const string EmailConfirmationSubject = "Xác nhận địa chỉ email - Hệ thống Aura";
     public const string PasswordResetSubject = "Yêu cầu đặt lại mật khẩu - Hệ thống Aura";
     public const string WelcomeSubject = "Chào mừng bạn đến với Hệ thống Aura";
+    public const string OrganisationOnboardingSubject = "[AURA] Yêu cầu đăng ký tổ chức mới";
+    public const string OrganisationAccountProvisionedSubject = "[AURA] Tài khoản tổ chức đã được cấp";
 
     #endregion
 
@@ -276,6 +278,66 @@ internal static class EmailTemplates
             <p style=""margin: 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
                 Trân trọng,<br>
                 <strong>Đội ngũ Aura</strong>
+            </p>";
+
+        return WrapInBaseTemplate(content);
+    }
+
+    public static string GetOrganisationOnboardingAdminBody(
+        string organisationName,
+        string orgType,
+        string contactFullName,
+        string contactEmail,
+        string? contactPhone,
+        string? address,
+        string? licenseNumber,
+        string? notes)
+    {
+        var content = $@"
+            <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 22px; font-weight: 600;"">
+                Yêu cầu đăng ký tổ chức mới
+            </h2>
+            <p style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Có một tổ chức mới vừa gửi biểu mẫu onboarding và đang chờ System Admin xác nhận.
+            </p>
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""border: 1px solid {BorderColor}; border-radius: 8px; margin-bottom: 24px;"">
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor}; width: 180px;"">Tên tổ chức</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{organisationName}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Loại hình</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{orgType}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Người liên hệ</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{contactFullName}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Email</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{contactEmail}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Số điện thoại</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{contactPhone ?? "—"}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Địa chỉ</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{address ?? "—"}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã giấy phép</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{licenseNumber ?? "—"}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600;"">Ghi chú</td><td style=""padding: 12px 16px;"">{notes ?? "—"}</td></tr>
+            </table>
+            <div style=""border-left: 3px solid {BorderWarning}; padding-left: 16px; color: {AlertWarningText};"">
+                Vui lòng vào giao diện quản trị tổ chức để xác nhận và cấp tài khoản.
+            </div>";
+
+        return WrapInBaseTemplate(content);
+    }
+
+    public static string GetOrganisationCredentialsBody(
+        string contactFullName,
+        string organisationName,
+        string email,
+        string temporaryPassword)
+    {
+        var content = $@"
+            <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 22px; font-weight: 600;"">
+                Tài khoản tổ chức đã được tạo
+            </h2>
+            <p style=""margin: 0 0 16px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Xin chào <strong>{contactFullName}</strong>,
+            </p>
+            <p style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                System Admin đã xác nhận hồ sơ của <strong>{organisationName}</strong>. Dưới đây là tài khoản quản trị tổ chức để bạn đăng nhập vào hệ thống AURA:
+            </p>
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BrandSoft}; border: 1px solid {BrandSoftBorder}; border-radius: 8px; margin-bottom: 24px;"">
+                <tr><td style=""padding: 16px;""><p style=""margin: 0 0 8px 0; color: {TextMain}; font-size: 15px;""><strong>Email đăng nhập:</strong> {email}</p><p style=""margin: 0; color: {TextMain}; font-size: 15px;""><strong>Mật khẩu tạm:</strong> {temporaryPassword}</p></td></tr>
+            </table>
+            <p style=""margin: 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Sau khi đăng nhập, vui lòng kiểm tra và hoàn tất ký hợp đồng để kích hoạt quyền truy cập đầy đủ.
             </p>";
 
         return WrapInBaseTemplate(content);
