@@ -7,6 +7,7 @@ using Hangfire;
 using Hangfire.PostgreSql;
 using Infrastructure;
 using Infrastructure.Services;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using System.Reflection;
@@ -154,6 +155,7 @@ builder.Services.AddSignalR(options =>
 // Register SignalR hub service for notification,chat broadcasting
 builder.Services.AddScoped<INotificationHubService, NotificationHubService>();
 builder.Services.AddScoped<IChatHubService, ChatHubService>();
+builder.Services.AddSingleton<IUserIdProvider, SignalRUserIdProvider>();
 
 // Hangfire - Background job processing
 builder.Services.AddHangfire(config => config
@@ -261,6 +263,18 @@ recurringJobManager.AddOrUpdate<DailyQuotaResetJob>(
     "daily-quota-reset",
     job => job.ExecuteAsync(),
     quotaResetCron,
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+var slotMaintenanceCron = Environment.GetEnvironmentVariable("HANGFIRE_SLOT_MAINTENANCE_CRON");
+if (string.IsNullOrWhiteSpace(slotMaintenanceCron))
+{
+    slotMaintenanceCron = "*/5 * * * *";
+}
+
+recurringJobManager.AddOrUpdate<SlotMaintenanceJob>(
+    "slot-maintenance-expire-unused",
+    job => job.ExpireUnusedSlotsAsync(CancellationToken.None),
+    slotMaintenanceCron,
     new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
 app.Run();

@@ -176,6 +176,7 @@ public static class DependencyInjection
         services.AddScoped<IGoogleMeetService, GoogleMeetService>();
         services.AddScoped<IAdminQueryService, AdminQueryService>();
         services.AddScoped<IAiQuotaService, AiQuotaService>();
+        services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
@@ -183,6 +184,7 @@ public static class DependencyInjection
 
         // Register Hangfire daily job
         services.AddScoped<DailyQuotaResetJob>();
+        services.AddScoped<SlotMaintenanceJob>();
 
         // Configure PayOS Settings
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));
