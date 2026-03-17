@@ -151,8 +151,9 @@ builder.Services.AddSignalR(options =>
     options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
 });
 
-// Register SignalR hub service for notification broadcasting
+// Register SignalR hub service for notification,chat broadcasting
 builder.Services.AddScoped<INotificationHubService, NotificationHubService>();
+builder.Services.AddScoped<IChatHubService, ChatHubService>();
 
 // Hangfire - Background job processing
 builder.Services.AddHangfire(config => config
@@ -234,6 +235,7 @@ app.MapControllers();
 
 // Map SignalR hubs for real-time notifications
 app.MapHub<NotificationHub>("/api/hubs/notifications");
+app.MapHub<ChatHub>("/api/hubs/chat");
 
 app.MapHealthChecks("/health");
 
