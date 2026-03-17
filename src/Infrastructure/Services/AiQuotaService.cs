@@ -92,9 +92,14 @@ public class AiQuotaService : IAiQuotaService
             "[AiQuotaService] Patient {PatientId} found — PurchasedAiQuota: {Purchased}, UsedAiQuota: {Used}, FreeQuota: {Free}",
             patient.Id, patient.PurchasedAiQuota, patient.UsedAiQuota, freeQuota);
 
+        var remainingFreeQuota = Math.Max(0, freeQuota - patient.UsedAiQuota);
         var totalQuota = freeQuota + patient.PurchasedAiQuota;
-        var remaining = Math.Max(0, totalQuota - patient.UsedAiQuota);
-        var quotaSource = patient.PurchasedAiQuota > 0 ? "Purchased" : "Free";
+        var remaining = remainingFreeQuota + patient.PurchasedAiQuota;
+        var quotaSource = remainingFreeQuota > 0
+            ? "Free"
+            : patient.PurchasedAiQuota > 0
+                ? "Purchased"
+                : "None";
 
         return new AiQuotaDto
         {
@@ -125,27 +130,34 @@ public class AiQuotaService : IAiQuotaService
             return new AiQuotaDto { TotalQuota = 0, UsedQuota = 0, RemainingQuota = 0, QuotaSource = "None" };
 
         var freeQuota = await GetSettingIntAsync("FREE_AI_QUOTA", 3, cancellationToken);
+        var remainingFreeQuota = Math.Max(0, freeQuota - org.UsedAiQuota);
         var totalQuota = freeQuota + org.PurchasedAiQuota;
-        var remaining = Math.Max(0, totalQuota - org.UsedAiQuota);
+        var remaining = remainingFreeQuota + org.PurchasedAiQuota;
 
         return new AiQuotaDto
         {
             TotalQuota = totalQuota,
             UsedQuota = org.UsedAiQuota,
             RemainingQuota = remaining,
-            QuotaSource = "Organisation"
+            QuotaSource = remainingFreeQuota > 0
+                ? "Free"
+                : org.PurchasedAiQuota > 0
+                    ? "Purchased"
+                    : "None"
         };
     }
 
     public async Task DeductQuotaAsync(Guid userId, string role, CancellationToken cancellationToken = default)
     {
+        var freeQuota = await GetSettingIntAsync("FREE_AI_QUOTA", 3, cancellationToken);
+
         if (string.Equals(role, "Patient", StringComparison.OrdinalIgnoreCase))
         {
             var patient = await _context.Patients
                 .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken)
                 ?? throw new InvalidOperationException("Patient not found.");
 
-            patient.IncrementUsedQuota();
+            patient.ConsumeQuota(freeQuota);
         }
         else if (IsOrganisationQuotaRole(role))
         {
@@ -160,7 +172,7 @@ public class AiQuotaService : IAiQuotaService
                 .FirstOrDefaultAsync(o => o.Id == user.OrganizationId.Value, cancellationToken)
                 ?? throw new InvalidOperationException("Organisation not found.");
 
-            org.IncrementUsedQuota();
+            org.ConsumeQuota(freeQuota);
         }
 
         await _context.SaveChangesAsync(cancellationToken);

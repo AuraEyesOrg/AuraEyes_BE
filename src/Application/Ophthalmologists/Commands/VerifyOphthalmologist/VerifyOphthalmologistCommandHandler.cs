@@ -1,7 +1,9 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
+using Domain.Enums;
 using Domain.Repositories;
+using Microsoft.Extensions.Logging;
 
 namespace Application.Ophthalmologists.Commands.VerifyOphthalmologist;
 
@@ -11,14 +13,20 @@ namespace Application.Ophthalmologists.Commands.VerifyOphthalmologist;
 public class VerifyOphthalmologistCommandHandler : ICommandHandler<VerifyOphthalmologistCommand>
 {
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<VerifyOphthalmologistCommandHandler> _logger;
 
     public VerifyOphthalmologistCommandHandler(
         IOphthalmologistRepository ophthalmologistRepository,
-        IUnitOfWork unitOfWork)
+        INotificationService notificationService,
+        IUnitOfWork unitOfWork,
+        ILogger<VerifyOphthalmologistCommandHandler> logger)
     {
         _ophthalmologistRepository = ophthalmologistRepository;
+        _notificationService = notificationService;
         _unitOfWork = unitOfWork;
+        _logger = logger;
     }
 
     public async Task<Result> Handle(VerifyOphthalmologistCommand request, CancellationToken cancellationToken)
@@ -39,6 +47,24 @@ public class VerifyOphthalmologistCommandHandler : ICommandHandler<VerifyOphthal
 
         await _ophthalmologistRepository.UpdateAsync(ophthalmologist, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _notificationService.SendAsync(
+                ophthalmologist.UserId,
+                "Tài khoản bác sĩ đã được phê duyệt",
+                "Chúc mừng, hồ sơ bác sĩ của bạn đã được System Admin phê duyệt. Bạn có thể tiếp tục sử dụng đầy đủ chức năng chuyên môn trên hệ thống.",
+                NotificationType.SystemAlert,
+                new { OphthalmologistId = ophthalmologist.Id, Action = "Approved" },
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to send approval notification for ophthalmologist {OphthalmologistId}",
+                ophthalmologist.Id);
+        }
 
         return Result.Success();
     }
