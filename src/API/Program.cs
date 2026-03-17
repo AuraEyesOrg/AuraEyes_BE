@@ -263,4 +263,16 @@ recurringJobManager.AddOrUpdate<DailyQuotaResetJob>(
     quotaResetCron,
     new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
+var slotMaintenanceCron = Environment.GetEnvironmentVariable("HANGFIRE_SLOT_MAINTENANCE_CRON");
+if (string.IsNullOrWhiteSpace(slotMaintenanceCron))
+{
+    slotMaintenanceCron = "*/5 * * * *";
+}
+
+recurringJobManager.AddOrUpdate<SlotMaintenanceJob>(
+    "slot-maintenance-expire-unused",
+    job => job.ExpireUnusedSlotsAsync(CancellationToken.None),
+    slotMaintenanceCron,
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
 app.Run();
