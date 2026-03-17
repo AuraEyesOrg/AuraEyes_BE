@@ -262,3 +262,7 @@ recurringJobManager.AddOrUpdate<DailyQuotaResetJob>(
     new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
 app.Run();
+
+public partial class Program
+{
+}
