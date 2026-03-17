@@ -132,7 +132,7 @@ public class DashboardMetricsService : IDashboardMetricsService
         }
         else
         {
-            var start = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddMonths(-(periods - 1));
+            var start = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-(periods - 1));
             var screenings = await _context.AiScreenings
                 .Where(s => s.CreatedAt >= start)
                 .GroupBy(s => new { s.CreatedAt.Year, s.CreatedAt.Month })
@@ -148,7 +148,7 @@ public class DashboardMetricsService : IDashboardMetricsService
 
             dataPoints.AddRange(screenings.Select(item =>
             {
-                var date = new DateTime(item.Year, item.Month, 1);
+                var date = new DateTime(item.Year, item.Month, 1, 0, 0, 0, DateTimeKind.Utc);
                 return new VolumeTrendDataPoint
                 {
                     Date = date,
