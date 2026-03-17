@@ -15,6 +15,12 @@ namespace Application.Scheduling.AppointmentSlots.Commands.ConfirmReservation;
 /// </summary>
 public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservationCommand, ConfirmReservationResult>
 {
+    private static readonly string[] VietnamTimeZoneIds =
+    [
+        "SE Asia Standard Time", // Windows
+        "Asia/Ho_Chi_Minh"       // Linux/macOS (IANA)
+    ];
+
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IConsultationSessionRepository _consultationSessionRepository;
     private readonly IUnitOfWork _unitOfWork;
@@ -102,8 +108,13 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
             // Get doctor ID from template
             var ophthalmologistId = slot.ScheduleTemplate?.OphthalId;
 
-            // Calculate appointment time
-            var appointmentTime = slot.Date.ToDateTime(slot.StartTime, DateTimeKind.Utc);
+            // Calculate appointment time:
+            var localAppointmentTime = slot.Date.ToDateTime(
+                slot.StartTime,
+                DateTimeKind.Unspecified);
+            var appointmentTime = TimeZoneInfo.ConvertTimeToUtc(
+                localAppointmentTime,
+                ResolveVietnamTimeZone());
 
             // Confirm the reservation (slot becomes Booked)
             slot.ConfirmReservation(effectivePatientProfileId);
@@ -141,5 +152,27 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
             _logger.LogError(ex, "Error confirming reservation for slot {SlotId}", request.AppointmentSlotId);
             throw;
         }
+    }
+
+    private static TimeZoneInfo ResolveVietnamTimeZone()
+    {
+        foreach (var timeZoneId in VietnamTimeZoneIds)
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                // Try next ID
+            }
+            catch (InvalidTimeZoneException)
+            {
+                // Try next ID
+            }
+        }
+
+        throw new InvalidOperationException(
+            "Unable to resolve Vietnam time zone. Checked: SE Asia Standard Time, Asia/Ho_Chi_Minh.");
     }
 }
