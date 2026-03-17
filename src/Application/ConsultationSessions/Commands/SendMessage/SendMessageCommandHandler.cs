@@ -89,6 +89,9 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         await _sessionRepository.UpdateAsync(session, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        if (session.ChatStatus == ChatStatus.MemoOnly)
+            return Result.Success();
+
         // Push realtime chat event to the other participant.
         Guid? recipientUserId = null;
 
@@ -130,7 +133,6 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
 
             if (ophthalmologist is not null)
             {
-                // Patient sent message -> Notify Doctor
                 var messagePreview = request.Message.Length > 50
                     ? request.Message[..50] + "..."
                     : request.Message;

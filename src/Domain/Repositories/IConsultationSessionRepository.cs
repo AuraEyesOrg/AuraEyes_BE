@@ -37,4 +37,21 @@ public interface IConsultationSessionRepository : IRepository<ConsultationSessio
         TimeSpan inactivityThreshold,
         TimeSpan reminderCooldown,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns VideoCall sessions in MemoOnly chat status whose AppointmentTime has passed,
+    /// meaning they are ready to transition to the IN_PROGRESS (Open) state.
+    /// </summary>
+    Task<IReadOnlyList<ConsultationSession>> GetSessionsReadyToOpenAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns VideoCall sessions in Open chat status whose grace period
+    /// (AppointmentTime + slotDuration + gracePeriod) has expired,
+    /// meaning they should auto-archive into the COMPLETED state.
+    /// </summary>
+    Task<IReadOnlyList<ConsultationSession>> GetSessionsPastGracePeriodAsync(
+        TimeSpan slotDuration,
+        TimeSpan gracePeriod,
+        CancellationToken cancellationToken = default);
 }
