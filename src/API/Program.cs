@@ -7,6 +7,7 @@ using Hangfire;
 using Hangfire.PostgreSql;
 using Infrastructure;
 using Infrastructure.Services;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.OpenApi.Models;
 using Npgsql;
 using Serilog;
@@ -152,8 +153,10 @@ builder.Services.AddSignalR(options =>
     options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
 });
 
-// Register SignalR hub service for notification broadcasting
+// Register SignalR hub service for notification,chat broadcasting
 builder.Services.AddScoped<INotificationHubService, NotificationHubService>();
+builder.Services.AddScoped<IChatHubService, ChatHubService>();
+builder.Services.AddSingleton<IUserIdProvider, SignalRUserIdProvider>();
 
 var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("DefaultConnection is not configured.");
@@ -253,6 +256,7 @@ app.MapControllers();
 
 // Map SignalR hubs for real-time notifications
 app.MapHub<NotificationHub>("/api/hubs/notifications");
+app.MapHub<ChatHub>("/api/hubs/chat");
 
 app.MapHealthChecks("/health");
 
@@ -286,5 +290,17 @@ else
 {
     Log.Warning("Hangfire server is disabled. Recurring jobs are not running in this environment.");
 }
+
+var slotMaintenanceCron = Environment.GetEnvironmentVariable("HANGFIRE_SLOT_MAINTENANCE_CRON");
+if (string.IsNullOrWhiteSpace(slotMaintenanceCron))
+{
+    slotMaintenanceCron = "*/5 * * * *";
+}
+
+recurringJobManager.AddOrUpdate<SlotMaintenanceJob>(
+    "slot-maintenance-expire-unused",
+    job => job.ExpireUnusedSlotsAsync(CancellationToken.None),
+    slotMaintenanceCron,
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
 app.Run();

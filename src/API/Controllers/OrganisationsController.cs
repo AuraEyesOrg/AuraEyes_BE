@@ -3,6 +3,8 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Ophthalmologists.Contracts.GetMyContract;
 using Application.Ophthalmologists.Contracts.UploadSignedContract;
+using Application.Common.Interfaces;
+using Application.Organisations.Queries.GetDashboardMetrics;
 using Application.Scheduling.Appointments.Common;
 using Application.Scheduling.Appointments.Queries.GetOrganisationAppointments;
 using Application.Scheduling.Appointments.Queries.GetOrganisationAvailableSlots;
@@ -29,6 +31,19 @@ public class OrganisationsController : BaseApiController
         _mediator = mediator;
         _currentUserService = currentUserService;
         _fileStorageService = fileStorageService;
+    }
+
+    [HttpGet("dashboard-metrics")]
+    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [ProducesResponseType(typeof(ApiResponse<OrganisationDashboardMetricsDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDashboardMetrics()
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
+
+        var result = await _mediator.Send(new GetDashboardMetricsQuery(_currentUserService.UserId.Value));
+        return HandleResult(result);
+
     }
 
     [HttpGet("{orgId:guid}/available-slots")]

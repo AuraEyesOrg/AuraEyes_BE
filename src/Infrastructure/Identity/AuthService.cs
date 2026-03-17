@@ -29,6 +29,7 @@ public class AuthService : IAuthService
     private readonly IRefreshTokenService _refreshTokenService;
     private readonly IEmailService _emailService;
     private readonly IOrganisationOnboardingService _organisationOnboardingService;
+    private readonly INotificationService _notificationService;
     private readonly IFileStorageService _fileStorageService;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
@@ -44,6 +45,7 @@ public class AuthService : IAuthService
         IRefreshTokenService refreshTokenService,
         IEmailService emailService,
         IOrganisationOnboardingService organisationOnboardingService,
+        INotificationService notificationService,
         IFileStorageService fileStorageService,
         IRepository<Patient> patientRepository,
         IRepository<Ophthalmologist> ophthalmologistRepository,
@@ -58,6 +60,7 @@ public class AuthService : IAuthService
         _refreshTokenService = refreshTokenService;
         _emailService = emailService;
         _organisationOnboardingService = organisationOnboardingService;
+        _notificationService = notificationService;
         _fileStorageService = fileStorageService;
         _patientRepository = patientRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
@@ -804,6 +807,26 @@ public class AuthService : IAuthService
             if (!succeeded)
             {
                 return Result.Failure(errors);
+            }
+
+            var roles = await _identityService.GetUserRolesAsync(userGuid);
+            if (roles.Contains(Roles.Ophthalmologist))
+            {
+                var adminUsers = await _userManager.GetUsersInRoleAsync(Roles.SystemAdmin);
+                foreach (var admin in adminUsers)
+                {
+                    await _notificationService.SendAsync(
+                        admin.Id,
+                        "Bác sĩ đã xác thực email",
+                        $"Bác sĩ {user.FullName} đã xác thực email. Vui lòng kiểm tra hợp đồng.",
+                        NotificationType.SystemAlert,
+                        new
+                        {
+                            ophthalmologistUserId = user.Id,
+                            emailConfirmed = true
+                        },
+                        cancellationToken);
+                }
             }
 
             _logger.LogInformation("Email confirmed for user: {UserId}", userId);

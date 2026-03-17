@@ -58,5 +58,10 @@ public enum NotificationType
     /// FR-49: User receives notification when wallet payment is processed
     /// Payload: { "TransactionId": "guid", "Amount": "decimal", "Action": "string" }
     /// </summary>
-    WalletPaymentProcessed = 8
+    WalletPaymentProcessed = 8,
+
+    /// <summary>
+    /// Internal platform alert for admin-facing operational actions.
+    /// </summary>
+    SystemAlert = 9
 }

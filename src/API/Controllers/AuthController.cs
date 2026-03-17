@@ -26,7 +26,7 @@ public class AuthController : BaseApiController
         _authService = authService;
         _currentUserService = currentUserService;
         _logger = logger;
-        _frontendUrl = configuration["FrontendUrl"] ?? "http://localhost:5173";
+        _frontendUrl = configuration["FrontendUrl"] ?? "http://localhost:3000";
     }
 
     /// <summary>

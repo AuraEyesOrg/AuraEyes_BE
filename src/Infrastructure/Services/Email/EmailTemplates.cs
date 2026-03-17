@@ -30,6 +30,16 @@ internal static class EmailTemplates
 
     #endregion
 
+    private static string ResolveLogoUrl(string baseLink)
+    {
+        if (!Uri.TryCreate(baseLink, UriKind.Absolute, out var uri))
+        {
+            return "http://localhost:3000/logo.png";
+        }
+
+        return $"{uri.Scheme}://{uri.Authority}/logo.png";
+    }
+
     #region Email Subjects
 
     public const string EmailConfirmationSubject = "Xác nhận địa chỉ email - Hệ thống Aura";
@@ -42,7 +52,7 @@ internal static class EmailTemplates
 
     #region Base Template
 
-    private static string WrapInBaseTemplate(string content) => $@"
+    private static string WrapInBaseTemplate(string content, string? logoUrl = null) => $@"
 <!DOCTYPE html>
 <html lang=""vi"">
 <head>
@@ -76,6 +86,7 @@ internal static class EmailTemplates
                     
                     <tr>
                         <td style=""padding: 32px 40px 16px 40px; text-align: center; border-bottom: 1px solid #F1F3F4;"">
+                            {(string.IsNullOrWhiteSpace(logoUrl) ? string.Empty : $"<img src=\"{logoUrl}\" alt=\"AURA Logo\" style=\"display:block; margin:0 auto 16px auto; width:72px; height:72px; object-fit:contain;\" />")}
                             <h1 style=""margin: 0; color: {BrandPrimary}; font-size: 26px; font-weight: 700; letter-spacing: 1px;"">
                                 ❖ AURA
                             </h1>
@@ -115,6 +126,7 @@ internal static class EmailTemplates
 
     public static string GetEmailConfirmationBody(string confirmationLink)
     {
+        var logoUrl = ResolveLogoUrl(confirmationLink);
         var content = $@"
             <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 22px; font-weight: 600;"">
                 Xác nhận địa chỉ email
@@ -161,7 +173,7 @@ internal static class EmailTemplates
                 </p>
             </div>";
 
-        return WrapInBaseTemplate(content);
+        return WrapInBaseTemplate(content, logoUrl);
     }
 
     #endregion
