@@ -85,6 +85,8 @@ jobs:
           GoogleMeet__ApplicationName=AURA Telemedicine
           GoogleMeet__DefaultDurationMinutes=30
 
+          AdminNotifications__OrganisationOnboardingEmail=${{ secrets.ADMIN_NOTIFICATIONS_EMAIL }}
+
           API_PORT=${API_PORT}
           BaseUrl=${{ secrets.FRONTEND_URL }}
 
