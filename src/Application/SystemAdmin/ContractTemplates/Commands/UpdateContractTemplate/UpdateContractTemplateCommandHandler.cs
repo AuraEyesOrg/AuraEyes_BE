@@ -3,7 +3,6 @@ using Application.Common.Models;
 using Application.SystemAdmin.ContractTemplates.Commands.CreateContractTemplate;
 using Application.SystemAdmin.ContractTemplates.Common;
 using Domain.Common;
-using Domain.Entities.Contracts;
 using Domain.Repositories;
 using Microsoft.Extensions.Logging;
 
@@ -30,7 +29,7 @@ public class UpdateContractTemplateCommandHandler
         UpdateContractTemplateCommand request,
         CancellationToken cancellationToken)
     {
-        var template = await _repository.GetByIdWithVariablesAsync(request.Id, cancellationToken);
+        var template = await _repository.GetByIdAsync(request.Id, cancellationToken);
         if (template is null)
             return Result<ContractTemplateDetailDto>.NotFound($"Contract template {request.Id} not found.");
 
@@ -43,22 +42,6 @@ public class UpdateContractTemplateCommandHandler
                 $"A template of type '{request.Type}' with version '{request.ContractVersion}' already exists.");
 
         template.Update(request.Title, request.Type, request.ContractVersion, request.ContentTemplate, request.EffectiveDate);
-
-        var variables = request.Variables
-            .Select(v => new ContractTemplateVariable(
-                template.Id,
-                v.Key,
-                v.Label,
-                v.VariableType,
-                v.Description,
-                v.DefaultValue,
-                v.SelectOptions,
-                v.Unit,
-                v.IsRequired,
-                v.SortOrder))
-            .ToList();
-
-        template.SetVariables(variables);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

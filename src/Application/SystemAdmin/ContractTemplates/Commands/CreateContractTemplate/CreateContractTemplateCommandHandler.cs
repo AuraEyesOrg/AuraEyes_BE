@@ -43,22 +43,6 @@ public class CreateContractTemplateCommandHandler
             request.ContentTemplate,
             request.EffectiveDate);
 
-        var variables = request.Variables
-            .Select((v, _) => new ContractTemplateVariable(
-                template.Id,
-                v.Key,
-                v.Label,
-                v.VariableType,
-                v.Description,
-                v.DefaultValue,
-                v.SelectOptions,
-                v.Unit,
-                v.IsRequired,
-                v.SortOrder))
-            .ToList();
-
-        template.SetVariables(variables);
-
         await _repository.AddAsync(template, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -78,26 +62,8 @@ public class CreateContractTemplateCommandHandler
         IsActive = t.IsActive,
         ContentTemplate = t.ContentTemplate,
         EffectiveDate = t.EffectiveDate,
-        VariableCount = t.Variables.Count,
+        VariableCount = 0,
         CreatedAt = t.CreatedAt,
-        UpdatedAt = t.UpdatedAt,
-        Variables = t.Variables
-            .OrderBy(v => v.SortOrder)
-            .Select(ToVariableDto)
-            .ToList()
-    };
-
-    internal static ContractTemplateVariableDto ToVariableDto(ContractTemplateVariable v) => new()
-    {
-        Id = v.Id,
-        Key = v.Key,
-        Label = v.Label,
-        VariableType = v.VariableType.ToString(),
-        Description = v.Description,
-        DefaultValue = v.DefaultValue,
-        SelectOptions = v.SelectOptions,
-        Unit = v.Unit,
-        IsRequired = v.IsRequired,
-        SortOrder = v.SortOrder
+        UpdatedAt = t.UpdatedAt
     };
 }

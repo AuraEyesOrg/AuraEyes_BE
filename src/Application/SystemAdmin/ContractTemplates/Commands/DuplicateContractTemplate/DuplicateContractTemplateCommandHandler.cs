@@ -30,7 +30,7 @@ public class DuplicateContractTemplateCommandHandler
         DuplicateContractTemplateCommand request,
         CancellationToken cancellationToken)
     {
-        var source = await _repository.GetByIdWithVariablesAsync(request.SourceId, cancellationToken);
+        var source = await _repository.GetByIdAsync(request.SourceId, cancellationToken);
         if (source is null)
             return Result<ContractTemplateDetailDto>.NotFound(
                 $"Source contract template {request.SourceId} not found.");
@@ -52,23 +52,6 @@ public class DuplicateContractTemplateCommandHandler
             candidateVersion,
             source.ContentTemplate,
             source.EffectiveDate);
-
-        // Copy all variable definitions
-        var clonedVariables = source.Variables
-            .OrderBy(v => v.SortOrder)
-            .Select(v => new ContractTemplateVariable(
-                clone.Id,
-                v.Key,
-                v.Label,
-                v.VariableType,
-                v.Description,
-                v.DefaultValue,
-                v.SelectOptions,
-                v.Unit,
-                v.IsRequired,
-                v.SortOrder));
-
-        clone.SetVariables(clonedVariables);
 
         await _repository.AddAsync(clone, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

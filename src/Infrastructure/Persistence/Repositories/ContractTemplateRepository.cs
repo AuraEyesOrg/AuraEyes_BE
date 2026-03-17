@@ -10,15 +10,6 @@ public class ContractTemplateRepository : Repository<ContractTemplate>, IContrac
 {
     public ContractTemplateRepository(ApplicationDbContext context) : base(context) { }
 
-    public async Task<ContractTemplate?> GetByIdWithVariablesAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        return await _context.ContractTemplates
-            .Include(t => t.Variables)
-            .FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted, cancellationToken);
-    }
-
     public async Task<(IReadOnlyList<ContractTemplate> Items, int TotalCount)> GetPagedAsync(
         string? searchTerm = null,
         ContractType? type = null,
