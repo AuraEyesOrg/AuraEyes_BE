@@ -6,8 +6,6 @@ namespace Domain.Repositories;
 
 public interface IContractTemplateRepository : IRepository<ContractTemplate>
 {
-    Task<ContractTemplate?> GetByIdWithVariablesAsync(Guid id, CancellationToken cancellationToken = default);
-
     Task<(IReadOnlyList<ContractTemplate> Items, int TotalCount)> GetPagedAsync(
         string? searchTerm = null,
         ContractType? type = null,

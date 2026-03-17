@@ -20,7 +20,6 @@ public class GetContractTemplateByIdQueryHandler
     {
         var template = await _context.ContractTemplates
             .AsNoTracking()
-            .Include(t => t.Variables.Where(v => !v.IsDeleted))
             .Where(t => t.Id == request.Id && !t.IsDeleted)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -36,25 +35,9 @@ public class GetContractTemplateByIdQueryHandler
             IsActive = template.IsActive,
             ContentTemplate = template.ContentTemplate,
             EffectiveDate = template.EffectiveDate,
-            VariableCount = template.Variables.Count,
+            VariableCount = 0,
             CreatedAt = template.CreatedAt,
-            UpdatedAt = template.UpdatedAt,
-            Variables = template.Variables
-                .OrderBy(v => v.SortOrder)
-                .Select(v => new ContractTemplateVariableDto
-                {
-                    Id = v.Id,
-                    Key = v.Key,
-                    Label = v.Label,
-                    VariableType = v.VariableType.ToString(),
-                    Description = v.Description,
-                    DefaultValue = v.DefaultValue,
-                    SelectOptions = v.SelectOptions,
-                    Unit = v.Unit,
-                    IsRequired = v.IsRequired,
-                    SortOrder = v.SortOrder
-                })
-                .ToList()
+            UpdatedAt = template.UpdatedAt
         };
 
         return Result<ContractTemplateDetailDto>.Success(dto);

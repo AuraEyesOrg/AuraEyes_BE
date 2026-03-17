@@ -28,6 +28,7 @@ public class AuthService : IAuthService
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenService _refreshTokenService;
     private readonly IEmailService _emailService;
+    private readonly IOrganisationOnboardingService _organisationOnboardingService;
     private readonly INotificationService _notificationService;
     private readonly IFileStorageService _fileStorageService;
     private readonly IRepository<Patient> _patientRepository;
@@ -43,6 +44,7 @@ public class AuthService : IAuthService
         ITokenService tokenService,
         IRefreshTokenService refreshTokenService,
         IEmailService emailService,
+        IOrganisationOnboardingService organisationOnboardingService,
         INotificationService notificationService,
         IFileStorageService fileStorageService,
         IRepository<Patient> patientRepository,
@@ -57,6 +59,7 @@ public class AuthService : IAuthService
         _tokenService = tokenService;
         _refreshTokenService = refreshTokenService;
         _emailService = emailService;
+        _organisationOnboardingService = organisationOnboardingService;
         _notificationService = notificationService;
         _fileStorageService = fileStorageService;
         _patientRepository = patientRepository;
@@ -303,6 +306,11 @@ public class AuthService : IAuthService
         }
     }
 
+    public Task<Result<OrganisationRegistrationResponse>> RegisterOrganisationAsync(
+        RegisterOrganisationRequest request,
+        CancellationToken cancellationToken = default)
+        => _organisationOnboardingService.SubmitRequestAsync(request, cancellationToken);
+
     /// <inheritdoc />
     public async Task<Result<LoginResponse>> GoogleLoginAsync(
         GoogleLoginRequest request,
@@ -495,7 +503,7 @@ public class AuthService : IAuthService
             {
                 var result = await _identityService.VerifyRecoveryCodeAsync(user.Id, request.Code);
                 isValidCode = result.Succeeded;
-                
+
                 if (isValidCode)
                 {
                     _logger.LogWarning("Recovery code used for user: {UserId}", user.Id);
@@ -563,7 +571,7 @@ public class AuthService : IAuthService
         bool? isVerified = null;
         string? verificationStatus = null;
         string? contractStatus = null;
-        
+
         if (roles.Contains(Roles.Patient))
         {
             var patients = await _patientRepository.FindAsync(
@@ -581,7 +589,7 @@ public class AuthService : IAuthService
                 isVerified = doctors[0].IsVerified;
                 verificationStatus = doctors[0].VerificationStatus.ToString();
             }
-            
+
             var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
             if (contract != null)
             {
@@ -685,7 +693,7 @@ public class AuthService : IAuthService
             bool? isVerified = null;
             string? verificationStatus = null;
             string? contractStatus = null;
-            
+
             if (roles.Contains(Roles.Patient))
             {
                 var patients = await _patientRepository.FindAsync(
@@ -703,7 +711,7 @@ public class AuthService : IAuthService
                     isVerified = doctors[0].IsVerified;
                     verificationStatus = doctors[0].VerificationStatus.ToString();
                 }
-                
+
                 var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
                 if (contract != null)
                 {
@@ -837,7 +845,7 @@ public class AuthService : IAuthService
         try
         {
             var userDto = await _identityService.GetUserByEmailAsync(email, cancellationToken);
-            
+
             if (userDto != null)
             {
                 var resetToken = await _identityService.GeneratePasswordResetTokenAsync(userDto.Id);
@@ -917,7 +925,7 @@ public class AuthService : IAuthService
             bool? isVerified = null;
             string? verificationStatus = null;
             string? contractStatus = null;
-            
+
             if (roles.Contains(Roles.Patient))
             {
                 var patients = await _patientRepository.FindAsync(
@@ -935,7 +943,7 @@ public class AuthService : IAuthService
                     isVerified = doctors[0].IsVerified;
                     verificationStatus = doctors[0].VerificationStatus.ToString();
                 }
-                
+
                 var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
                 if (contract != null)
                 {
@@ -972,7 +980,7 @@ public class AuthService : IAuthService
         try
         {
             var userDto = await _identityService.GetUserByEmailAsync(email, cancellationToken);
-            
+
             if (userDto != null && !userDto.EmailConfirmed)
             {
                 var confirmationToken = await _identityService.GenerateEmailConfirmationTokenAsync(userDto.Id);

@@ -65,6 +65,22 @@ public class AuthController : BaseApiController
         return HandleResult(result, result.Data?.Message ?? "Registration successful");
     }
 
+    /// <summary>
+    /// Submit a new organisation onboarding request.
+    /// </summary>
+    [HttpPost("register/organisation")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<OrganisationRegistrationResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RegisterOrganisation(
+        [FromBody] RegisterOrganisationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _authService.RegisterOrganisationAsync(request, cancellationToken);
+        return HandleResult(result, result.Data?.Message ?? "Organisation registration submitted successfully");
+    }
+
     [HttpPost("google-login")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<AuthResponse>), StatusCodes.Status200OK)]
