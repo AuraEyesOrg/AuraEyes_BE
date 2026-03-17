@@ -48,8 +48,7 @@ public class GetContractTemplatesQueryHandler
                 ContractVersion = t.ContractVersion,
                 IsActive = t.IsActive,
                 EffectiveDate = t.EffectiveDate,
-                VariableCount = _context.ContractTemplateVariables
-                    .Count(v => v.TemplateId == t.Id && !v.IsDeleted),
+                VariableCount = 0,
                 UsageCount = _context.Contracts
                     .Count(c => c.TemplateId == t.Id && !c.IsDeleted),
                 CreatedAt = t.CreatedAt,

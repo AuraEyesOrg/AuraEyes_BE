@@ -37,6 +37,7 @@ public class ApplicationDbContext : IdentityDbContext<
 
     // Users
     public DbSet<Organisation> Organisations => Set<Organisation>();
+    public DbSet<OrganisationOnboardingRequest> OrganisationOnboardingRequests => Set<OrganisationOnboardingRequest>();
     public DbSet<Ophthalmologist> Ophthalmologists => Set<Ophthalmologist>();
     public DbSet<Patient> Patients => Set<Patient>();
     public DbSet<Certificate> Certificates => Set<Certificate>();
@@ -71,7 +72,6 @@ public class ApplicationDbContext : IdentityDbContext<
     // Contracts
     public DbSet<Contract> Contracts => Set<Contract>();
     public DbSet<ContractTemplate> ContractTemplates => Set<ContractTemplate>();
-    public DbSet<ContractTemplateVariable> ContractTemplateVariables => Set<ContractTemplateVariable>();
 
     // Authorization
     public DbSet<Permission> Permissions => Set<Permission>();
@@ -150,13 +150,6 @@ public class ApplicationDbContext : IdentityDbContext<
         {
             if (entry.State == EntityState.Deleted)
             {
-                // ContractTemplateVariable has a non-partial unique index on (TemplateId, Key).
-                // Soft-deleting a variable while a new one with the same key is being inserted
-                // triggers EF Core's circular-dependency detection.  Hard deletes are correct
-                // for child config items — they are managed exclusively through SetVariables.
-                if (entry.Entity is Domain.Entities.Contracts.ContractTemplateVariable)
-                    continue;
-
                 // For all other BaseEntity types: convert hard delete → soft delete.
                 entry.State = EntityState.Modified;
                 entry.Property(nameof(BaseEntity.IsDeleted)).CurrentValue = true;

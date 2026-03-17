@@ -7,5 +7,13 @@
         "System": "Information"
       }
     }
+  },
+  "BaseUrl": "http://localhost:3000",
+  "Hangfire": {
+    "ServerEnabled": false,
+    "WorkerCount": 1
+  },
+  "AdminNotifications": {
+    "OrganisationOnboardingEmail": "systemadmin@gmail.com"
   }
 }

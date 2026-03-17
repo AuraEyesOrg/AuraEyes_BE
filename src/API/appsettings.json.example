@@ -33,5 +33,12 @@
     "FromName": "Aura Eyes System",
     "FromEmail": "noreply@auraeyes.com"
   },
+  "Hangfire": {
+    "ServerEnabled": true,
+    "WorkerCount": 1
+  },
+  "AdminNotifications": {
+    "OrganisationOnboardingEmail": "systemadmin@gmail.com"
+  },
   "AllowedHosts": "*"
 }

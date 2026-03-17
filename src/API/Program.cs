@@ -9,6 +9,7 @@ using Infrastructure;
 using Infrastructure.Services;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.OpenApi.Models;
+using Npgsql;
 using Serilog;
 using System.Reflection;
 using System.Text.Json.Serialization;
@@ -111,13 +112,13 @@ builder.Services.AddSwaggerGen(options =>
     {
         options.IncludeXmlComments(xmlPath);
     }
-    
+
     // Add custom operation filter for better documentation
     options.EnableAnnotations();
-    
+
     // Fix Schema ID collision by using full type name (namespace + class name)
     // This prevents conflicts when same class names exist in different namespaces
-    options.CustomSchemaIds(type => 
+    options.CustomSchemaIds(type =>
     {
         var fullName = type.FullName ?? type.Name;
         // Replace nested class '+' with '.'
@@ -157,19 +158,37 @@ builder.Services.AddScoped<INotificationHubService, NotificationHubService>();
 builder.Services.AddScoped<IChatHubService, ChatHubService>();
 builder.Services.AddSingleton<IUserIdProvider, SignalRUserIdProvider>();
 
+var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("DefaultConnection is not configured.");
+
+var hangfireConnectionBuilder = new NpgsqlConnectionStringBuilder(defaultConnection)
+{
+    // Use a tiny dedicated pool for Hangfire to avoid saturating Supabase session pool.
+    MaxPoolSize = 2,
+    MinPoolSize = 0
+};
+
+var enableHangfireServer = builder.Configuration.GetValue<bool?>("Hangfire:ServerEnabled")
+    ?? !builder.Environment.IsDevelopment();
+
+var hangfireWorkerCount = builder.Configuration.GetValue<int?>("Hangfire:WorkerCount") ?? 1;
+
 // Hangfire - Background job processing
 builder.Services.AddHangfire(config => config
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
     .UsePostgreSqlStorage(options =>
-        options.UseNpgsqlConnection(
-            builder.Configuration.GetConnectionString("DefaultConnection"))));
-builder.Services.AddHangfireServer(options =>
+        options.UseNpgsqlConnection(hangfireConnectionBuilder.ConnectionString)));
+
+if (enableHangfireServer)
 {
-    // Limit workers to prevent Supabase connection pool exhaustion (MaxClientsInSessionMode)
-    options.WorkerCount = 2;
-});
+    builder.Services.AddHangfireServer(options =>
+    {
+        // Keep worker count very low when using Supabase pooled connection.
+        options.WorkerCount = Math.Max(1, hangfireWorkerCount);
+    });
+}
 
 var app = builder.Build();
 
@@ -185,7 +204,7 @@ using (var scope = app.Services.CreateScope())
         var roleManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Infrastructure.Identity.ApplicationRole>>();
         var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
         var seederLogger = loggerFactory.CreateLogger("DatabaseSeeder");
-        
+
         await Infrastructure.Services.DatabaseSeeder.SeedAsync(context, userManager, roleManager, seederLogger);
         Log.Information("Database seeding completed successfully");
     }
@@ -257,13 +276,20 @@ if (string.IsNullOrWhiteSpace(quotaResetCron))
     quotaResetCron = defaultQuotaResetCron;
 }
 
-// Register recurring jobs
-var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
-recurringJobManager.AddOrUpdate<DailyQuotaResetJob>(
-    "daily-quota-reset",
-    job => job.ExecuteAsync(),
-    quotaResetCron,
-    new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+if (enableHangfireServer)
+{
+    // Register recurring jobs
+    var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+    recurringJobManager.AddOrUpdate<DailyQuotaResetJob>(
+        "daily-quota-reset",
+        job => job.ExecuteAsync(),
+        quotaResetCron,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+}
+else
+{
+    Log.Warning("Hangfire server is disabled. Recurring jobs are not running in this environment.");
+}
 
 var slotMaintenanceCron = Environment.GetEnvironmentVariable("HANGFIRE_SLOT_MAINTENANCE_CRON");
 if (string.IsNullOrWhiteSpace(slotMaintenanceCron))
