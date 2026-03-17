@@ -11,6 +11,12 @@ namespace Application.ConsultationSessions.Commands.CreateVideoCallSession;
 public class CreateVideoCallSessionCommandHandler
     : ICommandHandler<CreateVideoCallSessionCommand, Guid>
 {
+    private static readonly string[] VietnamTimeZoneIds =
+    [
+        "SE Asia Standard Time", // Windows
+        "Asia/Ho_Chi_Minh"       // Linux/macOS (IANA)
+    ];
+
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
@@ -55,12 +61,14 @@ public class CreateVideoCallSessionCommandHandler
 
         var attendeeEmails = attendeeEmailsResult.Data; // Hoặc .Value tùy thuộc vào cách bạn thiết kế class Result<T>
 
+        var normalizedAppointmentTimeUtc = NormalizeAppointmentTimeToUtc(request.AppointmentTime);
+
         MeetingInfo meetingInfo;
         try
         {
             meetingInfo = await _googleMeetService.CreateMeetingAsync(
                 "AURA Consultation",
-                request.AppointmentTime,
+                normalizedAppointmentTimeUtc,
                 attendeeEmails,
                 cancellationToken: cancellationToken);
         }
@@ -73,7 +81,7 @@ public class CreateVideoCallSessionCommandHandler
         var session = ConsultationSession.CreateVideoCall(
             request.PatientId,
             request.Price,
-            request.AppointmentTime,
+            normalizedAppointmentTimeUtc,
             request.OphthalmologistId,
             appointmentSlotId: null,
             meetingInfo.MeetingLink,
@@ -131,5 +139,42 @@ public class CreateVideoCallSessionCommandHandler
         }
 
         return Result<List<string>>.Success(emails);
+    }
+
+    private static DateTime NormalizeAppointmentTimeToUtc(DateTime appointmentTime)
+    {
+        if (appointmentTime.Kind == DateTimeKind.Utc)
+        {
+            return appointmentTime;
+        }
+
+        if (appointmentTime.Kind == DateTimeKind.Local)
+        {
+            return appointmentTime.ToUniversalTime();
+        }
+
+        return TimeZoneInfo.ConvertTimeToUtc(appointmentTime, ResolveVietnamTimeZone());
+    }
+
+    private static TimeZoneInfo ResolveVietnamTimeZone()
+    {
+        foreach (var timeZoneId in VietnamTimeZoneIds)
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                // Try next ID.
+            }
+            catch (InvalidTimeZoneException)
+            {
+                // Try next ID.
+            }
+        }
+
+        throw new InvalidOperationException(
+            "Unable to resolve Vietnam time zone. Checked: SE Asia Standard Time, Asia/Ho_Chi_Minh.");
     }
 }

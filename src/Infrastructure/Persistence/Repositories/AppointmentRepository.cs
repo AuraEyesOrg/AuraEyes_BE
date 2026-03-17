@@ -11,6 +11,12 @@ namespace Infrastructure.Persistence.Repositories;
 /// </summary>
 public class AppointmentRepository : Repository<Appointment>, IAppointmentRepository
 {
+    private static readonly string[] VietnamTimeZoneIds =
+    [
+        "SE Asia Standard Time", // Windows
+        "Asia/Ho_Chi_Minh"       // Linux/macOS (IANA)
+    ];
+
     public AppointmentRepository(ApplicationDbContext context) : base(context)
     {
     }
@@ -248,7 +254,7 @@ public class AppointmentRepository : Repository<Appointment>, IAppointmentReposi
         Guid patientId,
         CancellationToken cancellationToken = default)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = GetVietnamToday();
 
         return await _dbSet
             .Include(a => a.Organisation)
@@ -268,7 +274,7 @@ public class AppointmentRepository : Repository<Appointment>, IAppointmentReposi
         Guid doctorId,
         CancellationToken cancellationToken = default)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = GetVietnamToday();
 
         return await _dbSet
             .Include(a => a.Patient)
@@ -293,5 +299,30 @@ public class AppointmentRepository : Repository<Appointment>, IAppointmentReposi
             .Include(a => a.Doctor)
             .Include(a => a.AppointmentSlot)
             .FirstOrDefaultAsync(a => a.ConsultationSessionId == consultationSessionId, cancellationToken);
+    }
+
+    private static DateOnly GetVietnamToday()
+    {
+        var utcNow = DateTime.UtcNow;
+        foreach (var timeZoneId in VietnamTimeZoneIds)
+        {
+            try
+            {
+                var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(
+                    utcNow,
+                    TimeZoneInfo.FindSystemTimeZoneById(timeZoneId));
+                return DateOnly.FromDateTime(vietnamNow);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                // Try next ID.
+            }
+            catch (InvalidTimeZoneException)
+            {
+                // Try next ID.
+            }
+        }
+
+        return DateOnly.FromDateTime(utcNow);
     }
 }
