@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.Common.Constants;
 using Domain.Common;
 using Domain.Entities.Consultation;
 using Domain.Enums;
@@ -17,17 +18,20 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IConsultationSessionRepository _consultationSessionRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICurrentUserService _currentUser;
     private readonly ILogger<ConfirmReservationCommandHandler> _logger;
 
     public ConfirmReservationCommandHandler(
         IAppointmentSlotRepository appointmentSlotRepository,
         IConsultationSessionRepository consultationSessionRepository,
         IUnitOfWork unitOfWork,
+        ICurrentUserService currentUser,
         ILogger<ConfirmReservationCommandHandler> logger)
     {
         _appointmentSlotRepository = appointmentSlotRepository;
         _consultationSessionRepository = consultationSessionRepository;
         _unitOfWork = unitOfWork;
+        _currentUser = currentUser;
         _logger = logger;
     }
 
@@ -39,6 +43,20 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
 
         try
         {
+            Guid effectivePatientProfileId = request.PatientId;
+
+            if (_currentUser.IsInRole(Roles.Patient))
+            {
+                if (!_currentUser.ProfileId.HasValue)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<ConfirmReservationResult>.Forbidden(
+                        "Unable to resolve patient profile from current token.");
+                }
+
+                effectivePatientProfileId = _currentUser.ProfileId.Value;
+            }
+
             // Get slot with lock
             var slot = await _appointmentSlotRepository.GetByIdWithLockAsync(
                 request.AppointmentSlotId, cancellationToken);
@@ -58,8 +76,11 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                     $"Slot is not in reserved state. Current status: {slot.Status}");
             }
 
-            // Verify the reservation belongs to this patient
-            if (slot.ReservedBy != request.PatientId)
+            // Verify the reservation belongs to this patient.
+            // Backward-compatible check: old reservations may store ApplicationUser.Id.
+            var reservedByMatchesProfile = slot.ReservedBy == effectivePatientProfileId;
+            var reservedByMatchesUser = _currentUser.UserId.HasValue && slot.ReservedBy == _currentUser.UserId.Value;
+            if (!reservedByMatchesProfile && !reservedByMatchesUser)
             {
                 await _unitOfWork.RollbackTransactionAsync(cancellationToken);
                 return Result<ConfirmReservationResult>.Forbidden(
@@ -85,11 +106,11 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
             var appointmentTime = slot.Date.ToDateTime(slot.StartTime, DateTimeKind.Utc);
 
             // Confirm the reservation (slot becomes Booked)
-            slot.ConfirmReservation(request.PatientId);
+            slot.ConfirmReservation(effectivePatientProfileId);
 
             // Create consultation session
             var session = ConsultationSession.CreateVideoCall(
-                patientId: request.PatientId,
+                patientId: effectivePatientProfileId,
                 price: slot.Cost ?? 0,
                 appointmentTime: appointmentTime,
                 ophthalmologistId: ophthalmologistId,

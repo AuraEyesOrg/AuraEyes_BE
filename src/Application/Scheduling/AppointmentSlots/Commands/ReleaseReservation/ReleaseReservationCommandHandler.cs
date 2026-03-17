@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.Common.Constants;
 using Domain.Common;
 using Domain.Enums;
 using Domain.Repositories;
@@ -15,15 +16,18 @@ public class ReleaseReservationCommandHandler : ICommandHandler<ReleaseReservati
 {
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICurrentUserService _currentUser;
     private readonly ILogger<ReleaseReservationCommandHandler> _logger;
 
     public ReleaseReservationCommandHandler(
         IAppointmentSlotRepository appointmentSlotRepository,
         IUnitOfWork unitOfWork,
+        ICurrentUserService currentUser,
         ILogger<ReleaseReservationCommandHandler> logger)
     {
         _appointmentSlotRepository = appointmentSlotRepository;
         _unitOfWork = unitOfWork;
+        _currentUser = currentUser;
         _logger = logger;
     }
 
@@ -45,12 +49,27 @@ public class ReleaseReservationCommandHandler : ICommandHandler<ReleaseReservati
         // Verify authorization
         if (!request.IsSystemRelease)
         {
-            if (!request.PatientId.HasValue)
+            Guid? effectivePatientProfileId = request.PatientId;
+
+            if (_currentUser.IsInRole(Roles.Patient))
+            {
+                if (!_currentUser.ProfileId.HasValue)
+                {
+                    return Result.Forbidden("Unable to resolve patient profile from current token.");
+                }
+
+                effectivePatientProfileId = _currentUser.ProfileId.Value;
+            }
+
+            if (!effectivePatientProfileId.HasValue)
             {
                 return Result.Forbidden("Patient ID is required to release a reservation.");
             }
 
-            if (slot.ReservedBy != request.PatientId.Value)
+            var reservedByMatchesProfile = slot.ReservedBy == effectivePatientProfileId.Value;
+            var reservedByMatchesUser = _currentUser.UserId.HasValue && slot.ReservedBy == _currentUser.UserId.Value;
+
+            if (!reservedByMatchesProfile && !reservedByMatchesUser)
             {
                 return Result.Forbidden("You are not authorized to release this reservation.");
             }
