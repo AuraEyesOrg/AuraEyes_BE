@@ -7,6 +7,7 @@ using Hangfire;
 using Hangfire.PostgreSql;
 using Infrastructure;
 using Infrastructure.Services;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.OpenApi.Models;
 using Npgsql;
@@ -190,6 +191,37 @@ if (enableHangfireServer)
     });
 }
 
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true; // Bắt buộc bật nếu dùng HTTPS
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
+        new[] { "application/json", "application/xml", "text/plain", "image/svg+xml" }); // Chỉ định nén file
+});
+
+builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
+{
+    // Nén mức độ ưu tiên tốc độ để không block CPU server
+    options.Level = System.IO.Compression.CompressionLevel.Fastest;
+});
+
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+{
+    // Nén mức độ ưu tiên tốc độ để không block CPU server
+    options.Level = System.IO.Compression.CompressionLevel.Fastest;
+});
+
+// Configure Output Caching
+builder.Services.AddOutputCache(options =>
+{
+    options.AddBasePolicy(builder => builder.Expire(TimeSpan.FromSeconds(10)));
+    
+    options.AddPolicy("PublicData", builder => 
+        builder.Expire(TimeSpan.FromMinutes(5))
+               .SetVaryByQuery("*")); // Vary cache by query parameters
+});
+
 var app = builder.Build();
 
 // Seed domain entities (Organisation, Ophthalmologist, Patient)
@@ -243,10 +275,10 @@ app.UseMiddleware<RequestLoggingMiddleware>();
 
 app.UseHttpsRedirection();
 
-// Note: Static files are stored in S3, not wwwroot
-// app.UseStaticFiles(); // Removed - using S3 for file storage
+app.UseResponseCompression();
 
 app.UseCors("FrontendCors");
+app.UseOutputCache();
 
 // Add authentication before authorization
 app.UseAuthentication();
