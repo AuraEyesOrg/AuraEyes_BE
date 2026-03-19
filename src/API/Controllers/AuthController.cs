@@ -26,7 +26,7 @@ public class AuthController : BaseApiController
         _authService = authService;
         _currentUserService = currentUserService;
         _logger = logger;
-        _frontendUrl = configuration["FrontendUrl"] ?? "http://localhost:3000";
+        _frontendUrl = (configuration["FrontendUrl"] ?? "http://localhost:3000").TrimEnd('/');
     }
 
     /// <summary>
@@ -275,7 +275,7 @@ public class AuthController : BaseApiController
         [FromBody] ForgotPasswordRequest request,
         CancellationToken cancellationToken)
     {
-        var resetUrlBase = $"{Request.Scheme}://{Request.Host}/reset-password";
+        var resetUrlBase = $"{_frontendUrl}/reset-password";
         await _authService.ForgotPasswordAsync(request.Email, resetUrlBase, cancellationToken);
 
         // Always return success to prevent email enumeration
