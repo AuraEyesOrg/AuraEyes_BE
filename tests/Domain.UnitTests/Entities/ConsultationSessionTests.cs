@@ -47,7 +47,7 @@ public class ConsultationSessionTests
         session.PatientId.Should().Be(patientId);
         session.Price.Should().Be(100m);
         session.Type.Should().Be(ConsultationSessionType.VideoCall);
-        session.Status.Should().Be(SessionStatus.Pending);
+        session.Status.Should().Be(SessionStatus.Confirmed);
         session.ChatStatus.Should().Be(ChatStatus.MemoOnly);
         session.AppointmentTime.Should().Be(appointmentTime);
     }

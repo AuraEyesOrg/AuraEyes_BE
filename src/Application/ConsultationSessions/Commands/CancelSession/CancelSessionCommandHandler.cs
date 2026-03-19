@@ -28,6 +28,7 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
     private readonly IRepository<Patient> _patientRepository;
     private readonly IGoogleMeetService _googleMeetService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<CancelSessionCommandHandler> _logger;
 
     public CancelSessionCommandHandler(
@@ -37,6 +38,7 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
         IRepository<Patient> patientRepository,
         IGoogleMeetService googleMeetService,
         IUnitOfWork unitOfWork,
+        ICurrentUserService currentUserService,
         ILogger<CancelSessionCommandHandler> logger)
     {
         _sessionRepository = sessionRepository;
@@ -45,6 +47,7 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
         _patientRepository = patientRepository;
         _googleMeetService = googleMeetService;
         _unitOfWork = unitOfWork;
+        _currentUserService = currentUserService;
         _logger = logger;
     }
 
@@ -72,10 +75,20 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
         }
 
         // ── 2. Determine who is cancelling ──
-        var cancelledByProfileId = request.CancelledByUserId;
+        if (!_currentUserService.ProfileId.HasValue)
+        {
+            return Result.Forbidden("Unable to resolve user profile for cancellation.");
+        }
+        var cancelledByProfileId = _currentUserService.ProfileId.Value;
+
         bool isCancelledByPatient = session.PatientId == cancelledByProfileId;
         bool isCancelledByDoctor = session.OphthalmologistId.HasValue
                                    && session.OphthalmologistId.Value == cancelledByProfileId;
+
+        if (!isCancelledByPatient && !isCancelledByDoctor)
+        {
+            return Result.Forbidden("You are not allowed to cancel this session.");
+        }
 
         // ── 3. Patient anti-spam: 3 cancellations / day ──
         if (isCancelledByPatient)
@@ -124,6 +137,7 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
                 {
                     if (isCancelledByDoctor)
                     {
+                        slot.CancelBooking(); // Release back to Available first to allow cancellation
                         slot.Cancel(); // "Burn" the slot — Cancelled, no rebooking
                         _logger.LogInformation(
                             "Slot {SlotId} burned (doctor-cancelled session {SessionId}).",
