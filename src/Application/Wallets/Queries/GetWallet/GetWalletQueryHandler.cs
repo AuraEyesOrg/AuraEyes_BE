@@ -33,13 +33,19 @@ public class GetWalletQueryHandler : IQueryHandler<GetWalletQuery, WalletDto>
             await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
+        var now = DateTime.UtcNow;
+        var stats = await _walletRepository.GetMonthlyStatsAsync(wallet.Id, now.Year, now.Month, cancellationToken);
+
         var dto = new WalletDto
         {
             Id = wallet.Id,
             UserId = wallet.UserId,
             Balance = wallet.Balance,
             CreatedAt = wallet.CreatedAt,
-            UpdatedAt = wallet.UpdatedAt
+            UpdatedAt = wallet.UpdatedAt,
+            TotalDepositsThisMonth = stats.TotalDeposits,
+            TotalSpentThisMonth = stats.TotalSpent,
+            TransactionsThisMonth = stats.TransactionsCount
         };
 
         return Result<WalletDto>.Success(dto);
