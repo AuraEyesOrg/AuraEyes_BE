@@ -54,4 +54,12 @@ public interface IConsultationSessionRepository : IRepository<ConsultationSessio
         TimeSpan slotDuration,
         TimeSpan gracePeriod,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Counts how many sessions a patient cancelled today (UTC).
+    /// Used to enforce the 3-cancellations-per-day anti-spam rule.
+    /// </summary>
+    Task<int> CountCancelledTodayByPatientAsync(
+        Guid patientId,
+        CancellationToken cancellationToken = default);
 }

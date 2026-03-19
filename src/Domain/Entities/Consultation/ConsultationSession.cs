@@ -96,7 +96,7 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
             OphthalmologistId = ophthalmologistId,
             AppointmentSlotId = appointmentSlotId,
             Type = ConsultationSessionType.VideoCall,
-            Status = SessionStatus.Pending,
+            Status = SessionStatus.Confirmed,
             ChatStatus = ChatStatus.MemoOnly,
             Price = price,
             AppointmentTime = appointmentTime,
@@ -166,12 +166,16 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     }
 
     /// <summary>
-    /// Opens 2-way chat (e.g. after doctor submits verification report).
+    /// Opens 2-way chat (e.g. at appointment time or after doctor submits verification report).
+    /// Also promotes Pending → Confirmed because an open chat implies the session is active.
     /// </summary>
     public void OpenChat()
     {
         if (ChatStatus == ChatStatus.Archived)
             throw new InvalidOperationException("Cannot reopen an archived session");
+
+        if (Status == SessionStatus.Pending)
+            Status = SessionStatus.Confirmed;
 
         ChatStatus = ChatStatus.Open;
         LastActivityAt = DateTime.UtcNow;
