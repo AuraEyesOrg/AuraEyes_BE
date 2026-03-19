@@ -41,7 +41,9 @@ public class GetWalletTransactionsQueryHandler : IQueryHandler<GetWalletTransact
             Amount = t.Amount,
             TransactionType = t.TransactionType,
             Description = t.Description,
-            CreatedAt = t.CreatedAt
+            CreatedAt = t.CreatedAt,
+            ReferenceId = t.ReferenceId,
+            ReferenceType = t.ReferenceType?.ToString()
         }).ToList();
 
         var pagedResult = new PagedResult<WalletTransactionDto>(

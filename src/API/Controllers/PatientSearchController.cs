@@ -10,6 +10,7 @@ using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 
 namespace API.Controllers;
 
@@ -36,6 +37,7 @@ public class PatientSearchController : BaseApiController
     /// <returns>Paginated list of ophthalmologists.</returns>
     [HttpGet("ophthalmologists")]
     [AllowAnonymous]
+    [OutputCache(PolicyName = "PublicData")]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<OphthalmologistListDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SearchOphthalmologists(
         [FromQuery] string? searchTerm = null,
@@ -61,6 +63,7 @@ public class PatientSearchController : BaseApiController
     /// <returns>Ophthalmologist details.</returns>
     [HttpGet("ophthalmologists/{id:guid}")]
     [AllowAnonymous]
+    [OutputCache(PolicyName = "PublicData")]
     [ProducesResponseType(typeof(ApiResponse<OphthalmologistDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetOphthalmologistDetail(Guid id)
@@ -79,6 +82,7 @@ public class PatientSearchController : BaseApiController
     /// <returns>Paginated list of organisations.</returns>
     [HttpGet("organisations")]
     [AllowAnonymous]
+    [OutputCache(PolicyName = "PublicData")]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<OrganisationListDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SearchOrganisations(
         [FromQuery] string? searchTerm = null,

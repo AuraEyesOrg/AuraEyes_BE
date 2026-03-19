@@ -62,4 +62,35 @@ public class WalletRepository : Repository<Wallet>, IWalletRepository
 
         return (items, totalCount);
     }
+
+    public async Task<(decimal TotalDeposits, decimal TotalSpent, int TransactionsCount)> GetMonthlyStatsAsync(
+        Guid walletId,
+        int year,
+        int month,
+        CancellationToken cancellationToken = default)
+    {
+        var startDate = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var endDate = startDate.AddMonths(1);
+
+        var monthTransactions = await _context.WalletTransactions
+            .Where(t => t.WalletId == walletId && t.CreatedAt >= startDate && t.CreatedAt < endDate)
+            .ToListAsync(cancellationToken);
+
+        var transactionsCount = monthTransactions.Count;
+        
+        // Deposits, Refunds, Bonuses are positive flow
+        var totalDeposits = monthTransactions
+            .Where(t => t.TransactionType == Domain.Enums.TransactionType.Deposit || 
+                        t.TransactionType == Domain.Enums.TransactionType.Refund || 
+                        t.TransactionType == Domain.Enums.TransactionType.Bonus)
+            .Sum(t => t.Amount);
+
+        // Payments, Withdrawals are negative flow
+        var totalSpent = monthTransactions
+            .Where(t => t.TransactionType == Domain.Enums.TransactionType.Payment || 
+                        t.TransactionType == Domain.Enums.TransactionType.Withdrawal)
+            .Sum(t => t.Amount);
+
+        return (totalDeposits, totalSpent, transactionsCount);
+    }
 }
