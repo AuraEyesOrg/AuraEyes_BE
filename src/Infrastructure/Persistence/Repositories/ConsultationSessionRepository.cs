@@ -137,4 +137,19 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
                 s.AppointmentTime <= cutoff)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<int> CountCancelledTodayByPatientAsync(
+        Guid patientId,
+        CancellationToken cancellationToken = default)
+    {
+        var todayUtc = DateTime.UtcNow.Date;
+
+        return await _dbSet
+            .CountAsync(s =>
+                s.PatientId == patientId &&
+                s.Status == SessionStatus.Cancelled &&
+                s.ClosedAt != null &&
+                s.ClosedAt.Value >= todayUtc,
+                cancellationToken);
+    }
 }
