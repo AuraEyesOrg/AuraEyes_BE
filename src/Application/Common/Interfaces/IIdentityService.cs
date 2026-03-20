@@ -47,6 +47,14 @@ public interface IIdentityService
     
     Task<bool> IsInRoleAsync(Guid userId, string role);
 
+    /// <summary>
+    /// Get active, non-deleted user IDs by role and organization.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> GetUserIdsByRoleAndOrganizationAsync(
+        string role,
+        Guid organizationId,
+        CancellationToken cancellationToken = default);
+
     // Account Management
     Task UpdateLastLoginAsync(Guid userId);
     
