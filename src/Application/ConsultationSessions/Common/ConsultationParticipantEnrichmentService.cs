@@ -67,6 +67,7 @@ public class ConsultationParticipantEnrichmentService : IConsultationParticipant
         return baseDto with
         {
             PatientName = patientDisplay?.FullName,
+            PatientAvatarUrl = patientDisplay?.AvatarUrl,
             OphthalmologistName = doctorDisplay?.FullName,
             OrganisationName = null,
             OphthalmologistAvatarUrl = doctorDisplay?.AvatarUrl,
@@ -105,6 +106,7 @@ public class ConsultationParticipantEnrichmentService : IConsultationParticipant
             return baseDto with
             {
                 PatientName = patientDisplay?.FullName,
+                PatientAvatarUrl = patientDisplay?.AvatarUrl,
                 OphthalmologistName = doctorDisplay?.FullName,
                 OrganisationName = null,
                 OphthalmologistAvatarUrl = doctorDisplay?.AvatarUrl

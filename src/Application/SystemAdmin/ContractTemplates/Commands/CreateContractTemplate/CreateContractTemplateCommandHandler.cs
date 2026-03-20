@@ -44,7 +44,8 @@ public class CreateContractTemplateCommandHandler
             request.Type,
             request.ContractVersion,
             request.ContentTemplate,
-            effectiveDateUtc);
+            effectiveDateUtc,
+            request.EmploymentType);
 
         await _repository.AddAsync(template, cancellationToken);
         try
@@ -85,6 +86,7 @@ public class CreateContractTemplateCommandHandler
         Id = t.Id,
         Title = t.Title,
         Type = t.Type.ToString(),
+        EmploymentType = t.EmploymentType?.ToString(),
         ContractVersion = t.ContractVersion,
         IsActive = t.IsActive,
         ContentTemplate = t.ContentTemplate,

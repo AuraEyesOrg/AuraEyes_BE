@@ -92,7 +92,6 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         if (session.ChatStatus == ChatStatus.MemoOnly)
             return Result.Success();
 
-        // Push realtime chat event to the other participant.
         Guid? recipientUserId = null;
 
         if (isPatient && session.OphthalmologistId.HasValue)

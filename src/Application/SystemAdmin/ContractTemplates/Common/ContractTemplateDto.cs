@@ -5,6 +5,7 @@ public class ContractTemplateDto
     public Guid Id { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
+    public string? EmploymentType { get; set; }
     public string ContractVersion { get; set; } = string.Empty;
     public bool IsActive { get; set; }
     public int VariableCount { get; set; }

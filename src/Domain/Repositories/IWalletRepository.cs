@@ -44,4 +44,13 @@ public interface IWalletRepository : IRepository<Wallet>
         int pageNumber = 1,
         int pageSize = 20,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get summary statistics for a specific month.
+    /// </summary>
+    Task<(decimal TotalDeposits, decimal TotalSpent, int TransactionsCount)> GetMonthlyStatsAsync(
+        Guid walletId,
+        int year,
+        int month,
+        CancellationToken cancellationToken = default);
 }

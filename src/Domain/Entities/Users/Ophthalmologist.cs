@@ -11,6 +11,9 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
     public Guid UserId { get; private set; }
     public string? Bio { get; private set; }
     public string? Phone { get; private set; }
+    public OphthalmologistEmploymentType EmploymentType { get; private set; }
+    public int? WorkingHoursPerWeek { get; private set; }
+    public decimal? ExpectedMonthlySalary { get; private set; }
     public int YearsOfExperience { get; private set; }
     public bool IsVerified { get; private set; }
     public VerificationStatus VerificationStatus { get; private set; }
@@ -26,11 +29,30 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
 
     private Ophthalmologist() { } // EF Core
 
-    public Ophthalmologist(Guid userId, string? bio = null, int yearsOfExperience = 0, string? phone = null, string? licenseUrl = null, string? degreeUrl = null)
+    public Ophthalmologist(
+        Guid userId,
+        string? bio = null,
+        int yearsOfExperience = 0,
+        string? phone = null,
+        string? licenseUrl = null,
+        string? degreeUrl = null,
+        OphthalmologistEmploymentType employmentType = OphthalmologistEmploymentType.FullTime,
+        int? workingHoursPerWeek = null,
+        decimal? expectedMonthlySalary = null)
     {
+        if (yearsOfExperience < 0)
+            throw new ArgumentException("Years of experience cannot be negative", nameof(yearsOfExperience));
+        if (workingHoursPerWeek.HasValue && (workingHoursPerWeek < 1 || workingHoursPerWeek > 112))
+            throw new ArgumentException("Working hours per week must be between 1 and 112", nameof(workingHoursPerWeek));
+        if (expectedMonthlySalary.HasValue && expectedMonthlySalary < 0)
+            throw new ArgumentException("Expected monthly salary cannot be negative", nameof(expectedMonthlySalary));
+
         UserId = userId;
         Bio = bio;
         Phone = phone;
+        EmploymentType = employmentType;
+        WorkingHoursPerWeek = workingHoursPerWeek;
+        ExpectedMonthlySalary = expectedMonthlySalary;
         YearsOfExperience = yearsOfExperience;
         IsVerified = false;
         VerificationStatus = VerificationStatus.PendingVerification;
@@ -47,6 +69,22 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
 
         Bio = bio;
         YearsOfExperience = yearsOfExperience;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateEmploymentPreferences(
+        OphthalmologistEmploymentType employmentType,
+        int? workingHoursPerWeek,
+        decimal? expectedMonthlySalary)
+    {
+        if (workingHoursPerWeek.HasValue && (workingHoursPerWeek < 1 || workingHoursPerWeek > 112))
+            throw new ArgumentException("Working hours per week must be between 1 and 112", nameof(workingHoursPerWeek));
+        if (expectedMonthlySalary.HasValue && expectedMonthlySalary < 0)
+            throw new ArgumentException("Expected monthly salary cannot be negative", nameof(expectedMonthlySalary));
+
+        EmploymentType = employmentType;
+        WorkingHoursPerWeek = workingHoursPerWeek;
+        ExpectedMonthlySalary = expectedMonthlySalary;
         UpdatedAt = DateTime.UtcNow;
     }
 

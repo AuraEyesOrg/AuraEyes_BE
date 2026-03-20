@@ -12,6 +12,10 @@ public class WalletDto
     public decimal Balance { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+
+    public decimal TotalDepositsThisMonth { get; set; }
+    public decimal TotalSpentThisMonth { get; set; }
+    public int TransactionsThisMonth { get; set; }
 }
 
 /// <summary>
@@ -25,6 +29,8 @@ public class WalletTransactionDto
     public TransactionType TransactionType { get; set; }
     public string? Description { get; set; }
     public DateTime CreatedAt { get; set; }
+    public Guid? ReferenceId { get; set; }
+    public string? ReferenceType { get; set; }
 }
 
 /// <summary>

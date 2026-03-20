@@ -52,7 +52,8 @@ public class DuplicateContractTemplateCommandHandler
             source.Type,
             candidateVersion,
             source.ContentTemplate,
-            source.EffectiveDate);
+            source.EffectiveDate,
+            source.EmploymentType);
 
         await _repository.AddAsync(clone, cancellationToken);
         try

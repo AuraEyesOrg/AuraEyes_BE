@@ -31,6 +31,7 @@ public class GetContractTemplateByIdQueryHandler
             Id = template.Id,
             Title = template.Title,
             Type = template.Type.ToString(),
+            EmploymentType = template.EmploymentType?.ToString(),
             ContractVersion = template.ContractVersion,
             IsActive = template.IsActive,
             ContentTemplate = template.ContentTemplate,

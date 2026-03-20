@@ -33,9 +33,9 @@ public class ChatHubService : IChatHubService
                 .User(userId.ToString())
                 .SendAsync("ReceiveChatMessage", chatMessage, cancellationToken);
 
-            _logger.LogDebug(
-                "Chat message event broadcast to user {UserId} for session {SessionId}",
-                userId, chatMessage.SessionId);
+            _logger.LogInformation(
+                "Chat message broadcast to UserId={UserId} for SessionId={SessionId}, MessageId={MessageId}",
+                userId, chatMessage.SessionId, chatMessage.MessageId);
         }
         catch (Exception ex)
         {
