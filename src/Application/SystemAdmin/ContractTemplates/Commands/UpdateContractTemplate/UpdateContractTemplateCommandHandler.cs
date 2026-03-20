@@ -44,7 +44,13 @@ public class UpdateContractTemplateCommandHandler
 
         var effectiveDateUtc = NormalizeToUtc(request.EffectiveDate);
 
-        template.Update(request.Title, request.Type, request.ContractVersion, request.ContentTemplate, effectiveDateUtc);
+        template.Update(
+            request.Title,
+            request.Type,
+            request.ContractVersion,
+            request.ContentTemplate,
+            effectiveDateUtc,
+            request.EmploymentType);
 
         try
         {

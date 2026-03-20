@@ -1,4 +1,5 @@
 using Domain.Entities.Contracts;
+using Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -15,6 +16,11 @@ public class ContractTemplateConfiguration : IEntityTypeConfiguration<ContractTe
         builder.Property(e => e.Type)
             .HasConversion<string>()
             .HasMaxLength(30);
+
+        builder.Property(e => e.EmploymentType)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired(false);
 
         builder.Property(e => e.ContractVersion)
             .HasMaxLength(20)
