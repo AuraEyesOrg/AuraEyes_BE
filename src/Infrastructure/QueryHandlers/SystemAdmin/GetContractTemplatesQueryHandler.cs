@@ -45,6 +45,9 @@ public class GetContractTemplatesQueryHandler
                 Id = t.Id,
                 Title = t.Title,
                 Type = t.Type.ToString(),
+                EmploymentType = t.EmploymentType.HasValue
+                    ? t.EmploymentType.Value.ToString()
+                    : null,
                 ContractVersion = t.ContractVersion,
                 IsActive = t.IsActive,
                 EffectiveDate = t.EffectiveDate,

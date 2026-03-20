@@ -9,6 +9,7 @@ public record UpdateContractTemplateCommand : ICommand<ContractTemplateDetailDto
     public Guid Id { get; init; }
     public string Title { get; init; } = string.Empty;
     public ContractType Type { get; init; }
+    public OphthalmologistEmploymentType? EmploymentType { get; init; }
     public string ContractVersion { get; init; } = string.Empty;
     public string ContentTemplate { get; init; } = string.Empty;
     public DateTime? EffectiveDate { get; init; }
