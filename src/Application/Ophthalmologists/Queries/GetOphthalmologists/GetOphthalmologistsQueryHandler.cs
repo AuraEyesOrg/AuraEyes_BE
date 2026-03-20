@@ -49,7 +49,11 @@ public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologists
                 YearsOfExperience = ophthalmologist.YearsOfExperience,
                 IsVerified = ophthalmologist.IsVerified,
                 CertificateCount = ophthalmologist.Certificates.Count,
-                CreatedAt = ophthalmologist.CreatedAt
+                CreatedAt = ophthalmologist.CreatedAt,
+                LicenseUrl = ophthalmologist.LicenseUrl,
+                DegreeUrl = ophthalmologist.DegreeUrl,
+                RatingAverage = ophthalmologist.RatingAverage,
+                RatingCount = ophthalmologist.RatingCount,
             });
         }
 
