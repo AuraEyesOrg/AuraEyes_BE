@@ -49,7 +49,7 @@ var configuredOrigins = builder.Configuration
 
 var allowedOrigins = configuredOrigins ??
     (builder.Environment.IsDevelopment()
-        ? new[] { "http://localhost:5173", "http://localhost:4173", "http://localhost:3000" }
+        ? new[] { "http://localhost:5173", "http://localhost:4173", "http://localhost:3000", "https://n8n.auraeyes.site" }
         : Array.Empty<string>());
 
 // Configure Swagger with JWT Bearer authentication
