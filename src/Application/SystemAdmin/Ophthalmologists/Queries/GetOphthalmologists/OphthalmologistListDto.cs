@@ -9,6 +9,9 @@ public class OphthalmologistListDto
     public string? Phone { get; set; }
     public string? Bio { get; set; }
     public int YearsOfExperience { get; set; }
+    public string EmploymentType { get; set; } = string.Empty;
+    public int? WorkingHoursPerWeek { get; set; }
+    public decimal? ExpectedMonthlySalary { get; set; }
     public string VerificationStatus { get; set; } = string.Empty;
     public bool IsVerified { get; set; }
     public string? LicenseUrl { get; set; }

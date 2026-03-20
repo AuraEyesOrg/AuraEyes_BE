@@ -217,7 +217,10 @@ public class AuthService : IAuthService
             // Create Ophthalmologist profile with uploaded file URLs
             var ophthalmologist = new Ophthalmologist(
                 user.Id, request.Bio, request.YearsOfExperience,
-                request.Phone, licenseUrl, degreeUrl);
+                request.Phone, licenseUrl, degreeUrl,
+                request.EmploymentType,
+                request.WorkingHoursPerWeek,
+                request.ExpectedMonthlySalary);
             await _ophthalmologistRepository.AddAsync(ophthalmologist, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -257,6 +260,9 @@ public class AuthService : IAuthService
                                 <li><strong>Name:</strong> {request.FullName}</li>
                                 <li><strong>Email:</strong> {request.Email}</li>
                                 <li><strong>Years of Experience:</strong> {request.YearsOfExperience}</li>
+                                <li><strong>Employment Type:</strong> {request.EmploymentType}</li>
+                                <li><strong>Working Hours / Week:</strong> {(request.WorkingHoursPerWeek?.ToString() ?? "N/A")}</li>
+                                <li><strong>Expected Salary:</strong> {(request.ExpectedMonthlySalary?.ToString("N0") ?? "N/A")}</li>
                             </ul>
                             <p>Please review their credentials (license and degree documents) in the System Admin panel.</p>
                             <p>— AURA System</p>
