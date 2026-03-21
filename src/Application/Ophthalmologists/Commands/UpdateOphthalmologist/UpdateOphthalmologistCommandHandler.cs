@@ -11,13 +11,16 @@ namespace Application.Ophthalmologists.Commands.UpdateOphthalmologist;
 public class UpdateOphthalmologistCommandHandler : ICommandHandler<UpdateOphthalmologistCommand>
 {
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IIdentityService _identityService;
     private readonly IUnitOfWork _unitOfWork;
 
     public UpdateOphthalmologistCommandHandler(
         IOphthalmologistRepository ophthalmologistRepository,
+        IIdentityService identityService,
         IUnitOfWork unitOfWork)
     {
         _ophthalmologistRepository = ophthalmologistRepository;
+        _identityService = identityService;
         _unitOfWork = unitOfWork;
     }
 
@@ -32,6 +35,24 @@ public class UpdateOphthalmologistCommandHandler : ICommandHandler<UpdateOphthal
 
         // Update profile using domain method
         ophthalmologist.UpdateProfile(request.Bio, request.YearsOfExperience);
+
+        // Self-profile flow can also update user identity fields.
+        if (request.UserId.HasValue)
+        {
+            var (succeeded, errors) = await _identityService.UpdateUserProfileAsync(
+                request.UserId.Value,
+                request.FullName ?? string.Empty,
+                request.Phone,
+                null,
+                null,
+                request.Address,
+                cancellationToken);
+
+            if (!succeeded)
+            {
+                return Result.Failure(errors);
+            }
+        }
 
         await _ophthalmologistRepository.UpdateAsync(ophthalmologist, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

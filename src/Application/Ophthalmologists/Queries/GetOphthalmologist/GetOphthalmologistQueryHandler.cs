@@ -35,6 +35,7 @@ public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQu
 
         // Get user information
         var user = await _identityService.GetUserByIdAsync(ophthalmologist.UserId, cancellationToken);
+        var userDetails = await _identityService.GetUserDetailsAsync(ophthalmologist.UserId, cancellationToken);
 
         var slots = await _appointmentSlotRepository.GetByOphthalmologistAsync(
             ophthalmologist.Id, 
@@ -52,6 +53,8 @@ public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQu
             UserId = ophthalmologist.UserId,
             UserFullName = user?.FullName,
             UserEmail = user?.Email,
+            UserPhoneNumber = userDetails?.PhoneNumber,
+            UserAddress = userDetails?.Address,
             Bio = ophthalmologist.Bio,
             YearsOfExperience = ophthalmologist.YearsOfExperience,
             IsVerified = ophthalmologist.IsVerified,

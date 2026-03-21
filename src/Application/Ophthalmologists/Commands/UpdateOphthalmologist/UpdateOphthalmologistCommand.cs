@@ -13,6 +13,27 @@ public record UpdateOphthalmologistCommand : ICommand
     public Guid Id { get; init; }
 
     /// <summary>
+    /// Optional authenticated user ID for self-profile updates.
+    /// When provided, user profile fields can also be updated.
+    /// </summary>
+    public Guid? UserId { get; init; }
+
+    /// <summary>
+    /// Optional full name update for self-profile flow.
+    /// </summary>
+    public string? FullName { get; init; }
+
+    /// <summary>
+    /// Optional phone update for self-profile flow.
+    /// </summary>
+    public string? Phone { get; init; }
+
+    /// <summary>
+    /// Optional address update for self-profile flow.
+    /// </summary>
+    public string? Address { get; init; }
+
+    /// <summary>
     /// Updated bio/description.
     /// </summary>
     public string? Bio { get; init; }
