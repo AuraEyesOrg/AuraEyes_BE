@@ -1,6 +1,7 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Common.Constants;
+using Application.Common.Helpers;
 using Application.SystemSettings.Interfaces;
 using Domain.Common;
 using Domain.Enums;
@@ -133,7 +134,7 @@ public class ReserveSlotCommandHandler : ICommandHandler<ReserveSlotCommand, Res
             }
 
             var localAppointmentTime = slot.Date.ToDateTime(slot.StartTime, DateTimeKind.Unspecified);
-            var appointmentTimeUtc = TimeZoneInfo.ConvertTimeToUtc(localAppointmentTime, ResolveVietnamTimeZone());
+            var appointmentTimeUtc = TimeZoneInfo.ConvertTimeToUtc(localAppointmentTime, VietnamTimeZoneResolver.TimeZone);
             
             if (appointmentTimeUtc <= DateTime.UtcNow.AddHours(advanceBookingHours))
             {
@@ -168,27 +169,5 @@ public class ReserveSlotCommandHandler : ICommandHandler<ReserveSlotCommand, Res
             _logger.LogError(ex, "Error reserving slot {SlotId}", request.AppointmentSlotId);
             throw;
         }
-    }
-
-    private static readonly string[] VietnamTimeZoneIds =
-    [
-        "SE Asia Standard Time", // Windows
-        "Asia/Ho_Chi_Minh"       // Linux/macOS (IANA)
-    ];
-
-    private static TimeZoneInfo ResolveVietnamTimeZone()
-    {
-        foreach (var timeZoneId in VietnamTimeZoneIds)
-        {
-            try
-            {
-                return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
-            }
-            catch (TimeZoneNotFoundException) { }
-            catch (InvalidTimeZoneException) { }
-        }
-
-        throw new InvalidOperationException(
-            "Unable to resolve Vietnam time zone. Checked: SE Asia Standard Time, Asia/Ho_Chi_Minh.");
     }
 }

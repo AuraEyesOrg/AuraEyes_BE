@@ -1,6 +1,7 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Common.Constants;
+using Application.Common.Helpers;
 using Domain.Common;
 using Domain.Entities.Consultation;
 using Domain.Entities.Financial;
@@ -18,12 +19,6 @@ namespace Application.Scheduling.AppointmentSlots.Commands.ConfirmReservation;
 /// </summary>
 public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservationCommand, ConfirmReservationResult>
 {
-    private static readonly string[] VietnamTimeZoneIds =
-    [
-        "SE Asia Standard Time", // Windows
-        "Asia/Ho_Chi_Minh"       // Linux/macOS (IANA)
-    ];
-
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IConsultationSessionRepository _consultationSessionRepository;
     private readonly IWalletRepository _walletRepository;
@@ -251,7 +246,7 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
     private DateTime CalculateAppointmentTimeUtc(Domain.Entities.Scheduling.AppointmentSlot slot)
     {
         var localAppointmentTime = slot.Date.ToDateTime(slot.StartTime, DateTimeKind.Unspecified);
-        return TimeZoneInfo.ConvertTimeToUtc(localAppointmentTime, ResolveVietnamTimeZone());
+        return TimeZoneInfo.ConvertTimeToUtc(localAppointmentTime, VietnamTimeZoneResolver.TimeZone);
     }
 
     private async Task<List<string>> ResolveAttendeeEmailsAsync(
@@ -281,21 +276,5 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
         }
 
         return emails;
-    }
-
-    private static TimeZoneInfo ResolveVietnamTimeZone()
-    {
-        foreach (var timeZoneId in VietnamTimeZoneIds)
-        {
-            try
-            {
-                return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
-            }
-            catch (TimeZoneNotFoundException) { }
-            catch (InvalidTimeZoneException) { }
-        }
-
-        throw new InvalidOperationException(
-            "Unable to resolve Vietnam time zone. Checked: SE Asia Standard Time, Asia/Ho_Chi_Minh.");
     }
 }
