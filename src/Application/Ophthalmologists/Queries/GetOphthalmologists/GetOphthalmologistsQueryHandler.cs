@@ -40,16 +40,13 @@ public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologists
         foreach (var ophthalmologist in items)
         {
             var user = await _identityService.GetUserByIdAsync(ophthalmologist.UserId, cancellationToken);
-            
-            var slots = await _appointmentSlotRepository.GetByOphthalmologistAsync(
+
+            var (minPrice, maxPrice) = await _appointmentSlotRepository.GetPriceRangeByOphthalmologistAsync(
                 ophthalmologist.Id, 
                 DateOnly.FromDateTime(DateTime.UtcNow), 
                 null, 
                 Domain.Enums.ScheduleStatus.Available, 
                 cancellationToken);
-                
-            decimal? minPrice = slots.Any() ? slots.Min(s => s.Cost) : null;
-            decimal? maxPrice = slots.Any() ? slots.Max(s => s.Cost) : null;
 
             dtoList.Add(new OphthalmologistListDto
             {
