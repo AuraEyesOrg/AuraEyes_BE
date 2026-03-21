@@ -7,6 +7,7 @@ using Application.Ophthalmologists.Commands.UnverifyOphthalmologist;
 using Application.Ophthalmologists.Commands.UpdateOphthalmologist;
 using Application.Ophthalmologists.Commands.VerifyOphthalmologist;
 using Application.Ophthalmologists.Common;
+using Application.Patients.Commands.UploadAvatar;
 using Application.Ophthalmologists.Contracts.GetMyContract;
 using Application.Ophthalmologists.Contracts.UploadSignedContract;
 using Application.Ophthalmologists.Queries.GetDashboardMetrics;
@@ -129,6 +130,97 @@ public class OphthalmologistsController : BaseApiController
 
         var result = await _mediator.Send(command);
         return HandleResult(result, "Ophthalmologist profile updated successfully.");
+    }
+
+    /// <summary>
+    /// Get current authenticated ophthalmologist profile.
+    /// </summary>
+    [HttpGet("~/api/ophthalmologist/profile")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<OphthalmologistDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetMyProfile(CancellationToken cancellationToken)
+    {
+        if (_currentUserService.ProfileId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found in token"));
+
+        var result = await _mediator.Send(
+            new GetOphthalmologistQuery(_currentUserService.ProfileId.Value),
+            cancellationToken);
+
+        return HandleResult(result, "Profile retrieved successfully");
+    }
+
+    /// <summary>
+    /// Update current authenticated ophthalmologist profile information.
+    /// </summary>
+    [HttpPut("~/api/ophthalmologist/profile")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateMyProfile(
+        [FromBody] UpdateOphthalmologistProfileRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
+
+        if (_currentUserService.ProfileId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found in token"));
+
+        var command = new UpdateOphthalmologistCommand
+        {
+            Id = _currentUserService.ProfileId.Value,
+            UserId = _currentUserService.UserId.Value,
+            FullName = request.FullName,
+            Phone = request.Phone,
+            Address = request.Address,
+            Bio = request.Bio,
+            YearsOfExperience = request.YearsOfExperience,
+        };
+
+        var result = await _mediator.Send(command, cancellationToken);
+        return HandleResult(result, "Profile updated successfully");
+    }
+
+    /// <summary>
+    /// Upload a new profile avatar for the authenticated ophthalmologist.
+    /// Accepts multipart form data with an image file.
+    /// </summary>
+    [HttpPost("~/api/ophthalmologist/profile/avatar")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<UploadAvatarResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UploadMyAvatar(
+        IFormFile avatar,
+        CancellationToken cancellationToken)
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
+
+        if (avatar.Length == 0)
+            return BadRequest(ApiResponseFactory.Error("No file uploaded"));
+
+        // Validate file type
+        var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+        if (!allowedTypes.Contains(avatar.ContentType.ToLowerInvariant()))
+            return BadRequest(ApiResponseFactory.Error("Invalid file type. Supported: JPG, PNG, GIF, WebP"));
+
+        // Validate file size (5MB max)
+        if (avatar.Length > 5 * 1024 * 1024)
+            return BadRequest(ApiResponseFactory.Error("File must be smaller than 5MB"));
+
+        using var stream = avatar.OpenReadStream();
+        var command = new UploadAvatarCommand
+        {
+            UserId = _currentUserService.UserId.Value,
+            FileStream = stream,
+            FileName = avatar.FileName,
+        };
+
+        var result = await _mediator.Send(command, cancellationToken);
+        return HandleResult(result, "Avatar uploaded successfully");
     }
 
     /// <summary>
@@ -257,4 +349,13 @@ public class OphthalmologistsController : BaseApiController
         var result = await _mediator.Send(command);
         return HandleResult(result, "Contract uploaded successfully. Waiting for admin verification.");
     }
+}
+
+public record UpdateOphthalmologistProfileRequest
+{
+    public string FullName { get; init; } = string.Empty;
+    public string? Phone { get; init; }
+    public string? Address { get; init; }
+    public string? Bio { get; init; }
+    public int YearsOfExperience { get; init; }
 }
