@@ -3,6 +3,7 @@ using Application.SystemSettings.Queries.GetSystemSettings;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 
 namespace API.Controllers;
 
@@ -22,6 +23,7 @@ public class SystemSettingsController : ControllerBase
     /// Can be accessed by anyone (used by Patient app to get advance booking limit).
     /// </summary>
     [HttpGet]
+    [OutputCache(PolicyName = "PublicData")]
     [AllowAnonymous]
     public async Task<IActionResult> GetSystemSettings(CancellationToken cancellationToken)
     {
