@@ -35,18 +35,28 @@ public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologists
             request.PageSize,
             cancellationToken);
 
+        var fromDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        var ophthalmologistIds = items.Select(x => x.Id).ToArray();
+        var priceRangesByOphthalmologist = await _appointmentSlotRepository.GetPriceRangesByOphthalmologistAsync(
+            ophthalmologistIds,
+            fromDate,
+            null,
+            Domain.Enums.ScheduleStatus.Available,
+            cancellationToken);
+
         var dtoList = new List<OphthalmologistListDto>();
 
         foreach (var ophthalmologist in items)
         {
             var user = await _identityService.GetUserByIdAsync(ophthalmologist.UserId, cancellationToken);
 
-            var (minPrice, maxPrice) = await _appointmentSlotRepository.GetPriceRangeByOphthalmologistAsync(
-                ophthalmologist.Id, 
-                DateOnly.FromDateTime(DateTime.UtcNow), 
-                null, 
-                Domain.Enums.ScheduleStatus.Available, 
-                cancellationToken);
+            decimal? minPrice = null;
+            decimal? maxPrice = null;
+            if (priceRangesByOphthalmologist.TryGetValue(ophthalmologist.Id, out var range))
+            {
+                minPrice = range.MinPrice;
+                maxPrice = range.MaxPrice;
+            }
 
             dtoList.Add(new OphthalmologistListDto
             {

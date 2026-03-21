@@ -50,6 +50,8 @@ public class GetConsultationSessionQueryHandler
         var isParticipant = _currentUser.ProfileId.HasValue
                             && (session.PatientId == _currentUser.ProfileId.Value
                                 || session.OphthalmologistId == _currentUser.ProfileId.Value);
+        var isPatient = _currentUser.ProfileId.HasValue
+                        && session.PatientId == _currentUser.ProfileId.Value;
 
         if (!isAdmin && !isParticipant)
         {
@@ -74,8 +76,13 @@ public class GetConsultationSessionQueryHandler
             session,
             cancellationToken);
 
+        var canViewRetinalImages = isAdmin || isPatient || session.IsRetinalImagesShared;
+        var canViewAiResults = isAdmin || isPatient || session.IsAIResultShared;
+
         var caseSnapshot = await BuildCaseSnapshotAsync(
             session.AiScreeningId,
+            canViewRetinalImages,
+            canViewAiResults,
             cancellationToken);
 
         dto = dto with
@@ -90,9 +97,11 @@ public class GetConsultationSessionQueryHandler
 
     private async Task<ConsultationCaseSnapshotDto?> BuildCaseSnapshotAsync(
         Guid? screeningId,
+        bool canViewRetinalImages,
+        bool canViewAiResults,
         CancellationToken cancellationToken)
     {
-        if (!screeningId.HasValue) return null;
+        if (!screeningId.HasValue || (!canViewRetinalImages && !canViewAiResults)) return null;
 
         var screening = await _aiScreeningRepository
             .Query()
@@ -102,12 +111,16 @@ public class GetConsultationSessionQueryHandler
 
         if (screening is null) return null;
 
-        var latestResult = screening.ScreeningResults
-            .OrderByDescending(x => x.CreatedAt)
-            .FirstOrDefault();
+        ScreeningResult? latestResult = null;
+        if (canViewAiResults)
+        {
+            latestResult = screening.ScreeningResults
+                .OrderByDescending(x => x.CreatedAt)
+                .FirstOrDefault();
+        }
 
         var symptoms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (!string.IsNullOrWhiteSpace(latestResult?.Findings))
+        if (canViewAiResults && !string.IsNullOrWhiteSpace(latestResult?.Findings))
         {
             foreach (var item in latestResult.Findings
                          .Split([',', ';', '\n', '\r'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
@@ -117,7 +130,7 @@ public class GetConsultationSessionQueryHandler
         }
 
         string? annotatedImageUrl = null;
-        if (!string.IsNullOrWhiteSpace(screening.RawJsonOutput))
+        if (canViewAiResults && !string.IsNullOrWhiteSpace(screening.RawJsonOutput))
         {
             try
             {
@@ -155,17 +168,19 @@ public class GetConsultationSessionQueryHandler
         return new ConsultationCaseSnapshotDto
         {
             ScreeningId = screening.Id,
-            RiskLevel = latestResult?.RiskLevel.ToString(),
-            ConfidenceScore = latestResult?.ConfidenceScore,
-            Summary = latestResult?.Summary,
-            Findings = latestResult?.Findings,
-            AnnotatedImageUrl = annotatedImageUrl,
-            OriginalImageUrls = screening.RetinalImages
-                .OrderBy(x => x.CreatedAt)
-                .Select(x => x.ImageUrl)
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .ToList(),
-            Symptoms = symptoms.ToList()
+            RiskLevel = canViewAiResults ? latestResult?.RiskLevel.ToString() : null,
+            ConfidenceScore = canViewAiResults ? latestResult?.ConfidenceScore : null,
+            Summary = canViewAiResults ? latestResult?.Summary : null,
+            Findings = canViewAiResults ? latestResult?.Findings : null,
+            AnnotatedImageUrl = canViewAiResults ? annotatedImageUrl : null,
+            OriginalImageUrls = canViewRetinalImages
+                ? screening.RetinalImages
+                    .OrderBy(x => x.CreatedAt)
+                    .Select(x => x.ImageUrl)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .ToList()
+                : [],
+            Symptoms = canViewAiResults ? symptoms.ToList() : []
         };
     }
 }

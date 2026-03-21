@@ -77,6 +77,16 @@ public interface IAppointmentSlotRepository : IRepository<AppointmentSlot>
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Get min/max slot prices for multiple ophthalmologists with optional filters.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, (decimal? MinPrice, decimal? MaxPrice)>> GetPriceRangesByOphthalmologistAsync(
+        IReadOnlyCollection<Guid> ophthalIds,
+        DateOnly? fromDate = null,
+        DateOnly? toDate = null,
+        ScheduleStatus? status = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get appointment slots by organisation (via template).
     /// </summary>
     Task<IReadOnlyList<AppointmentSlot>> GetByOrganisationAsync(
