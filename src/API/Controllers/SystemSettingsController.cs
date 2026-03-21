@@ -1,3 +1,4 @@
+using Application.Common.Constants;
 using Application.SystemSettings.Commands.UpdateSystemSettings;
 using Application.SystemSettings.Queries.GetSystemSettings;
 using MediatR;
@@ -8,8 +9,7 @@ using Microsoft.AspNetCore.OutputCaching;
 namespace API.Controllers;
 
 [Route("api/system-settings")]
-[ApiController]
-public class SystemSettingsController : ControllerBase
+public class SystemSettingsController : BaseApiController
 {
     private readonly ISender _sender;
 
@@ -36,7 +36,7 @@ public class SystemSettingsController : ControllerBase
     /// Restricted to System Admin role.
     /// </summary>
     [HttpPut]
-    [Authorize(Roles = "SystemAdmin")]
+    [Authorize(Policy = Policies.SystemAdminOnly)]
     public async Task<IActionResult> UpdateSystemSettings([FromBody] Dictionary<string, string> settings, CancellationToken cancellationToken)
     {
         var command = new UpdateSystemSettingsCommand { Settings = settings };
