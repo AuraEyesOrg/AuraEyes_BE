@@ -1,6 +1,8 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Feedback.Common;
+using Domain.Common;
+using Domain.Entities.Users;
 using Domain.Repositories;
 
 namespace Application.Feedback.Queries.ListOphthalmologistFeedback;
@@ -9,13 +11,16 @@ public class ListOphthalmologistFeedbackQueryHandler
     : IQueryHandler<ListOphthalmologistFeedbackQuery, PagedResult<OphthalmologistFeedbackDto>>
 {
     private readonly IOphthalmologistFeedbackRepository _ophthalmologistFeedbackRepository;
+    private readonly IRepository<Patient> _patientRepository;
     private readonly IIdentityService _identityService;
 
     public ListOphthalmologistFeedbackQueryHandler(
         IOphthalmologistFeedbackRepository ophthalmologistFeedbackRepository,
+        IRepository<Patient> patientRepository,
         IIdentityService identityService)
     {
         _ophthalmologistFeedbackRepository = ophthalmologistFeedbackRepository;
+        _patientRepository = patientRepository;
         _identityService = identityService;
     }
 
@@ -33,13 +38,16 @@ public class ListOphthalmologistFeedbackQueryHandler
 
         foreach (var x in items)
         {
-            var patient = await _identityService.GetUserByIdAsync(x.PatientId, cancellationToken);
+            var patientEntity = await _patientRepository.GetByIdAsync(x.PatientId, cancellationToken);
+            var patientUser = patientEntity != null 
+                ? await _identityService.GetUserByIdAsync(patientEntity.UserId, cancellationToken)
+                : null;
 
             dtoList.Add(new OphthalmologistFeedbackDto
             {
                 Id = x.Id,
                 PatientId = x.PatientId,
-                PatientFullName = patient?.FullName,
+                PatientFullName = patientUser?.FullName,
                 OphthalmologistId = x.OphthalmologistId,
                 ConsultationSessionId = x.ConsultationSessionId,
                 Rating = x.Rating,
