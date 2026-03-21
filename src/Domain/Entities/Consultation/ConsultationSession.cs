@@ -84,6 +84,9 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
         DateTime appointmentTime,
         Guid? ophthalmologistId = null,
         Guid? appointmentSlotId = null,
+        Guid? aiScreeningId = null,
+        bool shareRetinalImages = false,
+        bool shareAiResults = false,
         string? meetingLink = null,
         string? calendarEventId = null)
     {
@@ -95,10 +98,13 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
             PatientId = patientId,
             OphthalmologistId = ophthalmologistId,
             AppointmentSlotId = appointmentSlotId,
+            AiScreeningId = aiScreeningId,
             Type = ConsultationSessionType.VideoCall,
             Status = SessionStatus.Confirmed,
             ChatStatus = ChatStatus.MemoOnly,
             Price = price,
+            IsRetinalImagesShared = aiScreeningId.HasValue && shareRetinalImages,
+            IsAIResultShared = aiScreeningId.HasValue && shareAiResults,
             AppointmentTime = appointmentTime,
             MeetingLink = meetingLink,
             CalendarEventId = calendarEventId,
