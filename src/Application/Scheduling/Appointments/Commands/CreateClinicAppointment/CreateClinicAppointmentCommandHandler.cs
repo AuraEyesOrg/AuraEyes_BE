@@ -6,6 +6,7 @@ using Domain.Entities.Scheduling;
 using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
+using Application.Common.Constants;
 using Microsoft.Extensions.Logging;
 
 namespace Application.Scheduling.Appointments.Commands.CreateClinicAppointment;
@@ -16,7 +17,9 @@ public class CreateClinicAppointmentCommandHandler
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IRepository<Organisation> _organisationRepository;
+    private readonly IRepository<Patient> _patientRepository;
     private readonly ICurrentUserService _currentUser;
+    private readonly IIdentityService _identityService;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CreateClinicAppointmentCommandHandler> _logger;
@@ -25,7 +28,9 @@ public class CreateClinicAppointmentCommandHandler
         IAppointmentSlotRepository appointmentSlotRepository,
         IAppointmentRepository appointmentRepository,
         IRepository<Organisation> organisationRepository,
+        IRepository<Patient> patientRepository,
         ICurrentUserService currentUser,
+        IIdentityService identityService,
         INotificationService notificationService,
         IUnitOfWork unitOfWork,
         ILogger<CreateClinicAppointmentCommandHandler> logger)
@@ -33,7 +38,9 @@ public class CreateClinicAppointmentCommandHandler
         _appointmentSlotRepository = appointmentSlotRepository;
         _appointmentRepository = appointmentRepository;
         _organisationRepository = organisationRepository;
+        _patientRepository = patientRepository;
         _currentUser = currentUser;
+        _identityService = identityService;
         _notificationService = notificationService;
         _unitOfWork = unitOfWork;
         _logger = logger;
@@ -122,6 +129,20 @@ public class CreateClinicAppointmentCommandHandler
                 request.SlotId,
                 request.OrganisationId);
 
+            var appointmentTime = slot.StartTime.ToString("HH:mm");
+            var appointmentDate = slot.Date.ToString("dd/MM/yyyy");
+            var patientName = "bệnh nhân";
+
+            var patient = await _patientRepository.GetByIdAsync(patientId, cancellationToken);
+            if (patient is not null)
+            {
+                var patientUser = await _identityService.GetUserByIdAsync(patient.UserId, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(patientUser?.FullName))
+                {
+                    patientName = patientUser.FullName;
+                }
+            }
+
             if (_currentUser.UserId.HasValue)
             {
                 try
@@ -129,7 +150,7 @@ public class CreateClinicAppointmentCommandHandler
                     await _notificationService.SendAsync(
                         _currentUser.UserId.Value,
                         "Đặt lịch khám thành công",
-                        $"Lịch khám tại {organisation.Name} đã được xác nhận cho {slot.Date:dd/MM/yyyy} lúc {slot.StartTime.ToString("HH:mm")}.",
+                        $"Bạn đã đặt lịch thành công vào lúc {appointmentTime}, ngày {appointmentDate}",
                         NotificationType.NewAppointmentBooked,
                         new
                         {
@@ -139,6 +160,28 @@ public class CreateClinicAppointmentCommandHandler
                             OrganisationId = request.OrganisationId
                         },
                         cancellationToken);
+
+                    var organisationAdminUserIds = await _identityService.GetUserIdsByRoleAndOrganizationAsync(
+                        Roles.OrgAdmin,
+                        request.OrganisationId,
+                        cancellationToken);
+
+                    foreach (var providerUserId in organisationAdminUserIds)
+                    {
+                        await _notificationService.SendAsync(
+                            providerUserId,
+                            "Lịch hẹn mới từ bệnh nhân",
+                            $"Bạn có 1 lịch vào lúc {appointmentTime}, ngày {appointmentDate} từ bệnh nhân {patientName}",
+                            NotificationType.NewAppointmentBooked,
+                            new
+                            {
+                                AppointmentId = appointment.Id,
+                                AppointmentTime = $"{slot.Date:yyyy-MM-dd}T{slot.StartTime.ToString("HH:mm")}:00",
+                                PatientId = patientId,
+                                OrganisationId = request.OrganisationId
+                            },
+                            cancellationToken);
+                    }
                 }
                 catch (Exception ex)
                 {

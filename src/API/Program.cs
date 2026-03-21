@@ -8,6 +8,7 @@ using Hangfire.PostgreSql;
 using Infrastructure;
 using Infrastructure.Services;
 using Microsoft.AspNetCore.ResponseCompression;
+using Infrastructure.Services.Testing;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.OpenApi.Models;
 using Npgsql;
@@ -30,6 +31,13 @@ builder.Host.UseSerilog();
 // Add services to the container.
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+if (builder.Environment.IsEnvironment("Test"))
+{
+    // Replace external integrations with in-process test doubles.
+    builder.Services.AddScoped<IEmailService, FakeEmailService>();
+    builder.Services.AddScoped<IPayOSService, FakePayOSService>();
+}
 
 // Register HttpContextAccessor and CurrentUserService
 builder.Services.AddHttpContextAccessor();

@@ -29,6 +29,7 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
     private readonly IRepository<Patient> _patientRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IIdentityService _identityService;
+    private readonly INotificationService _notificationService;
     private readonly IGoogleMeetService _googleMeetService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
@@ -41,6 +42,7 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
         IRepository<Patient> patientRepository,
         IOphthalmologistRepository ophthalmologistRepository,
         IIdentityService identityService,
+        INotificationService notificationService,
         IGoogleMeetService googleMeetService,
         IUnitOfWork unitOfWork,
         ICurrentUserService currentUser,
@@ -52,6 +54,7 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
         _patientRepository = patientRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _identityService = identityService;
+        _notificationService = notificationService;
         _googleMeetService = googleMeetService;
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
@@ -197,6 +200,101 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
             await _consultationSessionRepository.AddAsync(session, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+            var appointmentTimeText = slot.StartTime.ToString("HH:mm");
+            var appointmentDateText = slot.Date.ToString("dd/MM/yyyy");
+            var appointmentTimestamp = $"{slot.Date:yyyy-MM-dd}T{slot.StartTime:HH:mm}:00";
+
+            var patient = await _patientRepository.GetByIdAsync(effectivePatientProfileId, cancellationToken);
+            var patientUser = patient is null
+                ? null
+                : await _identityService.GetUserByIdAsync(patient.UserId, cancellationToken);
+            var patientName = string.IsNullOrWhiteSpace(patientUser?.FullName)
+                ? "bệnh nhân"
+                : patientUser.FullName;
+
+            if (patient?.UserId is Guid patientUserId)
+            {
+                try
+                {
+                    await _notificationService.SendAsync(
+                        patientUserId,
+                        "Đặt lịch thành công",
+                        $"Bạn đã đặt lịch thành công vào lúc {appointmentTimeText}, ngày {appointmentDateText}",
+                        NotificationType.NewAppointmentBooked,
+                        new
+                        {
+                            ConsultationSessionId = session.Id,
+                            AppointmentSlotId = slot.Id,
+                            AppointmentTime = appointmentTimestamp
+                        },
+                        cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex,
+                        "Failed to send booking notification to patient for slot {SlotId}",
+                        slot.Id);
+                }
+            }
+
+            try
+            {
+                if (ophthalmologistId.HasValue)
+                {
+                    var ophthalmologist = await _ophthalmologistRepository.GetByIdAsync(
+                        ophthalmologistId.Value,
+                        cancellationToken);
+
+                    if (ophthalmologist is not null)
+                    {
+                        await _notificationService.SendAsync(
+                            ophthalmologist.UserId,
+                            "Lịch hẹn mới từ bệnh nhân",
+                            $"Bạn có 1 lịch vào lúc {appointmentTimeText}, ngày {appointmentDateText} từ bệnh nhân {patientName}",
+                            NotificationType.NewAppointmentBooked,
+                            new
+                            {
+                                ConsultationSessionId = session.Id,
+                                AppointmentSlotId = slot.Id,
+                                AppointmentTime = appointmentTimestamp,
+                                PatientId = effectivePatientProfileId
+                            },
+                            cancellationToken);
+                    }
+                }
+                else if (slot.ScheduleTemplate?.OrgId is Guid orgId)
+                {
+                    var organisationAdminUserIds = await _identityService.GetUserIdsByRoleAndOrganizationAsync(
+                        Roles.OrgAdmin,
+                        orgId,
+                        cancellationToken);
+
+                    foreach (var providerUserId in organisationAdminUserIds)
+                    {
+                        await _notificationService.SendAsync(
+                            providerUserId,
+                            "Lịch hẹn mới từ bệnh nhân",
+                            $"Bạn có 1 lịch vào lúc {appointmentTimeText}, ngày {appointmentDateText} từ bệnh nhân {patientName}",
+                            NotificationType.NewAppointmentBooked,
+                            new
+                            {
+                                ConsultationSessionId = session.Id,
+                                AppointmentSlotId = slot.Id,
+                                AppointmentTime = appointmentTimestamp,
+                                PatientId = effectivePatientProfileId,
+                                OrganisationId = orgId
+                            },
+                            cancellationToken);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Failed to send provider booking notification for slot {SlotId}",
+                    slot.Id);
+            }
 
             _logger.LogInformation(
                 "Reservation confirmed: slot {SlotId} → session {SessionId} (Confirmed), fee {Fee} VND deducted",
