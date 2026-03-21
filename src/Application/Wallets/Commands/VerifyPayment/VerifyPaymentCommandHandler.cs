@@ -145,7 +145,7 @@ public class VerifyPaymentCommandHandler : ICommandHandler<VerifyPaymentCommand,
                     await _notificationService.SendAsync(
                         depositRequest.UserId,
                         "Nạp tiền thành công",
-                        $"Bạn đã nạp {depositRequest.Amount:N0} VND vào ví. Số dư mới: {wallet.Balance:N0} VND",
+                        $"Bạn nạp tiền với số tiền {depositRequest.Amount:N0} VNĐ",
                         NotificationType.WalletDepositSuccess,
                         new { TransactionId = transaction.Id, Amount = depositRequest.Amount, Action = "Deposit" },
                         cancellationToken);

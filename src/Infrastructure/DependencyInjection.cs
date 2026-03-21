@@ -3,6 +3,7 @@ using Application.AiQuota.Interfaces;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.SystemAdmin.Interfaces;
+using Application.SystemSettings.Interfaces;
 using Domain.Common;
 using Domain.Repositories;
 using Infrastructure.Identity;
@@ -191,6 +192,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminQueryService, AdminQueryService>();
         services.AddScoped<IAiQuotaService, AiQuotaService>();
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
+        services.AddScoped<ISystemSettingService, SystemSettingService>();
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();

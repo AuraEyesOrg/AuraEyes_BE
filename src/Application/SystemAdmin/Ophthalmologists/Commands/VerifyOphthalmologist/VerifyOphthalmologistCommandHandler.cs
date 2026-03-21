@@ -70,7 +70,7 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
         {
             try
             {
-                await CreateContractForOphthalmologistAsync(ophthalmologist.UserId, cancellationToken);
+                await CreateContractForOphthalmologistAsync(ophthalmologist, cancellationToken);
             }
             catch (Exception contractEx)
             {
@@ -141,8 +141,12 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
     /// Finds the active OphthalmologistContract template, creates a Draft contract,
     /// then sends it for signature (→ PendingSignature).
     /// </summary>
-    private async Task CreateContractForOphthalmologistAsync(Guid userId, CancellationToken cancellationToken)
+    private async Task CreateContractForOphthalmologistAsync(
+        Domain.Entities.Users.Ophthalmologist ophthalmologist,
+        CancellationToken cancellationToken)
     {
+        var userId = ophthalmologist.UserId;
+
         // Check if a contract already exists for this user
         var existingContract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
         if (existingContract != null)
@@ -156,10 +160,10 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
             type: ContractType.OphthalmologistContract,
             isActive: true,
             pageNumber: 1,
-            pageSize: 1,
+            pageSize: 50,
             cancellationToken: cancellationToken);
 
-        var template = templates.FirstOrDefault();
+        var template = SelectTemplateByEmploymentType(templates, ophthalmologist.EmploymentType);
         if (template == null)
         {
             _logger.LogWarning("No active OphthalmologistContract template found. Cannot create contract for user {UserId}.", userId);
@@ -183,5 +187,35 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
 
         _logger.LogInformation("Contract {Number} created and sent for signature for user {UserId}.",
             contractNumber, userId);
+    }
+
+    private static ContractTemplate? SelectTemplateByEmploymentType(
+        IReadOnlyList<ContractTemplate> templates,
+        OphthalmologistEmploymentType employmentType)
+    {
+        if (templates.Count == 0)
+            return null;
+
+        static string Normalize(string value) => value.ToLowerInvariant().Replace("-", string.Empty).Replace(" ", string.Empty);
+
+        var expectedKeyword = employmentType == OphthalmologistEmploymentType.PartTime
+            ? "parttime"
+            : "fulltime";
+
+        var matched = templates
+            .Where(t => t.EmploymentType == employmentType)
+            .OrderByDescending(t => t.EffectiveDate ?? DateTime.MinValue)
+            .ThenByDescending(t => t.CreatedAt)
+            .FirstOrDefault();
+
+        if (matched != null)
+            return matched;
+
+        // Fallback: legacy template may not have EmploymentType populated yet.
+        return templates
+            .Where(t => Normalize(t.Title).Contains(expectedKeyword))
+            .OrderByDescending(t => t.EffectiveDate ?? DateTime.MinValue)
+            .ThenByDescending(t => t.CreatedAt)
+            .FirstOrDefault();
     }
 }

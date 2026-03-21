@@ -200,6 +200,22 @@ public class IdentityService : IIdentityService
         return await _userManager.IsInRoleAsync(user, role);
     }
 
+    public async Task<IReadOnlyList<Guid>> GetUserIdsByRoleAndOrganizationAsync(
+        string role,
+        Guid organizationId,
+        CancellationToken cancellationToken = default)
+    {
+        var usersInRole = await _userManager.GetUsersInRoleAsync(role);
+
+        return usersInRole
+            .Where(u =>
+                u.OrganizationId == organizationId &&
+                u.IsActive &&
+                !u.IsDeleted)
+            .Select(u => u.Id)
+            .ToList();
+    }
+
     public async Task UpdateLastLoginAsync(Guid userId)
     {
         var user = await _userManager.FindByIdAsync(userId.ToString());

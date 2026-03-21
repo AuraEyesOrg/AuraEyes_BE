@@ -1,9 +1,11 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Common.Constants;
+using Application.Common.Helpers;
 using Domain.Common;
 using Domain.Entities.Consultation;
 using Domain.Entities.Financial;
+using Domain.Entities.Screening;
 using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
@@ -17,18 +19,14 @@ namespace Application.Scheduling.AppointmentSlots.Commands.ConfirmReservation;
 /// </summary>
 public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservationCommand, ConfirmReservationResult>
 {
-    private static readonly string[] VietnamTimeZoneIds =
-    [
-        "SE Asia Standard Time", // Windows
-        "Asia/Ho_Chi_Minh"       // Linux/macOS (IANA)
-    ];
-
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IConsultationSessionRepository _consultationSessionRepository;
     private readonly IWalletRepository _walletRepository;
+    private readonly IRepository<AiScreening> _aiScreeningRepository;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IIdentityService _identityService;
+    private readonly INotificationService _notificationService;
     private readonly IGoogleMeetService _googleMeetService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
@@ -38,9 +36,11 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
         IAppointmentSlotRepository appointmentSlotRepository,
         IConsultationSessionRepository consultationSessionRepository,
         IWalletRepository walletRepository,
+        IRepository<AiScreening> aiScreeningRepository,
         IRepository<Patient> patientRepository,
         IOphthalmologistRepository ophthalmologistRepository,
         IIdentityService identityService,
+        INotificationService notificationService,
         IGoogleMeetService googleMeetService,
         IUnitOfWork unitOfWork,
         ICurrentUserService currentUser,
@@ -49,9 +49,11 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
         _appointmentSlotRepository = appointmentSlotRepository;
         _consultationSessionRepository = consultationSessionRepository;
         _walletRepository = walletRepository;
+        _aiScreeningRepository = aiScreeningRepository;
         _patientRepository = patientRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _identityService = identityService;
+        _notificationService = notificationService;
         _googleMeetService = googleMeetService;
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
@@ -117,6 +119,30 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
             }
 
             // ── 3. Wallet balance check & deduction ──
+            Guid? linkedAiScreeningId = null;
+            if (request.AiScreeningId.HasValue)
+            {
+                var screening = await _aiScreeningRepository.GetByIdAsync(
+                    request.AiScreeningId.Value, cancellationToken);
+
+                if (screening is null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<ConfirmReservationResult>.NotFound(
+                        $"AI screening '{request.AiScreeningId.Value}' not found.");
+                }
+
+                if (screening.PatientId != effectivePatientProfileId)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<ConfirmReservationResult>.Forbidden(
+                        "You can only attach your own screening result to this consultation.");
+                }
+
+                linkedAiScreeningId = screening.Id;
+            }
+
+            // ── 4. Wallet balance check & deduction ──
             var consultationFee = slot.Cost ?? 0;
 
             if (consultationFee > 0)
@@ -159,7 +185,7 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                 await _walletRepository.AddTransactionAsync(transaction, cancellationToken);
             }
 
-            // ── 4. Resolve attendee emails & create Google Meet ──
+            // ── 5. Resolve attendee emails & create Google Meet ──
             var ophthalmologistId = slot.ScheduleTemplate?.OphthalId;
             var appointmentTime = CalculateAppointmentTimeUtc(slot);
 
@@ -182,7 +208,7 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                     slot.Id);
             }
 
-            // ── 5. Confirm slot & create session (Status = Confirmed) ──
+            // ── 6. Confirm slot & create session (Status = Confirmed) ──
             slot.ConfirmReservation(effectivePatientProfileId);
 
             var session = ConsultationSession.CreateVideoCall(
@@ -191,12 +217,110 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                 appointmentTime: appointmentTime,
                 ophthalmologistId: ophthalmologistId,
                 appointmentSlotId: slot.Id,
+                aiScreeningId: linkedAiScreeningId,
+                shareRetinalImages: request.ShareRetinalImages,
+                shareAiResults: request.ShareAiResults,
                 meetingLink: meetingInfo?.MeetingLink,
                 calendarEventId: meetingInfo?.CalendarEventId);
 
             await _consultationSessionRepository.AddAsync(session, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+            var appointmentTimeText = slot.StartTime.ToString("HH:mm");
+            var appointmentDateText = slot.Date.ToString("dd/MM/yyyy");
+            var appointmentTimestamp = $"{slot.Date:yyyy-MM-dd}T{slot.StartTime:HH:mm}:00";
+
+            var patient = await _patientRepository.GetByIdAsync(effectivePatientProfileId, cancellationToken);
+            var patientUser = patient is null
+                ? null
+                : await _identityService.GetUserByIdAsync(patient.UserId, cancellationToken);
+            var patientName = string.IsNullOrWhiteSpace(patientUser?.FullName)
+                ? "bệnh nhân"
+                : patientUser.FullName;
+
+            if (patient?.UserId is Guid patientUserId)
+            {
+                try
+                {
+                    await _notificationService.SendAsync(
+                        patientUserId,
+                        "Đặt lịch thành công",
+                        $"Bạn đã đặt lịch thành công vào lúc {appointmentTimeText}, ngày {appointmentDateText}",
+                        NotificationType.NewAppointmentBooked,
+                        new
+                        {
+                            ConsultationSessionId = session.Id,
+                            AppointmentSlotId = slot.Id,
+                            AppointmentTime = appointmentTimestamp
+                        },
+                        cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex,
+                        "Failed to send booking notification to patient for slot {SlotId}",
+                        slot.Id);
+                }
+            }
+
+            try
+            {
+                if (ophthalmologistId.HasValue)
+                {
+                    var ophthalmologist = await _ophthalmologistRepository.GetByIdAsync(
+                        ophthalmologistId.Value,
+                        cancellationToken);
+
+                    if (ophthalmologist is not null)
+                    {
+                        await _notificationService.SendAsync(
+                            ophthalmologist.UserId,
+                            "Lịch hẹn mới từ bệnh nhân",
+                            $"Bạn có 1 lịch vào lúc {appointmentTimeText}, ngày {appointmentDateText} từ bệnh nhân {patientName}",
+                            NotificationType.NewAppointmentBooked,
+                            new
+                            {
+                                ConsultationSessionId = session.Id,
+                                AppointmentSlotId = slot.Id,
+                                AppointmentTime = appointmentTimestamp,
+                                PatientId = effectivePatientProfileId
+                            },
+                            cancellationToken);
+                    }
+                }
+                else if (slot.ScheduleTemplate?.OrgId is Guid orgId)
+                {
+                    var organisationAdminUserIds = await _identityService.GetUserIdsByRoleAndOrganizationAsync(
+                        Roles.OrgAdmin,
+                        orgId,
+                        cancellationToken);
+
+                    foreach (var providerUserId in organisationAdminUserIds)
+                    {
+                        await _notificationService.SendAsync(
+                            providerUserId,
+                            "Lịch hẹn mới từ bệnh nhân",
+                            $"Bạn có 1 lịch vào lúc {appointmentTimeText}, ngày {appointmentDateText} từ bệnh nhân {patientName}",
+                            NotificationType.NewAppointmentBooked,
+                            new
+                            {
+                                ConsultationSessionId = session.Id,
+                                AppointmentSlotId = slot.Id,
+                                AppointmentTime = appointmentTimestamp,
+                                PatientId = effectivePatientProfileId,
+                                OrganisationId = orgId
+                            },
+                            cancellationToken);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Failed to send provider booking notification for slot {SlotId}",
+                    slot.Id);
+            }
 
             _logger.LogInformation(
                 "Reservation confirmed: slot {SlotId} → session {SessionId} (Confirmed), fee {Fee} VND deducted",
@@ -220,7 +344,7 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
     private DateTime CalculateAppointmentTimeUtc(Domain.Entities.Scheduling.AppointmentSlot slot)
     {
         var localAppointmentTime = slot.Date.ToDateTime(slot.StartTime, DateTimeKind.Unspecified);
-        return TimeZoneInfo.ConvertTimeToUtc(localAppointmentTime, ResolveVietnamTimeZone());
+        return TimeZoneInfo.ConvertTimeToUtc(localAppointmentTime, VietnamTimeZoneResolver.TimeZone);
     }
 
     private async Task<List<string>> ResolveAttendeeEmailsAsync(
@@ -250,21 +374,5 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
         }
 
         return emails;
-    }
-
-    private static TimeZoneInfo ResolveVietnamTimeZone()
-    {
-        foreach (var timeZoneId in VietnamTimeZoneIds)
-        {
-            try
-            {
-                return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
-            }
-            catch (TimeZoneNotFoundException) { }
-            catch (InvalidTimeZoneException) { }
-        }
-
-        throw new InvalidOperationException(
-            "Unable to resolve Vietnam time zone. Checked: SE Asia Standard Time, Asia/Ho_Chi_Minh.");
     }
 }

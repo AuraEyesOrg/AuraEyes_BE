@@ -89,6 +89,7 @@ public partial class ContractTemplatesController : BaseApiController
         {
             Title = request.Title,
             Type = request.Type,
+            EmploymentType = request.EmploymentType,
             ContractVersion = request.ContractVersion,
             ContentTemplate = uploadResult.StoragePath!,
             EffectiveDate = request.EffectiveDate
@@ -130,6 +131,7 @@ public partial class ContractTemplatesController : BaseApiController
             Id = id,
             Title = request.Title,
             Type = request.Type,
+            EmploymentType = request.EmploymentType,
             ContractVersion = request.ContractVersion,
             ContentTemplate = contentTemplate,
             EffectiveDate = request.EffectiveDate
@@ -177,6 +179,7 @@ public record UpsertContractTemplateRequest
 {
     public string Title { get; init; } = string.Empty;
     public ContractType Type { get; init; }
+    public OphthalmologistEmploymentType? EmploymentType { get; init; }
     public string ContractVersion { get; init; } = string.Empty;
     public DateTime? EffectiveDate { get; init; }
     public IFormFile? TemplateFile { get; init; }

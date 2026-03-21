@@ -8,6 +8,7 @@ using Hangfire.PostgreSql;
 using Infrastructure;
 using Infrastructure.Services;
 using Microsoft.AspNetCore.ResponseCompression;
+using Infrastructure.Services.Testing;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.OpenApi.Models;
 using Npgsql;
@@ -31,6 +32,13 @@ builder.Host.UseSerilog();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+if (builder.Environment.IsEnvironment("Test"))
+{
+    // Replace external integrations with in-process test doubles.
+    builder.Services.AddScoped<IEmailService, FakeEmailService>();
+    builder.Services.AddScoped<IPayOSService, FakePayOSService>();
+}
+
 // Register HttpContextAccessor and CurrentUserService
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
@@ -49,7 +57,7 @@ var configuredOrigins = builder.Configuration
 
 var allowedOrigins = configuredOrigins ??
     (builder.Environment.IsDevelopment()
-        ? new[] { "http://localhost:5173", "http://localhost:4173", "http://localhost:3000" }
+        ? new[] { "http://localhost:5173", "http://localhost:4173", "http://localhost:3000", "https://n8n.auraeyes.site" }
         : Array.Empty<string>());
 
 // Configure Swagger with JWT Bearer authentication

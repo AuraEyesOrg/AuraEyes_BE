@@ -11,13 +11,16 @@ namespace Application.Ophthalmologists.Queries.GetOphthalmologist;
 public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQuery, OphthalmologistDto>
 {
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IIdentityService _identityService;
 
     public GetOphthalmologistQueryHandler(
         IOphthalmologistRepository ophthalmologistRepository,
+        IAppointmentSlotRepository appointmentSlotRepository,
         IIdentityService identityService)
     {
         _ophthalmologistRepository = ophthalmologistRepository;
+        _appointmentSlotRepository = appointmentSlotRepository;
         _identityService = identityService;
     }
 
@@ -33,6 +36,16 @@ public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQu
         // Get user information
         var user = await _identityService.GetUserByIdAsync(ophthalmologist.UserId, cancellationToken);
 
+        var slots = await _appointmentSlotRepository.GetByOphthalmologistAsync(
+            ophthalmologist.Id, 
+            DateOnly.FromDateTime(DateTime.UtcNow), 
+            null, 
+            Domain.Enums.ScheduleStatus.Available, 
+            cancellationToken);
+            
+        decimal? minPrice = slots.Any() ? slots.Min(s => s.Cost) : null;
+        decimal? maxPrice = slots.Any() ? slots.Max(s => s.Cost) : null;
+
         var dto = new OphthalmologistDto
         {
             Id = ophthalmologist.Id,
@@ -44,6 +57,10 @@ public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQu
             IsVerified = ophthalmologist.IsVerified,
             CreatedAt = ophthalmologist.CreatedAt,
             UpdatedAt = ophthalmologist.UpdatedAt,
+            RatingAverage = ophthalmologist.RatingAverage,
+            RatingCount = ophthalmologist.RatingCount,
+            MinPrice = minPrice,
+            MaxPrice = maxPrice,
             Certificates = ophthalmologist.Certificates.Select(c => new CertificateDto
             {
                 Id = c.Id,

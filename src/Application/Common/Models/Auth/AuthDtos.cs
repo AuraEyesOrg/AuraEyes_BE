@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Domain.Enums;
 using Microsoft.AspNetCore.Http;
 
 namespace Application.Common.Models.Auth;
@@ -79,6 +80,15 @@ public class RegisterOphthalmologistRequest
 
     [Range(0, 70)]
     public int YearsOfExperience { get; set; }
+
+    [Required]
+    public OphthalmologistEmploymentType EmploymentType { get; set; } = OphthalmologistEmploymentType.FullTime;
+
+    [Range(1, 112)]
+    public int? WorkingHoursPerWeek { get; set; }
+
+    [Range(typeof(decimal), "0", "999999999")]
+    public decimal? ExpectedMonthlySalary { get; set; }
 
     public Guid? OrganizationId { get; set; }
 

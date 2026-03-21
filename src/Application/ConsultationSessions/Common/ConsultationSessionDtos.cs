@@ -38,6 +38,9 @@ public record ConsultationSessionDto
     public string? ClosingReason { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
+    public bool IsRetinalImagesShared { get; init; }
+    public bool IsAIResultShared { get; init; }
+    public ConsultationCaseSnapshotDto? CaseSnapshot { get; init; }
     public IReadOnlyList<ChatMessageDto> Messages { get; init; } = [];
 }
 
@@ -62,4 +65,16 @@ public record ConsultationSessionListDto
     public string? MeetingLink { get; init; }
     public DateTime LastActivityAt { get; init; }
     public DateTime CreatedAt { get; init; }
+}
+
+public record ConsultationCaseSnapshotDto
+{
+    public Guid ScreeningId { get; init; }
+    public string? RiskLevel { get; init; }
+    public decimal? ConfidenceScore { get; init; }
+    public string? Summary { get; init; }
+    public string? Findings { get; init; }
+    public string? AnnotatedImageUrl { get; init; }
+    public IReadOnlyList<string> OriginalImageUrls { get; init; } = [];
+    public IReadOnlyList<string> Symptoms { get; init; } = [];
 }

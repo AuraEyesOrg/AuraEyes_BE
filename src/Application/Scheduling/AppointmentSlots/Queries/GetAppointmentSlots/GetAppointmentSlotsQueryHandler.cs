@@ -54,21 +54,20 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
             request.PageSize,
             cancellationToken);
 
-        // Get templates to calculate available capacity
-        var dtoList = new List<AppointmentSlotListDto>();
-        foreach (var slot in items)
+        // Map to DTOs using already-loaded ScheduleTemplate
+        var dtoList = items.Select(slot =>
         {
-            var slotWithTemplate = await _repository.GetByIdWithTemplateAsync(slot.Id, cancellationToken);
-            var availableCapacity = slotWithTemplate?.ScheduleTemplate != null
-                ? slotWithTemplate.ScheduleTemplate.MaxCapacity - slot.BookedCount
+            var template = slot.ScheduleTemplate;
+            var availableCapacity = template != null
+                ? template.MaxCapacity - slot.BookedCount
                 : 0;
 
-            dtoList.Add(new AppointmentSlotListDto
+            return new AppointmentSlotListDto
             {
                 Id = slot.Id,
                 ScheduleTemplateId = slot.ScheduleTemplateId,
-                OphthalId = slotWithTemplate?.ScheduleTemplate?.OphthalId,
-                OrgId = slotWithTemplate?.ScheduleTemplate?.OrgId,
+                OphthalId = template?.OphthalId,
+                OrgId = template?.OrgId,
                 Date = slot.Date,
                 StartTime = slot.StartTime,
                 EndTime = slot.EndTime,
@@ -78,8 +77,8 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
                 BookedCount = slot.BookedCount,
                 AvailableCapacity = availableCapacity,
                 CreatedAt = slot.CreatedAt
-            });
-        }
+            };
+        }).ToList();
 
         var resultPage = new PagedResult<AppointmentSlotListDto>(
             dtoList,

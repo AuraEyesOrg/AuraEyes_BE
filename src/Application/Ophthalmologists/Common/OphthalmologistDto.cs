@@ -14,6 +14,12 @@ public class OphthalmologistDto
     public bool IsVerified { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public string? LicenseUrl { get; set; }
+    public string? DegreeUrl { get; set; }
+    public decimal RatingAverage { get; set; }
+    public int RatingCount { get; set; }
+    public decimal? MinPrice { get; set; }
+    public decimal? MaxPrice { get; set; }
     public List<CertificateDto> Certificates { get; set; } = new();
 }
 

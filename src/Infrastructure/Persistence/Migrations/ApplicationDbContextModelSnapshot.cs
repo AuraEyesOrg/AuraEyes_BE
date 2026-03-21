@@ -663,6 +663,10 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("EffectiveDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("EmploymentType")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -2047,6 +2051,17 @@ namespace Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("EmploymentType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("FullTime");
+
+                    b.Property<decimal?>("ExpectedMonthlySalary")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -2095,6 +2110,9 @@ namespace Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasDefaultValue("PendingVerification");
+
+                    b.Property<int?>("WorkingHoursPerWeek")
+                        .HasColumnType("integer");
 
                     b.Property<int>("YearsOfExperience")
                         .ValueGeneratedOnAdd()

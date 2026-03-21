@@ -149,6 +149,78 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<(decimal? MinPrice, decimal? MaxPrice)> GetPriceRangeByOphthalmologistAsync(
+        Guid ophthalId,
+        DateOnly? fromDate = null,
+        DateOnly? toDate = null,
+        ScheduleStatus? status = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbSet
+            .Where(s => s.ScheduleTemplate != null && s.ScheduleTemplate.OphthalId == ophthalId);
+
+        if (fromDate.HasValue)
+            query = query.Where(s => s.Date >= fromDate.Value);
+
+        if (toDate.HasValue)
+            query = query.Where(s => s.Date <= toDate.Value);
+
+        if (status.HasValue)
+            query = query.Where(s => s.Status == status.Value);
+
+        var aggregate = await query
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                MinPrice = g.Min(s => s.Cost),
+                MaxPrice = g.Max(s => s.Cost)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return aggregate is null
+            ? (null, null)
+            : (aggregate.MinPrice, aggregate.MaxPrice);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, (decimal? MinPrice, decimal? MaxPrice)>> GetPriceRangesByOphthalmologistAsync(
+        IReadOnlyCollection<Guid> ophthalIds,
+        DateOnly? fromDate = null,
+        DateOnly? toDate = null,
+        ScheduleStatus? status = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (ophthalIds.Count == 0)
+            return new Dictionary<Guid, (decimal? MinPrice, decimal? MaxPrice)>();
+
+        var query = _dbSet
+            .Where(s => s.ScheduleTemplate != null
+                        && s.ScheduleTemplate.OphthalId.HasValue
+                        && ophthalIds.Contains(s.ScheduleTemplate.OphthalId.Value));
+
+        if (fromDate.HasValue)
+            query = query.Where(s => s.Date >= fromDate.Value);
+
+        if (toDate.HasValue)
+            query = query.Where(s => s.Date <= toDate.Value);
+
+        if (status.HasValue)
+            query = query.Where(s => s.Status == status.Value);
+
+        var aggregates = await query
+            .GroupBy(s => s.ScheduleTemplate!.OphthalId!.Value)
+            .Select(g => new
+            {
+                OphthalId = g.Key,
+                MinPrice = g.Min(s => s.Cost),
+                MaxPrice = g.Max(s => s.Cost)
+            })
+            .ToListAsync(cancellationToken);
+
+        return aggregates.ToDictionary(
+            x => x.OphthalId,
+            x => (x.MinPrice, x.MaxPrice));
+    }
+
     public async Task<IReadOnlyList<AppointmentSlot>> GetByOrganisationAsync(
         Guid orgId,
         DateOnly? fromDate = null,

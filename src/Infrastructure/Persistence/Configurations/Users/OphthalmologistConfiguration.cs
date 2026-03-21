@@ -15,6 +15,16 @@ public class OphthalmologistConfiguration : IEntityTypeConfiguration<Ophthalmolo
         builder.Property(e => e.Phone)
             .HasMaxLength(20);
 
+        builder.Property(e => e.EmploymentType)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasDefaultValue(OphthalmologistEmploymentType.FullTime);
+
+        builder.Property(e => e.WorkingHoursPerWeek);
+
+        builder.Property(e => e.ExpectedMonthlySalary)
+            .HasPrecision(18, 2);
+
         builder.Property(e => e.YearsOfExperience)
             .HasDefaultValue(0);
 
