@@ -79,13 +79,13 @@ public class CreateVideoCallSessionCommandHandler
         }
 
         var session = ConsultationSession.CreateVideoCall(
-            request.PatientId,
-            request.Price,
-            normalizedAppointmentTimeUtc,
-            request.OphthalmologistId,
+            patientId: request.PatientId,
+            price: request.Price,
+            appointmentTime: normalizedAppointmentTimeUtc,
+            ophthalmologistId: request.OphthalmologistId,
             appointmentSlotId: null,
-            meetingInfo.MeetingLink,
-            meetingInfo.CalendarEventId);
+            meetingLink: meetingInfo.MeetingLink,
+            calendarEventId: meetingInfo.CalendarEventId);
 
         await _sessionRepository.AddAsync(session, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
