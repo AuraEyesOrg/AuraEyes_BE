@@ -28,7 +28,7 @@ public class SystemSettingsController : BaseApiController
     public async Task<IActionResult> GetSystemSettings(CancellationToken cancellationToken)
     {
         var result = await _sender.Send(new GetSystemSettingsQuery(), cancellationToken);
-        return result.IsSuccess ? Ok(result.Data) : BadRequest(result.ErrorMessage);
+        return HandleResult(result);
     }
 
     /// <summary>
@@ -41,7 +41,7 @@ public class SystemSettingsController : BaseApiController
     {
         var command = new UpdateSystemSettingsCommand { Settings = settings };
         var result = await _sender.Send(command, cancellationToken);
-        
-        return result.IsSuccess ? Ok(result.Data) : BadRequest(result.ErrorMessage);
+
+        return HandleResult(result);
     }
 }
