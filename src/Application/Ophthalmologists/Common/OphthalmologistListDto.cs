@@ -19,4 +19,6 @@ public class OphthalmologistListDto
     public string? DegreeUrl { get; set; }
     public decimal RatingAverage { get; set; }
     public int RatingCount { get; set; }
+    public decimal? MinPrice { get; set; }
+    public decimal? MaxPrice { get; set; }
 }

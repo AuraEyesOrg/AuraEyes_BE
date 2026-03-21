@@ -11,13 +11,16 @@ namespace Application.Ophthalmologists.Queries.GetOphthalmologists;
 public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologistsQuery, PagedResult<OphthalmologistListDto>>
 {
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IIdentityService _identityService;
 
     public GetOphthalmologistsQueryHandler(
         IOphthalmologistRepository ophthalmologistRepository,
+        IAppointmentSlotRepository appointmentSlotRepository,
         IIdentityService identityService)
     {
         _ophthalmologistRepository = ophthalmologistRepository;
+        _appointmentSlotRepository = appointmentSlotRepository;
         _identityService = identityService;
     }
 
@@ -37,6 +40,16 @@ public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologists
         foreach (var ophthalmologist in items)
         {
             var user = await _identityService.GetUserByIdAsync(ophthalmologist.UserId, cancellationToken);
+            
+            var slots = await _appointmentSlotRepository.GetByOphthalmologistAsync(
+                ophthalmologist.Id, 
+                DateOnly.FromDateTime(DateTime.UtcNow), 
+                null, 
+                Domain.Enums.ScheduleStatus.Available, 
+                cancellationToken);
+                
+            decimal? minPrice = slots.Any() ? slots.Min(s => s.Cost) : null;
+            decimal? maxPrice = slots.Any() ? slots.Max(s => s.Cost) : null;
 
             dtoList.Add(new OphthalmologistListDto
             {
@@ -54,6 +67,8 @@ public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologists
                 DegreeUrl = ophthalmologist.DegreeUrl,
                 RatingAverage = ophthalmologist.RatingAverage,
                 RatingCount = ophthalmologist.RatingCount,
+                MinPrice = minPrice,
+                MaxPrice = maxPrice
             });
         }
 
