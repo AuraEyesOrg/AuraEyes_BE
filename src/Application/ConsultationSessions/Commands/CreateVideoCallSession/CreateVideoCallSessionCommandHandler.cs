@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.Common.Helpers;
 using Domain.Common;
 using Domain.Entities.Consultation;
 using Domain.Entities.Users;
@@ -11,12 +12,6 @@ namespace Application.ConsultationSessions.Commands.CreateVideoCallSession;
 public class CreateVideoCallSessionCommandHandler
     : ICommandHandler<CreateVideoCallSessionCommand, Guid>
 {
-    private static readonly string[] VietnamTimeZoneIds =
-    [
-        "SE Asia Standard Time", // Windows
-        "Asia/Ho_Chi_Minh"       // Linux/macOS (IANA)
-    ];
-
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
@@ -79,13 +74,13 @@ public class CreateVideoCallSessionCommandHandler
         }
 
         var session = ConsultationSession.CreateVideoCall(
-            request.PatientId,
-            request.Price,
-            normalizedAppointmentTimeUtc,
-            request.OphthalmologistId,
+            patientId: request.PatientId,
+            price: request.Price,
+            appointmentTime: normalizedAppointmentTimeUtc,
+            ophthalmologistId: request.OphthalmologistId,
             appointmentSlotId: null,
-            meetingInfo.MeetingLink,
-            meetingInfo.CalendarEventId);
+            meetingLink: meetingInfo.MeetingLink,
+            calendarEventId: meetingInfo.CalendarEventId);
 
         await _sessionRepository.AddAsync(session, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -153,28 +148,6 @@ public class CreateVideoCallSessionCommandHandler
             return appointmentTime.ToUniversalTime();
         }
 
-        return TimeZoneInfo.ConvertTimeToUtc(appointmentTime, ResolveVietnamTimeZone());
-    }
-
-    private static TimeZoneInfo ResolveVietnamTimeZone()
-    {
-        foreach (var timeZoneId in VietnamTimeZoneIds)
-        {
-            try
-            {
-                return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
-            }
-            catch (TimeZoneNotFoundException)
-            {
-                // Try next ID.
-            }
-            catch (InvalidTimeZoneException)
-            {
-                // Try next ID.
-            }
-        }
-
-        throw new InvalidOperationException(
-            "Unable to resolve Vietnam time zone. Checked: SE Asia Standard Time, Asia/Ho_Chi_Minh.");
+        return TimeZoneInfo.ConvertTimeToUtc(appointmentTime, VietnamTimeZoneResolver.TimeZone);
     }
 }

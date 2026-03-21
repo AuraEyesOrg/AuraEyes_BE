@@ -1,5 +1,6 @@
 using Application.AiQuota.Common;
 using Application.AiQuota.Interfaces;
+using Application.SystemSettings.Interfaces;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -15,11 +16,16 @@ public class AiQuotaService : IAiQuotaService
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<AiQuotaService> _logger;
+    private readonly ISystemSettingService _settingService;
 
-    public AiQuotaService(ApplicationDbContext context, ILogger<AiQuotaService> logger)
+    public AiQuotaService(
+        ApplicationDbContext context, 
+        ILogger<AiQuotaService> logger,
+        ISystemSettingService settingService)
     {
         _context = context;
         _logger = logger;
+        _settingService = settingService;
     }
 
     public async Task<AiQuotaDto> GetQuotaAsync(Guid userId, string role, CancellationToken cancellationToken = default)
@@ -209,20 +215,14 @@ public class AiQuotaService : IAiQuotaService
 
     private async Task<int> GetSettingIntAsync(string key, int defaultValue, CancellationToken cancellationToken)
     {
-        var setting = await _context.Set<Domain.Entities.Platform.SystemSetting>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
-
-        return setting is not null && int.TryParse(setting.Value, out var value) ? value : defaultValue;
+        var valueStr = await _settingService.GetSettingAsync(key, cancellationToken);
+        return !string.IsNullOrEmpty(valueStr) && int.TryParse(valueStr, out var value) ? value : defaultValue;
     }
 
     private async Task<decimal> GetSettingDecimalAsync(string key, decimal defaultValue, CancellationToken cancellationToken)
     {
-        var setting = await _context.Set<Domain.Entities.Platform.SystemSetting>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
-
-        return setting is not null && decimal.TryParse(setting.Value, out var value) ? value : defaultValue;
+        var valueStr = await _settingService.GetSettingAsync(key, cancellationToken);
+        return !string.IsNullOrEmpty(valueStr) && decimal.TryParse(valueStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var value) ? value : defaultValue;
     }
 
     private static bool IsOrganisationQuotaRole(string role)

@@ -1,6 +1,8 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Common.Constants;
+using Application.Common.Helpers;
+using Application.SystemSettings.Interfaces;
 using Domain.Common;
 using Domain.Enums;
 using Domain.Repositories;
@@ -18,17 +20,20 @@ public class ReserveSlotCommandHandler : ICommandHandler<ReserveSlotCommand, Res
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
     private readonly ILogger<ReserveSlotCommandHandler> _logger;
+    private readonly ISystemSettingService _settingService;
 
     public ReserveSlotCommandHandler(
         IAppointmentSlotRepository appointmentSlotRepository,
         IUnitOfWork unitOfWork,
         ICurrentUserService currentUser,
-        ILogger<ReserveSlotCommandHandler> logger)
+        ILogger<ReserveSlotCommandHandler> logger,
+        ISystemSettingService settingService)
     {
         _appointmentSlotRepository = appointmentSlotRepository;
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
         _logger = logger;
+        _settingService = settingService;
     }
 
     public async Task<Result<ReserveSlotResult>> Handle(ReserveSlotCommand request, CancellationToken cancellationToken)
@@ -114,6 +119,28 @@ public class ReserveSlotCommandHandler : ICommandHandler<ReserveSlotCommand, Res
                     _ => Result<ReserveSlotResult>.Conflict(
                         $"This slot is not available. Current status: {slot.Status}")
                 };
+            }
+
+            // Check advance booking constraint
+            var advanceBookingStr = await _settingService.GetSettingAsync("MIN_ADVANCE_BOOKING_HOURS", cancellationToken);
+            double advanceBookingHours = 0;
+            if (!string.IsNullOrEmpty(advanceBookingStr) && double.TryParse(advanceBookingStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double parsed))
+            {
+                advanceBookingHours = parsed;
+            }
+            if (advanceBookingHours < 0.5)
+            {
+                advanceBookingHours = 0.5; // Enforce minimum 30 minutes
+            }
+
+            var localAppointmentTime = slot.Date.ToDateTime(slot.StartTime, DateTimeKind.Unspecified);
+            var appointmentTimeUtc = TimeZoneInfo.ConvertTimeToUtc(localAppointmentTime, VietnamTimeZoneResolver.TimeZone);
+            
+            if (appointmentTimeUtc <= DateTime.UtcNow.AddHours(advanceBookingHours))
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                var formattedTime = advanceBookingHours < 1 ? $"{Math.Round(advanceBookingHours * 60)} minute(s)" : $"{advanceBookingHours} hour(s)";
+                return Result<ReserveSlotResult>.Conflict($"Slots must be booked at least {formattedTime} in advance.");
             }
 
             // Calculate expiration time

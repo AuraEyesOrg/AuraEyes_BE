@@ -1,9 +1,11 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Common.Constants;
+using Application.Common.Helpers;
 using Domain.Common;
 using Domain.Entities.Consultation;
 using Domain.Entities.Financial;
+using Domain.Entities.Screening;
 using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
@@ -17,15 +19,10 @@ namespace Application.Scheduling.AppointmentSlots.Commands.ConfirmReservation;
 /// </summary>
 public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservationCommand, ConfirmReservationResult>
 {
-    private static readonly string[] VietnamTimeZoneIds =
-    [
-        "SE Asia Standard Time", // Windows
-        "Asia/Ho_Chi_Minh"       // Linux/macOS (IANA)
-    ];
-
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IConsultationSessionRepository _consultationSessionRepository;
     private readonly IWalletRepository _walletRepository;
+    private readonly IRepository<AiScreening> _aiScreeningRepository;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IIdentityService _identityService;
@@ -39,6 +36,7 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
         IAppointmentSlotRepository appointmentSlotRepository,
         IConsultationSessionRepository consultationSessionRepository,
         IWalletRepository walletRepository,
+        IRepository<AiScreening> aiScreeningRepository,
         IRepository<Patient> patientRepository,
         IOphthalmologistRepository ophthalmologistRepository,
         IIdentityService identityService,
@@ -51,6 +49,7 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
         _appointmentSlotRepository = appointmentSlotRepository;
         _consultationSessionRepository = consultationSessionRepository;
         _walletRepository = walletRepository;
+        _aiScreeningRepository = aiScreeningRepository;
         _patientRepository = patientRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _identityService = identityService;
@@ -120,6 +119,30 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
             }
 
             // ── 3. Wallet balance check & deduction ──
+            Guid? linkedAiScreeningId = null;
+            if (request.AiScreeningId.HasValue)
+            {
+                var screening = await _aiScreeningRepository.GetByIdAsync(
+                    request.AiScreeningId.Value, cancellationToken);
+
+                if (screening is null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<ConfirmReservationResult>.NotFound(
+                        $"AI screening '{request.AiScreeningId.Value}' not found.");
+                }
+
+                if (screening.PatientId != effectivePatientProfileId)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<ConfirmReservationResult>.Forbidden(
+                        "You can only attach your own screening result to this consultation.");
+                }
+
+                linkedAiScreeningId = screening.Id;
+            }
+
+            // ── 4. Wallet balance check & deduction ──
             var consultationFee = slot.Cost ?? 0;
 
             if (consultationFee > 0)
@@ -162,7 +185,7 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                 await _walletRepository.AddTransactionAsync(transaction, cancellationToken);
             }
 
-            // ── 4. Resolve attendee emails & create Google Meet ──
+            // ── 5. Resolve attendee emails & create Google Meet ──
             var ophthalmologistId = slot.ScheduleTemplate?.OphthalId;
             var appointmentTime = CalculateAppointmentTimeUtc(slot);
 
@@ -185,7 +208,7 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                     slot.Id);
             }
 
-            // ── 5. Confirm slot & create session (Status = Confirmed) ──
+            // ── 6. Confirm slot & create session (Status = Confirmed) ──
             slot.ConfirmReservation(effectivePatientProfileId);
 
             var session = ConsultationSession.CreateVideoCall(
@@ -194,6 +217,9 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                 appointmentTime: appointmentTime,
                 ophthalmologistId: ophthalmologistId,
                 appointmentSlotId: slot.Id,
+                aiScreeningId: linkedAiScreeningId,
+                shareRetinalImages: request.ShareRetinalImages,
+                shareAiResults: request.ShareAiResults,
                 meetingLink: meetingInfo?.MeetingLink,
                 calendarEventId: meetingInfo?.CalendarEventId);
 
@@ -318,7 +344,7 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
     private DateTime CalculateAppointmentTimeUtc(Domain.Entities.Scheduling.AppointmentSlot slot)
     {
         var localAppointmentTime = slot.Date.ToDateTime(slot.StartTime, DateTimeKind.Unspecified);
-        return TimeZoneInfo.ConvertTimeToUtc(localAppointmentTime, ResolveVietnamTimeZone());
+        return TimeZoneInfo.ConvertTimeToUtc(localAppointmentTime, VietnamTimeZoneResolver.TimeZone);
     }
 
     private async Task<List<string>> ResolveAttendeeEmailsAsync(
@@ -348,21 +374,5 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
         }
 
         return emails;
-    }
-
-    private static TimeZoneInfo ResolveVietnamTimeZone()
-    {
-        foreach (var timeZoneId in VietnamTimeZoneIds)
-        {
-            try
-            {
-                return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
-            }
-            catch (TimeZoneNotFoundException) { }
-            catch (InvalidTimeZoneException) { }
-        }
-
-        throw new InvalidOperationException(
-            "Unable to resolve Vietnam time zone. Checked: SE Asia Standard Time, Asia/Ho_Chi_Minh.");
     }
 }
