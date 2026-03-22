@@ -195,6 +195,7 @@ public static class DependencyInjection
         services.AddScoped<IAiQuotaService, AiQuotaService>();
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
         services.AddScoped<ISystemSettingService, SystemSettingService>();
+        services.AddScoped<IOphthalmologistScreeningReadService, OphthalmologistScreeningReadService>();
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
