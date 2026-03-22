@@ -57,7 +57,8 @@ var configuredOrigins = builder.Configuration
 
 var allowedOrigins = configuredOrigins ??
     (builder.Environment.IsDevelopment()
-        ? new[] { "http://localhost:5173", "http://localhost:4173", "http://localhost:3000", "https://n8n.auraeyes.site" }
+        ? new[] { "http://localhost:5173", "http://localhost:4173", "http://localhost:3000", "https://localhost:5001", "https://n8n.auraeyes.site", "https://localhost:5001", 
+            "http://localhost:5000" }
         : Array.Empty<string>());
 
 // Configure Swagger with JWT Bearer authentication
@@ -173,7 +174,7 @@ var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnec
 var hangfireConnectionBuilder = new NpgsqlConnectionStringBuilder(defaultConnection)
 {
     // Use a tiny dedicated pool for Hangfire to avoid saturating Supabase session pool.
-    MaxPoolSize = 2,
+    MaxPoolSize = 5,
     MinPoolSize = 0
 };
 
