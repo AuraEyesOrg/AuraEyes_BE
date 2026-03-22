@@ -93,14 +93,36 @@ public class RegisterOphthalmologistRequest
     public Guid? OrganizationId { get; set; }
 
     /// <summary>
-    /// Medical license image. Accepts PDF, JPG, PNG.
+    /// Medical degree credentials. At least one degree is required.
     /// </summary>
-    public IFormFile? LicenseImage { get; set; }
+    [Required]
+    [MinLength(1)]
+    public List<CredentialItemDto> Degrees { get; set; } = new();
 
     /// <summary>
-    /// Medical degree image. Accepts PDF, JPG, PNG.
+    /// Medical license/certificate credentials. At least one certificate is required.
     /// </summary>
-    public IFormFile? DegreeImage { get; set; }
+    [Required]
+    [MinLength(1)]
+    public List<CredentialItemDto> Certificates { get; set; } = new();
+}
+
+public class CredentialItemDto
+{
+    [Required]
+    [MaxLength(200)]
+    public string Name { get; set; } = string.Empty;
+
+    [MaxLength(200)]
+    public string? IssuingAuthority { get; set; }
+
+    [Required]
+    public DateTime IssuedDate { get; set; }
+
+    public DateTime? ExpiryDate { get; set; }
+
+    [Required]
+    public IFormFile? File { get; set; }
 }
 
 public record RegisterOrganisationRequest

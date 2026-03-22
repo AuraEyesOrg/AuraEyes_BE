@@ -168,6 +168,16 @@ public class AuthService : IAuthService
 
         try
         {
+            if (request.Degrees.Count == 0)
+            {
+                return Result<RegisterResponse>.Failure("At least one degree is required");
+            }
+
+            if (request.Certificates.Count == 0)
+            {
+                return Result<RegisterResponse>.Failure("At least one certificate is required");
+            }
+
             var existingUser = await _identityService.GetUserByEmailAsync(request.Email, cancellationToken);
             if (existingUser != null)
             {
@@ -194,33 +204,75 @@ public class AuthService : IAuthService
 
             await _identityService.AddToRoleAsync(user.Id, Roles.Ophthalmologist);
 
-            // Upload credential files to Supabase S3 if provided
+            // Upload credential files to Supabase S3 and map to Certificate entities
             string? licenseUrl = null;
             string? degreeUrl = null;
 
-            if (request.LicenseImage is { Length: > 0 })
-            {
-                await using var stream = request.LicenseImage.OpenReadStream();
-                licenseUrl = await _fileStorageService.SaveFileAsync(
-                    stream, request.LicenseImage.FileName, $"credentials/{user.Id}", cancellationToken);
-                uploadedFileUrls.Add(licenseUrl);
-            }
-
-            if (request.DegreeImage is { Length: > 0 })
-            {
-                await using var stream = request.DegreeImage.OpenReadStream();
-                degreeUrl = await _fileStorageService.SaveFileAsync(
-                    stream, request.DegreeImage.FileName, $"credentials/{user.Id}", cancellationToken);
-                uploadedFileUrls.Add(degreeUrl);
-            }
-
-            // Create Ophthalmologist profile with uploaded file URLs
             var ophthalmologist = new Ophthalmologist(
                 user.Id, request.Bio, request.YearsOfExperience,
                 request.Phone, licenseUrl, degreeUrl,
                 request.EmploymentType,
                 request.WorkingHoursPerWeek,
                 request.ExpectedMonthlySalary);
+
+            foreach (var degree in request.Degrees)
+            {
+                if (degree.File is null || degree.File.Length == 0)
+                {
+                    return Result<RegisterResponse>.Failure("Degree file is required");
+                }
+
+                await using var stream = degree.File.OpenReadStream();
+                var uploadedUrl = await _fileStorageService.SaveFileAsync(
+                    stream,
+                    degree.File.FileName,
+                    $"credentials/{user.Id}",
+                    cancellationToken);
+
+                uploadedFileUrls.Add(uploadedUrl);
+
+                degreeUrl ??= uploadedUrl;
+
+                ophthalmologist.AddCertificate(new Certificate(
+                    ophthalmologist.Id,
+                    CertificateType.Degree,
+                    degree.Name,
+                    degree.IssuingAuthority,
+                    degree.IssuedDate,
+                    degree.ExpiryDate,
+                    uploadedUrl));
+            }
+
+            foreach (var certificate in request.Certificates)
+            {
+                if (certificate.File is null || certificate.File.Length == 0)
+                {
+                    return Result<RegisterResponse>.Failure("Certificate file is required");
+                }
+
+                await using var stream = certificate.File.OpenReadStream();
+                var uploadedUrl = await _fileStorageService.SaveFileAsync(
+                    stream,
+                    certificate.File.FileName,
+                    $"credentials/{user.Id}",
+                    cancellationToken);
+
+                uploadedFileUrls.Add(uploadedUrl);
+
+                licenseUrl ??= uploadedUrl;
+
+                ophthalmologist.AddCertificate(new Certificate(
+                    ophthalmologist.Id,
+                    CertificateType.License,
+                    certificate.Name,
+                    certificate.IssuingAuthority,
+                    certificate.IssuedDate,
+                    certificate.ExpiryDate,
+                    uploadedUrl));
+            }
+
+            ophthalmologist.UpdateCredentialFiles(licenseUrl, degreeUrl);
+
             await _ophthalmologistRepository.AddAsync(ophthalmologist, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -264,7 +316,7 @@ public class AuthService : IAuthService
                                 <li><strong>Working Hours / Week:</strong> {(request.WorkingHoursPerWeek?.ToString() ?? "N/A")}</li>
                                 <li><strong>Expected Salary:</strong> {(request.ExpectedMonthlySalary?.ToString("N0") ?? "N/A")}</li>
                             </ul>
-                            <p>Please review their credentials (license and degree documents) in the System Admin panel.</p>
+                            <p>Please review their submitted credentials (degrees and licenses/certificates) in the System Admin panel.</p>
                             <p>— AURA System</p>
                             """,
                             isHtml: true,
