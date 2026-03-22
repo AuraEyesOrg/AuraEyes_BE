@@ -230,6 +230,8 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
             var appointmentTimeText = slot.StartTime.ToString("HH:mm");
             var appointmentDateText = slot.Date.ToString("dd/MM/yyyy");
             var appointmentTimestamp = $"{slot.Date:yyyy-MM-dd}T{slot.StartTime:HH:mm}:00";
+            var sharedMedicalData = linkedAiScreeningId.HasValue &&
+                                    (request.ShareRetinalImages || request.ShareAiResults);
 
             var patient = await _patientRepository.GetByIdAsync(effectivePatientProfileId, cancellationToken);
             var patientUser = patient is null
@@ -252,7 +254,9 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                         {
                             ConsultationSessionId = session.Id,
                             AppointmentSlotId = slot.Id,
-                            AppointmentTime = appointmentTimestamp
+                            AppointmentTime = appointmentTimestamp,
+                            AiScreeningId = linkedAiScreeningId,
+                            SharedMedicalData = sharedMedicalData
                         },
                         cancellationToken);
                 }
@@ -274,17 +278,23 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
 
                     if (ophthalmologist is not null)
                     {
+                        var doctorBody = sharedMedicalData && linkedAiScreeningId.HasValue
+                            ? $"Bạn có lịch {appointmentTimeText} ngày {appointmentDateText} từ {patientName}. Bệnh nhân đã đính kèm hồ sơ sàng lọc — mở thông báo để xem chi tiết AI trên trang tư vấn."
+                            : $"Bạn có 1 lịch vào lúc {appointmentTimeText}, ngày {appointmentDateText} từ bệnh nhân {patientName}";
+
                         await _notificationService.SendAsync(
                             ophthalmologist.UserId,
                             "Lịch hẹn mới từ bệnh nhân",
-                            $"Bạn có 1 lịch vào lúc {appointmentTimeText}, ngày {appointmentDateText} từ bệnh nhân {patientName}",
+                            doctorBody,
                             NotificationType.NewAppointmentBooked,
                             new
                             {
                                 ConsultationSessionId = session.Id,
                                 AppointmentSlotId = slot.Id,
                                 AppointmentTime = appointmentTimestamp,
-                                PatientId = effectivePatientProfileId
+                                PatientId = effectivePatientProfileId,
+                                AiScreeningId = linkedAiScreeningId,
+                                SharedMedicalData = sharedMedicalData
                             },
                             cancellationToken);
                     }
@@ -301,7 +311,9 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                         await _notificationService.SendAsync(
                             providerUserId,
                             "Lịch hẹn mới từ bệnh nhân",
-                            $"Bạn có 1 lịch vào lúc {appointmentTimeText}, ngày {appointmentDateText} từ bệnh nhân {patientName}",
+                            sharedMedicalData && linkedAiScreeningId.HasValue
+                                ? $"Bạn có lịch {appointmentTimeText} ngày {appointmentDateText} từ {patientName}. Hồ sơ sàng lọc đã được chia sẻ — xem trong hệ thống."
+                                : $"Bạn có 1 lịch vào lúc {appointmentTimeText}, ngày {appointmentDateText} từ bệnh nhân {patientName}",
                             NotificationType.NewAppointmentBooked,
                             new
                             {
@@ -309,7 +321,9 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                                 AppointmentSlotId = slot.Id,
                                 AppointmentTime = appointmentTimestamp,
                                 PatientId = effectivePatientProfileId,
-                                OrganisationId = orgId
+                                OrganisationId = orgId,
+                                AiScreeningId = linkedAiScreeningId,
+                                SharedMedicalData = sharedMedicalData
                             },
                             cancellationToken);
                     }

@@ -158,6 +158,20 @@ public class GetConsultationSessionQueryHandler
                         }
                     }
                 }
+
+                if (root.TryGetProperty("prediction", out var prediction) &&
+                    prediction.TryGetProperty("top_k", out var topK) &&
+                    topK.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in topK.EnumerateArray())
+                    {
+                        if (item.TryGetProperty("class_name", out var classNameEl))
+                        {
+                            var value = classNameEl.GetString();
+                            if (!string.IsNullOrWhiteSpace(value)) symptoms.Add(value);
+                        }
+                    }
+                }
             }
             catch
             {
@@ -173,6 +187,7 @@ public class GetConsultationSessionQueryHandler
             Summary = canViewAiResults ? latestResult?.Summary : null,
             Findings = canViewAiResults ? latestResult?.Findings : null,
             AnnotatedImageUrl = canViewAiResults ? annotatedImageUrl : null,
+            RawJsonOutput = canViewAiResults ? screening.RawJsonOutput : null,
             OriginalImageUrls = canViewRetinalImages
                 ? screening.RetinalImages
                     .OrderBy(x => x.CreatedAt)
