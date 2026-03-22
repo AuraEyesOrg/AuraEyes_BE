@@ -8,6 +8,10 @@ public class CertificateConfiguration : IEntityTypeConfiguration<Certificate>
 {
     public void Configure(EntityTypeBuilder<Certificate> builder)
     {
+        builder.Property(e => e.Type)
+            .HasConversion<int>()
+            .IsRequired();
+
         builder.Property(e => e.Name)
             .HasMaxLength(200)
             .IsRequired();
