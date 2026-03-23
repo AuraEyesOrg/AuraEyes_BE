@@ -110,6 +110,12 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public async Task ResetDatabaseAsync()
     {
         await _databaseFixture.ResetAsync();
+
+        // Keep seeded users but always reset 2FA flags between tests.
+        using var scope = Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await dbContext.Database.ExecuteSqlRawAsync("UPDATE \"AspNetUsers\" SET \"TwoFactorEnabled\" = FALSE");
+
         AiMockServer.ResetLogEntries();
         PaymentMockServer.ResetLogEntries();
     }

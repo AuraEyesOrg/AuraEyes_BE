@@ -21,6 +21,18 @@ public static class AuthHelper
         return auth.AccessToken!;
     }
 
+    public static async Task<string> LoginOrgAdminAsync(HttpClient client)
+    {
+        var auth = await LoginWithTokensAsync(client, "orgadmin@gmail.com", "OrgAdmin@123$");
+        return auth.AccessToken!;
+    }
+
+    public static async Task<string> LoginOphthalmologistAsync(HttpClient client)
+    {
+        var auth = await LoginWithTokensAsync(client, "ophthalmologist@gmail.com", "Ophthalmologist@123$");
+        return auth.AccessToken!;
+    }
+
     public static async Task<string> LoginAsync(HttpClient client, string email, string password)
     {
         var auth = await LoginWithTokensAsync(client, email, password);
