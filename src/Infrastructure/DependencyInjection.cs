@@ -178,6 +178,7 @@ public static class DependencyInjection
         services.AddScoped<IPostRepository, PostRepository>();
         services.AddScoped<IAiScreeningQuery, AiScreeningQuery>();
         services.AddScoped<IOrganisationPatientsRepository, OrganisationPatientsRepository>();
+        services.AddScoped<IOphthalmologistScreeningsReadRepository, OphthalmologistScreeningsReadRepository>();
 
         // Register Identity Services
         services.AddScoped<IIdentityService, IdentityService>();
@@ -196,7 +197,6 @@ public static class DependencyInjection
         services.AddScoped<IAiQuotaService, AiQuotaService>();
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
         services.AddScoped<ISystemSettingService, SystemSettingService>();
-        services.AddScoped<IOphthalmologistScreeningReadService, OphthalmologistScreeningReadService>();
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
