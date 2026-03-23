@@ -75,6 +75,7 @@ public record ConsultationCaseSnapshotDto
     public string? Summary { get; init; }
     public string? Findings { get; init; }
     public string? AnnotatedImageUrl { get; init; }
+    public string? RawJsonOutput { get; init; }
     public IReadOnlyList<string> OriginalImageUrls { get; init; } = [];
     public IReadOnlyList<string> Symptoms { get; init; } = [];
 }

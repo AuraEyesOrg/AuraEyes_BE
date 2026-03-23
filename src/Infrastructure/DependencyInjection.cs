@@ -9,6 +9,7 @@ using Domain.Repositories;
 using Infrastructure.Identity;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Interceptors;
+using Infrastructure.Persistence.Queries;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.Services;
 using Infrastructure.Settings;
@@ -175,6 +176,9 @@ public static class DependencyInjection
         services.AddScoped<IContractTemplateRepository, ContractTemplateRepository>();
         services.AddScoped<IContractRepository, ContractRepository>();
         services.AddScoped<IPostRepository, PostRepository>();
+        services.AddScoped<IAiScreeningQuery, AiScreeningQuery>();
+        services.AddScoped<IOrganisationPatientsRepository, OrganisationPatientsRepository>();
+        services.AddScoped<IOphthalmologistScreeningsReadRepository, OphthalmologistScreeningsReadRepository>();
 
         // Register Identity Services
         services.AddScoped<IIdentityService, IdentityService>();
