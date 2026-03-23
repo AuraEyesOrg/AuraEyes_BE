@@ -11,15 +11,33 @@ public static class AuthHelper
 
     public static async Task<string> LoginPatientAsync(HttpClient client)
     {
-        return await LoginAsync(client, "patient@gmail.com", "Patient@123$");
+        var auth = await LoginWithTokensAsync(client, "patient@gmail.com", "Patient@123$");
+        return auth.AccessToken!;
     }
 
     public static async Task<string> LoginSystemAdminAsync(HttpClient client)
     {
-        return await LoginAsync(client, "systemadmin@gmail.com", "SystemAdmin@123$");
+        var auth = await LoginWithTokensAsync(client, "systemadmin@gmail.com", "SystemAdmin@123$");
+        return auth.AccessToken!;
     }
 
     public static async Task<string> LoginAsync(HttpClient client, string email, string password)
+    {
+        var auth = await LoginWithTokensAsync(client, email, password);
+        return auth.AccessToken!;
+    }
+
+    public static async Task<AuthResponse> LoginPatientWithTokensAsync(HttpClient client)
+    {
+        return await LoginWithTokensAsync(client, "patient@gmail.com", "Patient@123$");
+    }
+
+    public static async Task<AuthResponse> LoginSystemAdminWithTokensAsync(HttpClient client)
+    {
+        return await LoginWithTokensAsync(client, "systemadmin@gmail.com", "SystemAdmin@123$");
+    }
+
+    public static async Task<AuthResponse> LoginWithTokensAsync(HttpClient client, string email, string password)
     {
         var loginPayload = new LoginRequest
         {
@@ -35,8 +53,9 @@ public static class AuthHelper
         apiResponse!.Success.Should().BeTrue();
         apiResponse.Data.Should().NotBeNull();
         apiResponse.Data!.AccessToken.Should().NotBeNullOrWhiteSpace();
+        apiResponse.Data.RefreshToken.Should().NotBeNullOrWhiteSpace();
 
-        return apiResponse.Data.AccessToken!;
+        return apiResponse.Data;
     }
 
     public static void SetBearerToken(HttpClient client, string token)
