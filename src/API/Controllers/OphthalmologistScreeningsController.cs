@@ -1,6 +1,9 @@
 using Application.Common.Constants;
+using Application.OphthalmologistScreenings.Queries.GetOphthalmologistScreeningDetail;
+using Application.OphthalmologistScreenings.Queries.ListOphthalmologistScreenings;
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,14 +16,14 @@ namespace API.Controllers;
 [Authorize(Policy = Policies.OphthalmologistOnly)]
 public class OphthalmologistScreeningsController : BaseApiController
 {
-    private readonly IOphthalmologistScreeningReadService _readService;
+    private readonly IMediator _mediator;
     private readonly ICurrentUserService _currentUser;
 
     public OphthalmologistScreeningsController(
-        IOphthalmologistScreeningReadService readService,
+        IMediator mediator,
         ICurrentUserService currentUser)
     {
-        _readService = readService;
+        _mediator = mediator;
         _currentUser = currentUser;
     }
 
@@ -32,8 +35,14 @@ public class OphthalmologistScreeningsController : BaseApiController
         if (_currentUser.ProfileId is null)
             return Unauthorized(ApiResponseFactory.Unauthorized("Unable to resolve ophthalmologist profile."));
 
-        var items = await _readService.ListForOphthalmologistAsync(_currentUser.ProfileId.Value, cancellationToken);
-        return Ok(ApiResponseFactory.Success(items, "Screenings loaded"));
+        var result = await _mediator.Send(
+            new ListOphthalmologistScreeningsQuery { OphthalmologistProfileId = _currentUser.ProfileId.Value },
+            cancellationToken);
+
+        if (!result.IsSuccess)
+            return HandleResult(result, "Screenings loaded");
+
+        return Ok(ApiResponseFactory.Success(result.Data, "Screenings loaded"));
     }
 
     [HttpGet("{screeningId:guid}")]
@@ -47,14 +56,14 @@ public class OphthalmologistScreeningsController : BaseApiController
         if (_currentUser.ProfileId is null)
             return Unauthorized(ApiResponseFactory.Unauthorized("Unable to resolve ophthalmologist profile."));
 
-        var detail = await _readService.GetDetailForOphthalmologistAsync(
-            _currentUser.ProfileId.Value,
-            screeningId,
+        var result = await _mediator.Send(
+            new GetOphthalmologistScreeningDetailQuery
+            {
+                OphthalmologistProfileId = _currentUser.ProfileId.Value,
+                ScreeningId = screeningId
+            },
             cancellationToken);
 
-        if (detail is null)
-            return NotFound(ApiResponseFactory.NotFound("Screening not found or you do not have access."));
-
-        return Ok(ApiResponseFactory.Success(detail, "Screening detail loaded"));
+        return HandleResult(result, "Screening detail loaded");
     }
 }
