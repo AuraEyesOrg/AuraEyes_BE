@@ -18,17 +18,20 @@ public class SaveAiScreeningResultsCommandHandler : ICommandHandler<SaveAiScreen
     private readonly IRepository<AiScreening> _screeningRepository;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IAiScreeningQuery _screeningQuery;
     private readonly ILogger<SaveAiScreeningResultsCommandHandler> _logger;
 
     public SaveAiScreeningResultsCommandHandler(
         IRepository<AiScreening> screeningRepository,
         IRepository<Patient> patientRepository,
         IUnitOfWork unitOfWork,
+        IAiScreeningQuery screeningQuery,
         ILogger<SaveAiScreeningResultsCommandHandler> logger)
     {
         _screeningRepository = screeningRepository;
         _patientRepository = patientRepository;
         _unitOfWork = unitOfWork;
+        _screeningQuery = screeningQuery;
         _logger = logger;
     }
 
@@ -64,6 +67,11 @@ public class SaveAiScreeningResultsCommandHandler : ICommandHandler<SaveAiScreen
         // Store raw JSON output in the screening
         screening.Process(request.RawJsonOutput);
 
+        // Count images from DB — aggregate loaded via GetByIdAsync does not populate RetinalImages.
+        var imagesCount = await _screeningQuery.CountRetinalImagesForScreeningAsync(
+            request.ScreeningId,
+            cancellationToken);
+
         // Create screening result entity
         var screeningResult = new ScreeningResult(
             aiScreeningId: request.ScreeningId,
@@ -98,7 +106,7 @@ public class SaveAiScreeningResultsCommandHandler : ICommandHandler<SaveAiScreen
             {
                 ScreeningId = request.ScreeningId,
                 ScreeningResultId = screeningResult.Id,
-                ImagesCount = screening.RetinalImages.Count,
+                ImagesCount = imagesCount,
                 SavedAt = DateTime.UtcNow,
                 RiskLevel = request.RiskLevel.ToString()
             });
