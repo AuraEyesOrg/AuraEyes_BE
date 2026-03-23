@@ -2,6 +2,8 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.OrganisationPatients;
+using Application.OrganisationPatients.Queries.GetOrganisationRecentPatients;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,14 +13,14 @@ namespace API.Controllers;
 [Authorize(Policy = Policies.OrgAdminOnly)]
 public class OrganisationPatientsController : BaseApiController
 {
-    private readonly IOrganisationRecentPatientsReadService _readService;
+    private readonly IMediator _mediator;
     private readonly ICurrentUserService _currentUser;
 
     public OrganisationPatientsController(
-        IOrganisationRecentPatientsReadService readService,
+        IMediator mediator,
         ICurrentUserService currentUser)
     {
-        _readService = readService;
+        _mediator = mediator;
         _currentUser = currentUser;
     }
 
@@ -32,12 +34,11 @@ public class OrganisationPatientsController : BaseApiController
         if (_currentUser.UserId is null)
             return Unauthorized(ApiResponseFactory.Unauthorized("Unable to resolve current user."));
 
-        var items = await _readService.GetRecentPatientsForOrganisationAdminAsync(
-            _currentUser.UserId.Value,
-            take,
+        var result = await _mediator.Send(
+            new GetOrganisationRecentPatientsQuery(_currentUser.UserId.Value, take),
             cancellationToken);
 
-        return Ok(ApiResponseFactory.Success(items, "Recent patients loaded"));
+        return HandleResult(result, "Recent patients loaded");
     }
 }
 

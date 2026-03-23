@@ -1,25 +1,23 @@
-using Application.Common.Interfaces;
-using Application.OrganisationPatients;
 using Domain.Entities.Consultation;
 using Domain.Entities.Screening;
 using Domain.Entities.Users;
+using Domain.Repositories;
 using Infrastructure.Identity;
-using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
-namespace Infrastructure.Services;
+namespace Infrastructure.Persistence.Repositories;
 
-public sealed class OrganisationRecentPatientsReadService : IOrganisationRecentPatientsReadService
+public sealed class OrganisationPatientsRepository : IOrganisationPatientsRepository
 {
     private readonly ApplicationDbContext _context;
 
-    public OrganisationRecentPatientsReadService(ApplicationDbContext context)
+    public OrganisationPatientsRepository(ApplicationDbContext context)
     {
         _context = context;
     }
 
-    public async Task<IReadOnlyList<OrganisationRecentPatientDto>> GetRecentPatientsForOrganisationAdminAsync(
+    public async Task<IReadOnlyList<OrganisationRecentPatientReadModel>> GetRecentPatientsForOrganisationAdminAsync(
         Guid orgAdminUserId,
         int take,
         CancellationToken cancellationToken = default)
@@ -29,33 +27,30 @@ public sealed class OrganisationRecentPatientsReadService : IOrganisationRecentP
             .FirstOrDefaultAsync(u => u.Id == orgAdminUserId, cancellationToken);
 
         if (appUser?.OrganizationId is null)
-            return Array.Empty<OrganisationRecentPatientDto>();
+            return Array.Empty<OrganisationRecentPatientReadModel>();
 
         var organisationId = appUser.OrganizationId.Value;
         take = Math.Clamp(take, 1, 100);
 
-        // Distinct screening IDs tied to this organisation through consultation sessions.
-        var screeningIds = await _context.Set<ConsultationSession>()
+        var organisationScreeningIds = _context.Set<ConsultationSession>()
             .AsNoTracking()
             .Where(cs => cs.OrganisationId == organisationId && cs.AiScreeningId != null)
             .Select(cs => cs.AiScreeningId!.Value)
-            .Distinct()
-            .OrderByDescending(id => id) // stable fallback
-            .ToListAsync(cancellationToken);
+            .Distinct();
 
-        if (screeningIds.Count == 0)
-            return Array.Empty<OrganisationRecentPatientDto>();
-
-        // Load screenings (and patient/user) ordered by screening creation.
         var recentRows = await (
             from scr in _context.Set<AiScreening>().AsNoTracking()
             join p in _context.Set<Patient>().AsNoTracking() on scr.PatientId equals p.Id
             join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
-            where screeningIds.Contains(scr.Id)
-            orderby scr.CreatedAt descending
+            join screeningId in organisationScreeningIds on scr.Id equals screeningId
+            orderby scr.CreatedAt descending, scr.Id descending
             select new { Screening = scr, PatientUser = u }
-        ).Take(take)
+        )
+        .Take(take)
         .ToListAsync(cancellationToken);
+
+        if (recentRows.Count == 0)
+            return Array.Empty<OrganisationRecentPatientReadModel>();
 
         var screeningIdSet = recentRows.Select(r => r.Screening.Id).ToHashSet();
 
@@ -79,7 +74,7 @@ public sealed class OrganisationRecentPatientsReadService : IOrganisationRecentP
             .GroupBy(d => d.AiScreeningId)
             .ToDictionary(g => g.Key, g => g.First());
 
-        var list = new List<OrganisationRecentPatientDto>(recentRows.Count);
+        var list = new List<OrganisationRecentPatientReadModel>(recentRows.Count);
 
         foreach (var row in recentRows)
         {
@@ -92,7 +87,7 @@ public sealed class OrganisationRecentPatientsReadService : IOrganisationRecentP
             var status = MapStatus(diag);
             var priority = MapPriority(latest?.RiskLevel, diag);
 
-            list.Add(new OrganisationRecentPatientDto
+            list.Add(new OrganisationRecentPatientReadModel
             {
                 Id = scr.PatientId.ToString(),
                 Name = string.IsNullOrWhiteSpace(u.FullName) ? (u.Email ?? "Patient") : u.FullName,
@@ -125,7 +120,7 @@ public sealed class OrganisationRecentPatientsReadService : IOrganisationRecentP
         {
             Domain.Enums.Gender.Male => "M",
             Domain.Enums.Gender.Female => "F",
-            _ => "F"
+            _ => string.Empty
         };
     }
 
@@ -181,4 +176,3 @@ public sealed class OrganisationRecentPatientsReadService : IOrganisationRecentP
         return null;
     }
 }
-
