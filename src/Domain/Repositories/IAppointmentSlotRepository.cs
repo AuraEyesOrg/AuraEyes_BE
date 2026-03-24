@@ -52,6 +52,7 @@ public interface IAppointmentSlotRepository : IRepository<AppointmentSlot>
         ScheduleStatus? status = null,
         DateOnly? fromDate = null,
         DateOnly? toDate = null,
+        bool excludePastSlots = false,
         int pageNumber = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default);

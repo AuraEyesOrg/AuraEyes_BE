@@ -85,6 +85,7 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
         ScheduleStatus? status = null,
         DateOnly? fromDate = null,
         DateOnly? toDate = null,
+        bool excludePastSlots = false,
         int pageNumber = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default)
@@ -111,6 +112,17 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
         if (toDate.HasValue)
             query = query.Where(s => s.Date <= toDate.Value);
 
+        if (excludePastSlots)
+        {
+            var vietnamNow = GetVietnamNow();
+            var vietnamToday = DateOnly.FromDateTime(vietnamNow);
+            var vietnamTime = TimeOnly.FromDateTime(vietnamNow);
+
+            query = query.Where(s =>
+                s.Date > vietnamToday ||
+                (s.Date == vietnamToday && s.StartTime > vietnamTime));
+        }
+
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
@@ -121,6 +133,28 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
             .ToListAsync(cancellationToken);
 
         return (items, totalCount);
+    }
+
+    private static DateTime GetVietnamNow()
+    {
+        var utcNow = DateTime.UtcNow;
+        foreach (var timeZoneId in new[] { "SE Asia Standard Time", "Asia/Ho_Chi_Minh" })
+        {
+            try
+            {
+                var timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+                return TimeZoneInfo.ConvertTimeFromUtc(utcNow, timeZone);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+            }
+            catch (InvalidTimeZoneException)
+            {
+            }
+        }
+
+        // UTC fallback to avoid hard failures if timezone metadata is unavailable.
+        return utcNow;
     }
 
     public async Task<IReadOnlyList<AppointmentSlot>> GetByOphthalmologistAsync(
