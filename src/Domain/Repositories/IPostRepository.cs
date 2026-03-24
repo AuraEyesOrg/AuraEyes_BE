@@ -19,7 +19,10 @@ public interface IPostRepository : IRepository<ProfessionalPost>
         int pageSize = 10,
         CancellationToken cancellationToken = default,
         Guid? authorId = null,
-        AuthorType? authorType = null);
+        AuthorType? authorType = null,
+        Guid? viewerUserId = null,
+        bool includeHiddenForViewer = false,
+        bool hiddenOnly = false);
 
     /// <summary>
     /// Get post by ID with attachments included.

@@ -21,7 +21,10 @@ public class PostRepository : Repository<ProfessionalPost>, IPostRepository
         int pageSize = 10,
         CancellationToken cancellationToken = default,
         Guid? authorId = null,
-        AuthorType? authorType = null)
+        AuthorType? authorType = null,
+        Guid? viewerUserId = null,
+        bool includeHiddenForViewer = false,
+        bool hiddenOnly = false)
     {
         var query = _dbSet
             .AsNoTracking()
@@ -29,6 +32,22 @@ public class PostRepository : Repository<ProfessionalPost>, IPostRepository
             .Include(p => p.OriginalPost)
                 .ThenInclude(op => op!.Attachments)
             .AsQueryable();
+
+        if (hiddenOnly)
+        {
+            query = query.Where(p => p.IsHidden);
+        }
+        else if (!includeHiddenForViewer)
+        {
+            if (viewerUserId.HasValue)
+            {
+                query = query.Where(p => !p.IsHidden || p.AuthorId == viewerUserId.Value);
+            }
+            else
+            {
+                query = query.Where(p => !p.IsHidden);
+            }
+        }
 
         if (category.HasValue)
             query = query.Where(p => p.Category == category.Value);
@@ -219,6 +238,6 @@ public class PostRepository : Repository<ProfessionalPost>, IPostRepository
     {
         return await _dbSet
             .AsNoTracking()
-            .CountAsync(p => p.AuthorId == authorId, cancellationToken);
+            .CountAsync(p => p.AuthorId == authorId && !p.IsHidden, cancellationToken);
     }
 }

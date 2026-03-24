@@ -31,7 +31,10 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
             request.PageSize,
             cancellationToken,
             request.AuthorId,
-            request.AuthorType);
+            request.AuthorType,
+            request.CurrentUserId,
+            request.IsSystemAdmin,
+            request.HiddenOnly && request.IsSystemAdmin);
 
         var postIds = posts.Select(p => p.Id).ToList();
 
@@ -81,18 +84,24 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
                     Id = p.OriginalPost.Id,
                     Author = authors.GetValueOrDefault(p.OriginalPost.AuthorId)
                              ?? new AuthorDto { Id = p.OriginalPost.AuthorId, FullName = "Unknown" },
-                    Content = p.OriginalPost.Content,
+                    Content = p.OriginalPost.IsHidden && p.OriginalPost.AuthorId != request.CurrentUserId && !request.IsSystemAdmin
+                        ? "This original post is hidden by moderators."
+                        : p.OriginalPost.Content,
                     Category = p.OriginalPost.Category,
-                    Attachments = p.OriginalPost.Attachments.Select(a => new AttachmentDto
-                    {
-                        Id = a.Id,
-                        Type = a.Type,
-                        FileName = a.FileName,
-                        FileUrl = a.FileUrl,
-                        MimeType = a.MimeType,
-                        FileSize = a.FileSize,
-                        DisplayOrder = a.DisplayOrder
-                    }).OrderBy(a => a.DisplayOrder).ToList(),
+                    Attachments = p.OriginalPost.IsHidden && p.OriginalPost.AuthorId != request.CurrentUserId && !request.IsSystemAdmin
+                        ? new List<AttachmentDto>()
+                        : p.OriginalPost.Attachments.Select(a => new AttachmentDto
+                        {
+                            Id = a.Id,
+                            Type = a.Type,
+                            FileName = a.FileName,
+                            FileUrl = a.FileUrl,
+                            MimeType = a.MimeType,
+                            FileSize = a.FileSize,
+                            DisplayOrder = a.DisplayOrder
+                        }).OrderBy(a => a.DisplayOrder).ToList(),
+                    IsHidden = p.OriginalPost.IsHidden,
+                    HideReason = p.OriginalPost.IsHidden ? p.OriginalPost.HideReason : null,
                     CreatedAt = p.OriginalPost.CreatedAt
                 }
                 : null,
@@ -113,6 +122,8 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
             }).OrderBy(a => a.DisplayOrder).ToList(),
             CurrentUserReaction = userReactions.GetValueOrDefault(p.Id),
             IsBookmarked = savedPostIds.Contains(p.Id),
+            IsHidden = p.IsHidden,
+            HideReason = p.IsHidden ? p.HideReason : null,
             CreatedAt = p.CreatedAt
         }).ToList();
 

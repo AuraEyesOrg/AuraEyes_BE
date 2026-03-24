@@ -29,6 +29,13 @@ public class GetPostByIdQueryHandler : IQueryHandler<GetPostByIdQuery, PostDetai
         if (post == null)
             return Result<PostDetailDto>.NotFound("Post not found");
 
+        var canViewHiddenPost = !post.IsHidden
+            || post.AuthorId == request.CurrentUserId
+            || request.IsSystemAdmin;
+
+        if (!canViewHiddenPost)
+            return Result<PostDetailDto>.NotFound("Post not found");
+
         // Increment view count
         post.IncrementViewCount();
 
@@ -74,6 +81,8 @@ public class GetPostByIdQueryHandler : IQueryHandler<GetPostByIdQuery, PostDetai
             }).OrderBy(a => a.DisplayOrder).ToList(),
             CurrentUserReaction = reaction?.Type,
             IsBookmarked = isBookmarked,
+            IsHidden = post.IsHidden,
+            HideReason = post.IsHidden ? post.HideReason : null,
             CreatedAt = post.CreatedAt,
             UpdatedAt = post.UpdatedAt
         };

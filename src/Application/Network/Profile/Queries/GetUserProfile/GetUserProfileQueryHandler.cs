@@ -45,7 +45,20 @@ public class GetUserProfileQueryHandler : IQueryHandler<GetUserProfileQuery, Use
             Bio = ophthalmologist?.Bio,
             PostCount = postCount,
             YearsOfExperience = ophthalmologist?.YearsOfExperience ?? 0,
-            IsVerified = ophthalmologist?.IsVerified ?? false
+            IsVerified = ophthalmologist?.IsVerified ?? false,
+            Certificates = ophthalmologist?.Certificates
+                .Select(c => new UserProfileCertificateDto
+                {
+                    Id = c.Id,
+                    Type = c.Type.ToString(),
+                    Name = c.Name,
+                    IssuingAuthority = c.IssuingAuthority,
+                    IssuedDate = c.IssuedDate,
+                    ExpiryDate = c.ExpiryDate,
+                    CertificateUrl = c.CertificateUrl
+                })
+                .OrderByDescending(c => c.IssuedDate)
+                .ToList() ?? new List<UserProfileCertificateDto>()
         };
 
         return Result<UserProfileDto>.Success(dto);

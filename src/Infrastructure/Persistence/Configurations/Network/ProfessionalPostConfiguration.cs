@@ -38,6 +38,12 @@ public class ProfessionalPostConfiguration : IEntityTypeConfiguration<Profession
         builder.Property(e => e.IsRepost)
             .HasDefaultValue(false);
 
+        builder.Property(e => e.IsHidden)
+            .HasDefaultValue(false);
+
+        builder.Property(e => e.HideReason)
+            .HasMaxLength(1000);
+
         builder.Property(e => e.ReactionCount)
             .HasDefaultValue(0);
 
@@ -80,6 +86,7 @@ public class ProfessionalPostConfiguration : IEntityTypeConfiguration<Profession
         builder.HasIndex(e => e.OrganisationId);
         builder.HasIndex(e => e.Category);
         builder.HasIndex(e => e.CreatedAt);
+        builder.HasIndex(e => e.IsHidden);
         builder.HasIndex(e => new { e.AuthorId, e.AuthorType });
     }
 }
