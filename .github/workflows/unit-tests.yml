@@ -47,12 +47,20 @@ jobs:
           --collect:"XPlat Code Coverage"
           --results-directory ./TestResults
 
+      - name: List generated test artifacts
+        if: always()
+        run: |
+          echo "=== TestResults tree ==="
+          find ./TestResults -type f || true
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-results
-          path: TestResults/**/*.trx
+          path: |
+            TestResults/**/*.trx
+            TestResults/**/test-results.trx
           if-no-files-found: warn
 
       - name: Upload coverage reports
@@ -60,5 +68,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: code-coverage
-          path: TestResults/**/coverage.cobertura.xml
+          path: |
+            TestResults/**/coverage.cobertura.xml
+            TestResults/**
           if-no-files-found: warn
