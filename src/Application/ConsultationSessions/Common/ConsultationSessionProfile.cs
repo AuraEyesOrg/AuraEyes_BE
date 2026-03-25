@@ -22,6 +22,7 @@ public class ConsultationSessionProfile : Profile
             .ForMember(dest => dest.PatientAvatarUrl, opt => opt.Ignore())
             .ForMember(dest => dest.OphthalmologistName, opt => opt.Ignore())
             .ForMember(dest => dest.OrganisationName, opt => opt.Ignore())
-            .ForMember(dest => dest.OphthalmologistAvatarUrl, opt => opt.Ignore());
+            .ForMember(dest => dest.OphthalmologistAvatarUrl, opt => opt.Ignore())
+            .ForMember(dest => dest.CaseSnapshot, opt => opt.Ignore());
     }
 }

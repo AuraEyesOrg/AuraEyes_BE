@@ -17,7 +17,7 @@ public class PatientResourcesController : BaseApiController
     private readonly ILogger<PatientResourcesController> _logger;
 
     private const string DefaultTrustedDomains =
-        "vinmec.com,vnio.vn,bvmatsaigon.vn,benhvienmathanoi.vn,suckhoedoisong.vn";
+        "vinmec.com,vnio.vn,benhvienmat.com,matsaigon.com,matquocte.vn,medlatec.vn,hellobacsi.com";
 
     public PatientResourcesController(
         IHttpClientFactory httpClientFactory,
@@ -33,7 +33,6 @@ public class PatientResourcesController : BaseApiController
 
     /// <param name="diseases">
     /// Comma-separated list of disease/condition names returned by the AI model
-    /// (e.g. "bệnh võng mạc tiểu đường,tăng nhãn áp"). Only the primary (first)
     /// disease is used as the main search keyword.
     /// </param>
     /// <param name="limit">Maximum number of results to return (1–10).</param>
