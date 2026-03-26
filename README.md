@@ -1,5 +1,10 @@
 # Microservice Boilerplate - Clean Architecture + DDD + CQRS
 
+[![BE Quality & Security](https://github.com/AuraEyesOrg/AuraEyes_BE/actions/workflows/be-quality-security.yml/badge.svg?branch=develop)](https://github.com/AuraEyesOrg/AuraEyes_BE/actions/workflows/be-quality-security.yml)
+[![Backend Unit Tests](https://github.com/AuraEyesOrg/AuraEyes_BE/actions/workflows/unit-tests.yml/badge.svg?branch=develop)](https://github.com/AuraEyesOrg/AuraEyes_BE/actions/workflows/unit-tests.yml)
+[![Build & Push Aura Eyes API Image](https://github.com/AuraEyesOrg/AuraEyes_BE/actions/workflows/build-image.yml/badge.svg?branch=develop)](https://github.com/AuraEyesOrg/AuraEyes_BE/actions/workflows/build-image.yml)
+[![Deploy Aura Eyes API (Production)](https://github.com/AuraEyesOrg/AuraEyes_BE/actions/workflows/deploy.yml/badge.svg?branch=develop)](https://github.com/AuraEyesOrg/AuraEyes_BE/actions/workflows/deploy.yml)
+
 A production-ready boilerplate for building microservices using ASP.NET Core 8.0 with Clean Architecture, Domain-Driven Design (DDD), and Command Query Responsibility Segregation (CQRS) patterns.
 
 ## � Table of Contents
