@@ -23,8 +23,8 @@ public class NotificationHubService : INotificationHubService
 
     /// <inheritdoc />
     public async Task BroadcastToUserAsync(
-        Guid userId, 
-        NotificationDto notification, 
+        Guid userId,
+        NotificationDto notification,
         CancellationToken cancellationToken = default)
     {
         try
@@ -48,8 +48,8 @@ public class NotificationHubService : INotificationHubService
 
     /// <inheritdoc />
     public async Task BroadcastToGroupAsync(
-        string groupName, 
-        NotificationDto notification, 
+        string groupName,
+        NotificationDto notification,
         CancellationToken cancellationToken = default)
     {
         try

@@ -12,12 +12,12 @@ public class PostReaction : BaseEntity
     /// Post that was reacted to
     /// </summary>
     public Guid PostId { get; private set; }
-    
+
     /// <summary>
     /// User who reacted (NO FK - just stores ID)
     /// </summary>
     public Guid UserId { get; private set; }
-    
+
     /// <summary>
     /// Type of reaction
     /// </summary>

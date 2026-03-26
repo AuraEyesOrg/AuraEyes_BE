@@ -17,10 +17,10 @@ public interface INotificationService
     /// <param name="payload">Optional payload object containing metadata (will be serialized to JSON)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     Task SendAsync(
-        Guid userId, 
+        Guid userId,
         string title,
-        string message, 
-        NotificationType type, 
+        string message,
+        NotificationType type,
         object? payload = null,
         CancellationToken cancellationToken = default);
 

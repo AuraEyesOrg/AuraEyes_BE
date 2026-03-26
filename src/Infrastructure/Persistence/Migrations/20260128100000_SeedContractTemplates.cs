@@ -13,10 +13,10 @@ public partial class SeedContractTemplates : Migration
         // Ophthalmologist Contract Template
         var ophthalmologistId = Guid.NewGuid();
         var ophthalmologistTemplate = GetOphthalmologistContractTemplate();
-        
+
         // Escape single quotes for SQL
         ophthalmologistTemplate = ophthalmologistTemplate.Replace("'", "''");
-        
+
         migrationBuilder.Sql($@"
             INSERT INTO ""ContractTemplates"" 
             (""Id"", ""Title"", ""Type"", ""ContractVersion"", ""ContentTemplate"", ""IsActive"", ""EffectiveDate"", ""CreatedAt"", ""IsDeleted"")
@@ -27,10 +27,10 @@ public partial class SeedContractTemplates : Migration
         // Medical Organization Contract Template
         var organizationId = Guid.NewGuid();
         var organizationTemplate = GetMedicalOrganizationContractTemplate();
-        
+
         // Escape single quotes for SQL
         organizationTemplate = organizationTemplate.Replace("'", "''");
-        
+
         migrationBuilder.Sql($@"
             INSERT INTO ""ContractTemplates"" 
             (""Id"", ""Title"", ""Type"", ""ContractVersion"", ""ContentTemplate"", ""IsActive"", ""EffectiveDate"", ""CreatedAt"", ""IsDeleted"")

@@ -135,7 +135,7 @@ public class ReserveSlotCommandHandler : ICommandHandler<ReserveSlotCommand, Res
 
             var localAppointmentTime = slot.Date.ToDateTime(slot.StartTime, DateTimeKind.Unspecified);
             var appointmentTimeUtc = TimeZoneInfo.ConvertTimeToUtc(localAppointmentTime, VietnamTimeZoneResolver.TimeZone);
-            
+
             if (appointmentTimeUtc <= DateTime.UtcNow.AddHours(advanceBookingHours))
             {
                 await _unitOfWork.RollbackTransactionAsync(cancellationToken);

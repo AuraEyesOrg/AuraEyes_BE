@@ -14,7 +14,7 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     public Guid? OphthalmologistId { get; private set; }
     public Guid? OrganisationId { get; private set; }
     public Guid? AiScreeningId { get; private set; }
-    
+
     /// <summary>FK to AppointmentSlot - links this session to a specific appointment slot.</summary>
     public Guid? AppointmentSlotId { get; private set; }
 
@@ -47,7 +47,7 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
 
     private readonly List<MedicalDiagnosis> _medicalDiagnoses = new();
     public IReadOnlyCollection<MedicalDiagnosis> MedicalDiagnoses => _medicalDiagnoses.AsReadOnly();
-    
+
     /// <summary>Navigation property to the appointment slot.</summary>
     public AppointmentSlot? AppointmentSlot { get; private set; }
 

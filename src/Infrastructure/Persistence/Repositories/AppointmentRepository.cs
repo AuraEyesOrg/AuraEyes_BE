@@ -40,7 +40,7 @@ public class AppointmentRepository : Repository<Appointment>, IAppointmentReposi
         if (fromDate.HasValue || toDate.HasValue)
         {
             query = query.Where(a => a.AppointmentSlot != null);
-            
+
             if (fromDate.HasValue)
                 query = query.Where(a => a.AppointmentSlot!.Date >= fromDate.Value);
 
@@ -77,7 +77,7 @@ public class AppointmentRepository : Repository<Appointment>, IAppointmentReposi
         if (fromDate.HasValue || toDate.HasValue)
         {
             query = query.Where(a => a.AppointmentSlot != null);
-            
+
             if (fromDate.HasValue)
                 query = query.Where(a => a.AppointmentSlot!.Date >= fromDate.Value);
 
@@ -261,7 +261,7 @@ public class AppointmentRepository : Repository<Appointment>, IAppointmentReposi
             .Include(a => a.Doctor)
             .Include(a => a.AppointmentSlot)
             .Where(a => a.PatientId == patientId)
-            .Where(a => a.Status == AppointmentStatus.Pending || 
+            .Where(a => a.Status == AppointmentStatus.Pending ||
                        a.Status == AppointmentStatus.Confirmed ||
                        a.Status == AppointmentStatus.CheckedIn)
             .Where(a => a.AppointmentSlot != null && a.AppointmentSlot.Date >= today)
@@ -281,7 +281,7 @@ public class AppointmentRepository : Repository<Appointment>, IAppointmentReposi
             .Include(a => a.Organisation)
             .Include(a => a.AppointmentSlot)
             .Where(a => a.DoctorId == doctorId)
-            .Where(a => a.Status == AppointmentStatus.Pending || 
+            .Where(a => a.Status == AppointmentStatus.Pending ||
                        a.Status == AppointmentStatus.Confirmed ||
                        a.Status == AppointmentStatus.CheckedIn)
             .Where(a => a.AppointmentSlot != null && a.AppointmentSlot.Date >= today)

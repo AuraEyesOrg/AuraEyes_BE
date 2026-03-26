@@ -38,12 +38,12 @@ public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQu
         var userDetails = await _identityService.GetUserDetailsAsync(ophthalmologist.UserId, cancellationToken);
 
         var slots = await _appointmentSlotRepository.GetByOphthalmologistAsync(
-            ophthalmologist.Id, 
-            DateOnly.FromDateTime(DateTime.UtcNow), 
-            null, 
-            Domain.Enums.ScheduleStatus.Available, 
+            ophthalmologist.Id,
+            DateOnly.FromDateTime(DateTime.UtcNow),
+            null,
+            Domain.Enums.ScheduleStatus.Available,
             cancellationToken);
-            
+
         decimal? minPrice = slots.Any() ? slots.Min(s => s.Cost) : null;
         decimal? maxPrice = slots.Any() ? slots.Max(s => s.Cost) : null;
 

@@ -31,7 +31,7 @@ public class EmailService : IEmailService
         var body = EmailTemplates.GetEmailConfirmationBody(confirmationLink);
 
         await SendAsync(email, subject, body, isHtml: true, cancellationToken);
-        
+
         _logger.LogInformation(
             "Email confirmation sent to {Email}",
             MaskEmail(email));
@@ -44,7 +44,7 @@ public class EmailService : IEmailService
         var body = EmailTemplates.GetPasswordResetBody(resetLink);
 
         await SendAsync(email, subject, body, isHtml: true, cancellationToken);
-        
+
         _logger.LogInformation(
             "Password reset email sent to {Email}",
             MaskEmail(email));
@@ -57,7 +57,7 @@ public class EmailService : IEmailService
         var body = EmailTemplates.GetWelcomeBody(fullName);
 
         await SendAsync(email, subject, body, isHtml: true, cancellationToken);
-        
+
         _logger.LogInformation(
             "Welcome email sent to {Email}",
             MaskEmail(email));
@@ -75,7 +75,7 @@ public class EmailService : IEmailService
         try
         {
             await SendMessageAsync(message, cancellationToken);
-            
+
             _logger.LogDebug(
                 "Email sent successfully - To: {To}, Subject: {Subject}",
                 MaskEmail(to),
@@ -146,7 +146,7 @@ public class EmailService : IEmailService
                 cancellationToken);
 
             // Authenticate if credentials provided
-            if (!string.IsNullOrWhiteSpace(_settings.Username) && 
+            if (!string.IsNullOrWhiteSpace(_settings.Username) &&
                 !string.IsNullOrWhiteSpace(_settings.Password))
             {
                 await client.AuthenticateAsync(

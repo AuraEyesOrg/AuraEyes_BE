@@ -25,7 +25,7 @@ public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologists
     }
 
     public async Task<Result<PagedResult<OphthalmologistListDto>>> Handle(
-        GetOphthalmologistsQuery request, 
+        GetOphthalmologistsQuery request,
         CancellationToken cancellationToken)
     {
         var (items, totalCount) = await _ophthalmologistRepository.GetPagedAsync(
@@ -80,9 +80,9 @@ public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologists
         }
 
         var pagedResult = new PagedResult<OphthalmologistListDto>(
-            dtoList, 
-            totalCount, 
-            request.PageNumber, 
+            dtoList,
+            totalCount,
+            request.PageNumber,
             request.PageSize);
 
         return Result<PagedResult<OphthalmologistListDto>>.Success(pagedResult);

@@ -58,7 +58,7 @@ var configuredOrigins = builder.Configuration
 
 var allowedOrigins = configuredOrigins ??
     (builder.Environment.IsDevelopment()
-        ? new[] { "http://localhost:5173", "http://localhost:4173", "http://localhost:3000", "https://localhost:5001", "https://n8n.auraeyes.site", "https://localhost:5001", 
+        ? new[] { "http://localhost:5173", "http://localhost:4173", "http://localhost:3000", "https://localhost:5001", "https://n8n.auraeyes.site", "https://localhost:5001",
             "http://localhost:5000" }
         : Array.Empty<string>());
 
@@ -226,8 +226,8 @@ builder.Services.Configure<GzipCompressionProviderOptions>(options =>
 builder.Services.AddOutputCache(options =>
 {
     options.AddBasePolicy(builder => builder.Expire(TimeSpan.FromSeconds(10)));
-    
-    options.AddPolicy("PublicData", builder => 
+
+    options.AddPolicy("PublicData", builder =>
         builder.Expire(TimeSpan.FromMinutes(5))
                .SetVaryByQuery("*")); // Vary cache by query parameters
 });

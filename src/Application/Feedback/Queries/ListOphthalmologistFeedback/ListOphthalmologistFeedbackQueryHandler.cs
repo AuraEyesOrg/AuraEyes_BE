@@ -39,7 +39,7 @@ public class ListOphthalmologistFeedbackQueryHandler
         foreach (var x in items)
         {
             var patientEntity = await _patientRepository.GetByIdAsync(x.PatientId, cancellationToken);
-            var patientUser = patientEntity != null 
+            var patientUser = patientEntity != null
                 ? await _identityService.GetUserByIdAsync(patientEntity.UserId, cancellationToken)
                 : null;
 

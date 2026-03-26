@@ -47,20 +47,20 @@ public class UpdateScheduleTemplateCommandHandler : ICommandHandler<UpdateSchedu
         }
 
         // Check that new capacity is not less than current active appointment slots
-        var activeSlots = template.AppointmentSlots?.Count(s => 
+        var activeSlots = template.AppointmentSlots?.Count(s =>
             s.Status != Domain.Enums.ScheduleStatus.Cancelled) ?? 0;
-        
+
         // Note: We allow capacity changes since BookedCount in each AppointmentSlot
         // handles individual slot capacity, not the template
 
         template.Update(
-            request.DayOfWeek, 
-            request.StartTime, 
-            request.EndTime, 
-            request.SlotDuration, 
+            request.DayOfWeek,
+            request.StartTime,
+            request.EndTime,
+            request.SlotDuration,
             request.MaxCapacity,
             request.Cost);
-        
+
         await _scheduleTemplateRepository.UpdateAsync(template, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

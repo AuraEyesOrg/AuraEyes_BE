@@ -12,32 +12,32 @@ public class PostAttachment : BaseEntity
     /// Post that this attachment belongs to
     /// </summary>
     public Guid PostId { get; private set; }
-    
+
     /// <summary>
     /// Type of attachment
     /// </summary>
     public AttachmentType Type { get; private set; }
-    
+
     /// <summary>
     /// Original file name
     /// </summary>
     public string FileName { get; private set; } = string.Empty;
-    
+
     /// <summary>
     /// URL to the file
     /// </summary>
     public string FileUrl { get; private set; } = string.Empty;
-    
+
     /// <summary>
     /// MIME type of the file
     /// </summary>
     public string? MimeType { get; private set; }
-    
+
     /// <summary>
     /// File size in bytes
     /// </summary>
     public long? FileSize { get; private set; }
-    
+
     /// <summary>
     /// Display order
     /// </summary>
@@ -62,7 +62,7 @@ public class PostAttachment : BaseEntity
     {
         if (string.IsNullOrWhiteSpace(fileName))
             throw new ArgumentException("File name cannot be empty", nameof(fileName));
-        
+
         if (string.IsNullOrWhiteSpace(fileUrl))
             throw new ArgumentException("File URL cannot be empty", nameof(fileUrl));
 

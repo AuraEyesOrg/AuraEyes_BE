@@ -21,30 +21,30 @@ public interface IIdentityService
         CancellationToken cancellationToken = default);
 
     Task<bool> CheckPasswordAsync(Guid userId, string password);
-    
+
     Task<UserDto?> GetUserByEmailAsync(string email, CancellationToken cancellationToken = default);
-    
+
     Task<UserDto?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default);
-    
+
     Task<bool> IsEmailConfirmedAsync(Guid userId);
-    
+
     Task<bool> IsUserActiveAsync(Guid userId);
 
     // Email Confirmation
     Task<string> GenerateEmailConfirmationTokenAsync(Guid userId);
-    
+
     Task<(bool Succeeded, string[] Errors)> ConfirmEmailAsync(Guid userId, string token);
 
     // Password Reset
     Task<string> GeneratePasswordResetTokenAsync(Guid userId);
-    
+
     Task<(bool Succeeded, string[] Errors)> ResetPasswordAsync(Guid userId, string token, string newPassword);
 
     // Role Management
     Task<IList<string>> GetUserRolesAsync(Guid userId);
-    
+
     Task<(bool Succeeded, string[] Errors)> AddToRoleAsync(Guid userId, string role);
-    
+
     Task<bool> IsInRoleAsync(Guid userId, string role);
 
     /// <summary>
@@ -57,26 +57,26 @@ public interface IIdentityService
 
     // Account Management
     Task UpdateLastLoginAsync(Guid userId);
-    
+
     Task<(bool Succeeded, string[] Errors)> DeactivateUserAsync(Guid userId);
-    
+
     Task<(bool Succeeded, string[] Errors)> SoftDeleteUserAsync(Guid userId);
 
     // Two-Factor Authentication (2FA) - TOTP Authenticator
-    
+
     Task<bool> IsTwoFactorEnabledAsync(Guid userId);
-    
+
     /// <summary>
     /// Get the current authenticator key (without regenerating).
     /// </summary>
     Task<string?> GetAuthenticatorKeyAsync(Guid userId);
-    
+
     Task<string> GetOrCreateAuthenticatorKeyAsync(Guid userId);
-    
+
     string GenerateAuthenticatorUri(string email, string sharedKey);
-    
+
     string FormatAuthenticatorKey(string key);
-    
+
     Task<(bool Succeeded, string[] Errors, string[]? RecoveryCodes)> EnableTwoFactorAsync(Guid userId, string verificationCode);
     Task<(bool Succeeded, string[] Errors)> DisableTwoFactorAsync(Guid userId);
     Task<bool> VerifyTwoFactorCodeAsync(Guid userId, string code);
