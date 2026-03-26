@@ -30,6 +30,8 @@ public class PostFeedDto
     public List<AttachmentDto> Attachments { get; set; } = new();
     public ReactionType? CurrentUserReaction { get; set; }
     public bool IsBookmarked { get; set; }
+    public bool IsHidden { get; set; }
+    public string? HideReason { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
@@ -43,5 +45,7 @@ public class OriginalPostDto
     public string Content { get; set; } = string.Empty;
     public PostCategory Category { get; set; }
     public List<AttachmentDto> Attachments { get; set; } = new();
+    public bool IsHidden { get; set; }
+    public string? HideReason { get; set; }
     public DateTime CreatedAt { get; set; }
 }

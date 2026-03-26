@@ -7,6 +7,7 @@ using Application.Network.Comments.Queries.GetComments;
 using Application.Network.Posts.Commands.CreatePost;
 using Application.Network.Posts.Commands.CreateRepost;
 using Application.Network.Posts.Commands.DeletePost;
+using Application.Network.Posts.Commands.HidePost;
 using Application.Network.Posts.Commands.UpdatePost;
 using Application.Network.Posts.Queries.GetFeed;
 using Application.Network.Posts.Queries.GetPostById;
@@ -53,16 +54,19 @@ public class NetworkController : BaseApiController
         [FromQuery] string? searchTerm = null,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10,
-        [FromQuery] Guid? authorId = null)
+        [FromQuery] Guid? authorId = null,
+        [FromQuery] bool hiddenOnly = false)
     {
         var query = new GetFeedQuery
         {
             CurrentUserId = _currentUserService.UserId!.Value,
+            IsSystemAdmin = _currentUserService.IsInRole(Roles.SystemAdmin),
             Category = category,
             SearchTerm = searchTerm,
             PageNumber = pageNumber,
             PageSize = pageSize,
-            AuthorId = authorId
+            AuthorId = authorId,
+            HiddenOnly = hiddenOnly
         };
 
         var result = await _mediator.Send(query);
@@ -84,6 +88,7 @@ public class NetworkController : BaseApiController
         var query = new GetFeedQuery
         {
             CurrentUserId = _currentUserService.UserId!.Value,
+            IsSystemAdmin = _currentUserService.IsInRole(Roles.SystemAdmin),
             AuthorType = authorType,
             Category = category,
             SearchTerm = searchTerm,
@@ -106,7 +111,8 @@ public class NetworkController : BaseApiController
         var query = new GetPostByIdQuery
         {
             PostId = postId,
-            CurrentUserId = _currentUserService.UserId!.Value
+            CurrentUserId = _currentUserService.UserId!.Value,
+            IsSystemAdmin = _currentUserService.IsInRole(Roles.SystemAdmin)
         };
 
         var result = await _mediator.Send(query);
@@ -174,6 +180,25 @@ public class NetworkController : BaseApiController
 
         var result = await _mediator.Send(command);
         return HandleResult(result, "Post deleted successfully");
+    }
+
+    /// <summary>
+    /// Hide a post by moderation (SystemAdmin only).
+    /// </summary>
+    [HttpPost("posts/{postId:guid}/hide")]
+    [Authorize(Policy = Policies.SystemAdminOnly)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> HidePost(Guid postId, [FromBody] HidePostRequest request)
+    {
+        var command = new HidePostCommand
+        {
+            PostId = postId,
+            HideReason = request.HideReason
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result, "Post hidden successfully");
     }
 
     /// <summary>
@@ -475,6 +500,11 @@ public class ToggleReactionRequest
 public class ToggleSavePostRequest
 {
     public string? CollectionName { get; set; }
+}
+
+public class HidePostRequest
+{
+    public string? HideReason { get; set; }
 }
 
 #endregion
