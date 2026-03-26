@@ -155,7 +155,7 @@ public class RefreshTokenService : IRefreshTokenService
         var cutoffDate = DateTime.UtcNow.AddDays(-daysToKeep);
 
         var tokensToDelete = await _context.RefreshTokens
-            .Where(t => t.ExpiresAt < cutoffDate || 
+            .Where(t => t.ExpiresAt < cutoffDate ||
                        (t.RevokedAt.HasValue && t.RevokedAt < cutoffDate))
             .ToListAsync(cancellationToken);
 

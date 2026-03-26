@@ -34,8 +34,8 @@ public class GetOphthalmologistFeedbackQueryHandler : IQueryHandler<GetOphthalmo
             return Result<OphthalmologistFeedbackDto>.NotFound($"Ophthalmologist feedback '{request.FeedbackId}' not found.");
 
         var patientEntity = await _patientRepository.GetByIdAsync(feedback.PatientId, cancellationToken);
-        var patientUser = patientEntity != null 
-            ? await _identityService.GetUserByIdAsync(patientEntity.UserId, cancellationToken) 
+        var patientUser = patientEntity != null
+            ? await _identityService.GetUserByIdAsync(patientEntity.UserId, cancellationToken)
             : null;
 
         var dto = new OphthalmologistFeedbackDto

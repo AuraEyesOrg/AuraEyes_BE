@@ -50,7 +50,7 @@ public class CompleteAiScreeningCommandHandler : ICommandHandler<CompleteAiScree
         // Check if already processed
         if (screening.ProcessedAt.HasValue)
         {
-            _logger.LogWarning("AI Screening {ScreeningId} already processed at {ProcessedAt}", 
+            _logger.LogWarning("AI Screening {ScreeningId} already processed at {ProcessedAt}",
                 request.ScreeningId, screening.ProcessedAt);
             return Result<CompleteAiScreeningResponse>.Failure("Screening has already been processed");
         }

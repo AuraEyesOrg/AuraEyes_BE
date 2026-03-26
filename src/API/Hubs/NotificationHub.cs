@@ -23,9 +23,9 @@ public class NotificationHub : Hub
     public override async Task OnConnectedAsync()
     {
         var userId = Context.UserIdentifier;
-        _logger.LogInformation("Client connected: ConnectionId={ConnectionId}, UserId={UserId}", 
+        _logger.LogInformation("Client connected: ConnectionId={ConnectionId}, UserId={UserId}",
             Context.ConnectionId, userId);
-        
+
         await base.OnConnectedAsync();
     }
 
@@ -35,14 +35,14 @@ public class NotificationHub : Hub
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         var userId = Context.UserIdentifier;
-        _logger.LogInformation("Client disconnected: ConnectionId={ConnectionId}, UserId={UserId}", 
+        _logger.LogInformation("Client disconnected: ConnectionId={ConnectionId}, UserId={UserId}",
             Context.ConnectionId, userId);
-        
+
         if (exception != null)
         {
             _logger.LogWarning(exception, "Client disconnected with error");
         }
-        
+
         await base.OnDisconnectedAsync(exception);
     }
 
@@ -52,7 +52,7 @@ public class NotificationHub : Hub
     public async Task JoinGroup(string groupName)
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
-        _logger.LogInformation("User {UserId} joined group {GroupName}", 
+        _logger.LogInformation("User {UserId} joined group {GroupName}",
             Context.UserIdentifier, groupName);
     }
 
@@ -62,7 +62,7 @@ public class NotificationHub : Hub
     public async Task LeaveGroup(string groupName)
     {
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
-        _logger.LogInformation("User {UserId} left group {GroupName}", 
+        _logger.LogInformation("User {UserId} left group {GroupName}",
             Context.UserIdentifier, groupName);
     }
 }

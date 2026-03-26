@@ -59,7 +59,7 @@ public class SubmitVerificationReportCommandHandler
                     request.DiagnosesCode,
                     request.DiagnosesText,
                     request.TreatmentPlan);
-            
+
             await _diagnosisRepository.AddAsync(diagnosis, cancellationToken);
 
             session.OpenChat();

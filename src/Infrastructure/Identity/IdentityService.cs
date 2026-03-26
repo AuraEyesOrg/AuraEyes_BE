@@ -17,7 +17,7 @@ public class IdentityService : IIdentityService
 
     // Number of recovery codes to generate
     private const int DefaultRecoveryCodesCount = 10;
-    
+
     // Issuer name for TOTP authenticator apps
     private const string AuthenticatorIssuer = "AuraEyes";
 
@@ -293,13 +293,13 @@ public class IdentityService : IIdentityService
 
         // Reset the authenticator key to generate a new one
         await _userManager.ResetAuthenticatorKeyAsync(user);
-        
+
         var key = await _userManager.GetAuthenticatorKeyAsync(user);
         return key ?? throw new InvalidOperationException("Failed to generate authenticator key");
     }
 
     public async Task<(bool Succeeded, string[] Errors, string[]? RecoveryCodes)> EnableTwoFactorAsync(
-        Guid userId, 
+        Guid userId,
         string verificationCode)
     {
         var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -322,7 +322,7 @@ public class IdentityService : IIdentityService
 
         // Generate recovery codes
         var recoveryCodes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, DefaultRecoveryCodesCount);
-        
+
         return (true, Array.Empty<string>(), recoveryCodes?.ToArray());
     }
 
@@ -362,7 +362,7 @@ public class IdentityService : IIdentityService
             return (false, new[] { "User not found" });
 
         var result = await _userManager.RedeemTwoFactorRecoveryCodeAsync(user, recoveryCode);
-        
+
         return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
     }
 
@@ -403,13 +403,13 @@ public class IdentityService : IIdentityService
     {
         var result = new StringBuilder();
         var currentPosition = 0;
-        
+
         while (currentPosition + 4 < key.Length)
         {
             result.Append(key.AsSpan(currentPosition, 4)).Append(' ');
             currentPosition += 4;
         }
-        
+
         if (currentPosition < key.Length)
         {
             result.Append(key.AsSpan(currentPosition));

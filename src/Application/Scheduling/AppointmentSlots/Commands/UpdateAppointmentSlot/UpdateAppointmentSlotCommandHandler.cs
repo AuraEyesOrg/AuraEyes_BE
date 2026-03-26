@@ -54,7 +54,7 @@ public class UpdateAppointmentSlotCommandHandler : ICommandHandler<UpdateAppoint
         // We need to add an Update method to the entity
         // For now, we update the cost since the entity supports it
         slot.UpdateCost(request.Cost);
-        
+
         await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

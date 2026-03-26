@@ -22,7 +22,7 @@ public class CurrentUserService : ICurrentUserService
         {
             var userIdClaim = _httpContextAccessor.HttpContext?.User.FindFirst("uid")?.Value
                            ?? _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            
+
             return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
         }
     }

@@ -22,7 +22,7 @@ public class SystemSettingService : ISystemSettingService
         var setting = await _context.SystemSettings
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
-            
+
         return setting?.Value;
     }
 

@@ -55,8 +55,8 @@ public class GetConsultationSessionQueryHandler
 
         if (!isAdmin && !isParticipant)
         {
-           return Result<ConsultationSessionDto>.Forbidden(
-               "You are not a participant of this session.");
+            return Result<ConsultationSessionDto>.Forbidden(
+                "You are not a participant of this session.");
         }
 
         // Flatten all messages from all conversations, ordered by SentAt

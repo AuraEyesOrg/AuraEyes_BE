@@ -21,12 +21,12 @@ public interface ICurrentUserService
     /// Current user's email.
     /// </summary>
     string? Email { get; }
-    
+
     /// <summary>
     /// Current user's roles.
     /// </summary>
     IEnumerable<string> Roles { get; }
-    
+
     /// <summary>
     /// Check if current user is authenticated.
     /// </summary>
@@ -36,7 +36,7 @@ public interface ICurrentUserService
     /// Client IP address from the current HTTP request.
     /// </summary>
     string? IpAddress { get; }
-    
+
     /// <summary>
     /// Check if current user is in a specific role.
     /// </summary>

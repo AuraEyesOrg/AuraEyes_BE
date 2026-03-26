@@ -72,7 +72,7 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
         builder.HasIndex(e => e.ConsultationSessionId);
         builder.HasIndex(e => e.Type);
         builder.HasIndex(e => e.Status);
-        
+
         // Unique constraint: one patient can only have one active appointment per slot
         builder.HasIndex(e => new { e.PatientId, e.AppointmentSlotId })
             .IsUnique()

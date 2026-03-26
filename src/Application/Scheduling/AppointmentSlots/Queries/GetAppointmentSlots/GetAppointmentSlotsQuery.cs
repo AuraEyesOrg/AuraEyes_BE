@@ -13,6 +13,7 @@ public record GetAppointmentSlotsQuery : IQuery<PagedResult<AppointmentSlotListD
     public ScheduleStatus? Status { get; init; }
     public DateOnly? FromDate { get; init; }
     public DateOnly? ToDate { get; init; }
+    public bool ExcludePastSlots { get; init; } = false;
     public int PageNumber { get; init; } = 1;
     public int PageSize { get; init; } = 10;
 }
