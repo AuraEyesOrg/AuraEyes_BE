@@ -19,7 +19,7 @@ public class AiQuotaService : IAiQuotaService
     private readonly ISystemSettingService _settingService;
 
     public AiQuotaService(
-        ApplicationDbContext context, 
+        ApplicationDbContext context,
         ILogger<AiQuotaService> logger,
         ISystemSettingService settingService)
     {

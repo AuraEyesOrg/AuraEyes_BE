@@ -101,7 +101,7 @@ public class TwoFactorController : BaseApiController
 
             // Generate new authenticator key
             var sharedKey = await _identityService.GetOrCreateAuthenticatorKeyAsync(userId.Value);
-            
+
             // Generate QR code URI and formatted key using IdentityService
             var authenticatorUri = _identityService.GenerateAuthenticatorUri(email, sharedKey);
             var formattedKey = _identityService.FormatAuthenticatorKey(sharedKey);
@@ -146,7 +146,7 @@ public class TwoFactorController : BaseApiController
                 .Replace("-", string.Empty);
 
             var (succeeded, errors, recoveryCodes) = await _identityService.EnableTwoFactorAsync(
-                userId.Value, 
+                userId.Value,
                 verificationCode);
 
             if (!succeeded)

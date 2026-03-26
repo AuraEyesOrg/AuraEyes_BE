@@ -77,17 +77,17 @@ public class WalletRepository : Repository<Wallet>, IWalletRepository
             .ToListAsync(cancellationToken);
 
         var transactionsCount = monthTransactions.Count;
-        
+
         // Deposits, Refunds, Bonuses are positive flow
         var totalDeposits = monthTransactions
-            .Where(t => t.TransactionType == Domain.Enums.TransactionType.Deposit || 
-                        t.TransactionType == Domain.Enums.TransactionType.Refund || 
+            .Where(t => t.TransactionType == Domain.Enums.TransactionType.Deposit ||
+                        t.TransactionType == Domain.Enums.TransactionType.Refund ||
                         t.TransactionType == Domain.Enums.TransactionType.Bonus)
             .Sum(t => t.Amount);
 
         // Payments, Withdrawals are negative flow
         var totalSpent = monthTransactions
-            .Where(t => t.TransactionType == Domain.Enums.TransactionType.Payment || 
+            .Where(t => t.TransactionType == Domain.Enums.TransactionType.Payment ||
                         t.TransactionType == Domain.Enums.TransactionType.Withdrawal)
             .Sum(t => t.Amount);
 

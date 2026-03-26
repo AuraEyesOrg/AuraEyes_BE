@@ -11,12 +11,12 @@ public class SavedPost : BaseEntity
     /// User who saved the post (NO FK - just stores ID)
     /// </summary>
     public Guid UserId { get; private set; }
-    
+
     /// <summary>
     /// Post that was saved
     /// </summary>
     public Guid PostId { get; private set; }
-    
+
     /// <summary>
     /// Optional collection/folder name
     /// </summary>

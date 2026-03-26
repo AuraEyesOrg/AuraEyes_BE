@@ -66,7 +66,7 @@ public class NotificationsController : BaseApiController
         };
 
         var result = await _mediator.Send(query);
-        
+
         if (!result.IsSuccess)
             return HandleResult(result);
 

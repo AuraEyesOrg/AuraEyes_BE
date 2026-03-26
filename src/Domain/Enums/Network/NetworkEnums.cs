@@ -9,17 +9,17 @@ public enum PostCategory
     /// 🔬 Case presentation - sharing treatment experiences
     /// </summary>
     CasePresentation,
-    
+
     /// <summary>
     /// 💬 Peer discussion - professional discussions among colleagues
     /// </summary>
     PeerDiscussion,
-    
+
     /// <summary>
     /// 📚 Knowledge share - sharing knowledge, research, documents
     /// </summary>
     KnowledgeShare,
-    
+
     /// <summary>
     /// 📢 Announcement - announcements from organisations
     /// </summary>
@@ -44,22 +44,22 @@ public enum ReactionType
     /// 💡 Insightful
     /// </summary>
     Insightful,
-    
+
     /// <summary>
     /// ✅ Agree
     /// </summary>
     Agree,
-    
+
     /// <summary>
     /// 🙏 Helpful
     /// </summary>
     Helpful,
-    
+
     /// <summary>
     /// ❓ Question
     /// </summary>
     Question,
-    
+
     /// <summary>
     /// 🎉 Celebrate
     /// </summary>
@@ -75,12 +75,12 @@ public enum AttachmentType
     /// Medical images
     /// </summary>
     Image,
-    
+
     /// <summary>
     /// PDF, documents
     /// </summary>
     Document,
-    
+
     /// <summary>
     /// Research papers
     /// </summary>

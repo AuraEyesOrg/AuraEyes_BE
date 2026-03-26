@@ -87,6 +87,11 @@ jobs:
 
           AdminNotifications__OrganisationOnboardingEmail=${{ secrets.ADMIN_NOTIFICATIONS_EMAIL }}
 
+          SerpApi__ApiKey=${{ secrets.SERPAPI_KEY }}
+          SerpApi__BaseUrl=https://serpapi.com/search.json
+
+          Hangfire__ServerEnabled=true
+
           API_PORT=${API_PORT}
           BaseUrl=${{ secrets.FRONTEND_URL }}
 

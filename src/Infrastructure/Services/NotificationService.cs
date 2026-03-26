@@ -89,7 +89,7 @@ public class NotificationService : INotificationService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, 
+            _logger.LogError(ex,
                 "Failed to send notification to User {UserId}: {Message}",
                 userId, ex.Message);
             throw;

@@ -71,21 +71,21 @@ public class CreateContractCommandHandler : ICommandHandler<CreateContractComman
         string contractType,
         string userFullName,
         string userEmail) => new()
-    {
-        Id = c.Id,
-        ContractNumber = c.ContractNumber,
-        Status = c.Status.ToString(),
-        TemplateId = c.TemplateId,
-        TemplateTitle = templateTitle,
-        ContractType = contractType,
-        UserId = c.UserId,
-        UserFullName = userFullName,
-        UserEmail = userEmail,
-        AiQuotaLimit = c.AiQuotaLimit,
-        PlatformCommissionRate = c.PlatformCommissionRate,
-        SignedDate = c.SignedDate,
-        ScannedDocumentUrl = c.ScannedDocumentUrl,
-        CreatedAt = c.CreatedAt,
-        UpdatedAt = c.UpdatedAt
-    };
+        {
+            Id = c.Id,
+            ContractNumber = c.ContractNumber,
+            Status = c.Status.ToString(),
+            TemplateId = c.TemplateId,
+            TemplateTitle = templateTitle,
+            ContractType = contractType,
+            UserId = c.UserId,
+            UserFullName = userFullName,
+            UserEmail = userEmail,
+            AiQuotaLimit = c.AiQuotaLimit,
+            PlatformCommissionRate = c.PlatformCommissionRate,
+            SignedDate = c.SignedDate,
+            ScannedDocumentUrl = c.ScannedDocumentUrl,
+            CreatedAt = c.CreatedAt,
+            UpdatedAt = c.UpdatedAt
+        };
 }

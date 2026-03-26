@@ -20,7 +20,7 @@ public class TokenService : ITokenService
     public TokenService(IOptions<JwtSettings> jwtSettings)
     {
         _jwtSettings = jwtSettings.Value;
-        
+
         _tokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
@@ -120,7 +120,7 @@ public class TokenService : ITokenService
         var principal = ValidateToken(token);
         if (principal == null) return null;
 
-        var userIdClaim = principal.FindFirst(JwtRegisteredClaimNames.Sub) 
+        var userIdClaim = principal.FindFirst(JwtRegisteredClaimNames.Sub)
                          ?? principal.FindFirst("uid")
                          ?? principal.FindFirst(ClaimTypes.NameIdentifier);
 

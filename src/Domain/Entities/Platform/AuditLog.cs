@@ -12,17 +12,17 @@ public class AuditLog : BaseEntity, IAggregateRoot
     public string Action { get; private set; } = string.Empty;
     public string EntityName { get; private set; } = string.Empty;
     public string? EntityId { get; private set; }
-    
+
     /// <summary>
     /// Previous state as JSON - stored as JSONB in PostgreSQL
     /// </summary>
     public string? OldValue { get; private set; }
-    
+
     /// <summary>
     /// New state as JSON - stored as JSONB in PostgreSQL
     /// </summary>
     public string? NewValue { get; private set; }
-    
+
     public string? IpAddress { get; private set; }
 
     private AuditLog() { } // EF Core

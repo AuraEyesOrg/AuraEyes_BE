@@ -13,32 +13,32 @@ public class PostComment : BaseEntity
     /// Post that was commented on
     /// </summary>
     public Guid PostId { get; private set; }
-    
+
     /// <summary>
     /// Author ID (NO FK - just stores ID)
     /// </summary>
     public Guid AuthorId { get; private set; }
-    
+
     /// <summary>
     /// Type of author
     /// </summary>
     public AuthorType AuthorType { get; private set; }
-    
+
     /// <summary>
     /// Comment content
     /// </summary>
     public string Content { get; private set; } = string.Empty;
-    
+
     /// <summary>
     /// Parent comment ID for nested replies (self-reference)
     /// </summary>
     public Guid? ParentCommentId { get; private set; }
-    
+
     /// <summary>
     /// Number of replies (denormalized)
     /// </summary>
     public int ReplyCount { get; private set; }
-    
+
     /// <summary>
     /// Number of likes (denormalized)
     /// </summary>
@@ -47,7 +47,7 @@ public class PostComment : BaseEntity
     // Navigation properties (within network module only)
     public virtual ProfessionalPost Post { get; private set; } = null!;
     public virtual PostComment? ParentComment { get; private set; }
-    
+
     private readonly List<PostComment> _replies = new();
     public virtual IReadOnlyCollection<PostComment> Replies => _replies.AsReadOnly();
 
