@@ -1,4 +1,5 @@
 using Application.Common.Constants;
+using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Scheduling.AppointmentSlots.Commands.BlockSlot;
 using Application.Scheduling.AppointmentSlots.Commands.BookAppointmentSlot;
@@ -30,10 +31,12 @@ namespace API.Controllers;
 public class AppointmentSlotsController : BaseApiController
 {
     private readonly IMediator _mediator;
+    private readonly ICurrentUserService _currentUser;
 
-    public AppointmentSlotsController(IMediator mediator)
+    public AppointmentSlotsController(IMediator mediator, ICurrentUserService currentUser)
     {
         _mediator = mediator;
+        _currentUser = currentUser;
     }
 
     /// <summary>
@@ -190,6 +193,40 @@ public class AppointmentSlotsController : BaseApiController
         {
             AppointmentSlotId = slotId,
             PatientId = request.PatientId
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Book an appointment slot (slotId provided in request body).
+    /// This endpoint is convenient for external assistants (e.g., n8n) that prefer fixed URLs.
+    /// PatientId is resolved from the authenticated user's profile_id claim.
+    /// </summary>
+    [HttpPost("book")]
+    [Authorize(Policy = Policies.PatientOnly)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> BookAppointmentSlotByBody([FromBody] BookAppointmentSlotByBodyRequest request)
+    {
+        if (request is null)
+        {
+            return BadRequest(ApiResponseFactory.Error("Request body is required."));
+        }
+
+        if (!_currentUser.ProfileId.HasValue)
+        {
+            return Unauthorized(ApiResponseFactory.Unauthorized(
+                "Authenticated patient profile is required to book an appointment slot."));
+        }
+
+        var command = new BookAppointmentSlotCommand
+        {
+            AppointmentSlotId = request.SlotId,
+            PatientId = _currentUser.ProfileId.Value
         };
 
         var result = await _mediator.Send(command);
@@ -390,6 +427,11 @@ public record UpdateAppointmentSlotRequest
 public record BookAppointmentSlotRequest
 {
     public Guid PatientId { get; init; }
+}
+
+public record BookAppointmentSlotByBodyRequest
+{
+    public Guid SlotId { get; init; }
 }
 
 public record UpdateAppointmentSlotStatusRequest
