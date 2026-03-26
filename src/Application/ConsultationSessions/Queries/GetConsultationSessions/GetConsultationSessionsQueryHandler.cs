@@ -77,8 +77,13 @@ public class GetConsultationSessionsQueryHandler
         if (dtos.Count == 0) return dtos;
 
         var canAlwaysViewAi = isAdmin;
+        // Only load screenings for sessions the caller is authorized to view.
         var screeningIds = sessions
-            .Where(s => s.AiScreeningId.HasValue)
+            .Where(s =>
+                s.AiScreeningId.HasValue &&
+                (canAlwaysViewAi ||
+                 (currentProfileId.HasValue && s.PatientId == currentProfileId.Value) ||
+                 s.IsAIResultShared))
             .Select(s => s.AiScreeningId!.Value)
             .Distinct()
             .ToList();

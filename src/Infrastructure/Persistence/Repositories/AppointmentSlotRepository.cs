@@ -154,7 +154,7 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
         }
 
         // UTC fallback to avoid hard failures if timezone metadata is unavailable.
-        return utcNow;
+        return utcNow + TimeSpan.FromHours(7);
     }
 
     public async Task<IReadOnlyList<AppointmentSlot>> GetByOphthalmologistAsync(
