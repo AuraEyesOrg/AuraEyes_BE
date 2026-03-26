@@ -85,8 +85,6 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
     /// </summary>
     public string? HideReason { get; private set; }
     
-=======
->>>>>>> 94dad57168b13a9f5b4ed1b45e88ee2a6240aaf0
     // Navigation properties (within network module only)
     public virtual ProfessionalPost? OriginalPost { get; private set; }
 
