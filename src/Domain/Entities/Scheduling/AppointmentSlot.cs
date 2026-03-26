@@ -222,7 +222,7 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
             throw new InvalidOperationException("No bookings to cancel");
 
         BookedCount--;
-        
+
         // For single-capacity slots (online consultation)
         if (MaxCapacity == 1 && BookedCount == 0 && Status == ScheduleStatus.Booked)
         {

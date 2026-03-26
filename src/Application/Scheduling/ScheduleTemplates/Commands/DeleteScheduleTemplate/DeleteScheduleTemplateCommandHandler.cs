@@ -38,7 +38,7 @@ public class DeleteScheduleTemplateCommandHandler : ICommandHandler<DeleteSchedu
         }
 
         // Check if there are any active (not cancelled/completed) appointment slots
-        var hasActiveSlots = template.AppointmentSlots?.Any(s => 
+        var hasActiveSlots = template.AppointmentSlots?.Any(s =>
             s.Status == ScheduleStatus.Available || s.Status == ScheduleStatus.Booked) ?? false;
 
         if (hasActiveSlots)

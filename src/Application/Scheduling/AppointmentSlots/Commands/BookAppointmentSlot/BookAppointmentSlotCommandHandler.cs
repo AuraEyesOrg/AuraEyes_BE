@@ -57,7 +57,7 @@ public class BookAppointmentSlotCommandHandler : ICommandHandler<BookAppointment
         try
         {
             slot.Book();
-            
+
             // Update status to Booked if this is the first booking
             // or if we've reached capacity
             if (slot.BookedCount >= slot.ScheduleTemplate.MaxCapacity)

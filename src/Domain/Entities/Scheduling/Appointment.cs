@@ -41,7 +41,7 @@ public class Appointment : BaseEntity, IAggregateRoot
     /// <summary>
     /// FK to Ophthalmologist.
     /// - ONLINE_CONSULTATION: Required, set at booking time
-/// - CLINIC_VISIT: Must remain NULL
+    /// - CLINIC_VISIT: Must remain NULL
     /// </summary>
     public Guid? DoctorId { get; private set; }
 
