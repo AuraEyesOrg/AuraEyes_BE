@@ -31,6 +31,7 @@ builder.Host.UseSerilog();
 // Add services to the container.
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddHttpClient();
 
 if (builder.Environment.IsEnvironment("Test"))
 {

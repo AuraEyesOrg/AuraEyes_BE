@@ -50,6 +50,7 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
             request.Status,
             request.FromDate,
             request.ToDate,
+            request.ExcludePastSlots,
             request.PageNumber,
             request.PageSize,
             cancellationToken);

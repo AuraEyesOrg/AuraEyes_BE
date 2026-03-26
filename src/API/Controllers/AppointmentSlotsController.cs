@@ -49,6 +49,7 @@ public class AppointmentSlotsController : BaseApiController
         [FromQuery] ScheduleStatus? status = null,
         [FromQuery] DateOnly? fromDate = null,
         [FromQuery] DateOnly? toDate = null,
+        [FromQuery] bool excludePastSlots = false,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10)
     {
@@ -60,6 +61,7 @@ public class AppointmentSlotsController : BaseApiController
             Status = status,
             FromDate = fromDate,
             ToDate = toDate,
+            ExcludePastSlots = excludePastSlots,
             PageNumber = pageNumber,
             PageSize = pageSize
         };

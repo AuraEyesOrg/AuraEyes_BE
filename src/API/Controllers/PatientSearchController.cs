@@ -130,6 +130,7 @@ public class PatientSearchController : BaseApiController
             Status = ScheduleStatus.Available,
             FromDate = fromDate,
             ToDate = toDate,
+            ExcludePastSlots = true,
             PageNumber = pageNumber,
             PageSize = pageSize
         };
