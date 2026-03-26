@@ -74,7 +74,6 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
     /// </summary>
     public bool AllowComments { get; private set; } = true;
 
-<<<<<<< HEAD
     /// <summary>
     /// Whether this post has been hidden by moderation.
     /// </summary>
