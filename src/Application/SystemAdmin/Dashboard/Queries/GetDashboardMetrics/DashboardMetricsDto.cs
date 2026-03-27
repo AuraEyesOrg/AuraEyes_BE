@@ -5,23 +5,17 @@ namespace Application.SystemAdmin.Dashboard.Queries.GetDashboardMetrics;
 /// </summary>
 public class DashboardMetricsDto
 {
-    // Total Screenings Today (3.3.2)
-    public int TotalScreeningsToday { get; set; }
-    public int TotalScreeningsYesterday { get; set; }
-    public decimal ScreeningsChangePercentage { get; set; }
+    public decimal TotalInflow { get; set; }
+    public decimal TotalOutflow { get; set; }
+    public decimal RefundOutflow { get; set; }
+    public decimal NetCashflow { get; set; }
+    public decimal EstimatedCommission { get; set; }
+    public List<PaymentMethodCashflowDto> PaymentMethodBreakdown { get; set; } = new();
+}
 
-    // AI Accuracy (3.3.3)
-    public decimal AiAccuracy { get; set; }
-    public decimal AiAccuracyChangePercentage { get; set; }
-
-    // Pending Reviews (3.3.4)
-    public int PendingReviews { get; set; }
-    public int CriticalCases { get; set; }
-    public bool ActionRequired { get; set; }
-
-    // Quick Stats
-    public int TotalActiveClinics { get; set; }
-    public int TotalActiveDevices { get; set; }
-    public int TotalUsers { get; set; }
-    public int TotalPatients { get; set; }
+public class PaymentMethodCashflowDto
+{
+    public string PaymentMethod { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public decimal Percentage { get; set; }
 }

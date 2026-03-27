@@ -28,33 +28,82 @@ public class DashboardMetricsService : IDashboardMetricsService
 
     public async Task<DashboardMetricsDto> GetSystemAdminMetricsAsync(CancellationToken cancellationToken = default)
     {
-        var today = DateTime.UtcNow.Date;
-        var yesterday = today.AddDays(-1);
+        var completedDeposits = await _context.DepositRequests
+            .Where(deposit => deposit.Status == PaymentStatus.Completed)
+            .ToListAsync(cancellationToken);
 
-        var totalScreeningsToday = await _context.AiScreenings.CountAsync(s => s.CreatedAt >= today, cancellationToken);
-        var totalScreeningsYesterday = await _context.AiScreenings.CountAsync(s => s.CreatedAt >= yesterday && s.CreatedAt < today, cancellationToken);
-        var pendingReviews = await _context.ConsultationSessions.CountAsync(s => s.Status == SessionStatus.Pending, cancellationToken);
-        var criticalCases = await _context.ScreeningResults.CountAsync(r => r.RiskLevel == RiskLevel.High || r.RiskLevel == RiskLevel.Critical, cancellationToken);
-        var averageConfidence = await _context.ScreeningResults
-            .Select(r => (decimal?)r.ConfidenceScore)
-            .AverageAsync(cancellationToken) ?? 0m;
+        var totalInflow = completedDeposits.Sum(deposit => deposit.Amount);
+
+        var paymentMethodRaw = completedDeposits
+            .GroupBy(deposit => deposit.PaymentMethod)
+            .Select(group => new
+            {
+                PaymentMethod = group.Key,
+                Amount = group.Sum(item => item.Amount)
+            })
+            .OrderByDescending(item => item.Amount)
+            .ToList();
+
+        var refundOutflow = await _context.WalletTransactions
+            .Where(transaction => transaction.TransactionType == TransactionType.Refund)
+            .SumAsync(transaction => (decimal?)transaction.Amount, cancellationToken) ?? 0m;
+
+        var withdrawalOutflow = await _context.WalletTransactions
+            .Where(transaction => transaction.TransactionType == TransactionType.Withdrawal)
+            .SumAsync(transaction => (decimal?)transaction.Amount, cancellationToken) ?? 0m;
+
+        var totalOutflow = refundOutflow + withdrawalOutflow;
+
+        var activeContractRatesByOrg = await (from contract in _context.Contracts
+                                              join user in _context.Users on contract.UserId equals user.Id
+                                              where contract.Status == ContractStatus.Active && user.OrganizationId != null
+                                              group contract by user.OrganizationId!.Value
+            into grouped
+                                              select new
+                                              {
+                                                  OrganisationId = grouped.Key,
+                                                  CommissionRate = grouped
+                                                      .OrderByDescending(item => item.CreatedAt)
+                                                      .Select(item => item.PlatformCommissionRate)
+                                                      .FirstOrDefault()
+                                              })
+            .ToDictionaryAsync(item => item.OrganisationId, item => item.CommissionRate, cancellationToken);
+
+        var completedRevenueByOrg = await _context.ConsultationSessions
+            .Where(session => session.Status == SessionStatus.Completed && session.OrganisationId != null)
+            .GroupBy(session => session.OrganisationId!.Value)
+            .Select(group => new
+            {
+                OrganisationId = group.Key,
+                Revenue = group.Sum(item => item.Price)
+            })
+            .ToListAsync(cancellationToken);
+
+        var estimatedCommission = completedRevenueByOrg.Sum(item =>
+        {
+            if (!activeContractRatesByOrg.TryGetValue(item.OrganisationId, out var rate))
+            {
+                return 0m;
+            }
+
+            return item.Revenue * rate;
+        });
+
+        var paymentMethodBreakdown = paymentMethodRaw.Select(item => new PaymentMethodCashflowDto
+        {
+            PaymentMethod = item.PaymentMethod.ToString(),
+            Amount = item.Amount,
+            Percentage = totalInflow <= 0m ? 0m : Math.Round(item.Amount / totalInflow * 100m, 1)
+        }).ToList();
 
         return new DashboardMetricsDto
         {
-            TotalScreeningsToday = totalScreeningsToday,
-            TotalScreeningsYesterday = totalScreeningsYesterday,
-            ScreeningsChangePercentage = totalScreeningsYesterday == 0
-                ? (totalScreeningsToday > 0 ? 100m : 0m)
-                : Math.Round(((decimal)(totalScreeningsToday - totalScreeningsYesterday) / totalScreeningsYesterday) * 100m, 1),
-            AiAccuracy = Math.Round(averageConfidence, 1),
-            AiAccuracyChangePercentage = 0m,
-            PendingReviews = pendingReviews,
-            CriticalCases = criticalCases,
-            ActionRequired = pendingReviews > 0 || criticalCases > 0,
-            TotalActiveClinics = await _context.Organisations.CountAsync(cancellationToken),
-            TotalActiveDevices = 0,
-            TotalUsers = await _context.Users.CountAsync(cancellationToken),
-            TotalPatients = await _context.Patients.CountAsync(cancellationToken)
+            TotalInflow = totalInflow,
+            TotalOutflow = totalOutflow,
+            RefundOutflow = refundOutflow,
+            NetCashflow = totalInflow - totalOutflow,
+            EstimatedCommission = Math.Round(estimatedCommission, 0),
+            PaymentMethodBreakdown = paymentMethodBreakdown
         };
     }
 
