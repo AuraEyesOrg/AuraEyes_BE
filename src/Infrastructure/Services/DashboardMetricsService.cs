@@ -253,6 +253,29 @@ public class DashboardMetricsService : IDashboardMetricsService
                                  select session.Id)
             .Distinct()
             .CountAsync(cancellationToken);
+
+          var urgentCaseList = await (from session in _context.ConsultationSessions
+                            join result in _context.ScreeningResults on session.AiScreeningId equals result.AiScreeningId
+                            join patient in _context.Patients on session.PatientId equals patient.Id
+                            join user in _context.Users on patient.UserId equals user.Id
+                            where session.OphthalmologistId == doctorId
+                                && session.Status == SessionStatus.Pending
+                                && (result.RiskLevel == RiskLevel.High || result.RiskLevel == RiskLevel.Critical)
+                            select new OphthalmologistUrgentCaseDto
+                            {
+                                ConsultationSessionId = session.Id,
+                                PatientId = patient.Id,
+                                PatientName = user.FullName,
+                                RiskLevel = result.RiskLevel.ToString(),
+                                ConfidenceScore = result.ConfidenceScore,
+                                AppointmentTime = session.AppointmentTime,
+                                CreatedAt = session.CreatedAt
+                            })
+            .OrderByDescending(item => item.RiskLevel == RiskLevel.Critical.ToString())
+            .ThenBy(item => item.AppointmentTime ?? DateTime.MaxValue)
+            .ThenByDescending(item => item.CreatedAt)
+            .Take(8)
+            .ToListAsync(cancellationToken);
         var completedToday = await _context.Appointments.CountAsync(
             appointment => appointment.DoctorId == doctorId &&
                            appointment.Status == AppointmentStatus.Completed &&
@@ -270,7 +293,8 @@ public class DashboardMetricsService : IDashboardMetricsService
             PendingReviews = pendingReviews,
             UrgentCases = urgentCases,
             CompletedToday = completedToday,
-            OpenSlotsToday = openSlotsToday
+            OpenSlotsToday = openSlotsToday,
+            UrgentCaseList = urgentCaseList
         };
     }
 
