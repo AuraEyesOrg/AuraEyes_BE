@@ -14,7 +14,9 @@ using Microsoft.OpenApi.Models;
 using Npgsql;
 using Serilog;
 using System.Reflection;
+using System.Security.Claims;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -232,6 +234,55 @@ builder.Services.AddOutputCache(options =>
                .SetVaryByQuery("*")); // Vary cache by query parameters
 });
 
+var rateLimitingSection = builder.Configuration.GetSection("RateLimiting");
+var globalPermitLimit = rateLimitingSection.GetValue<int?>("GlobalPermitLimit") ?? 120;
+var globalWindowSeconds = rateLimitingSection.GetValue<int?>("GlobalWindowSeconds") ?? 60;
+var globalQueueLimit = rateLimitingSection.GetValue<int?>("GlobalQueueLimit") ?? 0;
+var authPermitLimit = rateLimitingSection.GetValue<int?>("AuthPermitLimit") ?? 20;
+var authWindowSeconds = rateLimitingSection.GetValue<int?>("AuthWindowSeconds") ?? 60;
+var authQueueLimit = rateLimitingSection.GetValue<int?>("AuthQueueLimit") ?? 0;
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, token) =>
+    {
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter =
+                Math.Ceiling(retryAfter.TotalSeconds).ToString();
+        }
+
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            message = "Too many requests. Please retry later."
+        }, cancellationToken: token);
+    };
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var path = httpContext.Request.Path;
+        var isAuthEndpoint = path.StartsWithSegments("/api/auth", StringComparison.OrdinalIgnoreCase);
+
+        var partitionKey = httpContext.User.Identity?.IsAuthenticated == true
+            ? $"user:{httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? httpContext.User.Identity.Name ?? "unknown"}"
+            : $"ip:{httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
+
+        var permitLimit = isAuthEndpoint ? authPermitLimit : globalPermitLimit;
+        var windowSeconds = isAuthEndpoint ? authWindowSeconds : globalWindowSeconds;
+        var queueLimit = isAuthEndpoint ? authQueueLimit : globalQueueLimit;
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = permitLimit,
+            Window = TimeSpan.FromSeconds(windowSeconds),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = queueLimit,
+            AutoReplenishment = true
+        });
+    });
+});
+
 var app = builder.Build();
 
 // Seed domain entities (Organisation, Ophthalmologist, Patient)
@@ -286,6 +337,8 @@ app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseHttpsRedirection();
 
 app.UseResponseCompression();
+
+app.UseRateLimiter();
 
 app.UseCors("FrontendCors");
 app.UseOutputCache();

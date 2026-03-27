@@ -13,6 +13,14 @@
     "ServerEnabled": false,
     "WorkerCount": 1
   },
+  "RateLimiting": {
+    "GlobalPermitLimit": 60,
+    "GlobalWindowSeconds": 60,
+    "GlobalQueueLimit": 0,
+    "AuthPermitLimit": 8,
+    "AuthWindowSeconds": 60,
+    "AuthQueueLimit": 0
+  },
   "AdminNotifications": {
     "OrganisationOnboardingEmail": "systemadmin@gmail.com"
   }
