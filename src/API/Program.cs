@@ -3,6 +3,7 @@ using API.Middleware;
 using API.Services;
 using Application;
 using Application.Common.Interfaces;
+using Application.Common.Models;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Infrastructure;
@@ -235,12 +236,35 @@ builder.Services.AddOutputCache(options =>
 });
 
 var rateLimitingSection = builder.Configuration.GetSection("RateLimiting");
-var globalPermitLimit = rateLimitingSection.GetValue<int?>("GlobalPermitLimit") ?? 120;
-var globalWindowSeconds = rateLimitingSection.GetValue<int?>("GlobalWindowSeconds") ?? 60;
-var globalQueueLimit = rateLimitingSection.GetValue<int?>("GlobalQueueLimit") ?? 0;
-var authPermitLimit = rateLimitingSection.GetValue<int?>("AuthPermitLimit") ?? 20;
-var authWindowSeconds = rateLimitingSection.GetValue<int?>("AuthWindowSeconds") ?? 60;
-var authQueueLimit = rateLimitingSection.GetValue<int?>("AuthQueueLimit") ?? 0;
+var readPermitLimit = rateLimitingSection.GetValue<int?>("ReadPermitLimit")
+    ?? rateLimitingSection.GetValue<int?>("GlobalPermitLimit")
+    ?? 240;
+var readWindowSeconds = rateLimitingSection.GetValue<int?>("ReadWindowSeconds")
+    ?? rateLimitingSection.GetValue<int?>("GlobalWindowSeconds")
+    ?? 60;
+var readQueueLimit = rateLimitingSection.GetValue<int?>("ReadQueueLimit")
+    ?? rateLimitingSection.GetValue<int?>("GlobalQueueLimit")
+    ?? 0;
+
+var writePermitLimit = rateLimitingSection.GetValue<int?>("WritePermitLimit")
+    ?? rateLimitingSection.GetValue<int?>("GlobalPermitLimit")
+    ?? 80;
+var writeWindowSeconds = rateLimitingSection.GetValue<int?>("WriteWindowSeconds")
+    ?? rateLimitingSection.GetValue<int?>("GlobalWindowSeconds")
+    ?? 60;
+var writeQueueLimit = rateLimitingSection.GetValue<int?>("WriteQueueLimit")
+    ?? rateLimitingSection.GetValue<int?>("GlobalQueueLimit")
+    ?? 0;
+
+var sensitivePermitLimit = rateLimitingSection.GetValue<int?>("SensitivePermitLimit")
+    ?? rateLimitingSection.GetValue<int?>("AuthPermitLimit")
+    ?? 8;
+var sensitiveWindowSeconds = rateLimitingSection.GetValue<int?>("SensitiveWindowSeconds")
+    ?? rateLimitingSection.GetValue<int?>("AuthWindowSeconds")
+    ?? 60;
+var sensitiveQueueLimit = rateLimitingSection.GetValue<int?>("SensitiveQueueLimit")
+    ?? rateLimitingSection.GetValue<int?>("AuthQueueLimit")
+    ?? 0;
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -253,24 +277,55 @@ builder.Services.AddRateLimiter(options =>
                 Math.Ceiling(retryAfter.TotalSeconds).ToString();
         }
 
-        await context.HttpContext.Response.WriteAsJsonAsync(new
-        {
-            message = "Too many requests. Please retry later."
-        }, cancellationToken: token);
+        var response = ApiResponseFactory.Error("Too many requests. Please retry later.");
+        await context.HttpContext.Response.WriteAsJsonAsync(response, cancellationToken: token);
     };
 
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
     {
         var path = httpContext.Request.Path;
-        var isAuthEndpoint = path.StartsWithSegments("/api/auth", StringComparison.OrdinalIgnoreCase);
+        var method = httpContext.Request.Method;
+
+        var isSensitiveEndpoint =
+            (HttpMethods.IsPost(method) &&
+             (path.StartsWithSegments("/api/auth/login", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/auth/google-login", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/auth/register", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/auth/forgot-password", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/auth/reset-password", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/auth/resend-confirmation", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/auth/refresh", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/two-factor/setup", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/two-factor/enable", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/two-factor/disable", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/two-factor/recovery-codes", StringComparison.OrdinalIgnoreCase)));
+
+        var isReadRequest = HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method);
 
         var partitionKey = httpContext.User.Identity?.IsAuthenticated == true
             ? $"user:{httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? httpContext.User.Identity.Name ?? "unknown"}"
             : $"ip:{httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
 
-        var permitLimit = isAuthEndpoint ? authPermitLimit : globalPermitLimit;
-        var windowSeconds = isAuthEndpoint ? authWindowSeconds : globalWindowSeconds;
-        var queueLimit = isAuthEndpoint ? authQueueLimit : globalQueueLimit;
+        var policyKey = isSensitiveEndpoint ? "sensitive" : isReadRequest ? "read" : "write";
+        partitionKey = $"{policyKey}:{partitionKey}";
+
+        var permitLimit = isSensitiveEndpoint
+            ? sensitivePermitLimit
+            : isReadRequest
+                ? readPermitLimit
+                : writePermitLimit;
+
+        var windowSeconds = isSensitiveEndpoint
+            ? sensitiveWindowSeconds
+            : isReadRequest
+                ? readWindowSeconds
+                : writeWindowSeconds;
+
+        var queueLimit = isSensitiveEndpoint
+            ? sensitiveQueueLimit
+            : isReadRequest
+                ? readQueueLimit
+                : writeQueueLimit;
 
         return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
         {

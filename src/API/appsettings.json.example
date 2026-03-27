@@ -38,12 +38,15 @@
     "WorkerCount": 1
   },
   "RateLimiting": {
-    "GlobalPermitLimit": 120,
-    "GlobalWindowSeconds": 60,
-    "GlobalQueueLimit": 0,
-    "AuthPermitLimit": 20,
-    "AuthWindowSeconds": 60,
-    "AuthQueueLimit": 0
+    "ReadPermitLimit": 240,
+    "ReadWindowSeconds": 60,
+    "ReadQueueLimit": 0,
+    "WritePermitLimit": 80,
+    "WriteWindowSeconds": 60,
+    "WriteQueueLimit": 0,
+    "SensitivePermitLimit": 20,
+    "SensitiveWindowSeconds": 60,
+    "SensitiveQueueLimit": 0
   },
   "AdminNotifications": {
     "OrganisationOnboardingEmail": "systemadmin@gmail.com"
