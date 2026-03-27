@@ -12,6 +12,7 @@ using Application.SystemAdmin.Dashboard.Queries.GetSystemHealth;
 using Domain.Enums;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 
 namespace Infrastructure.Services;
 
@@ -28,83 +29,157 @@ public class DashboardMetricsService : IDashboardMetricsService
 
     public async Task<DashboardMetricsDto> GetSystemAdminMetricsAsync(CancellationToken cancellationToken = default)
     {
-        var completedDeposits = await _context.DepositRequests
+        var now = DateTime.UtcNow;
+
+        var currentMonthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var nextMonthStart = currentMonthStart.AddMonths(1);
+        var previousMonthStart = currentMonthStart.AddMonths(-1);
+
+        var doctorTotalTask = _context.Ophthalmologists.CountAsync(cancellationToken);
+        var organisationTotalTask = _context.Organisations.CountAsync(cancellationToken);
+        var patientTotalTask = _context.Patients.CountAsync(cancellationToken);
+
+        var doctorCurrentMonthTask = _context.Ophthalmologists
+            .CountAsync(o => o.CreatedAt >= currentMonthStart && o.CreatedAt < nextMonthStart, cancellationToken);
+        var doctorPreviousMonthTask = _context.Ophthalmologists
+            .CountAsync(o => o.CreatedAt >= previousMonthStart && o.CreatedAt < currentMonthStart, cancellationToken);
+
+        var organisationCurrentMonthTask = _context.Organisations
+            .CountAsync(o => o.CreatedAt >= currentMonthStart && o.CreatedAt < nextMonthStart, cancellationToken);
+        var organisationPreviousMonthTask = _context.Organisations
+            .CountAsync(o => o.CreatedAt >= previousMonthStart && o.CreatedAt < currentMonthStart, cancellationToken);
+
+        var patientCurrentMonthTask = _context.Patients
+            .CountAsync(p => p.CreatedAt >= currentMonthStart && p.CreatedAt < nextMonthStart, cancellationToken);
+        var patientPreviousMonthTask = _context.Patients
+            .CountAsync(p => p.CreatedAt >= previousMonthStart && p.CreatedAt < currentMonthStart, cancellationToken);
+
+        var completedDepositsTask = _context.DepositRequests
             .Where(deposit => deposit.Status == PaymentStatus.Completed)
             .ToListAsync(cancellationToken);
 
-        var totalInflow = completedDeposits.Sum(deposit => deposit.Amount);
-
-        var paymentMethodRaw = completedDeposits
-            .GroupBy(deposit => deposit.PaymentMethod)
+        var yearStart = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var nextYearStart = yearStart.AddYears(1);
+        var monthlyRevenueRawTask = _context.DepositRequests
+            .Where(deposit =>
+                deposit.Status == PaymentStatus.Completed &&
+                (deposit.CompletedAt ?? deposit.CreatedAt) >= yearStart &&
+                (deposit.CompletedAt ?? deposit.CreatedAt) < nextYearStart)
+            .GroupBy(deposit => (deposit.CompletedAt ?? deposit.CreatedAt).Month)
             .Select(group => new
             {
-                PaymentMethod = group.Key,
-                Amount = group.Sum(item => item.Amount)
+                Month = group.Key,
+                Revenue = group.Sum(item => item.Amount)
+            })
+            .ToListAsync(cancellationToken);
+
+        var sevenDaysStart = now.Date.AddDays(-6);
+        var nextDay = now.Date.AddDays(1);
+        var dailyRevenueRawTask = _context.DepositRequests
+            .Where(deposit =>
+                deposit.Status == PaymentStatus.Completed &&
+                (deposit.CompletedAt ?? deposit.CreatedAt) >= sevenDaysStart &&
+                (deposit.CompletedAt ?? deposit.CreatedAt) < nextDay)
+            .GroupBy(deposit => (deposit.CompletedAt ?? deposit.CreatedAt).Date)
+            .Select(group => new
+            {
+                Date = group.Key,
+                Revenue = group.Sum(item => item.Amount)
+            })
+            .ToListAsync(cancellationToken);
+
+        await Task.WhenAll(
+            doctorTotalTask,
+            organisationTotalTask,
+            patientTotalTask,
+            doctorCurrentMonthTask,
+            doctorPreviousMonthTask,
+            organisationCurrentMonthTask,
+            organisationPreviousMonthTask,
+            patientCurrentMonthTask,
+            patientPreviousMonthTask,
+            completedDepositsTask,
+            monthlyRevenueRawTask,
+            dailyRevenueRawTask);
+
+        var completedDeposits = completedDepositsTask.Result;
+        var totalDepositAmount = completedDeposits.Sum(deposit => deposit.Amount);
+
+        var paymentMethodBreakdown = completedDeposits
+            .GroupBy(deposit => deposit.PaymentMethod)
+            .Select(group =>
+            {
+                var amount = group.Sum(item => item.Amount);
+                return new PaymentMethodRevenueDto
+                {
+                    PaymentMethod = group.Key.ToString(),
+                    Amount = amount,
+                    Percentage = totalDepositAmount <= 0m ? 0m : Math.Round(amount / totalDepositAmount * 100m, 1)
+                };
             })
             .OrderByDescending(item => item.Amount)
             .ToList();
 
-        var refundOutflow = await _context.WalletTransactions
-            .Where(transaction => transaction.TransactionType == TransactionType.Refund)
-            .SumAsync(transaction => (decimal?)transaction.Amount, cancellationToken) ?? 0m;
-
-        var withdrawalOutflow = await _context.WalletTransactions
-            .Where(transaction => transaction.TransactionType == TransactionType.Withdrawal)
-            .SumAsync(transaction => (decimal?)transaction.Amount, cancellationToken) ?? 0m;
-
-        var totalOutflow = refundOutflow + withdrawalOutflow;
-
-        var activeContractRatesByOrg = await (from contract in _context.Contracts
-                                              join user in _context.Users on contract.UserId equals user.Id
-                                              where contract.Status == ContractStatus.Active && user.OrganizationId != null
-                                              group contract by user.OrganizationId!.Value
-            into grouped
-                                              select new
-                                              {
-                                                  OrganisationId = grouped.Key,
-                                                  CommissionRate = grouped
-                                                      .OrderByDescending(item => item.CreatedAt)
-                                                      .Select(item => item.PlatformCommissionRate)
-                                                      .FirstOrDefault()
-                                              })
-            .ToDictionaryAsync(item => item.OrganisationId, item => item.CommissionRate, cancellationToken);
-
-        var completedRevenueByOrg = await _context.ConsultationSessions
-            .Where(session => session.Status == SessionStatus.Completed && session.OrganisationId != null)
-            .GroupBy(session => session.OrganisationId!.Value)
-            .Select(group => new
+        var monthlyRevenueMap = monthlyRevenueRawTask.Result
+            .ToDictionary(item => item.Month, item => Math.Round(item.Revenue, 0));
+        var monthlyRevenue = Enumerable.Range(1, 12)
+            .Select(month => new MonthlyRevenuePointDto
             {
-                OrganisationId = group.Key,
-                Revenue = group.Sum(item => item.Price)
+                Month = month,
+                Label = CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(month),
+                Revenue = monthlyRevenueMap.GetValueOrDefault(month, 0m)
             })
-            .ToListAsync(cancellationToken);
+            .ToList();
 
-        var estimatedCommission = completedRevenueByOrg.Sum(item =>
-        {
-            if (!activeContractRatesByOrg.TryGetValue(item.OrganisationId, out var rate))
+        var dailyRevenueMap = dailyRevenueRawTask.Result
+            .ToDictionary(item => item.Date, item => Math.Round(item.Revenue, 0));
+        var dailyRevenue = Enumerable.Range(0, 7)
+            .Select(offset => sevenDaysStart.AddDays(offset))
+            .Select(date => new DailyRevenuePointDto
             {
-                return 0m;
-            }
-
-            return item.Revenue * rate;
-        });
-
-        var paymentMethodBreakdown = paymentMethodRaw.Select(item => new PaymentMethodCashflowDto
-        {
-            PaymentMethod = item.PaymentMethod.ToString(),
-            Amount = item.Amount,
-            Percentage = totalInflow <= 0m ? 0m : Math.Round(item.Amount / totalInflow * 100m, 1)
-        }).ToList();
+                Date = DateTime.SpecifyKind(date, DateTimeKind.Utc),
+                Label = date.ToString("dd MMM", CultureInfo.InvariantCulture),
+                Revenue = dailyRevenueMap.GetValueOrDefault(date, 0m)
+            })
+            .ToList();
 
         return new DashboardMetricsDto
         {
-            TotalInflow = totalInflow,
-            TotalOutflow = totalOutflow,
-            RefundOutflow = refundOutflow,
-            NetCashflow = totalInflow - totalOutflow,
-            EstimatedCommission = Math.Round(estimatedCommission, 0),
-            PaymentMethodBreakdown = paymentMethodBreakdown
+            Doctors = new UserGrowthMetricDto
+            {
+                Total = doctorTotalTask.Result,
+                CurrentMonth = doctorCurrentMonthTask.Result,
+                PreviousMonth = doctorPreviousMonthTask.Result,
+                GrowthPercentage = CalculateGrowthPercentage(doctorCurrentMonthTask.Result, doctorPreviousMonthTask.Result)
+            },
+            Organisations = new UserGrowthMetricDto
+            {
+                Total = organisationTotalTask.Result,
+                CurrentMonth = organisationCurrentMonthTask.Result,
+                PreviousMonth = organisationPreviousMonthTask.Result,
+                GrowthPercentage = CalculateGrowthPercentage(organisationCurrentMonthTask.Result, organisationPreviousMonthTask.Result)
+            },
+            Patients = new UserGrowthMetricDto
+            {
+                Total = patientTotalTask.Result,
+                CurrentMonth = patientCurrentMonthTask.Result,
+                PreviousMonth = patientPreviousMonthTask.Result,
+                GrowthPercentage = CalculateGrowthPercentage(patientCurrentMonthTask.Result, patientPreviousMonthTask.Result)
+            },
+            PaymentMethodBreakdown = paymentMethodBreakdown,
+            MonthlyRevenue = monthlyRevenue,
+            DailyRevenue = dailyRevenue
         };
+    }
+
+    private static decimal CalculateGrowthPercentage(int currentMonthCount, int previousMonthCount)
+    {
+        if (previousMonthCount == 0)
+        {
+            return currentMonthCount == 0 ? 0m : 100m;
+        }
+
+        return Math.Round(((decimal)(currentMonthCount - previousMonthCount) / previousMonthCount) * 100m, 1);
     }
 
     public async Task<PagedResult<RecentScreeningDto>> GetRecentScreeningsAsync(int pageNumber, int pageSize, CancellationToken cancellationToken = default)

@@ -54,13 +54,13 @@ public class AdminQueryService : IAdminQueryService
 
         var totalCount = await query.CountAsync(cancellationToken);
 
-        var items = await query
+        var pageRows = await query
             .OrderByDescending(x => x.Ophthalmologist.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(x => new OphthalmologistListDto
+            .Select(x => new
             {
-                Id = x.Ophthalmologist.Id,
+                OphthalmologistId = x.Ophthalmologist.Id,
                 UserId = x.User.Id,
                 FullName = x.User.FullName,
                 Email = x.User.Email!,
@@ -80,6 +80,78 @@ public class AdminQueryService : IAdminQueryService
                 CreatedAt = x.Ophthalmologist.CreatedAt
             })
             .ToListAsync(cancellationToken);
+
+        var ophthalmologistIds = pageRows
+            .Select(x => x.OphthalmologistId)
+            .ToList();
+
+        var credentialRows = await _context.Certificates
+            .AsNoTracking()
+            .Where(c => ophthalmologistIds.Contains(c.OphthalmologistId))
+            .Select(c => new OphthalmologistCredentialProjection
+            {
+                OphthalmologistId = c.OphthalmologistId,
+                Type = c.Type,
+                Credential = new OphthalmologistCredentialDto
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    IssuingAuthority = c.IssuingAuthority,
+                    IssuedDate = c.IssuedDate,
+                    ExpiryDate = c.ExpiryDate,
+                    CertificateUrl = c.CertificateUrl
+                }
+            })
+            .ToListAsync(cancellationToken);
+
+        var credentialsByOphthalmologist = credentialRows
+            .GroupBy(x => x.OphthalmologistId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.ToList());
+
+        var items = pageRows
+            .Select(row =>
+            {
+                var credentials = credentialsByOphthalmologist.TryGetValue(row.OphthalmologistId, out var mapped)
+                    ? mapped
+                    : new List<OphthalmologistCredentialProjection>();
+
+                var licenses = credentials
+                    .Where(c => c.Type == CertificateType.License)
+                    .Select(c => c.Credential)
+                    .ToList();
+
+                var degrees = credentials
+                    .Where(c => c.Type == CertificateType.Degree)
+                    .Select(c => c.Credential)
+                    .ToList();
+
+                return new OphthalmologistListDto
+                {
+                    Id = row.OphthalmologistId,
+                    UserId = row.UserId,
+                    FullName = row.FullName,
+                    Email = row.Email,
+                    Phone = row.Phone,
+                    Bio = row.Bio,
+                    YearsOfExperience = row.YearsOfExperience,
+                    EmploymentType = row.EmploymentType,
+                    WorkingHoursPerWeek = row.WorkingHoursPerWeek,
+                    ExpectedMonthlySalary = row.ExpectedMonthlySalary,
+                    VerificationStatus = row.VerificationStatus,
+                    IsVerified = row.IsVerified,
+                    LicenseUrl = row.LicenseUrl,
+                    DegreeUrl = row.DegreeUrl,
+                    Licenses = licenses,
+                    Degrees = degrees,
+                    RejectionReason = row.RejectionReason,
+                    OrganisationName = row.OrganisationName,
+                    IsActive = row.IsActive,
+                    CreatedAt = row.CreatedAt
+                };
+            })
+            .ToList();
 
         return new PagedResult<OphthalmologistListDto>(
             items, totalCount, pageNumber, pageSize);
@@ -216,5 +288,12 @@ public class AdminQueryService : IAdminQueryService
             .ToListAsync(cancellationToken);
 
         return new PagedResult<AuditLogDto>(items, totalCount, pageNumber, pageSize);
+    }
+
+    private sealed class OphthalmologistCredentialProjection
+    {
+        public Guid OphthalmologistId { get; init; }
+        public CertificateType Type { get; init; }
+        public OphthalmologistCredentialDto Credential { get; init; } = new();
     }
 }
