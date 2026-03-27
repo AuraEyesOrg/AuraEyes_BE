@@ -311,16 +311,52 @@ public class DashboardMetricsService : IDashboardMetricsService
         }
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var appointmentsQuery = _context.Appointments.Where(appointment => appointment.OrganisationId == organisationId);
+
+        var totalAppointments = await appointmentsQuery.CountAsync(cancellationToken);
+        var pendingCount = await appointmentsQuery.CountAsync(
+            appointment => appointment.Status == AppointmentStatus.Pending,
+            cancellationToken);
+        var confirmedCount = await appointmentsQuery.CountAsync(
+            appointment => appointment.Status == AppointmentStatus.Confirmed,
+            cancellationToken);
+        var completedCount = await appointmentsQuery.CountAsync(
+            appointment => appointment.Status == AppointmentStatus.Completed,
+            cancellationToken);
+        var cancelledCount = await appointmentsQuery.CountAsync(
+            appointment => appointment.Status == AppointmentStatus.Cancelled,
+            cancellationToken);
+        var noShowCount = await appointmentsQuery.CountAsync(
+            appointment => appointment.Status == AppointmentStatus.NoShow,
+            cancellationToken);
+
+        var todayCapacity = await (from slot in _context.AppointmentSlots
+                                   join template in _context.ScheduleTemplates on slot.ScheduleTemplateId equals template.Id
+                                   where template.OrgId == organisationId && slot.Date == today
+                                   select new { slot.BookedCount, slot.MaxCapacity })
+            .ToListAsync(cancellationToken);
+
+        var totalBooked = todayCapacity.Sum(item => item.BookedCount);
+        var totalCapacity = todayCapacity.Sum(item => item.MaxCapacity);
+        var utilizationRate = totalCapacity <= 0
+            ? 0m
+            : Math.Round((decimal)totalBooked / totalCapacity * 100m, 1);
+
+        var quota = await _aiQuotaService.GetQuotaAsync(userId, "OrgAdmin", cancellationToken);
 
         return new OrganisationDashboardMetricsDto
         {
-            TotalAppointments = await _context.Appointments.CountAsync(appointment => appointment.OrganisationId == organisationId, cancellationToken),
-            PendingAppointments = await _context.Appointments.CountAsync(appointment => appointment.OrganisationId == organisationId && (appointment.Status == AppointmentStatus.Pending || appointment.Status == AppointmentStatus.Confirmed), cancellationToken),
-            AvailableSlotsToday = await (from slot in _context.AppointmentSlots
-                                         join template in _context.ScheduleTemplates on slot.ScheduleTemplateId equals template.Id
-                                         where template.OrgId == organisationId && slot.Date == today && slot.Status == ScheduleStatus.Available
-                                         select slot.Id).CountAsync(cancellationToken),
-            ActiveDoctors = await _context.Users.CountAsync(user => user.OrganizationId == organisationId && !user.IsDeleted, cancellationToken)
+            UtilizationRatePercent = utilizationRate,
+            RemainingAiQuota = quota.RemainingQuota,
+            TotalAppointments = totalAppointments,
+            AppointmentStatus = new OrganisationAppointmentStatusBreakdownDto
+            {
+                Pending = pendingCount,
+                Confirmed = confirmedCount,
+                Completed = completedCount,
+                Cancelled = cancelledCount,
+                NoShow = noShowCount
+            }
         };
     }
 
