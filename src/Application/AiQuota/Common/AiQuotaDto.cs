@@ -17,4 +17,7 @@ public record AiQuotaDto
 
     /// <summary>Credits per bundle (for Patient purchase flow).</summary>
     public int? BundleSize { get; init; }
+
+    /// <summary>Price per 1 quota credit in VND.</summary>
+    public decimal? UnitPrice { get; init; }
 }

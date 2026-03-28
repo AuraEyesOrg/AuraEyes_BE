@@ -35,32 +35,32 @@ public class DashboardMetricsService : IDashboardMetricsService
         var nextMonthStart = currentMonthStart.AddMonths(1);
         var previousMonthStart = currentMonthStart.AddMonths(-1);
 
-        var doctorTotalTask = _context.Ophthalmologists.CountAsync(cancellationToken);
-        var organisationTotalTask = _context.Organisations.CountAsync(cancellationToken);
-        var patientTotalTask = _context.Patients.CountAsync(cancellationToken);
+        var doctorTotal = await _context.Ophthalmologists.CountAsync(cancellationToken);
+        var organisationTotal = await _context.Organisations.CountAsync(cancellationToken);
+        var patientTotal = await _context.Patients.CountAsync(cancellationToken);
 
-        var doctorCurrentMonthTask = _context.Ophthalmologists
+        var doctorCurrentMonth = await _context.Ophthalmologists
             .CountAsync(o => o.CreatedAt >= currentMonthStart && o.CreatedAt < nextMonthStart, cancellationToken);
-        var doctorPreviousMonthTask = _context.Ophthalmologists
+        var doctorPreviousMonth = await _context.Ophthalmologists
             .CountAsync(o => o.CreatedAt >= previousMonthStart && o.CreatedAt < currentMonthStart, cancellationToken);
 
-        var organisationCurrentMonthTask = _context.Organisations
+        var organisationCurrentMonth = await _context.Organisations
             .CountAsync(o => o.CreatedAt >= currentMonthStart && o.CreatedAt < nextMonthStart, cancellationToken);
-        var organisationPreviousMonthTask = _context.Organisations
+        var organisationPreviousMonth = await _context.Organisations
             .CountAsync(o => o.CreatedAt >= previousMonthStart && o.CreatedAt < currentMonthStart, cancellationToken);
 
-        var patientCurrentMonthTask = _context.Patients
+        var patientCurrentMonth = await _context.Patients
             .CountAsync(p => p.CreatedAt >= currentMonthStart && p.CreatedAt < nextMonthStart, cancellationToken);
-        var patientPreviousMonthTask = _context.Patients
+        var patientPreviousMonth = await _context.Patients
             .CountAsync(p => p.CreatedAt >= previousMonthStart && p.CreatedAt < currentMonthStart, cancellationToken);
 
-        var completedDepositsTask = _context.DepositRequests
+        var completedDeposits = await _context.DepositRequests
             .Where(deposit => deposit.Status == PaymentStatus.Completed)
             .ToListAsync(cancellationToken);
 
         var yearStart = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var nextYearStart = yearStart.AddYears(1);
-        var monthlyRevenueRawTask = _context.DepositRequests
+        var monthlyRevenueRaw = await _context.DepositRequests
             .Where(deposit =>
                 deposit.Status == PaymentStatus.Completed &&
                 (deposit.CompletedAt ?? deposit.CreatedAt) >= yearStart &&
@@ -75,7 +75,7 @@ public class DashboardMetricsService : IDashboardMetricsService
 
         var sevenDaysStart = now.Date.AddDays(-6);
         var nextDay = now.Date.AddDays(1);
-        var dailyRevenueRawTask = _context.DepositRequests
+        var dailyRevenueRaw = await _context.DepositRequests
             .Where(deposit =>
                 deposit.Status == PaymentStatus.Completed &&
                 (deposit.CompletedAt ?? deposit.CreatedAt) >= sevenDaysStart &&
@@ -87,22 +87,6 @@ public class DashboardMetricsService : IDashboardMetricsService
                 Revenue = group.Sum(item => item.Amount)
             })
             .ToListAsync(cancellationToken);
-
-        await Task.WhenAll(
-            doctorTotalTask,
-            organisationTotalTask,
-            patientTotalTask,
-            doctorCurrentMonthTask,
-            doctorPreviousMonthTask,
-            organisationCurrentMonthTask,
-            organisationPreviousMonthTask,
-            patientCurrentMonthTask,
-            patientPreviousMonthTask,
-            completedDepositsTask,
-            monthlyRevenueRawTask,
-            dailyRevenueRawTask);
-
-        var completedDeposits = completedDepositsTask.Result;
         var totalDepositAmount = completedDeposits.Sum(deposit => deposit.Amount);
 
         var paymentMethodBreakdown = completedDeposits
@@ -120,7 +104,7 @@ public class DashboardMetricsService : IDashboardMetricsService
             .OrderByDescending(item => item.Amount)
             .ToList();
 
-        var monthlyRevenueMap = monthlyRevenueRawTask.Result
+        var monthlyRevenueMap = monthlyRevenueRaw
             .ToDictionary(item => item.Month, item => Math.Round(item.Revenue, 0));
         var monthlyRevenue = Enumerable.Range(1, 12)
             .Select(month => new MonthlyRevenuePointDto
@@ -131,7 +115,7 @@ public class DashboardMetricsService : IDashboardMetricsService
             })
             .ToList();
 
-        var dailyRevenueMap = dailyRevenueRawTask.Result
+        var dailyRevenueMap = dailyRevenueRaw
             .ToDictionary(item => item.Date, item => Math.Round(item.Revenue, 0));
         var dailyRevenue = Enumerable.Range(0, 7)
             .Select(offset => sevenDaysStart.AddDays(offset))
@@ -147,24 +131,24 @@ public class DashboardMetricsService : IDashboardMetricsService
         {
             Doctors = new UserGrowthMetricDto
             {
-                Total = doctorTotalTask.Result,
-                CurrentMonth = doctorCurrentMonthTask.Result,
-                PreviousMonth = doctorPreviousMonthTask.Result,
-                GrowthPercentage = CalculateGrowthPercentage(doctorCurrentMonthTask.Result, doctorPreviousMonthTask.Result)
+                Total = doctorTotal,
+                CurrentMonth = doctorCurrentMonth,
+                PreviousMonth = doctorPreviousMonth,
+                GrowthPercentage = CalculateGrowthPercentage(doctorCurrentMonth, doctorPreviousMonth)
             },
             Organisations = new UserGrowthMetricDto
             {
-                Total = organisationTotalTask.Result,
-                CurrentMonth = organisationCurrentMonthTask.Result,
-                PreviousMonth = organisationPreviousMonthTask.Result,
-                GrowthPercentage = CalculateGrowthPercentage(organisationCurrentMonthTask.Result, organisationPreviousMonthTask.Result)
+                Total = organisationTotal,
+                CurrentMonth = organisationCurrentMonth,
+                PreviousMonth = organisationPreviousMonth,
+                GrowthPercentage = CalculateGrowthPercentage(organisationCurrentMonth, organisationPreviousMonth)
             },
             Patients = new UserGrowthMetricDto
             {
-                Total = patientTotalTask.Result,
-                CurrentMonth = patientCurrentMonthTask.Result,
-                PreviousMonth = patientPreviousMonthTask.Result,
-                GrowthPercentage = CalculateGrowthPercentage(patientCurrentMonthTask.Result, patientPreviousMonthTask.Result)
+                Total = patientTotal,
+                CurrentMonth = patientCurrentMonth,
+                PreviousMonth = patientPreviousMonth,
+                GrowthPercentage = CalculateGrowthPercentage(patientCurrentMonth, patientPreviousMonth)
             },
             PaymentMethodBreakdown = paymentMethodBreakdown,
             MonthlyRevenue = monthlyRevenue,

@@ -1,6 +1,7 @@
 using Application.AiQuota.Interfaces;
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.SystemSettings.Interfaces;
 using Domain.Common;
 using Domain.Entities.Financial;
 using Domain.Enums;
@@ -11,8 +12,11 @@ namespace Application.AiQuota.Commands.BuyAiQuota;
 
 public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAiQuotaResponse>
 {
+    private const decimal DefaultUnitPrice = 10000m;
+
     private readonly IWalletRepository _walletRepository;
     private readonly IAiQuotaService _quotaService;
+    private readonly ISystemSettingService _settingService;
     private readonly ICurrentUserService _currentUser;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
@@ -21,6 +25,7 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
     public BuyAiQuotaCommandHandler(
         IWalletRepository walletRepository,
         IAiQuotaService quotaService,
+        ISystemSettingService settingService,
         ICurrentUserService currentUser,
         INotificationService notificationService,
         IUnitOfWork unitOfWork,
@@ -28,6 +33,7 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
     {
         _walletRepository = walletRepository;
         _quotaService = quotaService;
+        _settingService = settingService;
         _currentUser = currentUser;
         _notificationService = notificationService;
         _unitOfWork = unitOfWork;
@@ -37,21 +43,19 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
     public async Task<Result<BuyAiQuotaResponse>> Handle(
         BuyAiQuotaCommand request, CancellationToken cancellationToken)
     {
+        if (request.QuotaAmount <= 0)
+            return Result<BuyAiQuotaResponse>.Failure("Quota amount must be greater than 0.");
+
         if (_currentUser.UserId is null)
             return Result<BuyAiQuotaResponse>.Unauthorized("User is not authenticated.");
 
         var userId = _currentUser.UserId.Value;
         var role = _currentUser.Roles.FirstOrDefault() ?? "Patient";
 
-        // Get current quota info (BundlePrice/BundleSize from SystemSettings)
-        var currentQuota = await _quotaService.GetQuotaAsync(userId, role, cancellationToken);
-
-        if (currentQuota.BundlePrice is null || currentQuota.BundleSize is null || currentQuota.BundleSize <= 0)
-            return Result<BuyAiQuotaResponse>.Failure("AI quota bundle is not configured for this role.");
-
-        var unitPrice = currentQuota.BundlePrice.Value / currentQuota.BundleSize.Value;
+        var configuredUnitPrice = await _settingService.GetSettingAsync("AI_QUOTA_UNIT_PRICE", cancellationToken);
+        var unitPrice = ResolveUnitPrice(configuredUnitPrice);
         var totalCredits = request.QuotaAmount;
-        var totalCost = unitPrice * totalCredits;
+        var totalCost = Math.Round(unitPrice * totalCredits, 0, MidpointRounding.AwayFromZero);
 
         // Get wallet
         var wallet = await _walletRepository.GetByUserIdAsync(userId, cancellationToken);
@@ -136,5 +140,20 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
             _logger.LogError(ex, "Failed to purchase AI quota for user {UserId}", userId);
             return Result<BuyAiQuotaResponse>.Failure($"Failed to purchase quota: {ex.Message}");
         }
+    }
+
+    private static decimal ResolveUnitPrice(string? configuredValue)
+    {
+        if (decimal.TryParse(
+                configuredValue,
+                System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var parsed)
+            && parsed > 0m)
+        {
+            return parsed;
+        }
+
+        return DefaultUnitPrice;
     }
 }
