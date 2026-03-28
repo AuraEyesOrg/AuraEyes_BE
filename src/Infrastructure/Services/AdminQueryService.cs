@@ -70,6 +70,8 @@ public class AdminQueryService : IAdminQueryService
                 EmploymentType = x.Ophthalmologist.EmploymentType.ToString(),
                 WorkingHoursPerWeek = x.Ophthalmologist.WorkingHoursPerWeek,
                 ExpectedMonthlySalary = x.Ophthalmologist.ExpectedMonthlySalary,
+                CommissionRate = x.Ophthalmologist.CommissionRate,
+                ActualMonthlySalary = x.Ophthalmologist.ActualMonthlySalary,
                 VerificationStatus = x.Ophthalmologist.VerificationStatus.ToString(),
                 IsVerified = x.Ophthalmologist.IsVerified,
                 LicenseUrl = x.Ophthalmologist.LicenseUrl,
