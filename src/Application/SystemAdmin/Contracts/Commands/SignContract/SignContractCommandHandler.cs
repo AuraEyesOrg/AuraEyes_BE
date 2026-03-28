@@ -12,6 +12,7 @@ public class SignContractCommandHandler : ICommandHandler<SignContractCommand, C
 {
     private readonly IContractRepository _contractRepository;
     private readonly IContractTemplateRepository _templateRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IIdentityService _identityService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<SignContractCommandHandler> _logger;
@@ -19,12 +20,14 @@ public class SignContractCommandHandler : ICommandHandler<SignContractCommand, C
     public SignContractCommandHandler(
         IContractRepository contractRepository,
         IContractTemplateRepository templateRepository,
+        IOphthalmologistRepository ophthalmologistRepository,
         IIdentityService identityService,
         IUnitOfWork unitOfWork,
         ILogger<SignContractCommandHandler> logger)
     {
         _contractRepository = contractRepository;
         _templateRepository = templateRepository;
+        _ophthalmologistRepository = ophthalmologistRepository;
         _identityService = identityService;
         _unitOfWork = unitOfWork;
         _logger = logger;
@@ -38,11 +41,20 @@ public class SignContractCommandHandler : ICommandHandler<SignContractCommand, C
         if (contract is null)
             return Result<ContractDto>.NotFound($"Contract {request.Id} not found.");
 
+        var ophthalmologist = await _ophthalmologistRepository.GetByUserIdAsync(contract.UserId, cancellationToken);
+        if (ophthalmologist is null)
+            return Result<ContractDto>.NotFound($"Ophthalmologist profile for user {contract.UserId} not found.");
+
         try
         {
+            ophthalmologist.UpdateDealTerms(request.CommissionRate, request.ActualMonthlySalary);
             contract.Sign(request.SignedContent, request.ScannedDocumentUrl);
         }
         catch (InvalidOperationException ex)
+        {
+            return Result<ContractDto>.Failure(ex.Message);
+        }
+        catch (ArgumentException ex)
         {
             return Result<ContractDto>.Failure(ex.Message);
         }
@@ -59,6 +71,8 @@ public class SignContractCommandHandler : ICommandHandler<SignContractCommand, C
             template?.Title ?? string.Empty,
             template?.Type.ToString() ?? string.Empty,
             user?.FullName ?? string.Empty,
-            user?.Email ?? string.Empty));
+            user?.Email ?? string.Empty,
+            ophthalmologist.CommissionRate,
+            ophthalmologist.ActualMonthlySalary));
     }
 }

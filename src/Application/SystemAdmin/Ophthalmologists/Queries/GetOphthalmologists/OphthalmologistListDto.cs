@@ -22,6 +22,8 @@ public class OphthalmologistListDto
     public string EmploymentType { get; set; } = string.Empty;
     public int? WorkingHoursPerWeek { get; set; }
     public decimal? ExpectedMonthlySalary { get; set; }
+    public decimal? CommissionRate { get; set; }
+    public decimal? ActualMonthlySalary { get; set; }
     public string VerificationStatus { get; set; } = string.Empty;
     public bool IsVerified { get; set; }
     public string? LicenseUrl { get; set; }

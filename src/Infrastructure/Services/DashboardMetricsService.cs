@@ -362,28 +362,41 @@ public class DashboardMetricsService : IDashboardMetricsService
             .Distinct()
             .CountAsync(cancellationToken);
 
-          var urgentCaseList = await (from session in _context.ConsultationSessions
-                            join result in _context.ScreeningResults on session.AiScreeningId equals result.AiScreeningId
-                            join patient in _context.Patients on session.PatientId equals patient.Id
-                            join user in _context.Users on patient.UserId equals user.Id
-                            where session.OphthalmologistId == doctorId
-                                && session.Status == SessionStatus.Pending
-                                && (result.RiskLevel == RiskLevel.High || result.RiskLevel == RiskLevel.Critical)
-                            select new OphthalmologistUrgentCaseDto
-                            {
-                                ConsultationSessionId = session.Id,
-                                PatientId = patient.Id,
-                                PatientName = user.FullName,
-                                RiskLevel = result.RiskLevel.ToString(),
-                                ConfidenceScore = result.ConfidenceScore,
-                                AppointmentTime = session.AppointmentTime,
-                                CreatedAt = session.CreatedAt
-                            })
-            .OrderByDescending(item => item.RiskLevel == RiskLevel.Critical.ToString())
+        var urgentCasesRaw = await (from session in _context.ConsultationSessions
+                                    join result in _context.ScreeningResults on session.AiScreeningId equals result.AiScreeningId
+                                    join patient in _context.Patients on session.PatientId equals patient.Id
+                                    join user in _context.Users on patient.UserId equals user.Id
+                                    where session.OphthalmologistId == doctorId
+                                        && session.Status == SessionStatus.Pending
+                                        && (result.RiskLevel == RiskLevel.High || result.RiskLevel == RiskLevel.Critical)
+                                    select new
+                                    {
+                                        ConsultationSessionId = session.Id,
+                                        PatientId = patient.Id,
+                                        PatientName = user.FullName,
+                                        result.RiskLevel,
+                                        result.ConfidenceScore,
+                                        AppointmentTime = session.AppointmentTime,
+                                        CreatedAt = session.CreatedAt
+                                    })
+            .OrderByDescending(item => item.RiskLevel == RiskLevel.Critical)
             .ThenBy(item => item.AppointmentTime ?? DateTime.MaxValue)
             .ThenByDescending(item => item.CreatedAt)
             .Take(8)
             .ToListAsync(cancellationToken);
+
+        var urgentCaseList = urgentCasesRaw
+            .Select(item => new OphthalmologistUrgentCaseDto
+            {
+                ConsultationSessionId = item.ConsultationSessionId,
+                PatientId = item.PatientId,
+                PatientName = item.PatientName,
+                RiskLevel = item.RiskLevel.ToString(),
+                ConfidenceScore = item.ConfidenceScore,
+                AppointmentTime = item.AppointmentTime,
+                CreatedAt = item.CreatedAt
+            })
+            .ToList();
         var completedToday = await _context.Appointments.CountAsync(
             appointment => appointment.DoctorId == doctorId &&
                            appointment.Status == AppointmentStatus.Completed &&
