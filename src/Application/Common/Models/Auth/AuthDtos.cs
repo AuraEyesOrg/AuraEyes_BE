@@ -119,6 +119,10 @@ public class CredentialItemDto
     [Required]
     public DateTime IssuedDate { get; set; }
 
+    /// <summary>
+    /// Optional at DTO level because degrees do not require it.
+    /// Business rule enforces it for certificates/licenses.
+    /// </summary>
     public DateTime? ExpiryDate { get; set; }
 
     [Required]

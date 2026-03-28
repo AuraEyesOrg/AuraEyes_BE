@@ -1,6 +1,7 @@
 using Application.AiQuota.Interfaces;
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.SystemSettings.Interfaces;
 using Domain.Common;
 using Domain.Entities.Financial;
 using Domain.Enums;
@@ -11,8 +12,11 @@ namespace Application.AiQuota.Commands.BuyAiQuota;
 
 public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAiQuotaResponse>
 {
+    private const decimal DefaultUnitPrice = 10000m;
+
     private readonly IWalletRepository _walletRepository;
     private readonly IAiQuotaService _quotaService;
+    private readonly ISystemSettingService _settingService;
     private readonly ICurrentUserService _currentUser;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
@@ -21,6 +25,7 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
     public BuyAiQuotaCommandHandler(
         IWalletRepository walletRepository,
         IAiQuotaService quotaService,
+        ISystemSettingService settingService,
         ICurrentUserService currentUser,
         INotificationService notificationService,
         IUnitOfWork unitOfWork,
@@ -28,6 +33,7 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
     {
         _walletRepository = walletRepository;
         _quotaService = quotaService;
+        _settingService = settingService;
         _currentUser = currentUser;
         _notificationService = notificationService;
         _unitOfWork = unitOfWork;
@@ -37,19 +43,19 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
     public async Task<Result<BuyAiQuotaResponse>> Handle(
         BuyAiQuotaCommand request, CancellationToken cancellationToken)
     {
+        if (request.QuotaAmount <= 0)
+            return Result<BuyAiQuotaResponse>.Failure("Quota amount must be greater than 0.");
+
         if (_currentUser.UserId is null)
             return Result<BuyAiQuotaResponse>.Unauthorized("User is not authenticated.");
 
         var userId = _currentUser.UserId.Value;
         var role = _currentUser.Roles.FirstOrDefault() ?? "Patient";
 
-        // Get current quota info (includes BundlePrice and BundleSize from SystemSettings)
-        var currentQuota = await _quotaService.GetQuotaAsync(userId, role, cancellationToken);
-
-        if (currentQuota.BundlePrice is null || currentQuota.BundleSize is null)
-            return Result<BuyAiQuotaResponse>.Failure("AI quota bundle is not configured for this role.");
-
-        var totalCost = currentQuota.BundlePrice.Value * request.NumberOfBundles;
+        var configuredUnitPrice = await _settingService.GetSettingAsync("AI_QUOTA_UNIT_PRICE", cancellationToken);
+        var unitPrice = ResolveUnitPrice(configuredUnitPrice);
+        var totalCredits = request.QuotaAmount;
+        var totalCost = Math.Round(unitPrice * totalCredits, 0, MidpointRounding.AwayFromZero);
 
         // Get wallet
         var wallet = await _walletRepository.GetByUserIdAsync(userId, cancellationToken);
@@ -66,34 +72,29 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
             await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
             // Withdraw from wallet
-            var description = $"Mua {request.NumberOfBundles * currentQuota.BundleSize.Value} lượt AI screening ({request.NumberOfBundles} gói x {currentQuota.BundlePrice.Value:N0} VND)";
+            var description = $"Mua {totalCredits} lượt AI screening ({unitPrice:N0} VND/lượt)";
             wallet.Withdraw(totalCost, description);
             await _walletRepository.UpdateAsync(wallet, cancellationToken);
 
-            // Create wallet transactions (one per bundle for audit trail)
-            Guid? lastTransactionId = null;
-            for (var i = 0; i < request.NumberOfBundles; i++)
-            {
-                var transaction = new WalletTransaction(
-                    wallet.Id,
-                    currentQuota.BundlePrice.Value,
-                    TransactionType.Payment,
-                    description,
-                    "AiQuota");
+            // Create wallet transaction for this quota top-up purchase
+            var transaction = new WalletTransaction(
+                wallet.Id,
+                totalCost,
+                TransactionType.Payment,
+                description,
+                "AiQuota");
 
-                await _walletRepository.AddTransactionAsync(transaction, cancellationToken);
-                lastTransactionId = transaction.Id;
-            }
+            await _walletRepository.AddTransactionAsync(transaction, cancellationToken);
+            var lastTransactionId = transaction.Id;
 
             // Add purchased quota credits to the entity (Patient or Organisation)
-            var totalCredits = request.NumberOfBundles * currentQuota.BundleSize.Value;
             await _quotaService.AddPurchasedQuotaAsync(userId, role, totalCredits, cancellationToken);
 
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
             _logger.LogInformation(
-                "User {UserId} purchased {Bundles} AI quota bundle(s) for {Amount} VND",
-                userId, request.NumberOfBundles, totalCost);
+                "User {UserId} purchased {QuotaAmount} AI quota credit(s) for {Amount} VND",
+                userId, totalCredits, totalCost);
 
             // Get updated quota
             var updatedQuota = await _quotaService.GetQuotaAsync(userId, role, cancellationToken);
@@ -106,7 +107,14 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
                     "Thanh toán thành công",
                     $"Bạn đã mua {totalCredits} lượt AI screening với giá {totalCost:N0} VND. Số dư còn lại: {wallet.Balance:N0} VND",
                     NotificationType.WalletPaymentProcessed,
-                    new { TransactionId = lastTransactionId, Amount = totalCost, Action = "AI Quota Purchase" },
+                    new
+                    {
+                        TransactionId = lastTransactionId,
+                        Amount = totalCost,
+                        QuotaAmount = totalCredits,
+                        UnitPrice = unitPrice,
+                        Action = "AI Quota Purchase"
+                    },
                     cancellationToken);
             }
             catch (Exception ex)
@@ -132,5 +140,20 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
             _logger.LogError(ex, "Failed to purchase AI quota for user {UserId}", userId);
             return Result<BuyAiQuotaResponse>.Failure($"Failed to purchase quota: {ex.Message}");
         }
+    }
+
+    private static decimal ResolveUnitPrice(string? configuredValue)
+    {
+        if (decimal.TryParse(
+                configuredValue,
+                System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var parsed)
+            && parsed > 0m)
+        {
+            return parsed;
+        }
+
+        return DefaultUnitPrice;
     }
 }

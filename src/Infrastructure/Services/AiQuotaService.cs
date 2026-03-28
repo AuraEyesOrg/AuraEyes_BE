@@ -14,6 +14,8 @@ namespace Infrastructure.Services;
 /// </summary>
 public class AiQuotaService : IAiQuotaService
 {
+    private const decimal DefaultUnitPrice = 10000m;
+
     private readonly ApplicationDbContext _context;
     private readonly ILogger<AiQuotaService> _logger;
     private readonly ISystemSettingService _settingService;
@@ -57,8 +59,8 @@ public class AiQuotaService : IAiQuotaService
     private async Task<AiQuotaDto> GetPatientQuotaAsync(Guid userId, CancellationToken cancellationToken)
     {
         var freeQuota = await GetSettingIntAsync("FREE_AI_QUOTA", 3, cancellationToken);
-        var bundleSize = await GetSettingIntAsync("AI_QUOTA_BUNDLE", 5, cancellationToken);
-        var bundlePrice = await GetSettingDecimalAsync("AI_QUOTA_PRICE", 50000m, cancellationToken);
+        var configuredUnitPrice = await GetSettingDecimalAsync("AI_QUOTA_UNIT_PRICE", DefaultUnitPrice, cancellationToken);
+        var unitPrice = NormalizeUnitPrice(configuredUnitPrice);
 
         // Also try with IgnoreQueryFilters to detect if record exists but is soft-deleted
         var patient = await _context.Patients
@@ -89,8 +91,7 @@ public class AiQuotaService : IAiQuotaService
                 UsedQuota = 0,
                 RemainingQuota = freeQuota,
                 QuotaSource = "Free",
-                BundlePrice = bundlePrice,
-                BundleSize = bundleSize
+                UnitPrice = unitPrice
             };
         }
 
@@ -113,9 +114,13 @@ public class AiQuotaService : IAiQuotaService
             UsedQuota = patient.UsedAiQuota,
             RemainingQuota = remaining,
             QuotaSource = quotaSource,
-            BundlePrice = bundlePrice,
-            BundleSize = bundleSize
+            UnitPrice = unitPrice
         };
+    }
+
+    private static decimal NormalizeUnitPrice(decimal unitPrice)
+    {
+        return unitPrice > 0m ? unitPrice : DefaultUnitPrice;
     }
 
     private async Task<AiQuotaDto> GetOrgQuotaAsync(Guid userId, CancellationToken cancellationToken)
@@ -136,6 +141,8 @@ public class AiQuotaService : IAiQuotaService
             return new AiQuotaDto { TotalQuota = 0, UsedQuota = 0, RemainingQuota = 0, QuotaSource = "None" };
 
         var freeQuota = await GetSettingIntAsync("FREE_AI_QUOTA", 3, cancellationToken);
+        var configuredUnitPrice = await GetSettingDecimalAsync("AI_QUOTA_UNIT_PRICE", DefaultUnitPrice, cancellationToken);
+        var unitPrice = NormalizeUnitPrice(configuredUnitPrice);
         var remainingFreeQuota = Math.Max(0, freeQuota - org.UsedAiQuota);
         var totalQuota = freeQuota + org.PurchasedAiQuota;
         var remaining = remainingFreeQuota + org.PurchasedAiQuota;
@@ -145,6 +152,7 @@ public class AiQuotaService : IAiQuotaService
             TotalQuota = totalQuota,
             UsedQuota = org.UsedAiQuota,
             RemainingQuota = remaining,
+            UnitPrice = unitPrice,
             QuotaSource = remainingFreeQuota > 0
                 ? "Free"
                 : org.PurchasedAiQuota > 0

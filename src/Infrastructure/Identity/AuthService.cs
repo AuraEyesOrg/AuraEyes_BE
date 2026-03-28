@@ -178,6 +178,22 @@ public class AuthService : IAuthService
                 return Result<RegisterResponse>.Failure("At least one certificate is required");
             }
 
+            if (request.Certificates.Any(certificate => !certificate.ExpiryDate.HasValue))
+            {
+                return Result<RegisterResponse>.Failure("Expiry date is required for every certificate/license");
+            }
+
+            foreach (var certificate in request.Certificates)
+            {
+                var issuedDateUtc = EnsureUtc(certificate.IssuedDate);
+                var expiryDateUtc = EnsureUtc(certificate.ExpiryDate);
+
+                if (!expiryDateUtc.HasValue || expiryDateUtc.Value <= issuedDateUtc)
+                {
+                    return Result<RegisterResponse>.Failure("Certificate expiry date must be later than issued date");
+                }
+            }
+
             var existingUser = await _identityService.GetUserByEmailAsync(request.Email, cancellationToken);
             if (existingUser != null)
             {
@@ -233,13 +249,15 @@ public class AuthService : IAuthService
 
                 degreeUrl ??= uploadedUrl;
 
+                var degreeIssuedDateUtc = EnsureUtc(degree.IssuedDate);
+
                 ophthalmologist.AddCertificate(new Certificate(
                     ophthalmologist.Id,
                     CertificateType.Degree,
                     degree.Name,
                     degree.IssuingAuthority,
-                    degree.IssuedDate,
-                    degree.ExpiryDate,
+                    degreeIssuedDateUtc,
+                    null,
                     uploadedUrl));
             }
 
@@ -261,13 +279,16 @@ public class AuthService : IAuthService
 
                 licenseUrl ??= uploadedUrl;
 
+                var certificateIssuedDateUtc = EnsureUtc(certificate.IssuedDate);
+                var certificateExpiryDateUtc = EnsureUtc(certificate.ExpiryDate);
+
                 ophthalmologist.AddCertificate(new Certificate(
                     ophthalmologist.Id,
                     CertificateType.License,
                     certificate.Name,
                     certificate.IssuingAuthority,
-                    certificate.IssuedDate,
-                    certificate.ExpiryDate,
+                    certificateIssuedDateUtc,
+                    certificateExpiryDateUtc,
                     uploadedUrl));
             }
 
@@ -362,6 +383,22 @@ public class AuthService : IAuthService
 
             return Result<RegisterResponse>.Failure("An error occurred during registration");
         }
+    }
+
+    private static DateTime EnsureUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            DateTimeKind.Unspecified => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
+    }
+
+    private static DateTime? EnsureUtc(DateTime? value)
+    {
+        return value.HasValue ? EnsureUtc(value.Value) : null;
     }
 
     public Task<Result<OrganisationRegistrationResponse>> RegisterOrganisationAsync(
