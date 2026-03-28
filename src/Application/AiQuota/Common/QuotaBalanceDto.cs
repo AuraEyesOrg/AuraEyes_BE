@@ -6,6 +6,5 @@ public record QuotaBalanceDto
     public int UsedAiQuota { get; init; }
     public int RemainingQuota { get; init; }
     public string QuotaSource { get; init; } = string.Empty;
-    public decimal? BundlePrice { get; init; }
-    public int? BundleSize { get; init; }
+    public decimal? UnitPrice { get; init; }
 }
