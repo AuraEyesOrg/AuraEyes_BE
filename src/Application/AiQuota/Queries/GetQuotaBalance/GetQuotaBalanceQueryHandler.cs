@@ -30,8 +30,7 @@ public class GetQuotaBalanceQueryHandler : IQueryHandler<GetQuotaBalanceQuery, Q
             UsedAiQuota = quota.UsedQuota,
             RemainingQuota = quota.RemainingQuota,
             QuotaSource = quota.QuotaSource,
-            BundlePrice = quota.BundlePrice,
-            BundleSize = quota.BundleSize
+            UnitPrice = quota.UnitPrice
         });
     }
 }

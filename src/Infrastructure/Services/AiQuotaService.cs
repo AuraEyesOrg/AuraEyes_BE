@@ -91,8 +91,6 @@ public class AiQuotaService : IAiQuotaService
                 UsedQuota = 0,
                 RemainingQuota = freeQuota,
                 QuotaSource = "Free",
-                BundlePrice = unitPrice,
-                BundleSize = 1,
                 UnitPrice = unitPrice
             };
         }
@@ -116,8 +114,6 @@ public class AiQuotaService : IAiQuotaService
             UsedQuota = patient.UsedAiQuota,
             RemainingQuota = remaining,
             QuotaSource = quotaSource,
-            BundlePrice = unitPrice,
-            BundleSize = 1,
             UnitPrice = unitPrice
         };
     }
