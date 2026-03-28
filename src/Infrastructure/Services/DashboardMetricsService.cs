@@ -12,6 +12,7 @@ using Application.SystemAdmin.Dashboard.Queries.GetSystemHealth;
 using Domain.Enums;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 
 namespace Infrastructure.Services;
 
@@ -28,34 +29,141 @@ public class DashboardMetricsService : IDashboardMetricsService
 
     public async Task<DashboardMetricsDto> GetSystemAdminMetricsAsync(CancellationToken cancellationToken = default)
     {
-        var today = DateTime.UtcNow.Date;
-        var yesterday = today.AddDays(-1);
+        var now = DateTime.UtcNow;
 
-        var totalScreeningsToday = await _context.AiScreenings.CountAsync(s => s.CreatedAt >= today, cancellationToken);
-        var totalScreeningsYesterday = await _context.AiScreenings.CountAsync(s => s.CreatedAt >= yesterday && s.CreatedAt < today, cancellationToken);
-        var pendingReviews = await _context.ConsultationSessions.CountAsync(s => s.Status == SessionStatus.Pending, cancellationToken);
-        var criticalCases = await _context.ScreeningResults.CountAsync(r => r.RiskLevel == RiskLevel.High || r.RiskLevel == RiskLevel.Critical, cancellationToken);
-        var averageConfidence = await _context.ScreeningResults
-            .Select(r => (decimal?)r.ConfidenceScore)
-            .AverageAsync(cancellationToken) ?? 0m;
+        var currentMonthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var nextMonthStart = currentMonthStart.AddMonths(1);
+        var previousMonthStart = currentMonthStart.AddMonths(-1);
+
+        var doctorTotal = await _context.Ophthalmologists.CountAsync(cancellationToken);
+        var organisationTotal = await _context.Organisations.CountAsync(cancellationToken);
+        var patientTotal = await _context.Patients.CountAsync(cancellationToken);
+
+        var doctorCurrentMonth = await _context.Ophthalmologists
+            .CountAsync(o => o.CreatedAt >= currentMonthStart && o.CreatedAt < nextMonthStart, cancellationToken);
+        var doctorPreviousMonth = await _context.Ophthalmologists
+            .CountAsync(o => o.CreatedAt >= previousMonthStart && o.CreatedAt < currentMonthStart, cancellationToken);
+
+        var organisationCurrentMonth = await _context.Organisations
+            .CountAsync(o => o.CreatedAt >= currentMonthStart && o.CreatedAt < nextMonthStart, cancellationToken);
+        var organisationPreviousMonth = await _context.Organisations
+            .CountAsync(o => o.CreatedAt >= previousMonthStart && o.CreatedAt < currentMonthStart, cancellationToken);
+
+        var patientCurrentMonth = await _context.Patients
+            .CountAsync(p => p.CreatedAt >= currentMonthStart && p.CreatedAt < nextMonthStart, cancellationToken);
+        var patientPreviousMonth = await _context.Patients
+            .CountAsync(p => p.CreatedAt >= previousMonthStart && p.CreatedAt < currentMonthStart, cancellationToken);
+
+        var completedDeposits = await _context.DepositRequests
+            .Where(deposit => deposit.Status == PaymentStatus.Completed)
+            .ToListAsync(cancellationToken);
+
+        var yearStart = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var nextYearStart = yearStart.AddYears(1);
+        var monthlyRevenueRaw = await _context.DepositRequests
+            .Where(deposit =>
+                deposit.Status == PaymentStatus.Completed &&
+                (deposit.CompletedAt ?? deposit.CreatedAt) >= yearStart &&
+                (deposit.CompletedAt ?? deposit.CreatedAt) < nextYearStart)
+            .GroupBy(deposit => (deposit.CompletedAt ?? deposit.CreatedAt).Month)
+            .Select(group => new
+            {
+                Month = group.Key,
+                Revenue = group.Sum(item => item.Amount)
+            })
+            .ToListAsync(cancellationToken);
+
+        var sevenDaysStart = now.Date.AddDays(-6);
+        var nextDay = now.Date.AddDays(1);
+        var dailyRevenueRaw = await _context.DepositRequests
+            .Where(deposit =>
+                deposit.Status == PaymentStatus.Completed &&
+                (deposit.CompletedAt ?? deposit.CreatedAt) >= sevenDaysStart &&
+                (deposit.CompletedAt ?? deposit.CreatedAt) < nextDay)
+            .GroupBy(deposit => (deposit.CompletedAt ?? deposit.CreatedAt).Date)
+            .Select(group => new
+            {
+                Date = group.Key,
+                Revenue = group.Sum(item => item.Amount)
+            })
+            .ToListAsync(cancellationToken);
+        var totalDepositAmount = completedDeposits.Sum(deposit => deposit.Amount);
+
+        var paymentMethodBreakdown = completedDeposits
+            .GroupBy(deposit => deposit.PaymentMethod)
+            .Select(group =>
+            {
+                var amount = group.Sum(item => item.Amount);
+                return new PaymentMethodRevenueDto
+                {
+                    PaymentMethod = group.Key.ToString(),
+                    Amount = amount,
+                    Percentage = totalDepositAmount <= 0m ? 0m : Math.Round(amount / totalDepositAmount * 100m, 1)
+                };
+            })
+            .OrderByDescending(item => item.Amount)
+            .ToList();
+
+        var monthlyRevenueMap = monthlyRevenueRaw
+            .ToDictionary(item => item.Month, item => Math.Round(item.Revenue, 0));
+        var monthlyRevenue = Enumerable.Range(1, 12)
+            .Select(month => new MonthlyRevenuePointDto
+            {
+                Month = month,
+                Label = CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(month),
+                Revenue = monthlyRevenueMap.GetValueOrDefault(month, 0m)
+            })
+            .ToList();
+
+        var dailyRevenueMap = dailyRevenueRaw
+            .ToDictionary(item => item.Date, item => Math.Round(item.Revenue, 0));
+        var dailyRevenue = Enumerable.Range(0, 7)
+            .Select(offset => sevenDaysStart.AddDays(offset))
+            .Select(date => new DailyRevenuePointDto
+            {
+                Date = DateTime.SpecifyKind(date, DateTimeKind.Utc),
+                Label = date.ToString("dd MMM", CultureInfo.InvariantCulture),
+                Revenue = dailyRevenueMap.GetValueOrDefault(date, 0m)
+            })
+            .ToList();
 
         return new DashboardMetricsDto
         {
-            TotalScreeningsToday = totalScreeningsToday,
-            TotalScreeningsYesterday = totalScreeningsYesterday,
-            ScreeningsChangePercentage = totalScreeningsYesterday == 0
-                ? (totalScreeningsToday > 0 ? 100m : 0m)
-                : Math.Round(((decimal)(totalScreeningsToday - totalScreeningsYesterday) / totalScreeningsYesterday) * 100m, 1),
-            AiAccuracy = Math.Round(averageConfidence, 1),
-            AiAccuracyChangePercentage = 0m,
-            PendingReviews = pendingReviews,
-            CriticalCases = criticalCases,
-            ActionRequired = pendingReviews > 0 || criticalCases > 0,
-            TotalActiveClinics = await _context.Organisations.CountAsync(cancellationToken),
-            TotalActiveDevices = 0,
-            TotalUsers = await _context.Users.CountAsync(cancellationToken),
-            TotalPatients = await _context.Patients.CountAsync(cancellationToken)
+            Doctors = new UserGrowthMetricDto
+            {
+                Total = doctorTotal,
+                CurrentMonth = doctorCurrentMonth,
+                PreviousMonth = doctorPreviousMonth,
+                GrowthPercentage = CalculateGrowthPercentage(doctorCurrentMonth, doctorPreviousMonth)
+            },
+            Organisations = new UserGrowthMetricDto
+            {
+                Total = organisationTotal,
+                CurrentMonth = organisationCurrentMonth,
+                PreviousMonth = organisationPreviousMonth,
+                GrowthPercentage = CalculateGrowthPercentage(organisationCurrentMonth, organisationPreviousMonth)
+            },
+            Patients = new UserGrowthMetricDto
+            {
+                Total = patientTotal,
+                CurrentMonth = patientCurrentMonth,
+                PreviousMonth = patientPreviousMonth,
+                GrowthPercentage = CalculateGrowthPercentage(patientCurrentMonth, patientPreviousMonth)
+            },
+            PaymentMethodBreakdown = paymentMethodBreakdown,
+            MonthlyRevenue = monthlyRevenue,
+            DailyRevenue = dailyRevenue
         };
+    }
+
+    private static decimal CalculateGrowthPercentage(int currentMonthCount, int previousMonthCount)
+    {
+        if (previousMonthCount == 0)
+        {
+            return currentMonthCount == 0 ? 0m : 100m;
+        }
+
+        return Math.Round(((decimal)(currentMonthCount - previousMonthCount) / previousMonthCount) * 100m, 1);
     }
 
     public async Task<PagedResult<RecentScreeningDto>> GetRecentScreeningsAsync(int pageNumber, int pageSize, CancellationToken cancellationToken = default)
@@ -253,6 +361,29 @@ public class DashboardMetricsService : IDashboardMetricsService
                                  select session.Id)
             .Distinct()
             .CountAsync(cancellationToken);
+
+          var urgentCaseList = await (from session in _context.ConsultationSessions
+                            join result in _context.ScreeningResults on session.AiScreeningId equals result.AiScreeningId
+                            join patient in _context.Patients on session.PatientId equals patient.Id
+                            join user in _context.Users on patient.UserId equals user.Id
+                            where session.OphthalmologistId == doctorId
+                                && session.Status == SessionStatus.Pending
+                                && (result.RiskLevel == RiskLevel.High || result.RiskLevel == RiskLevel.Critical)
+                            select new OphthalmologistUrgentCaseDto
+                            {
+                                ConsultationSessionId = session.Id,
+                                PatientId = patient.Id,
+                                PatientName = user.FullName,
+                                RiskLevel = result.RiskLevel.ToString(),
+                                ConfidenceScore = result.ConfidenceScore,
+                                AppointmentTime = session.AppointmentTime,
+                                CreatedAt = session.CreatedAt
+                            })
+            .OrderByDescending(item => item.RiskLevel == RiskLevel.Critical.ToString())
+            .ThenBy(item => item.AppointmentTime ?? DateTime.MaxValue)
+            .ThenByDescending(item => item.CreatedAt)
+            .Take(8)
+            .ToListAsync(cancellationToken);
         var completedToday = await _context.Appointments.CountAsync(
             appointment => appointment.DoctorId == doctorId &&
                            appointment.Status == AppointmentStatus.Completed &&
@@ -270,7 +401,8 @@ public class DashboardMetricsService : IDashboardMetricsService
             PendingReviews = pendingReviews,
             UrgentCases = urgentCases,
             CompletedToday = completedToday,
-            OpenSlotsToday = openSlotsToday
+            OpenSlotsToday = openSlotsToday,
+            UrgentCaseList = urgentCaseList
         };
     }
 
@@ -287,16 +419,52 @@ public class DashboardMetricsService : IDashboardMetricsService
         }
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var appointmentsQuery = _context.Appointments.Where(appointment => appointment.OrganisationId == organisationId);
+
+        var totalAppointments = await appointmentsQuery.CountAsync(cancellationToken);
+        var pendingCount = await appointmentsQuery.CountAsync(
+            appointment => appointment.Status == AppointmentStatus.Pending,
+            cancellationToken);
+        var confirmedCount = await appointmentsQuery.CountAsync(
+            appointment => appointment.Status == AppointmentStatus.Confirmed,
+            cancellationToken);
+        var completedCount = await appointmentsQuery.CountAsync(
+            appointment => appointment.Status == AppointmentStatus.Completed,
+            cancellationToken);
+        var cancelledCount = await appointmentsQuery.CountAsync(
+            appointment => appointment.Status == AppointmentStatus.Cancelled,
+            cancellationToken);
+        var noShowCount = await appointmentsQuery.CountAsync(
+            appointment => appointment.Status == AppointmentStatus.NoShow,
+            cancellationToken);
+
+        var todayCapacity = await (from slot in _context.AppointmentSlots
+                                   join template in _context.ScheduleTemplates on slot.ScheduleTemplateId equals template.Id
+                                   where template.OrgId == organisationId && slot.Date == today
+                                   select new { slot.BookedCount, slot.MaxCapacity })
+            .ToListAsync(cancellationToken);
+
+        var totalBooked = todayCapacity.Sum(item => item.BookedCount);
+        var totalCapacity = todayCapacity.Sum(item => item.MaxCapacity);
+        var utilizationRate = totalCapacity <= 0
+            ? 0m
+            : Math.Round((decimal)totalBooked / totalCapacity * 100m, 1);
+
+        var quota = await _aiQuotaService.GetQuotaAsync(userId, "OrgAdmin", cancellationToken);
 
         return new OrganisationDashboardMetricsDto
         {
-            TotalAppointments = await _context.Appointments.CountAsync(appointment => appointment.OrganisationId == organisationId, cancellationToken),
-            PendingAppointments = await _context.Appointments.CountAsync(appointment => appointment.OrganisationId == organisationId && (appointment.Status == AppointmentStatus.Pending || appointment.Status == AppointmentStatus.Confirmed), cancellationToken),
-            AvailableSlotsToday = await (from slot in _context.AppointmentSlots
-                                         join template in _context.ScheduleTemplates on slot.ScheduleTemplateId equals template.Id
-                                         where template.OrgId == organisationId && slot.Date == today && slot.Status == ScheduleStatus.Available
-                                         select slot.Id).CountAsync(cancellationToken),
-            ActiveDoctors = await _context.Users.CountAsync(user => user.OrganizationId == organisationId && !user.IsDeleted, cancellationToken)
+            UtilizationRatePercent = utilizationRate,
+            RemainingAiQuota = quota.RemainingQuota,
+            TotalAppointments = totalAppointments,
+            AppointmentStatus = new OrganisationAppointmentStatusBreakdownDto
+            {
+                Pending = pendingCount,
+                Confirmed = confirmedCount,
+                Completed = completedCount,
+                Cancelled = cancelledCount,
+                NoShow = noShowCount
+            }
         };
     }
 

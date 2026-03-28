@@ -16,6 +16,7 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
     public async Task<Ophthalmologist?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbSet
+            .Include(o => o.Certificates)
             .FirstOrDefaultAsync(o => o.UserId == userId, cancellationToken);
     }
 

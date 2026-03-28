@@ -12,4 +12,16 @@ public class UserProfileDto
     public int PostCount { get; set; }
     public int YearsOfExperience { get; set; }
     public bool IsVerified { get; set; }
+    public List<UserProfileCertificateDto> Certificates { get; set; } = new();
+}
+
+public class UserProfileCertificateDto
+{
+    public Guid Id { get; set; }
+    public string Type { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string? IssuingAuthority { get; set; }
+    public DateTime IssuedDate { get; set; }
+    public DateTime? ExpiryDate { get; set; }
+    public string? CertificateUrl { get; set; }
 }

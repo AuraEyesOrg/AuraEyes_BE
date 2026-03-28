@@ -74,6 +74,16 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
     /// </summary>
     public bool AllowComments { get; private set; } = true;
 
+    /// <summary>
+    /// Whether this post has been hidden by moderation.
+    /// </summary>
+    public bool IsHidden { get; private set; }
+
+    /// <summary>
+    /// Optional moderation reason when the post is hidden.
+    /// </summary>
+    public string? HideReason { get; private set; }
+    
     // Navigation properties (within network module only)
     public virtual ProfessionalPost? OriginalPost { get; private set; }
 
@@ -156,6 +166,16 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
     public void UpdateAllowComments(bool allowComments)
     {
         AllowComments = allowComments;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Hide a post by moderation.
+    /// </summary>
+    public void Hide(string? reason)
+    {
+        IsHidden = true;
+        HideReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         UpdatedAt = DateTime.UtcNow;
     }
 

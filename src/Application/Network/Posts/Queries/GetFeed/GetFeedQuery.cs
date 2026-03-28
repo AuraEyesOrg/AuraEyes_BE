@@ -10,10 +10,12 @@ namespace Application.Network.Posts.Queries.GetFeed;
 public record GetFeedQuery : IQuery<PagedResult<PostFeedDto>>
 {
     public Guid CurrentUserId { get; init; }
+    public bool IsSystemAdmin { get; init; }
     public PostCategory? Category { get; init; }
     public string? SearchTerm { get; init; }
     public int PageNumber { get; init; } = 1;
     public int PageSize { get; init; } = 10;
+    public bool HiddenOnly { get; init; }
     /// <summary>
     /// Optional: filter posts by a specific author (used on profile pages)
     /// </summary>

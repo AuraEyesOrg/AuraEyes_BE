@@ -5,7 +5,7 @@ namespace Application.AiQuota.Commands.BuyAiQuota;
 
 public record BuyAiQuotaCommand : ICommand<BuyAiQuotaResponse>
 {
-    public int NumberOfBundles { get; init; } = 1;
+    public int QuotaAmount { get; init; } = 5;
 }
 
 public record BuyAiQuotaResponse

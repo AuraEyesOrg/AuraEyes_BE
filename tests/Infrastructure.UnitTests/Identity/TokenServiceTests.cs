@@ -229,8 +229,15 @@ public class TokenServiceTests
         var tokenResult = await _sut.GenerateAccessTokenAsync(
             Guid.NewGuid(), "test@test.com", "Test", new[] { "Patient" });
 
-        // Tamper with the token by changing the last character
-        var tampered = tokenResult.AccessToken[..^1] + (tokenResult.AccessToken[^1] == 'A' ? 'B' : 'A');
+        // Tamper with signature segment to guarantee signature mismatch.
+        var segments = tokenResult.AccessToken.Split('.');
+        segments.Should().HaveCount(3);
+
+        var signature = segments[2];
+        signature.Should().NotBeNullOrEmpty();
+        var tamperedFirstChar = signature[0] == 'A' ? 'B' : 'A';
+        var tamperedSignature = tamperedFirstChar + signature[1..];
+        var tampered = string.Join('.', segments[0], segments[1], tamperedSignature);
 
         // Act
         var principal = _sut.ValidateToken(tampered);

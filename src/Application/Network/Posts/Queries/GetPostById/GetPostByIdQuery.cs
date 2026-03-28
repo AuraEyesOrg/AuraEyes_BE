@@ -9,4 +9,5 @@ public record GetPostByIdQuery : IQuery<PostDetailDto>
 {
     public Guid PostId { get; init; }
     public Guid CurrentUserId { get; init; }
+    public bool IsSystemAdmin { get; init; }
 }
