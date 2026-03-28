@@ -25,6 +25,12 @@ public class OphthalmologistConfiguration : IEntityTypeConfiguration<Ophthalmolo
         builder.Property(e => e.ExpectedMonthlySalary)
             .HasPrecision(18, 2);
 
+        builder.Property(e => e.CommissionRate)
+            .HasPrecision(5, 2);
+
+        builder.Property(e => e.ActualMonthlySalary)
+            .HasPrecision(18, 2);
+
         builder.Property(e => e.YearsOfExperience)
             .HasDefaultValue(0);
 
