@@ -141,6 +141,8 @@ public class AdminQueryService : IAdminQueryService
                     EmploymentType = row.EmploymentType,
                     WorkingHoursPerWeek = row.WorkingHoursPerWeek,
                     ExpectedMonthlySalary = row.ExpectedMonthlySalary,
+                    CommissionRate = row.CommissionRate,
+                    ActualMonthlySalary = row.ActualMonthlySalary,
                     VerificationStatus = row.VerificationStatus,
                     IsVerified = row.IsVerified,
                     LicenseUrl = row.LicenseUrl,

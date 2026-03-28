@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Financial;
+using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
 using Microsoft.Extensions.Logging;
@@ -20,6 +21,7 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
     private readonly IAppointmentSlotRepository _slotRepository;
     private readonly IWalletRepository _walletRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IRepository<Patient> _patientRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<EndSessionCommandHandler> _logger;
 
@@ -28,6 +30,7 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
         IAppointmentSlotRepository slotRepository,
         IWalletRepository walletRepository,
         IOphthalmologistRepository ophthalmologistRepository,
+        IRepository<Patient> patientRepository,
         IUnitOfWork unitOfWork,
         ILogger<EndSessionCommandHandler> logger)
     {
@@ -35,6 +38,7 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
         _slotRepository = slotRepository;
         _walletRepository = walletRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
+        _patientRepository = patientRepository;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -69,9 +73,58 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
                 }
             }
 
-            // ── 3. Wallet capture: transfer consultation fee to doctor ──
+            // ── 3. Wallet capture: ensure patient payment exists, then transfer fee to doctor ──
             if (session.Price > 0 && session.OphthalmologistId.HasValue)
             {
+                var patient = await _patientRepository.GetByIdAsync(session.PatientId, cancellationToken);
+                if (patient is null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result.NotFound($"Patient '{session.PatientId}' not found.");
+                }
+
+                var patientWallet = await _walletRepository.GetByUserIdWithTransactionsAsync(
+                    patient.UserId,
+                    cancellationToken);
+
+                if (patientWallet is null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result.Failure("Patient wallet not found.");
+                }
+
+                var hasPrepaidBooking = patientWallet.Transactions.Any(tx =>
+                    tx.TransactionType == TransactionType.Payment
+                    && tx.ReferenceType == "Booking"
+                    && tx.ReferenceId.HasValue
+                    && (tx.ReferenceId.Value == session.Id
+                        || (session.AppointmentSlotId.HasValue
+                            && tx.ReferenceId.Value == session.AppointmentSlotId.Value)));
+
+                if (!hasPrepaidBooking)
+                {
+                    if (patientWallet.Balance < session.Price)
+                    {
+                        await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                        return Result.Failure(
+                            $"Insufficient patient wallet balance. Required: {session.Price:N0} VND, Available: {patientWallet.Balance:N0} VND.");
+                    }
+
+                    patientWallet.Withdraw(session.Price,
+                        $"Consultation payment – Session {session.Id}");
+
+                    var patientPaymentTx = new WalletTransaction(
+                        patientWallet.Id,
+                        session.Price,
+                        TransactionType.Payment,
+                        "Consultation payment",
+                        referenceType: "Booking",
+                        referenceId: session.Id);
+
+                    patientWallet.AddTransaction(patientPaymentTx);
+                    await _walletRepository.AddTransactionAsync(patientPaymentTx, cancellationToken);
+                }
+
                 var doctor = await _ophthalmologistRepository.GetByIdAsync(
                     session.OphthalmologistId.Value, cancellationToken);
 
