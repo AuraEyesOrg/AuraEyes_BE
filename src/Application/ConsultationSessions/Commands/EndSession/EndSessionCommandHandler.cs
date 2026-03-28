@@ -130,19 +130,40 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
 
                 if (doctor is not null)
                 {
+                    // CommissionRate on Ophthalmologist is stored as 0–100 (doctor's share of the session fee).
+                    var commissionPercent = doctor.CommissionRate ?? 100m;
+                    var doctorShare = Math.Round(
+                        session.Price * (commissionPercent / 100m),
+                        0,
+                        MidpointRounding.AwayFromZero);
+                    var platformShare = session.Price - doctorShare;
+
+                    if (doctorShare < 0 || platformShare < 0)
+                    {
+                        await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                        return Result.Failure("Invalid commission configuration for this ophthalmologist.");
+                    }
+
                     var doctorWallet = await _walletRepository.GetByUserIdAsync(
                         doctor.UserId, cancellationToken);
 
-                    if (doctorWallet is not null)
+                    if (doctorShare > 0 && doctorWallet is null)
                     {
-                        doctorWallet.Deposit(session.Price,
-                            $"Consultation earnings – Session {session.Id}");
+                        await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                        return Result.Failure("Doctor wallet not found; consultation earnings cannot be recorded.");
+                    }
+
+                    if (doctorWallet is not null && doctorShare > 0)
+                    {
+                        var doctorNote =
+                            $"Consultation earnings: {doctorShare:N0} VND ({commissionPercent:0.##}% of {session.Price:N0} VND) – Session {session.Id}";
+                        doctorWallet.Deposit(doctorShare, doctorNote);
 
                         var earningsTx = new WalletTransaction(
                             doctorWallet.Id,
-                            session.Price,
-                            TransactionType.Transfer,
-                            "Consultation earnings",
+                            doctorShare,
+                            TransactionType.Deposit,
+                            $"Consultation earnings ({commissionPercent:0.##}% of fee)",
                             referenceType: "Booking",
                             referenceId: session.Id);
 
@@ -150,14 +171,34 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
                         await _walletRepository.AddTransactionAsync(earningsTx, cancellationToken);
 
                         _logger.LogInformation(
-                            "Captured {Amount} VND to doctor wallet {WalletId} for session {SessionId}.",
-                            session.Price, doctorWallet.Id, session.Id);
+                            "Captured {DoctorShare} VND (platform {PlatformShare} VND) to doctor wallet {WalletId} for session {SessionId}.",
+                            doctorShare, platformShare, doctorWallet.Id, session.Id);
                     }
-                    else
+
+                    if (platformShare > 0)
                     {
-                        _logger.LogWarning(
-                            "Doctor {DoctorId} has no wallet. Earnings for session {SessionId} not captured.",
-                            doctor.Id, session.Id);
+                        var platformWallet = await _walletRepository.GetSystemWalletAsync(cancellationToken);
+                        if (platformWallet is null)
+                        {
+                            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                            return Result.Failure(
+                                "System (platform) wallet not found. Ensure a wallet with OwnerType \"System\" exists.");
+                        }
+
+                        var platformNote =
+                            $"Platform commission: {platformShare:N0} VND ({100m - commissionPercent:0.##}% of {session.Price:N0} VND) – Session {session.Id}";
+                        platformWallet.Deposit(platformShare, platformNote);
+
+                        var platformTx = new WalletTransaction(
+                            platformWallet.Id,
+                            platformShare,
+                            TransactionType.Deposit,
+                            $"Platform commission ({100m - commissionPercent:0.##}% of fee)",
+                            referenceType: "Booking",
+                            referenceId: session.Id);
+
+                        platformWallet.AddTransaction(platformTx);
+                        await _walletRepository.AddTransactionAsync(platformTx, cancellationToken);
                     }
                 }
             }
