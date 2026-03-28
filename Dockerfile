@@ -20,7 +20,7 @@ RUN dotnet publish -c Release -o /app/publish --no-restore
 # =====================
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine
 
-RUN apk add --no-cache icu-libs curl
+RUN apk add --no-cache icu-libs curl tzdata
 
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
     DOTNET_GC_SERVER=1 \
