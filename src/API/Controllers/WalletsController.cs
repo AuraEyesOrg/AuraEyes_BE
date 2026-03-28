@@ -1,12 +1,15 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Wallets.Commands.CreateDeposit;
+using Application.Wallets.Commands.CreateWithdrawalRequest;
 using Application.Wallets.Commands.VerifyPayment;
 using Application.Wallets.Common;
 using Application.Wallets.Queries.GetDepositHistory;
 using Application.Wallets.Queries.GetDepositRequest;
+using Application.Wallets.Queries.GetWithdrawalHistory;
 using Application.Wallets.Queries.GetWallet;
 using Application.Wallets.Queries.GetWalletTransactions;
+using Application.Common.Constants;
 using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -212,6 +215,64 @@ public class WalletsController : BaseApiController
     }
 
     /// <summary>
+    /// Create withdrawal request for ophthalmologist wallet payout.
+    /// </summary>
+    [HttpPost("withdraw-requests")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<WithdrawalRequestDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> CreateWithdrawalRequest([FromBody] CreateWithdrawalRequest request)
+    {
+        var userId = _currentUserService.UserId;
+        if (!userId.HasValue)
+        {
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated."));
+        }
+
+        var command = new CreateWithdrawalRequestCommand
+        {
+            UserId = userId.Value,
+            AmountVnd = request.AmountVnd,
+            BankName = request.BankName,
+            BankAccountNumber = request.BankAccountNumber,
+            AccountHolderName = request.AccountHolderName,
+            ContractNumber = request.ContractNumber,
+            Note = request.Note
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Get current ophthalmologist withdrawal requests.
+    /// </summary>
+    [HttpGet("withdraw-requests")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<WithdrawalRequestDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetWithdrawalRequests(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var userId = _currentUserService.UserId;
+        if (!userId.HasValue)
+        {
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated."));
+        }
+
+        var result = await _mediator.Send(new GetWithdrawalHistoryQuery
+        {
+            UserId = userId.Value,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        });
+
+        return HandleResult(result);
+    }
+
+    /// <summary>
     /// Get payment status (public endpoint for checking without auth).
     /// </summary>
     /// <param name="orderCode">PayOS order code.</param>
@@ -325,6 +386,16 @@ public class VerifyPaymentRequest
     /// PayOS order code.
     /// </summary>
     public string OrderCode { get; set; } = string.Empty;
+}
+
+public class CreateWithdrawalRequest
+{
+    public decimal AmountVnd { get; set; }
+    public string BankName { get; set; } = string.Empty;
+    public string BankAccountNumber { get; set; } = string.Empty;
+    public string AccountHolderName { get; set; } = string.Empty;
+    public string? ContractNumber { get; set; }
+    public string? Note { get; set; }
 }
 
 /// <summary>

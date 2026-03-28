@@ -62,6 +62,8 @@ public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQu
             UpdatedAt = ophthalmologist.UpdatedAt,
             RatingAverage = ophthalmologist.RatingAverage,
             RatingCount = ophthalmologist.RatingCount,
+            CommissionRate = ophthalmologist.CommissionRate,
+            ActualMonthlySalary = ophthalmologist.ActualMonthlySalary,
             MinPrice = minPrice,
             MaxPrice = maxPrice,
             Certificates = ophthalmologist.Certificates.Select(c => new CertificateDto

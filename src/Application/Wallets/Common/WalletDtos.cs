@@ -77,3 +77,34 @@ public class VerifyPaymentResponse
     public string? Message { get; set; }
     public decimal? NewBalance { get; set; }
 }
+
+/// <summary>
+/// DTO for Withdrawal Request information.
+/// </summary>
+public class WithdrawalRequestDto
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public Guid WalletId { get; set; }
+    public decimal Amount { get; set; }
+    public PaymentStatus Status { get; set; }
+    public string BankName { get; set; } = string.Empty;
+    public string BankAccountNumber { get; set; } = string.Empty;
+    public string AccountHolderName { get; set; } = string.Empty;
+    public string? ContractNumber { get; set; }
+    public string? Note { get; set; }
+    public string? AdminNote { get; set; }
+    public string? TransferReference { get; set; }
+    public Guid? ProcessedByAdminId { get; set; }
+    public DateTime? ProcessedAt { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// DTO for admin withdrawal queue rows.
+/// </summary>
+public class AdminWithdrawalRequestDto : WithdrawalRequestDto
+{
+    public string DoctorFullName { get; set; } = string.Empty;
+    public string DoctorEmail { get; set; } = string.Empty;
+}
