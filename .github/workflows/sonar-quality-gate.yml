@@ -121,101 +121,125 @@ jobs:
     runs-on: ubuntu-latest
     needs: sonar
     if: ${{ always() && needs.sonar.result == 'success' }}
-    permissions:
-      contents: read
     steps:
-      - name: Decide whether to create Jira ticket
-        id: decide
+      - name: Fetch Sonar issues and create Jira tickets
         shell: bash
         run: |
-          SEVERE="${{ needs.sonar.outputs.severe_count }}"
+          set -e
+          
+          SONAR_HOST="${{ secrets.SONAR_HOST_URL }}"
+          SONAR_TOKEN="${{ secrets.SONAR_TOKEN }}"
+          SONAR_KEY="${{ secrets.SONAR_PROJECT_KEY }}"
+          JIRA_URL="${{ secrets.JIRA_BASE_URL }}"
+          JIRA_USER="${{ secrets.JIRA_EMAIL }}"
+          JIRA_TOKEN="${{ secrets.JIRA_API_TOKEN }}"
+          JIRA_PROJECT="${{ secrets.JIRA_PROJECT_KEY }}"
+          REPORT_URL="${{ needs.sonar.outputs.report_url }}"
           QG="${{ needs.sonar.outputs.quality_gate }}"
-
-          if [ -z "$SEVERE" ]; then
-            SEVERE="0"
+          
+          # Fetch issues
+          echo "📊 Fetching issues..."
+          ISSUES=$(curl -s -u "$SONAR_TOKEN": "$SONAR_HOST/api/issues/search?componentKeys=$SONAR_KEY&resolved=false&ps=500")
+          
+          BLOCKER=$(echo "$ISSUES" | jq '[.issues[] | select(.severity=="BLOCKER")] | length')
+          CRITICAL=$(echo "$ISSUES" | jq '[.issues[] | select(.severity=="CRITICAL")] | length')
+          MAJOR=$(echo "$ISSUES" | jq '[.issues[] | select(.severity=="MAJOR")] | length')
+          TOTAL=$((BLOCKER + CRITICAL + MAJOR))
+          
+          echo "Issues: BLOCKER=$BLOCKER, CRITICAL=$CRITICAL, MAJOR=$MAJOR (Total=$TOTAL)"
+          
+          if [ "$TOTAL" -lt 1 ] && [ "$QG" = "OK" ]; then
+            echo "✨ No blocking issues. Skipping."
+            exit 0
           fi
-
-          if [ -z "$QG" ]; then
-            QG="UNKNOWN"
+          
+          # Check existing parent
+          echo "🔍 Checking for existing parent ticket..."
+          parent_key=$(curl -s -u "$JIRA_USER:$JIRA_TOKEN" \
+            "$JIRA_URL/rest/api/2/search?jql=project%3D$JIRA_PROJECT%20AND%20summary~%22Quality%20Gate%20Failed%22%20AND%20statusCategory!=Done&maxResults=1" | jq -r '.issues[0].key // empty')
+          
+          if [ ! -z "$parent_key" ]; then
+            echo "✓ Existing parent: $parent_key"
+          else
+            # Create parent
+            echo "🎫 Creating parent ticket..."
+            parent_payload=$(jq -n \
+              --arg project "$JIRA_PROJECT" \
+              --arg summary "[Sonar] Quality Gate Failed - Multiple Issues Detected" \
+              --arg desc "Quality Gate: $QG\nBLOCKER: $BLOCKER\nCRITICAL: $CRITICAL\nMAJOR: $MAJOR\n\nReport: $REPORT_URL\nGitHub: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+              '{fields:{project:{key:$project},summary:$summary,description:$desc,issuetype:{name:"Task"},priority:{name:"High"}}}')
+            
+            parent_resp=$(curl -s -X POST -u "$JIRA_USER:$JIRA_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$parent_payload" \
+              "$JIRA_URL/rest/api/2/issue")
+            
+            parent_key=$(echo "$parent_resp" | jq -r '.key // empty')
+            if [ -z "$parent_key" ]; then
+              echo "❌ Failed to create parent: $parent_resp"
+              exit 1
+            fi
+            echo "✅ Created parent: $parent_key"
           fi
-
-          SHOULD_CREATE="false"
-          if [ "$SEVERE" != "0" ] || [ "$QG" != "OK" ]; then
-            SHOULD_CREATE="true"
+          
+          # Create BLOCKER subtasks (top 5)
+          if [ $BLOCKER -gt 0 ]; then
+            echo "🔴 Creating BLOCKER subtasks..."
+            counter=0
+            echo "$ISSUES" | jq -c '.issues[] | select(.severity=="BLOCKER")' | while read -r issue; do
+              counter=$((counter + 1))
+              [ $counter -gt 5 ] && break
+              
+              msg=$(echo "$issue" | jq -r '.message')
+              rule=$(echo "$issue" | jq -r '.rule // "Unknown"')
+              
+              payload=$(jq -n \
+                --arg project "$JIRA_PROJECT" \
+                --arg summary "BLOCKER: ${msg:0:60}" \
+                --arg desc "Rule: $rule\n\nReport: $REPORT_URL" \
+                --arg parent "$parent_key" \
+                '{fields:{project:{key:$project},summary:$summary,description:$desc,issuetype:{name:"Sub-task"},priority:{name:"Highest"},parent:{key:$parent}}}')
+              
+              sub_key=$(curl -s -X POST -u "$JIRA_USER:$JIRA_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "$payload" \
+                "$JIRA_URL/rest/api/2/issue" | jq -r '.key // empty')
+              
+              if [ ! -z "$sub_key" ]; then
+                echo "  ✅ $sub_key"
+              fi
+            done
           fi
-
-          echo "severe_count=$SEVERE" >> "$GITHUB_OUTPUT"
-          echo "quality_gate=$QG" >> "$GITHUB_OUTPUT"
-          echo "should_create=$SHOULD_CREATE" >> "$GITHUB_OUTPUT"
-
-          echo "Jira decision => severe_count=$SEVERE, quality_gate=$QG, should_create=$SHOULD_CREATE"
-
-      - name: Skip Jira creation (no blocking condition)
-        if: steps.decide.outputs.should_create != 'true'
-        shell: bash
-        run: |
-          echo "No Jira ticket needed. severe_count=${{ steps.decide.outputs.severe_count }}, quality_gate=${{ steps.decide.outputs.quality_gate }}"
-
-      - name: Check for existing Jira ticket
-        if: steps.decide.outputs.should_create == 'true'
-        id: check_ticket
-        shell: bash
-        run: |
-          SUMMARY="[Sonar][${{ github.repository }}] Severe issues on ${{ github.ref_name }}"
-          JQL="project=${{ secrets.JIRA_PROJECT_KEY }} AND summary ~ \"${SUMMARY}\" AND statusCategory != Done"
-          ENCODED_JQL=$(echo "$JQL" | jq -sRr @uri)
-
-          RESPONSE=$(curl -s \
-            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
-            -H "Accept: application/json" \
-            "${{ secrets.JIRA_BASE_URL }}/rest/api/2/search?jql=${ENCODED_JQL}&maxResults=1")
-
-          EXISTING=$(echo "$RESPONSE" | jq -r '.total // 0')
-          ISSUE_KEY=$(echo "$RESPONSE" | jq -r '.issues[0].key // empty')
-
-          echo "existing_ticket=$EXISTING" >> "$GITHUB_OUTPUT"
-          echo "issue_key=$ISSUE_KEY" >> "$GITHUB_OUTPUT"
-
-      - name: Create Jira issue
-        if: steps.decide.outputs.should_create == 'true' && steps.check_ticket.outputs.existing_ticket == '0'
-        shell: bash
-        run: |
-          SUMMARY="[Sonar][${{ github.repository }}] Severe issues on ${{ github.ref_name }}"
-          DESC="Repository: ${{ github.repository }}
-          Branch: ${{ github.ref_name }}
-          Commit: ${{ github.sha }}
-          Sonar Quality Gate: ${{ steps.decide.outputs.quality_gate }}
-          Severe issues (BLOCKER+CRITICAL): ${{ steps.decide.outputs.severe_count }}
-
-          Report: ${{ needs.sonar.outputs.report_url }}
-          Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-          PAYLOAD=$(jq -n \
-            --arg project "${{ secrets.JIRA_PROJECT_KEY }}" \
-            --arg summary "$SUMMARY" \
-            --arg desc "$DESC" \
-            --arg priority "High" \
-            '{fields:{project:{key:$project},summary:$summary,description:$desc,issuetype:{name:"Bug"},priority:{name:$priority}}}')
-
-          RESPONSE=$(curl -s -X POST \
-            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
-            -H "Accept: application/json" \
-            -H "Content-Type: application/json" \
-            --data "$PAYLOAD" \
-            "${{ secrets.JIRA_BASE_URL }}/rest/api/2/issue")
-
-          ISSUE_KEY=$(echo "$RESPONSE" | jq -r '.key // empty')
-          if [ -z "$ISSUE_KEY" ]; then
-            echo "❌ Failed to create Jira ticket"
-            echo "$RESPONSE" | jq '.'
-            exit 1
+          
+          # Create CRITICAL subtasks (top 5)
+          if [ $CRITICAL -gt 0 ]; then
+            echo "🟠 Creating CRITICAL subtasks..."
+            counter=0
+            echo "$ISSUES" | jq -c '.issues[] | select(.severity=="CRITICAL")' | while read -r issue; do
+              counter=$((counter + 1))
+              [ $counter -gt 5 ] && break
+              
+              msg=$(echo "$issue" | jq -r '.message')
+              rule=$(echo "$issue" | jq -r '.rule // "Unknown"')
+              
+              payload=$(jq -n \
+                --arg project "$JIRA_PROJECT" \
+                --arg summary "CRITICAL: ${msg:0:60}" \
+                --arg desc "Rule: $rule\n\nReport: $REPORT_URL" \
+                --arg parent "$parent_key" \
+                '{fields:{project:{key:$project},summary:$summary,description:$desc,issuetype:{name:"Sub-task"},priority:{name:"High"},parent:{key:$parent}}}')
+              
+              sub_key=$(curl -s -X POST -u "$JIRA_USER:$JIRA_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "$payload" \
+                "$JIRA_URL/rest/api/2/issue" | jq -r '.key // empty')
+              
+              if [ ! -z "$sub_key" ]; then
+                echo "  ✅ $sub_key"
+              fi
+            done
           fi
-
-          echo "✅ Created Jira ticket: $ISSUE_KEY"
-
-      - name: Notify existing ticket
-        if: steps.decide.outputs.should_create == 'true' && steps.check_ticket.outputs.existing_ticket != '0'
-        shell: bash
-        run: |
-          echo "ℹ️  Jira ticket already exists: ${{ steps.check_ticket.outputs.issue_key }}"
-          echo "Skipping duplicate creation"
+          
+          echo ""
+          echo "🎯 Done! Parent: $parent_key"
+          echo "URL: $JIRA_URL/browse/$parent_key"
