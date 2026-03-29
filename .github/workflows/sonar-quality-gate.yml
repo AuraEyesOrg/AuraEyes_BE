@@ -82,9 +82,10 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const severe = ${{ steps.evaluate.outputs.severe_count }};
-            const qg = "${{ steps.evaluate.outputs.quality_gate }}";
-            const reportUrl = "${{ steps.evaluate.outputs.report_url }}";
+            const severeRaw = "${{ steps.evaluate.outputs.severe_count }}";
+            const severe = Number.parseInt(severeRaw || "0", 10) || 0;
+            const qg = "${{ steps.evaluate.outputs.quality_gate }}" || "UNKNOWN";
+            const reportUrl = "${{ steps.evaluate.outputs.report_url }}" || "";
 
             let icon = qg === "OK" ? "✅" : "❌";
             let comment = `## ${icon} SonarQube Quality Gate Results
