@@ -33,7 +33,10 @@ public static class VietnamTimeZoneResolver
             }
         }
 
-        throw new InvalidOperationException(
-            "Unable to resolve Vietnam time zone. Checked: SE Asia Standard Time, Asia/Ho_Chi_Minh.");
+        return TimeZoneInfo.CreateCustomTimeZone(
+            "Vietnam Standard Time",
+            TimeSpan.FromHours(7),
+            "Vietnam Standard Time",
+            "Vietnam Standard Time");
     }
 }

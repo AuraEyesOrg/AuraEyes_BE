@@ -121,6 +121,8 @@ public class ContractsController : BaseApiController
         var command = new SignContractCommand
         {
             Id = id,
+            CommissionRate = request.CommissionRate,
+            ActualMonthlySalary = request.ActualMonthlySalary,
             SignedContent = request.SignedContent,
             ScannedDocumentUrl = request.ScannedDocumentUrl
         };
@@ -156,4 +158,4 @@ public class ContractsController : BaseApiController
 // =========================================================================
 
 public record UpdateContractRequest(Guid TemplateId, int AiQuotaLimit, decimal PlatformCommissionRate);
-public record SignContractRequest(string? SignedContent, string? ScannedDocumentUrl);
+public record SignContractRequest(decimal CommissionRate, decimal ActualMonthlySalary, string? SignedContent, string? ScannedDocumentUrl);
