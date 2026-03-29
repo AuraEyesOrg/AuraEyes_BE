@@ -109,9 +109,7 @@ jobs:
               `**Severe Issues:** ${bugBadge}`,
               `**Report:** [View in SonarQube](${reportUrl})`,
               "",
-              statusLine,
-              "",
-              "> Visit Jira for full issue list after Sonar automation runs."
+              statusLine
             ].join("\n");
 
             github.rest.issues.createComment({
@@ -141,6 +139,12 @@ jobs:
           REPORT_URL="${{ needs.sonar.outputs.report_url }}"
           QG="${{ needs.sonar.outputs.quality_gate }}"
 
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            SONAR_SCOPE="pullRequest=${{ github.event.pull_request.number }}"
+          else
+            SONAR_SCOPE="branch=${{ github.ref_name }}"
+          fi
+
           # Validate credentials
           if [ -z "$SONAR_HOST" ] || [ -z "$SONAR_TOKEN" ] || [ -z "$JIRA_TOKEN" ]; then
             echo "❌ Missing required secrets. Skipping Jira ticket creation."
@@ -149,7 +153,8 @@ jobs:
 
           # Fetch issues
           echo "📊 Fetching issues..."
-          ISSUES=$(curl -s -u "$SONAR_TOKEN": "$SONAR_HOST/api/issues/search?componentKeys=$SONAR_KEY&resolved=false&ps=500")
+          ISSUES=$(curl -s -u "$SONAR_TOKEN": "$SONAR_HOST/api/issues/search?componentKeys=$SONAR_KEY&resolved=false&ps=500&$SONAR_SCOPE")
+          HOTSPOTS=$(curl -s -u "$SONAR_TOKEN": "$SONAR_HOST/api/hotspots/search?projectKey=$SONAR_KEY&status=TO_REVIEW&ps=500&$SONAR_SCOPE")
 
           if ! echo "$ISSUES" | jq -e '.issues' >/dev/null 2>&1; then
             echo "⚠️ Sonar API did not return issues array. Response:"
@@ -163,12 +168,21 @@ jobs:
             MAJOR=$(echo "$ISSUES" | jq -r '[.issues[]? | select(.severity=="MAJOR")] | length')
           fi
 
+          if ! echo "$HOTSPOTS" | jq -e '.hotspots' >/dev/null 2>&1; then
+            echo "⚠️ Sonar API did not return hotspots array. Response:"
+            echo "$HOTSPOTS"
+            HOTSPOT_COUNT=0
+          else
+            HOTSPOT_COUNT=$(echo "$HOTSPOTS" | jq -r '[.hotspots[]?] | length')
+          fi
+
           BLOCKER=${BLOCKER:-0}
           CRITICAL=${CRITICAL:-0}
           MAJOR=${MAJOR:-0}
-          TOTAL=$((BLOCKER + CRITICAL + MAJOR))
+          HOTSPOT_COUNT=${HOTSPOT_COUNT:-0}
+          TOTAL=$((BLOCKER + CRITICAL + MAJOR + HOTSPOT_COUNT))
 
-          echo "Issues: BLOCKER=$BLOCKER, CRITICAL=$CRITICAL, MAJOR=$MAJOR (Total=$TOTAL)"
+          echo "Issues: BLOCKER=$BLOCKER, CRITICAL=$CRITICAL, MAJOR=$MAJOR, HOTSPOTS=$HOTSPOT_COUNT (Total=$TOTAL)"
 
           if [ "$TOTAL" -lt 1 ] && [ "$QG" = "OK" ]; then
             echo "✨ No blocking issues. Skipping."
@@ -188,7 +202,7 @@ jobs:
             parent_payload=$(jq -n \
               --arg project "$JIRA_PROJECT" \
               --arg summary "🐛 [Sonar] Quality Gate Failed - Multiple Issues Detected" \
-              --arg desc "Quality Gate: $QG\nBLOCKER: $BLOCKER | CRITICAL: $CRITICAL | MAJOR: $MAJOR\n\nReport: $REPORT_URL\nGitHub Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+              --arg desc "Quality Gate: $QG\nBLOCKER: $BLOCKER | CRITICAL: $CRITICAL | MAJOR: $MAJOR | HOTSPOTS: $HOTSPOT_COUNT\n\nReport: $REPORT_URL\nGitHub Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
               '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":"Bug"},"priority":{"name":"High"}}}')
             
             parent_resp=$(curl -s -X POST -u "$JIRA_USER:$JIRA_TOKEN" \
@@ -292,6 +306,37 @@ jobs:
                 echo "  ✅ $sub_key - $msg"
               else
                 echo "  ❌ Failed to create: $msg"
+                echo "     Jira response: $sub_resp"
+              fi
+            done
+          fi
+
+          # Create HOTSPOT subtasks (top 5)
+          if [ "$HOTSPOT_COUNT" -gt 0 ]; then
+            echo "🛡️ Creating HOTSPOT subtasks (max 5)..."
+            echo "$HOTSPOTS" | jq -c '.hotspots[]' | head -5 | while read -r hotspot; do
+              msg=$(echo "$hotspot" | jq -r '.message // "Security hotspot requires review"')
+              file=$(echo "$hotspot" | jq -r '.component // "Unknown"')
+              line=$(echo "$hotspot" | jq -r '.line // "N/A"')
+              prob=$(echo "$hotspot" | jq -r '.vulnerabilityProbability // "MEDIUM"')
+
+              payload=$(jq -n \
+                --arg project "$JIRA_PROJECT" \
+                --arg summary "🐛 HOTSPOT: ${msg:0:45}" \
+                --arg desc "**File:** $file (Line $line)\n**Risk:** $prob\n**Report:** $REPORT_URL" \
+                --arg parent "$parent_key" \
+                '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":"Sub-task"},"priority":{"name":"High"},"parent":{"key":$parent}}}')
+
+              sub_resp=$(curl -s -X POST -u "$JIRA_USER:$JIRA_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "$payload" \
+                "$JIRA_URL/rest/api/2/issue")
+              sub_key=$(echo "$sub_resp" | jq -r '.key // empty')
+
+              if [ ! -z "$sub_key" ]; then
+                echo "  ✅ $sub_key - $msg"
+              else
+                echo "  ❌ Failed to create HOTSPOT: $msg"
                 echo "     Jira response: $sub_resp"
               fi
             done
