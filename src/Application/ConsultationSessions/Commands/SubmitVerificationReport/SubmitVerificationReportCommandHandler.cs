@@ -1,5 +1,7 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.PatientRoadmaps.Common;
+using System.Text.Json;
 using Domain.Common;
 using Domain.Entities.Consultation;
 using Domain.Entities.Screening;
@@ -14,20 +16,29 @@ public class SubmitVerificationReportCommandHandler
 {
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly IRepository<MedicalDiagnosis> _diagnosisRepository;
+    private readonly IRepository<AiScreening> _screeningRepository;
+    private readonly IRepository<PatientRoadmap> _roadmapRepository;
     private readonly IRepository<Patient> _patientRepository;
+    private readonly IPatientRoadmapGenerationService _roadmapGenerationService;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
 
     public SubmitVerificationReportCommandHandler(
         IConsultationSessionRepository sessionRepository,
         IRepository<MedicalDiagnosis> diagnosisRepository,
+        IRepository<AiScreening> screeningRepository,
+        IRepository<PatientRoadmap> roadmapRepository,
         IRepository<Patient> patientRepository,
+        IPatientRoadmapGenerationService roadmapGenerationService,
         INotificationService notificationService,
         IUnitOfWork unitOfWork)
     {
         _sessionRepository = sessionRepository;
         _diagnosisRepository = diagnosisRepository;
+        _screeningRepository = screeningRepository;
+        _roadmapRepository = roadmapRepository;
         _patientRepository = patientRepository;
+        _roadmapGenerationService = roadmapGenerationService;
         _notificationService = notificationService;
         _unitOfWork = unitOfWork;
     }
@@ -49,17 +60,48 @@ public class SubmitVerificationReportCommandHandler
         if (!session.AiScreeningId.HasValue)
             return Result.Failure("Session has no linked AI screening.");
 
+        var diagnosisCode = string.IsNullOrWhiteSpace(request.DiagnosisCode)
+            ? request.DiagnosesCode
+            : request.DiagnosisCode;
+
+        var clinicalFindings = string.IsNullOrWhiteSpace(request.ClinicalFindings)
+            ? request.DiagnosesText
+            : request.ClinicalFindings;
+
+        var screening = await _screeningRepository.GetByIdAsync(session.AiScreeningId.Value, cancellationToken);
+        if (screening is null)
+            return Result.NotFound($"AI screening '{session.AiScreeningId.Value}' was not found.");
+
+        if (string.IsNullOrWhiteSpace(screening.RawJsonOutput))
+            return Result.Failure("AI screening output is unavailable for roadmap generation.");
+
+        var generatedRoadmap = await _roadmapGenerationService.GenerateFromDiagnosisAsync(
+            new PatientRoadmapGenerationInput
+            {
+                PatientId = session.PatientId,
+                ScreeningId = screening.Id,
+                AiScreeningRawJson = screening.RawJsonOutput,
+                DiagnosisCode = diagnosisCode,
+                CodingSystem = request.CodingSystem,
+                ClinicalFindings = clinicalFindings,
+                SeverityLevel = request.SeverityLevel,
+                ConfidenceLevel = request.ConfidenceLevel,
+                TreatmentPlan = request.TreatmentPlan,
+                Recommendations = request.Recommendations,
+                LifestyleAdvice = request.LifestyleAdvice,
+                IsUrgent = request.IsUrgent,
+                Status = request.Status,
+                FollowUpDate = request.FollowUpDate,
+                IsReferralNeeded = request.IsReferralNeeded
+            },
+            cancellationToken);
+
+        if (!generatedRoadmap.IsSuccess || generatedRoadmap.Data is null)
+            return Result.Failure(generatedRoadmap.ErrorMessage);
+
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            var diagnosisCode = string.IsNullOrWhiteSpace(request.DiagnosisCode)
-                ? request.DiagnosesCode
-                : request.DiagnosisCode;
-
-            var clinicalFindings = string.IsNullOrWhiteSpace(request.ClinicalFindings)
-                ? request.DiagnosesText
-                : request.ClinicalFindings;
-
             var diagnosis = new MedicalDiagnosis(
                     session.AiScreeningId.Value,
                     request.DoctorId,
@@ -79,6 +121,22 @@ public class SubmitVerificationReportCommandHandler
                     request.FinalizedAt);
 
             await _diagnosisRepository.AddAsync(diagnosis, cancellationToken);
+
+            var roadmap = new PatientRoadmap(
+                session.PatientId,
+                diagnosis.Id,
+                generatedRoadmap.Data.RiskLevel,
+                generatedRoadmap.Data.Summary,
+                JsonSerializer.Serialize(generatedRoadmap.Data.NextSteps),
+                JsonSerializer.Serialize(generatedRoadmap.Data.LifestyleAdvice),
+                JsonSerializer.Serialize(generatedRoadmap.Data.WarningSigns),
+                generatedRoadmap.Data.FollowUpNeeded,
+                generatedRoadmap.Data.FollowUpTimeframe,
+                generatedRoadmap.Data.RawAiResponse,
+                "AI",
+                DateTime.UtcNow);
+
+            await _roadmapRepository.AddAsync(roadmap, cancellationToken);
 
             session.OpenChat();
             await _sessionRepository.UpdateAsync(session, cancellationToken);

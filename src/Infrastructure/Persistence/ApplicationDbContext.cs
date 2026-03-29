@@ -48,6 +48,7 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<RetinalImage> RetinalImages => Set<RetinalImage>();
     public DbSet<ScreeningResult> ScreeningResults => Set<ScreeningResult>();
     public DbSet<MedicalDiagnosis> MedicalDiagnoses => Set<MedicalDiagnosis>();
+    public DbSet<PatientRoadmap> PatientRoadmaps => Set<PatientRoadmap>();
 
     // Consultation
     public DbSet<ConsultationSession> ConsultationSessions => Set<ConsultationSession>();

@@ -64,6 +64,9 @@ public static class DependencyInjection
         // Google Meet Settings
         services.Configure<GoogleMeetSettings>(configuration.GetSection(GoogleMeetSettings.SectionName));
 
+        // Google AI Studio Settings
+        services.Configure<GoogleAiStudioSettings>(configuration.GetSection(GoogleAiStudioSettings.SectionName));
+
         // Google Auth Settings (for Google Login)
         services.Configure<GoogleAuthSettings>(configuration.GetSection(GoogleAuthSettings.SectionName));
 
@@ -193,6 +196,7 @@ public static class DependencyInjection
         services.AddScoped<IFileStorageService, SupabaseStorageService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IGoogleMeetService, GoogleMeetService>();
+        services.AddScoped<IPatientRoadmapGenerationService, PatientRoadmapGenerationService>();
         services.AddScoped<IAdminQueryService, AdminQueryService>();
         services.AddScoped<IAiQuotaService, AiQuotaService>();
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
