@@ -126,7 +126,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          
+
           SONAR_HOST="${{ secrets.SONAR_HOST_URL }}"
           SONAR_TOKEN="${{ secrets.SONAR_TOKEN }}"
           SONAR_KEY="${{ secrets.SONAR_PROJECT_KEY }}"
@@ -136,28 +136,28 @@ jobs:
           JIRA_PROJECT="${{ secrets.JIRA_PROJECT_KEY }}"
           REPORT_URL="${{ needs.sonar.outputs.report_url }}"
           QG="${{ needs.sonar.outputs.quality_gate }}"
-          
+
           # Fetch issues
           echo "📊 Fetching issues..."
           ISSUES=$(curl -s -u "$SONAR_TOKEN": "$SONAR_HOST/api/issues/search?componentKeys=$SONAR_KEY&resolved=false&ps=500")
-          
+
           BLOCKER=$(echo "$ISSUES" | jq '[.issues[] | select(.severity=="BLOCKER")] | length')
           CRITICAL=$(echo "$ISSUES" | jq '[.issues[] | select(.severity=="CRITICAL")] | length')
           MAJOR=$(echo "$ISSUES" | jq '[.issues[] | select(.severity=="MAJOR")] | length')
           TOTAL=$((BLOCKER + CRITICAL + MAJOR))
-          
+
           echo "Issues: BLOCKER=$BLOCKER, CRITICAL=$CRITICAL, MAJOR=$MAJOR (Total=$TOTAL)"
-          
+
           if [ "$TOTAL" -lt 1 ] && [ "$QG" = "OK" ]; then
             echo "✨ No blocking issues. Skipping."
             exit 0
           fi
-          
+
           # Check existing parent
           echo "🔍 Checking for existing parent ticket..."
           parent_key=$(curl -s -u "$JIRA_USER:$JIRA_TOKEN" \
             "$JIRA_URL/rest/api/2/search?jql=project%3D$JIRA_PROJECT%20AND%20summary~%22Quality%20Gate%20Failed%22%20AND%20statusCategory!=Done&maxResults=1" | jq -r '.issues[0].key // empty')
-          
+
           if [ ! -z "$parent_key" ]; then
             echo "✓ Existing parent: $parent_key"
           else
@@ -181,7 +181,7 @@ jobs:
             fi
             echo "✅ Created parent: $parent_key"
           fi
-          
+
           # Create BLOCKER subtasks (top 5)
           if [ $BLOCKER -gt 0 ]; then
             echo "🔴 Creating BLOCKER subtasks..."
@@ -210,7 +210,7 @@ jobs:
               fi
             done
           fi
-          
+
           # Create CRITICAL subtasks (top 5)
           if [ $CRITICAL -gt 0 ]; then
             echo "🟠 Creating CRITICAL subtasks..."
@@ -239,7 +239,7 @@ jobs:
               fi
             done
           fi
-          
+
           echo ""
           echo "🎯 Done! Parent: $parent_key"
           echo "URL: $JIRA_URL/browse/$parent_key"
