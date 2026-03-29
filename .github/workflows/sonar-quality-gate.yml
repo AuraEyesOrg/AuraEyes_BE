@@ -282,12 +282,14 @@ jobs:
               rule=$(echo "$issue" | jq -r '.rule // "Unknown"')
               file=$(echo "$issue" | jq -r '.component // "Unknown"')
               line=$(echo "$issue" | jq -r '.line // "N/A"')
+              issue_key=$(echo "$issue" | jq -r '.key // "N/A"')
+              desc=$(printf 'Issue: %s\nSeverity: BLOCKER\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nReport: %s' "$msg" "$rule" "$file" "$line" "$issue_key" "$REPORT_URL")
               
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
                 --arg issueType "$SUBTASK_ISSUE_TYPE" \
                 --arg summary "🐛 BLOCKER: ${msg:0:50}" \
-                --arg desc "**File:** $file (Line $line)\n**Rule:** $rule\n**Report:** $REPORT_URL" \
+                --arg desc "$desc" \
                 --arg parent "$parent_key" \
                 '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":$issueType},"priority":{"name":"Highest"},"parent":{"key":$parent}}}')
               
@@ -314,12 +316,14 @@ jobs:
               rule=$(echo "$issue" | jq -r '.rule // "Unknown"')
               file=$(echo "$issue" | jq -r '.component // "Unknown"')
               line=$(echo "$issue" | jq -r '.line // "N/A"')
+              issue_key=$(echo "$issue" | jq -r '.key // "N/A"')
+              desc=$(printf 'Issue: %s\nSeverity: CRITICAL\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nReport: %s' "$msg" "$rule" "$file" "$line" "$issue_key" "$REPORT_URL")
               
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
                 --arg issueType "$SUBTASK_ISSUE_TYPE" \
                 --arg summary "⚠️ CRITICAL: ${msg:0:50}" \
-                --arg desc "**File:** $file (Line $line)\n**Rule:** $rule\n**Report:** $REPORT_URL" \
+                --arg desc "$desc" \
                 --arg parent "$parent_key" \
                 '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":$issueType},"priority":{"name":"High"},"parent":{"key":$parent}}}')
               
@@ -346,12 +350,14 @@ jobs:
               rule=$(echo "$issue" | jq -r '.rule // "Unknown"')
               file=$(echo "$issue" | jq -r '.component // "Unknown"')
               line=$(echo "$issue" | jq -r '.line // "N/A"')
+              issue_key=$(echo "$issue" | jq -r '.key // "N/A"')
+              desc=$(printf 'Issue: %s\nSeverity: MAJOR\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nReport: %s' "$msg" "$rule" "$file" "$line" "$issue_key" "$REPORT_URL")
               
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
                 --arg issueType "$SUBTASK_ISSUE_TYPE" \
                 --arg summary "📌 MAJOR: ${msg:0:50}" \
-                --arg desc "**File:** $file (Line $line)\n**Rule:** $rule\n**Report:** $REPORT_URL" \
+                --arg desc "$desc" \
                 --arg parent "$parent_key" \
                 '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":$issueType},"priority":{"name":"Medium"},"parent":{"key":$parent}}}')
               
@@ -378,12 +384,14 @@ jobs:
               file=$(echo "$hotspot" | jq -r '.component // "Unknown"')
               line=$(echo "$hotspot" | jq -r '.line // "N/A"')
               prob=$(echo "$hotspot" | jq -r '.vulnerabilityProbability // "MEDIUM"')
+              hotspot_key=$(echo "$hotspot" | jq -r '.key // "N/A"')
+              desc=$(printf 'Issue: %s\nType: SECURITY HOTSPOT\nRisk: %s\nFile: %s (Line %s)\nSonar Key: %s\nReport: %s' "$msg" "$prob" "$file" "$line" "$hotspot_key" "$REPORT_URL")
 
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
                 --arg issueType "$SUBTASK_ISSUE_TYPE" \
                 --arg summary "🐛 HOTSPOT: ${msg:0:45}" \
-                --arg desc "**File:** $file (Line $line)\n**Risk:** $prob\n**Report:** $REPORT_URL" \
+                --arg desc "$desc" \
                 --arg parent "$parent_key" \
                 '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":$issueType},"priority":{"name":"High"},"parent":{"key":$parent}}}')
 
