@@ -61,19 +61,22 @@ jobs:
         id: evaluate
         shell: bash
         run: |
+          SONAR_HOST="${{ secrets.SONAR_HOST_URL }}"
+          SONAR_HOST="${SONAR_HOST%/}"
+
           # Get severe issues count
           SEVERE=$(curl -s -u "${{ secrets.SONAR_TOKEN }}": \
-            "${{ secrets.SONAR_HOST_URL }}/api/issues/search?componentKeys=${{ secrets.SONAR_PROJECT_KEY }}&severities=BLOCKER,CRITICAL&resolved=false&ps=1" | jq -r '.total // 0')
+            "$SONAR_HOST/api/issues/search?componentKeys=${{ secrets.SONAR_PROJECT_KEY }}&severities=BLOCKER,CRITICAL&resolved=false&ps=1" | jq -r '.total // 0')
 
           # Get quality gate status (PR-specific for pull_request events)
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             QG=$(curl -s -u "${{ secrets.SONAR_TOKEN }}": \
-              "${{ secrets.SONAR_HOST_URL }}/api/qualitygates/project_status?projectKey=${{ secrets.SONAR_PROJECT_KEY }}&pullRequest=${{ github.event.pull_request.number }}" | jq -r '.projectStatus.status // "UNKNOWN"')
-            REPORT_URL="${{ secrets.SONAR_HOST_URL }}/project/overview?id=${{ secrets.SONAR_PROJECT_KEY }}&pullRequest=${{ github.event.pull_request.number }}"
+              "$SONAR_HOST/api/qualitygates/project_status?projectKey=${{ secrets.SONAR_PROJECT_KEY }}&pullRequest=${{ github.event.pull_request.number }}" | jq -r '.projectStatus.status // "UNKNOWN"')
+            REPORT_URL="$SONAR_HOST/project/overview?id=${{ secrets.SONAR_PROJECT_KEY }}&pullRequest=${{ github.event.pull_request.number }}"
           else
             QG=$(curl -s -u "${{ secrets.SONAR_TOKEN }}": \
-              "${{ secrets.SONAR_HOST_URL }}/api/qualitygates/project_status?projectKey=${{ secrets.SONAR_PROJECT_KEY }}&branch=${{ github.ref_name }}" | jq -r '.projectStatus.status // "UNKNOWN"')
-            REPORT_URL="${{ secrets.SONAR_HOST_URL }}/project/overview?id=${{ secrets.SONAR_PROJECT_KEY }}&branch=${{ github.ref_name }}"
+              "$SONAR_HOST/api/qualitygates/project_status?projectKey=${{ secrets.SONAR_PROJECT_KEY }}&branch=${{ github.ref_name }}" | jq -r '.projectStatus.status // "UNKNOWN"')
+            REPORT_URL="$SONAR_HOST/project/overview?id=${{ secrets.SONAR_PROJECT_KEY }}&branch=${{ github.ref_name }}"
           fi
 
           echo "severe_count=$SEVERE" >> "$GITHUB_OUTPUT"
@@ -288,8 +291,9 @@ jobs:
               file=$(echo "$issue" | jq -r '.component // "Unknown"')
               line=$(echo "$issue" | jq -r '.line // "N/A"')
               issue_key=$(echo "$issue" | jq -r '.key // "N/A"')
-              issue_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&issues=$issue_key&open=$issue_key"
-              desc=$(printf 'Issue: %s\nSeverity: BLOCKER\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nIssue URL: %s\nReport: %s\n\nSteps to fix:\n1) Open the Sonar issue URL and review the rule details.\n2) Update code at the file/line above to satisfy the rule.\n3) Push commit and verify this subtask issue disappears in next scan.' "$msg" "$rule" "$file" "$line" "$issue_key" "$issue_url" "$REPORT_URL")
+              issue_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&$SONAR_SCOPE&open=$issue_key"
+              rule_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&$SONAR_SCOPE&resolved=false&rules=$rule"
+              desc=$(printf 'Issue Name: %s\nSeverity: BLOCKER\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nOpen This Issue: %s\nAll Similar Issues: %s\nReport: %s\n\nSteps to fix:\n1) Open This Issue link and review the rule details.\n2) Update code at the file/line above to satisfy the rule.\n3) Push commit and verify this subtask issue disappears in next scan.' "$msg" "$rule" "$file" "$line" "$issue_key" "$issue_url" "$rule_url" "$REPORT_URL")
               
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
@@ -323,8 +327,9 @@ jobs:
               file=$(echo "$issue" | jq -r '.component // "Unknown"')
               line=$(echo "$issue" | jq -r '.line // "N/A"')
               issue_key=$(echo "$issue" | jq -r '.key // "N/A"')
-              issue_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&issues=$issue_key&open=$issue_key"
-              desc=$(printf 'Issue: %s\nSeverity: CRITICAL\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nIssue URL: %s\nReport: %s\n\nSteps to fix:\n1) Open the Sonar issue URL and review impact/risk.\n2) Patch the code to remove the rule violation.\n3) Run tests and verify issue is closed on next Sonar run.' "$msg" "$rule" "$file" "$line" "$issue_key" "$issue_url" "$REPORT_URL")
+              issue_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&$SONAR_SCOPE&open=$issue_key"
+              rule_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&$SONAR_SCOPE&resolved=false&rules=$rule"
+              desc=$(printf 'Issue Name: %s\nSeverity: CRITICAL\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nOpen This Issue: %s\nAll Similar Issues: %s\nReport: %s\n\nSteps to fix:\n1) Open This Issue link and review impact/risk.\n2) Patch the code to remove the rule violation.\n3) Run tests and verify issue is closed on next Sonar run.' "$msg" "$rule" "$file" "$line" "$issue_key" "$issue_url" "$rule_url" "$REPORT_URL")
               
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
@@ -371,9 +376,10 @@ jobs:
               rule=$(echo "$group" | jq -r '.rule')
               count=$(echo "$group" | jq -r '.count')
               first_key=$(echo "$group" | jq -r '.samples[0].key')
-              issue_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&issues=$first_key&open=$first_key"
+              issue_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&$SONAR_SCOPE&open=$first_key"
+              rule_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&$SONAR_SCOPE&resolved=false&rules=$rule"
               sample_list=$(echo "$group" | jq -r '.samples[] | "- " + .key + " | " + .file + ":" + .line')
-              desc=$(printf 'Issue: %s\nSeverity: MAJOR\nRule: %s\nOccurrences: %s\nIssue URL: %s\nReport: %s\n\nExamples (Sonar Key | File:Line):\n%s\n\nSteps to fix:\n1) Open Issue URL to inspect this rule group.\n2) Fix all listed occurrences in Examples.\n3) Push commit and verify MAJOR count drops in next scan.' "$msg" "$rule" "$count" "$issue_url" "$REPORT_URL" "$sample_list")
+              desc=$(printf 'Issue Name: %s\nSeverity: MAJOR\nRule: %s\nOccurrences: %s\nOpen One Example: %s\nAll Similar Issues: %s\nReport: %s\n\nExamples (Sonar Key | File:Line):\n%s\n\nSteps to fix:\n1) Open one example or All Similar Issues.\n2) Fix all listed occurrences in Examples.\n3) Push commit and verify MAJOR count drops in next scan.' "$msg" "$rule" "$count" "$issue_url" "$rule_url" "$REPORT_URL" "$sample_list")
               
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
@@ -420,9 +426,10 @@ jobs:
               prob=$(echo "$group" | jq -r '.risk')
               count=$(echo "$group" | jq -r '.count')
               first_key=$(echo "$group" | jq -r '.samples[0].key')
-              hotspot_url="$SONAR_HOST/security_hotspots?id=$SONAR_KEY&hotspots=$first_key"
+              hotspot_url="$SONAR_HOST/security_hotspots?id=$SONAR_KEY&$SONAR_SCOPE&hotspots=$first_key"
+              all_hotspots_url="$SONAR_HOST/security_hotspots?id=$SONAR_KEY&$SONAR_SCOPE"
               sample_list=$(echo "$group" | jq -r '.samples[] | "- " + .key + " | " + .file + ":" + .line')
-              desc=$(printf 'Issue: %s\nType: SECURITY HOTSPOT\nRisk: %s\nOccurrences: %s\nHotspot URL: %s\nReport: %s\n\nExamples (Hotspot Key | File:Line):\n%s\n\nSteps to fix:\n1) Open Hotspot URL and review secure coding recommendation.\n2) Fix all listed occurrences in Examples.\n3) Re-run scan and verify hotspot count decreases.' "$msg" "$prob" "$count" "$hotspot_url" "$REPORT_URL" "$sample_list")
+              desc=$(printf 'Issue Name: %s\nType: SECURITY HOTSPOT\nRisk: %s\nOccurrences: %s\nOpen One Hotspot: %s\nAll Hotspots: %s\nReport: %s\n\nExamples (Hotspot Key | File:Line):\n%s\n\nSteps to fix:\n1) Open one hotspot or All Hotspots link.\n2) Fix all listed occurrences in Examples.\n3) Re-run scan and verify hotspot count decreases.' "$msg" "$prob" "$count" "$hotspot_url" "$all_hotspots_url" "$REPORT_URL" "$sample_list")
 
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
