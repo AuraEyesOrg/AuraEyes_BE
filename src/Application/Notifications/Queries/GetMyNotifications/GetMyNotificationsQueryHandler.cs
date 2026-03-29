@@ -36,9 +36,10 @@ public class GetMyNotificationsQueryHandler : IQueryHandler<GetMyNotificationsQu
             .AsNoTracking()
             .Where(n => n.UserId == userId);
 
-        if (request.Type.HasValue)
+        if (request.Types is { Count: > 0 })
         {
-            baseQuery = baseQuery.Where(n => n.Type == request.Type.Value);
+            var selectedTypes = request.Types;
+            baseQuery = baseQuery.Where(n => selectedTypes.Contains(n.Type));
         }
 
         var totalCount = await baseQuery.CountAsync(cancellationToken);

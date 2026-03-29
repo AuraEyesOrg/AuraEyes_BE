@@ -20,9 +20,9 @@ public record GetMyNotificationsQuery : IQuery<PaginatedNotificationsResponse>
     public int PageSize { get; init; } = 10;
 
     /// <summary>
-    /// Optional notification type filter
+    /// Optional notification type filters (OR condition)
     /// </summary>
-    public NotificationType? Type { get; init; }
+    public IReadOnlyCollection<NotificationType>? Types { get; init; }
 }
 
 /// <summary>
