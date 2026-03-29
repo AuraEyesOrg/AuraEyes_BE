@@ -29,9 +29,6 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore AuraEyes_BE.sln
 
-      - name: Build solution
-        run: dotnet build AuraEyes_BE.sln --configuration Release --no-restore
-
       - name: SonarQube - Begin
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -41,9 +38,11 @@ jobs:
             /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}" \
             /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
             /o:"${{ secrets.SONAR_ORGANIZATION }}" \
-            /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml" \
             /d:sonar.qualitygate.wait=true \
             /d:sonar.qualitygate.timeout=300
+
+      - name: Build solution
+        run: dotnet build AuraEyes_BE.sln --configuration Release --no-restore
 
       - name: Run unit tests
         run: dotnet test AuraEyes_BE.sln --configuration Release --no-build --logger trx --results-directory ./test-results
