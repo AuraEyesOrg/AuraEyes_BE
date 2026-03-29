@@ -1,0 +1,175 @@
+name: SonarQube Quality Gate & Jira Automation
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  sonar:
+    runs-on: ubuntu-latest
+    outputs:
+      severe_count: ${{ steps.evaluate.outputs.severe_count }}
+      quality_gate: ${{ steps.evaluate.outputs.quality_gate }}
+      report_url: ${{ steps.evaluate.outputs.report_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for SonarQube to analyze correctly
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Install SonarScanner for .NET
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      - name: Restore dependencies
+        run: dotnet restore AuraEyes_BE.sln
+
+      - name: Build solution
+        run: dotnet build AuraEyes_BE.sln --configuration Release --no-restore
+
+      - name: SonarQube - Begin
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          dotnet-sonarscanner begin \
+            /k:"${{ secrets.SONAR_PROJECT_KEY }}" \
+            /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}" \
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+            /o:"${{ secrets.SONAR_ORGANIZATION }}" \
+            /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml" \
+            /d:sonar.qualitygate.wait=true \
+            /d:sonar.qualitygate.timeout=300
+
+      - name: Run unit tests
+        run: dotnet test AuraEyes_BE.sln --configuration Release --no-build --logger trx --results-directory ./test-results
+
+      - name: SonarQube - End
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+
+      - name: Evaluate Sonar severity and quality gate
+        id: evaluate
+        shell: bash
+        run: |
+          # Get severe issues count
+          SEVERE=$(curl -s -u "${{ secrets.SONAR_TOKEN }}": \
+            "${{ secrets.SONAR_HOST_URL }}/api/issues/search?componentKeys=${{ secrets.SONAR_PROJECT_KEY }}&severities=BLOCKER,CRITICAL&resolved=false&ps=1" | jq -r '.total // 0')
+
+          # Get quality gate status
+          QG=$(curl -s -u "${{ secrets.SONAR_TOKEN }}": \
+            "${{ secrets.SONAR_HOST_URL }}/api/qualitygates/project_status?projectKey=${{ secrets.SONAR_PROJECT_KEY }}" | jq -r '.projectStatus.status // "UNKNOWN"')
+
+          # Get report URL
+          REPORT_URL="${{ secrets.SONAR_HOST_URL }}/dashboard?id=${{ secrets.SONAR_PROJECT_KEY }}"
+
+          echo "severe_count=$SEVERE" >> "$GITHUB_OUTPUT"
+          echo "quality_gate=$QG" >> "$GITHUB_OUTPUT"
+          echo "report_url=$REPORT_URL" >> "$GITHUB_OUTPUT"
+
+          echo "📊 **Sonar Quality Gate Report**"
+          echo "- Severe Issues: $SEVERE"
+          echo "- Quality Gate: $QG"
+          echo "- Report: $REPORT_URL"
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const severe = ${{ steps.evaluate.outputs.severe_count }};
+            const qg = "${{ steps.evaluate.outputs.quality_gate }}";
+            const reportUrl = "${{ steps.evaluate.outputs.report_url }}";
+
+            let icon = qg === "OK" ? "✅" : "❌";
+            let comment = `## ${icon} SonarQube Quality Gate Results
+
+            - **Quality Gate:** ${qg}
+            - **Severe Issues:** ${severe} (BLOCKER + CRITICAL)
+            - **Report:** [View in SonarQube](${reportUrl})
+
+            ${severe > 0 ? `⚠️ Found ${severe} severe issues that need to be fixed.` : "✨ All quality checks passed!"}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  create_jira_ticket:
+    runs-on: ubuntu-latest
+    needs: sonar
+    if: ${{ needs.sonar.outputs.severe_count != '0' || needs.sonar.outputs.quality_gate == 'ERROR' }}
+    steps:
+      - name: Check for existing Jira ticket
+        id: check_ticket
+        shell: bash
+        run: |
+          SUMMARY="[Sonar][${{ github.repository }}] Severe issues on ${{ github.ref_name }}"
+          JQL="project=${{ secrets.JIRA_PROJECT_KEY }} AND summary ~ \"${SUMMARY}\" AND statusCategory != Done"
+          ENCODED_JQL=$(echo "$JQL" | jq -sRr @uri)
+
+          RESPONSE=$(curl -s \
+            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
+            -H "Accept: application/json" \
+            "${{ secrets.JIRA_BASE_URL }}/rest/api/2/search?jql=${ENCODED_JQL}&maxResults=1")
+
+          EXISTING=$(echo "$RESPONSE" | jq -r '.total // 0')
+          ISSUE_KEY=$(echo "$RESPONSE" | jq -r '.issues[0].key // empty')
+
+          echo "existing_ticket=$EXISTING" >> "$GITHUB_OUTPUT"
+          echo "issue_key=$ISSUE_KEY" >> "$GITHUB_OUTPUT"
+
+      - name: Create Jira issue
+        if: steps.check_ticket.outputs.existing_ticket == '0'
+        shell: bash
+        run: |
+          SUMMARY="[Sonar][${{ github.repository }}] Severe issues on ${{ github.ref_name }}"
+          DESC="Repository: ${{ github.repository }}
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Sonar Quality Gate: ${{ needs.sonar.outputs.quality_gate }}
+          Severe issues (BLOCKER+CRITICAL): ${{ needs.sonar.outputs.severe_count }}
+          
+          Report: ${{ needs.sonar.outputs.report_url }}
+          Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          PAYLOAD=$(jq -n \
+            --arg project "${{ secrets.JIRA_PROJECT_KEY }}" \
+            --arg summary "$SUMMARY" \
+            --arg desc "$DESC" \
+            --arg priority "High" \
+            '{fields:{project:{key:$project},summary:$summary,description:$desc,issuetype:{name:"Bug"},priority:{name:$priority}}}')
+
+          RESPONSE=$(curl -s -X POST \
+            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
+            -H "Accept: application/json" \
+            -H "Content-Type: application/json" \
+            --data "$PAYLOAD" \
+            "${{ secrets.JIRA_BASE_URL }}/rest/api/2/issue")
+
+          ISSUE_KEY=$(echo "$RESPONSE" | jq -r '.key // empty')
+          if [ -z "$ISSUE_KEY" ]; then
+            echo "❌ Failed to create Jira ticket"
+            echo "$RESPONSE" | jq '.'
+            exit 1
+          fi
+
+          echo "✅ Created Jira ticket: $ISSUE_KEY"
+
+      - name: Notify existing ticket
+        if: steps.check_ticket.outputs.existing_ticket != '0'
+        shell: bash
+        run: |
+          echo "ℹ️  Jira ticket already exists: ${{ steps.check_ticket.outputs.issue_key }}"
+          echo "Skipping duplicate creation"
