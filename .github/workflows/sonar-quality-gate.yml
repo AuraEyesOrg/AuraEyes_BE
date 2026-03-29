@@ -23,7 +23,7 @@ jobs:
         with:
           dotnet-version: 8.0.x
           cache: true
-          cache-dependency-path: '**/packages.lock.json'
+          cache-dependency-path: "**/packages.lock.json"
 
       - name: Install SonarScanner for .NET
         run: dotnet tool install --global dotnet-sonarscanner
@@ -140,7 +140,7 @@ jobs:
           Commit: ${{ github.sha }}
           Sonar Quality Gate: ${{ needs.sonar.outputs.quality_gate }}
           Severe issues (BLOCKER+CRITICAL): ${{ needs.sonar.outputs.severe_count }}
-          
+
           Report: ${{ needs.sonar.outputs.report_url }}
           Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
