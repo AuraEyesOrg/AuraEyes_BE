@@ -127,6 +127,138 @@ public class DashboardMetricsService : IDashboardMetricsService
             })
             .ToList();
 
+        var monthlyPlatformRaw = await (
+            from t in _context.WalletTransactions.AsNoTracking()
+            join w in _context.Wallets.AsNoTracking() on t.WalletId equals w.Id
+            where w.OwnerType == "System"
+                  && t.TransactionType == TransactionType.Deposit
+                  && t.ReferenceType == "Booking"
+                  && t.CreatedAt >= yearStart
+                  && t.CreatedAt < nextYearStart
+            group t by t.CreatedAt.Month
+            into g
+            select new
+            {
+                Month = g.Key,
+                Revenue = g.Sum(x => x.Amount)
+            }).ToListAsync(cancellationToken);
+
+        var dailyPlatformRaw = await (
+            from t in _context.WalletTransactions.AsNoTracking()
+            join w in _context.Wallets.AsNoTracking() on t.WalletId equals w.Id
+            where w.OwnerType == "System"
+                  && t.TransactionType == TransactionType.Deposit
+                  && t.ReferenceType == "Booking"
+                  && t.CreatedAt >= sevenDaysStart
+                  && t.CreatedAt < nextDay
+            group t by t.CreatedAt.Date
+            into g
+            select new
+            {
+                Date = g.Key,
+                Revenue = g.Sum(x => x.Amount)
+            }).ToListAsync(cancellationToken);
+
+        var monthlyPlatformMap = monthlyPlatformRaw
+            .ToDictionary(item => item.Month, item => Math.Round(item.Revenue, 0));
+        var monthlyPlatformCommission = Enumerable.Range(1, 12)
+            .Select(month => new MonthlyRevenuePointDto
+            {
+                Month = month,
+                Label = CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(month),
+                Revenue = monthlyPlatformMap.GetValueOrDefault(month, 0m)
+            })
+            .ToList();
+
+        var dailyPlatformMap = dailyPlatformRaw
+            .ToDictionary(item => item.Date, item => Math.Round(item.Revenue, 0));
+        var dailyPlatformCommission = Enumerable.Range(0, 7)
+            .Select(offset => sevenDaysStart.AddDays(offset))
+            .Select(date => new DailyRevenuePointDto
+            {
+                Date = DateTime.SpecifyKind(date, DateTimeKind.Utc),
+                Label = date.ToString("dd MMM", CultureInfo.InvariantCulture),
+                Revenue = dailyPlatformMap.GetValueOrDefault(date, 0m)
+            })
+            .ToList();
+
+        var totalDepositRevenueYear = monthlyRevenue.Sum(m => m.Revenue);
+        var totalPlatformCommissionYear = monthlyPlatformCommission.Sum(m => m.Revenue);
+
+        var newDoctorsByMonth = await _context.Ophthalmologists.AsNoTracking()
+            .Where(o => o.CreatedAt >= yearStart && o.CreatedAt < nextYearStart)
+            .GroupBy(o => o.CreatedAt.Month)
+            .Select(g => new { Month = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+        var newOrgsByMonth = await _context.Organisations.AsNoTracking()
+            .Where(o => o.CreatedAt >= yearStart && o.CreatedAt < nextYearStart)
+            .GroupBy(o => o.CreatedAt.Month)
+            .Select(g => new { Month = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+        var newPatientsByMonth = await _context.Patients.AsNoTracking()
+            .Where(p => p.CreatedAt >= yearStart && p.CreatedAt < nextYearStart)
+            .GroupBy(p => p.CreatedAt.Month)
+            .Select(g => new { Month = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var doctorMonthMap = newDoctorsByMonth.ToDictionary(x => x.Month, x => x.Count);
+        var orgMonthMap = newOrgsByMonth.ToDictionary(x => x.Month, x => x.Count);
+        var patientMonthMap = newPatientsByMonth.ToDictionary(x => x.Month, x => x.Count);
+        var monthlyNewDoctorCounts = Enumerable.Range(1, 12).Select(m => doctorMonthMap.GetValueOrDefault(m, 0)).ToList();
+        var monthlyNewOrganisationCounts = Enumerable.Range(1, 12).Select(m => orgMonthMap.GetValueOrDefault(m, 0)).ToList();
+        var monthlyNewPatientCounts = Enumerable.Range(1, 12).Select(m => patientMonthMap.GetValueOrDefault(m, 0)).ToList();
+
+        var pendingDoctorVerifications = await _context.Ophthalmologists
+            .CountAsync(o => o.VerificationStatus == VerificationStatus.PendingVerification, cancellationToken);
+        var pendingWithdrawals = await _context.WithdrawalRequests
+            .CountAsync(
+                w => w.Status == PaymentStatus.Pending || w.Status == PaymentStatus.Processing,
+                cancellationToken);
+        var pendingOnboarding = await _context.OrganisationOnboardingRequests
+            .CountAsync(r => r.Status == OrganisationOnboardingStatus.Pending, cancellationToken);
+
+        var liveConsultations = await _context.ConsultationSessions
+            .CountAsync(
+                s => s.ChatStatus == ChatStatus.Open
+                     && s.Status != SessionStatus.Completed
+                     && s.Status != SessionStatus.Cancelled,
+                cancellationToken);
+
+        var databaseHealthy = await _context.Database.CanConnectAsync(cancellationToken);
+
+        // Consultation credits: Deposit or Transfer on ophthalmologist wallets. ReferenceType is usually
+        var topDoctorRows = await (
+            from t in _context.WalletTransactions.AsNoTracking()
+            join w in _context.Wallets.AsNoTracking() on t.WalletId equals w.Id
+            join o in _context.Ophthalmologists.AsNoTracking() on w.UserId equals o.UserId
+            join u in _context.Users.IgnoreQueryFilters().AsNoTracking() on o.UserId equals u.Id
+            where w.OwnerType == "Ophthalmologist"
+                  && (t.TransactionType == TransactionType.Deposit
+                      || t.TransactionType == TransactionType.Transfer)
+                  && (t.ReferenceType == "Booking")
+            group t.Amount by new { o.Id, o.RatingAverage, o.RatingCount, FullName = u.FullName } into g
+            select new TopPerformerDoctorDto
+            {
+                OphthalmologistId = g.Key.Id,
+                Name = g.Key.FullName ?? string.Empty,
+                Revenue = g.Sum(),
+                RatingAverage = g.Key.RatingAverage,
+                RatingCount = g.Key.RatingCount
+            }).OrderByDescending(x => x.Revenue).Take(5).ToListAsync(cancellationToken);
+
+        var topOrgRows = await _context.Organisations.AsNoTracking()
+            .OrderByDescending(o => o.RatingAverage)
+            .ThenByDescending(o => o.RatingCount)
+            .Take(5)
+            .Select(o => new TopPerformerOrganisationDto
+            {
+                OrganisationId = o.Id,
+                Name = o.Name,
+                RatingAverage = o.RatingAverage,
+                RatingCount = o.RatingCount
+            })
+            .ToListAsync(cancellationToken);
+
         return new DashboardMetricsDto
         {
             Doctors = new UserGrowthMetricDto
@@ -152,7 +284,28 @@ public class DashboardMetricsService : IDashboardMetricsService
             },
             PaymentMethodBreakdown = paymentMethodBreakdown,
             MonthlyRevenue = monthlyRevenue,
-            DailyRevenue = dailyRevenue
+            DailyRevenue = dailyRevenue,
+            TotalDepositRevenueYear = totalDepositRevenueYear,
+            TotalPlatformCommissionYear = totalPlatformCommissionYear,
+            MonthlyPlatformCommission = monthlyPlatformCommission,
+            DailyPlatformCommission = dailyPlatformCommission,
+            MonthlyNewDoctorCounts = monthlyNewDoctorCounts,
+            MonthlyNewOrganisationCounts = monthlyNewOrganisationCounts,
+            MonthlyNewPatientCounts = monthlyNewPatientCounts,
+            PendingActions = new DashboardPendingActionsDto
+            {
+                PendingOphthalmologistVerifications = pendingDoctorVerifications,
+                PendingWithdrawalRequests = pendingWithdrawals,
+                PendingOrganisationOnboarding = pendingOnboarding
+            },
+            SystemStatus = new DashboardSystemStatusDto
+            {
+                LiveConsultationSessions = liveConsultations,
+                ApiHealthy = true,
+                DatabaseHealthy = databaseHealthy
+            },
+            TopDoctorsByConsultationRevenue = topDoctorRows,
+            TopOrganisationsByRating = topOrgRows
         };
     }
 
