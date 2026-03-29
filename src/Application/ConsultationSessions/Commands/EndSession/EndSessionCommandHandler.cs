@@ -130,13 +130,14 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
 
                 if (doctor is not null)
                 {
-                    // CommissionRate on Ophthalmologist is stored as 0–100 (doctor's share of the session fee).
-                    var commissionPercent = doctor.CommissionRate ?? 100m;
-                    var doctorShare = Math.Round(
+                    // CommissionRate on Ophthalmologist is stored as 0–100 (platform's share of the session fee).
+                    var commissionPercent = doctor.CommissionRate ?? 0m;
+                    var platformShare = Math.Round(
                         session.Price * (commissionPercent / 100m),
                         0,
                         MidpointRounding.AwayFromZero);
-                    var platformShare = session.Price - doctorShare;
+                    var doctorShare = session.Price - platformShare;
+                    var doctorSharePercent = 100m - commissionPercent;
 
                     if (doctorShare < 0 || platformShare < 0)
                     {
@@ -155,15 +156,15 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
 
                     if (doctorWallet is not null && doctorShare > 0)
                     {
-                        var doctorNote =
-                            $"Consultation earnings: {doctorShare:N0} VND ({commissionPercent:0.##}% of {session.Price:N0} VND) – Session {session.Id}";
+                        var doctorNote = $"Consultation earnings: {doctorShare:N0} VND (Receive {doctorSharePercent:0.##}% from original fee {session.Price:N0} VND) – Session {session.Id}";
+                        
                         doctorWallet.Deposit(doctorShare, doctorNote);
 
                         var earningsTx = new WalletTransaction(
                             doctorWallet.Id,
                             doctorShare,
                             TransactionType.Deposit,
-                            $"Consultation earnings ({commissionPercent:0.##}% of fee)",
+                            $"Consultation earnings (After deducting {commissionPercent:0.##}% platform fee)",
                             referenceType: "Booking",
                             referenceId: session.Id);
 
@@ -186,14 +187,14 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
                         }
 
                         var platformNote =
-                            $"Platform commission: {platformShare:N0} VND ({100m - commissionPercent:0.##}% of {session.Price:N0} VND) – Session {session.Id}";
+                            $"Platform commission: {platformShare:N0} VND ({commissionPercent:0.##}% of {session.Price:N0} VND) – Session {session.Id}";
                         platformWallet.Deposit(platformShare, platformNote);
 
                         var platformTx = new WalletTransaction(
                             platformWallet.Id,
                             platformShare,
                             TransactionType.Deposit,
-                            $"Platform commission ({100m - commissionPercent:0.##}% of fee)",
+                            $"Platform commission ({commissionPercent:0.##}% of fee)",
                             referenceType: "Booking",
                             referenceId: session.Id);
 

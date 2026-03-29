@@ -127,6 +127,64 @@ public class DashboardMetricsService : IDashboardMetricsService
             })
             .ToList();
 
+        var monthlyPlatformRaw = await (
+            from t in _context.WalletTransactions.AsNoTracking()
+            join w in _context.Wallets.AsNoTracking() on t.WalletId equals w.Id
+            where w.OwnerType == "System"
+                  && t.TransactionType == TransactionType.Deposit
+                  && t.ReferenceType == "Booking"
+                  && t.CreatedAt >= yearStart
+                  && t.CreatedAt < nextYearStart
+            group t by t.CreatedAt.Month
+            into g
+            select new
+            {
+                Month = g.Key,
+                Revenue = g.Sum(x => x.Amount)
+            }).ToListAsync(cancellationToken);
+
+        var dailyPlatformRaw = await (
+            from t in _context.WalletTransactions.AsNoTracking()
+            join w in _context.Wallets.AsNoTracking() on t.WalletId equals w.Id
+            where w.OwnerType == "System"
+                  && t.TransactionType == TransactionType.Deposit
+                  && t.ReferenceType == "Booking"
+                  && t.CreatedAt >= sevenDaysStart
+                  && t.CreatedAt < nextDay
+            group t by t.CreatedAt.Date
+            into g
+            select new
+            {
+                Date = g.Key,
+                Revenue = g.Sum(x => x.Amount)
+            }).ToListAsync(cancellationToken);
+
+        var monthlyPlatformMap = monthlyPlatformRaw
+            .ToDictionary(item => item.Month, item => Math.Round(item.Revenue, 0));
+        var monthlyPlatformCommission = Enumerable.Range(1, 12)
+            .Select(month => new MonthlyRevenuePointDto
+            {
+                Month = month,
+                Label = CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(month),
+                Revenue = monthlyPlatformMap.GetValueOrDefault(month, 0m)
+            })
+            .ToList();
+
+        var dailyPlatformMap = dailyPlatformRaw
+            .ToDictionary(item => item.Date, item => Math.Round(item.Revenue, 0));
+        var dailyPlatformCommission = Enumerable.Range(0, 7)
+            .Select(offset => sevenDaysStart.AddDays(offset))
+            .Select(date => new DailyRevenuePointDto
+            {
+                Date = DateTime.SpecifyKind(date, DateTimeKind.Utc),
+                Label = date.ToString("dd MMM", CultureInfo.InvariantCulture),
+                Revenue = dailyPlatformMap.GetValueOrDefault(date, 0m)
+            })
+            .ToList();
+
+        var totalDepositRevenueYear = monthlyRevenue.Sum(m => m.Revenue);
+        var totalPlatformCommissionYear = monthlyPlatformCommission.Sum(m => m.Revenue);
+
         return new DashboardMetricsDto
         {
             Doctors = new UserGrowthMetricDto
@@ -152,7 +210,11 @@ public class DashboardMetricsService : IDashboardMetricsService
             },
             PaymentMethodBreakdown = paymentMethodBreakdown,
             MonthlyRevenue = monthlyRevenue,
-            DailyRevenue = dailyRevenue
+            DailyRevenue = dailyRevenue,
+            TotalDepositRevenueYear = totalDepositRevenueYear,
+            TotalPlatformCommissionYear = totalPlatformCommissionYear,
+            MonthlyPlatformCommission = monthlyPlatformCommission,
+            DailyPlatformCommission = dailyPlatformCommission
         };
     }
 

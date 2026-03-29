@@ -11,6 +11,15 @@ public class DashboardMetricsDto
     public List<PaymentMethodRevenueDto> PaymentMethodBreakdown { get; set; } = new();
     public List<MonthlyRevenuePointDto> MonthlyRevenue { get; set; } = new();
     public List<DailyRevenuePointDto> DailyRevenue { get; set; } = new();
+
+    /// <summary>Sum of completed patient top-ups (deposit requests) in the current calendar year.</summary>
+    public decimal TotalDepositRevenueYear { get; set; }
+
+    /// <summary>Platform share from consultations credited to the System wallet in the current calendar year.</summary>
+    public decimal TotalPlatformCommissionYear { get; set; }
+
+    public List<MonthlyRevenuePointDto> MonthlyPlatformCommission { get; set; } = new();
+    public List<DailyRevenuePointDto> DailyPlatformCommission { get; set; } = new();
 }
 
 public class UserGrowthMetricDto
