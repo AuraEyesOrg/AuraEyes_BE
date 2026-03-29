@@ -22,8 +22,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-          cache: true
-          cache-dependency-path: "**/packages.lock.json"
 
       - name: Install SonarScanner for .NET
         run: dotnet tool install --global dotnet-sonarscanner
