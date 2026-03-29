@@ -227,8 +227,6 @@ public class DashboardMetricsService : IDashboardMetricsService
         var databaseHealthy = await _context.Database.CanConnectAsync(cancellationToken);
 
         // Consultation credits: Deposit or Transfer on ophthalmologist wallets. ReferenceType is usually
-        // "Booking"; legacy rows may omit it — match description so all credited doctors appear in rankings.
-        // Join Users with IgnoreQueryFilters so soft-deleted accounts still contribute to historical revenue.
         var topDoctorRows = await (
             from t in _context.WalletTransactions.AsNoTracking()
             join w in _context.Wallets.AsNoTracking() on t.WalletId equals w.Id
