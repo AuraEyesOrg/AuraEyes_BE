@@ -98,17 +98,21 @@ jobs:
             const reportUrl = "${{ steps.evaluate.outputs.report_url }}" || "";
 
             let icon = qg === "OK" ? "✅" : "❌";
+            let bugBadge = severe > 0 ? `🐛 **${severe} Bugs Found**` : "✨ No Critical Issues";
             const statusLine = qg === "OK"
               ? "✨ All quality checks passed!"
-              : `⚠️ Quality Gate is ${qg}. Please review Sonar report.`;
-            let comment = `## ${icon} SonarQube Quality Gate Results
-
-            - **Quality Gate:** ${qg}
-            - **Severe Issues:** ${severe} (BLOCKER + CRITICAL)
-            - **Report:** [View in SonarQube](${reportUrl})
-
-            ${severe > 0 ? `⚠️ Found ${severe} severe issues that need to be fixed.` : statusLine}
-            `;
+              : `⚠️ Quality Gate is ${qg}. ${severe} severe issues detected.`;
+            const comment = [
+              `## ${icon} SonarQube Quality Gate Results`,
+              "",
+              `**Quality Gate:** ${qg}`,
+              `**Severe Issues:** ${bugBadge}`,
+              `**Report:** [View in SonarQube](${reportUrl})`,
+              "",
+              statusLine,
+              "",
+              "> Visit Jira for full issue list after Sonar automation runs."
+            ].join("\n");
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -137,6 +141,12 @@ jobs:
           REPORT_URL="${{ needs.sonar.outputs.report_url }}"
           QG="${{ needs.sonar.outputs.quality_gate }}"
 
+          # Validate credentials
+          if [ -z "$SONAR_HOST" ] || [ -z "$SONAR_TOKEN" ] || [ -z "$JIRA_TOKEN" ]; then
+            echo "❌ Missing required secrets. Skipping Jira ticket creation."
+            exit 0
+          fi
+
           # Fetch issues
           echo "📊 Fetching issues..."
           ISSUES=$(curl -s -u "$SONAR_TOKEN": "$SONAR_HOST/api/issues/search?componentKeys=$SONAR_KEY&resolved=false&ps=500")
@@ -156,18 +166,18 @@ jobs:
           # Check existing parent
           echo "🔍 Checking for existing parent ticket..."
           parent_key=$(curl -s -u "$JIRA_USER:$JIRA_TOKEN" \
-            "$JIRA_URL/rest/api/2/search?jql=project%3D$JIRA_PROJECT%20AND%20summary~%22Quality%20Gate%20Failed%22%20AND%20statusCategory!=Done&maxResults=1" | jq -r '.issues[0].key // empty')
+            "$JIRA_URL/rest/api/2/search?jql=project%3D$JIRA_PROJECT%20AND%20summary~%22%5BSonar%5D%22%20AND%20statusCategory!=Done%20ORDER%20BY%20created%20DESC&maxResults=1" | jq -r '.issues[0].key // empty')
 
           if [ ! -z "$parent_key" ]; then
-            echo "✓ Existing parent: $parent_key"
+            echo "✓ Using existing parent: $parent_key"
           else
             # Create parent
-            echo "🎫 Creating parent ticket..."
+            echo "🎫 Creating new parent ticket..."
             parent_payload=$(jq -n \
               --arg project "$JIRA_PROJECT" \
               --arg summary "[Sonar] Quality Gate Failed - Multiple Issues Detected" \
-              --arg desc "Quality Gate: $QG\nBLOCKER: $BLOCKER\nCRITICAL: $CRITICAL\nMAJOR: $MAJOR\n\nReport: $REPORT_URL\nGitHub: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-              '{fields:{project:{key:$project},summary:$summary,description:$desc,issuetype:{name:"Task"},priority:{name:"High"}}}')
+              --arg desc "Quality Gate: $QG\nBLOCKER: $BLOCKER | CRITICAL: $CRITICAL | MAJOR: $MAJOR\n\nReport: $REPORT_URL\nGitHub Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+              '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":"Task"},"priority":{"name":"High"}}}')
             
             parent_resp=$(curl -s -X POST -u "$JIRA_USER:$JIRA_TOKEN" \
               -H "Content-Type: application/json" \
@@ -184,21 +194,19 @@ jobs:
 
           # Create BLOCKER subtasks (top 5)
           if [ $BLOCKER -gt 0 ]; then
-            echo "🔴 Creating BLOCKER subtasks..."
-            counter=0
-            echo "$ISSUES" | jq -c '.issues[] | select(.severity=="BLOCKER")' | while read -r issue; do
-              counter=$((counter + 1))
-              [ $counter -gt 5 ] && break
-              
+            echo "🔴 Creating BLOCKER subtasks (max 5)..."
+            echo "$ISSUES" | jq -c '.issues[] | select(.severity=="BLOCKER")' | head -5 | while read -r issue; do
               msg=$(echo "$issue" | jq -r '.message')
               rule=$(echo "$issue" | jq -r '.rule // "Unknown"')
+              file=$(echo "$issue" | jq -r '.component // "Unknown"')
+              line=$(echo "$issue" | jq -r '.line // "N/A"')
               
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
-                --arg summary "BLOCKER: ${msg:0:60}" \
-                --arg desc "Rule: $rule\n\nReport: $REPORT_URL" \
+                --arg summary "🐛 BLOCKER: ${msg:0:50}" \
+                --arg desc "**File:** $file (Line $line)\n**Rule:** $rule\n**Report:** $REPORT_URL" \
                 --arg parent "$parent_key" \
-                '{fields:{project:{key:$project},summary:$summary,description:$desc,issuetype:{name:"Sub-task"},priority:{name:"Highest"},parent:{key:$parent}}}')
+                '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":"Sub-task"},"priority":{"name":"Highest"},"parent":{"key":$parent}}}')
               
               sub_key=$(curl -s -X POST -u "$JIRA_USER:$JIRA_TOKEN" \
                 -H "Content-Type: application/json" \
@@ -206,28 +214,28 @@ jobs:
                 "$JIRA_URL/rest/api/2/issue" | jq -r '.key // empty')
               
               if [ ! -z "$sub_key" ]; then
-                echo "  ✅ $sub_key"
+                echo "  ✅ $sub_key - $msg"
+              else
+                echo "  ❌ Failed to create: $msg"
               fi
             done
           fi
 
           # Create CRITICAL subtasks (top 5)
           if [ $CRITICAL -gt 0 ]; then
-            echo "🟠 Creating CRITICAL subtasks..."
-            counter=0
-            echo "$ISSUES" | jq -c '.issues[] | select(.severity=="CRITICAL")' | while read -r issue; do
-              counter=$((counter + 1))
-              [ $counter -gt 5 ] && break
-              
+            echo "🟠 Creating CRITICAL subtasks (max 5)..."
+            echo "$ISSUES" | jq -c '.issues[] | select(.severity=="CRITICAL")' | head -5 | while read -r issue; do
               msg=$(echo "$issue" | jq -r '.message')
               rule=$(echo "$issue" | jq -r '.rule // "Unknown"')
+              file=$(echo "$issue" | jq -r '.component // "Unknown"')
+              line=$(echo "$issue" | jq -r '.line // "N/A"')
               
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
-                --arg summary "CRITICAL: ${msg:0:60}" \
-                --arg desc "Rule: $rule\n\nReport: $REPORT_URL" \
+                --arg summary "⚠️ CRITICAL: ${msg:0:50}" \
+                --arg desc "**File:** $file (Line $line)\n**Rule:** $rule\n**Report:** $REPORT_URL" \
                 --arg parent "$parent_key" \
-                '{fields:{project:{key:$project},summary:$summary,description:$desc,issuetype:{name:"Sub-task"},priority:{name:"High"},parent:{key:$parent}}}')
+                '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":"Sub-task"},"priority":{"name":"High"},"parent":{"key":$parent}}}')
               
               sub_key=$(curl -s -X POST -u "$JIRA_USER:$JIRA_TOKEN" \
                 -H "Content-Type: application/json" \
@@ -235,7 +243,38 @@ jobs:
                 "$JIRA_URL/rest/api/2/issue" | jq -r '.key // empty')
               
               if [ ! -z "$sub_key" ]; then
-                echo "  ✅ $sub_key"
+                echo "  ✅ $sub_key - $msg"
+              else
+                echo "  ❌ Failed to create: $msg"
+              fi
+            done
+          fi
+
+          # Create MAJOR subtasks (top 3)
+          if [ $MAJOR -gt 0 ]; then
+            echo "🟡 Creating MAJOR subtasks (max 3)..."
+            echo "$ISSUES" | jq -c '.issues[] | select(.severity=="MAJOR")' | head -3 | while read -r issue; do
+              msg=$(echo "$issue" | jq -r '.message')
+              rule=$(echo "$issue" | jq -r '.rule // "Unknown"')
+              file=$(echo "$issue" | jq -r '.component // "Unknown"')
+              line=$(echo "$issue" | jq -r '.line // "N/A"')
+              
+              payload=$(jq -n \
+                --arg project "$JIRA_PROJECT" \
+                --arg summary "📌 MAJOR: ${msg:0:50}" \
+                --arg desc "**File:** $file (Line $line)\n**Rule:** $rule\n**Report:** $REPORT_URL" \
+                --arg parent "$parent_key" \
+                '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":"Sub-task"},"priority":{"name":"Medium"},"parent":{"key":$parent}}}')
+              
+              sub_key=$(curl -s -X POST -u "$JIRA_USER:$JIRA_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "$payload" \
+                "$JIRA_URL/rest/api/2/issue" | jq -r '.key // empty')
+              
+              if [ ! -z "$sub_key" ]; then
+                echo "  ✅ $sub_key - $msg"
+              else
+                echo "  ❌ Failed to create: $msg"
               fi
             done
           fi
