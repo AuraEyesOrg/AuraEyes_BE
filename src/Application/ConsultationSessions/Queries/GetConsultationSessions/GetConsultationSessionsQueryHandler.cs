@@ -43,6 +43,7 @@ public class GetConsultationSessionsQueryHandler
         var (items, totalCount) = await _sessionRepository.GetPagedAsync(
             request.PatientId,
             request.OphthalmologistId,
+            request.AiScreeningId,
             request.Type,
             request.Status,
             request.ChatStatus,

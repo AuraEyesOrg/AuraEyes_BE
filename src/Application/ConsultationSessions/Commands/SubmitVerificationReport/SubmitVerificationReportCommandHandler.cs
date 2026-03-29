@@ -52,13 +52,31 @@ public class SubmitVerificationReportCommandHandler
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
+            var diagnosisCode = string.IsNullOrWhiteSpace(request.DiagnosisCode)
+                ? request.DiagnosesCode
+                : request.DiagnosisCode;
+
+            var clinicalFindings = string.IsNullOrWhiteSpace(request.ClinicalFindings)
+                ? request.DiagnosesText
+                : request.ClinicalFindings;
+
             var diagnosis = new MedicalDiagnosis(
                     session.AiScreeningId.Value,
                     request.DoctorId,
                     session.Id,
-                    request.DiagnosesCode,
-                    request.DiagnosesText,
-                    request.TreatmentPlan);
+                    diagnosisCode,
+                    request.CodingSystem,
+                    clinicalFindings,
+                    request.SeverityLevel,
+                    request.ConfidenceLevel,
+                    request.TreatmentPlan,
+                    request.Recommendations,
+                    request.LifestyleAdvice,
+                    request.IsUrgent,
+                    request.Status,
+                    request.FollowUpDate,
+                    request.IsReferralNeeded,
+                    request.FinalizedAt);
 
             await _diagnosisRepository.AddAsync(diagnosis, cancellationToken);
 

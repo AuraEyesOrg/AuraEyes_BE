@@ -4,6 +4,7 @@ using Domain.Common;
 using Domain.Entities.Screening;
 using Domain.Entities.Users;
 using Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Application.Screenings.Commands.SaveAiScreeningResults;
@@ -48,7 +49,10 @@ public class SaveAiScreeningResultsCommandHandler : ICommandHandler<SaveAiScreen
         }
 
         // Get the screening session
-        var screening = await _screeningRepository.GetByIdAsync(request.ScreeningId, cancellationToken);
+        var screening = await _screeningRepository
+            .Query()
+            .Include(s => s.Consent)
+            .FirstOrDefaultAsync(s => s.Id == request.ScreeningId, cancellationToken);
         if (screening is null)
         {
             _logger.LogWarning("AI Screening {ScreeningId} not found", request.ScreeningId);
@@ -62,6 +66,16 @@ public class SaveAiScreeningResultsCommandHandler : ICommandHandler<SaveAiScreen
             _logger.LogWarning("Patient {PatientId} not found for screening {ScreeningId}",
                 screening.PatientId, request.ScreeningId);
             return Result<SaveAiScreeningResultsResponse>.NotFound("Patient not found");
+        }
+
+        if (!screening.HasAgreedConsent(screening.PatientId))
+        {
+            _logger.LogWarning(
+                "Consent missing or not agreed for screening {ScreeningId}, patient {PatientId}",
+                request.ScreeningId,
+                screening.PatientId);
+            return Result<SaveAiScreeningResultsResponse>.Failure(
+                "Patient consent is required before saving AI screening results.");
         }
 
         // Store raw JSON output in the screening

@@ -66,4 +66,47 @@ public class AiScreening : BaseEntity, IAggregateRoot
         _screeningResults.Add(result);
         UpdatedAt = DateTime.UtcNow;
     }
+
+    public void RecordConsent(Guid patientId, string consentContent)
+    {
+        if (patientId == Guid.Empty)
+            throw new ArgumentException("PatientId cannot be empty", nameof(patientId));
+
+        if (patientId != PatientId)
+            throw new InvalidOperationException("Consent can only be recorded by the screening owner.");
+
+        if (string.IsNullOrWhiteSpace(consentContent))
+            throw new ArgumentException("Consent content cannot be empty", nameof(consentContent));
+
+        var normalizedContent = consentContent.Trim();
+
+        if (Consent is null)
+        {
+            Consent = new Consent(Id, patientId, normalizedContent);
+            Consent.Agree();
+            UpdatedAt = DateTime.UtcNow;
+            return;
+        }
+
+        if (Consent.PatientId != patientId)
+            throw new InvalidOperationException("Existing consent owner does not match screening owner.");
+
+        var mergedContent = Consent.Content;
+        if (!mergedContent.Contains(normalizedContent, StringComparison.Ordinal))
+        {
+            mergedContent = string.IsNullOrWhiteSpace(mergedContent)
+                ? normalizedContent
+                : $"{mergedContent}\n\n{normalizedContent}";
+        }
+
+        Consent.Agree(mergedContent);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public bool HasAgreedConsent(Guid patientId)
+    {
+        return Consent is not null
+               && Consent.IsAgreed
+               && Consent.PatientId == patientId;
+    }
 }

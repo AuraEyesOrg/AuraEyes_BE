@@ -15,9 +15,16 @@ public class MedicalDiagnosis : BaseEntity, IAggregateRoot
     /// <summary>Required: every diagnosis must originate from a consultation session.</summary>
     public Guid ConsultationSessionId { get; private set; }
 
-    public string? DiagnosesCode { get; private set; }
-    public string? DiagnosesText { get; private set; }
+    public string? DiagnosisCode { get; private set; }
+    public string? CodingSystem { get; private set; }
+    public string? ClinicalFindings { get; private set; }
+    public string? SeverityLevel { get; private set; }
+    public decimal? ConfidenceLevel { get; private set; }
     public string? TreatmentPlan { get; private set; }
+    public string? Recommendations { get; private set; }
+    public bool IsUrgent { get; private set; }
+    public string? Status { get; private set; }
+    public DateTime? FinalizedAt { get; private set; }
 
     /// <summary>Lifestyle advice — replaces drug prescriptions to protect online doctors.</summary>
     public string? LifestyleAdvice { get; private set; }
@@ -31,27 +38,77 @@ public class MedicalDiagnosis : BaseEntity, IAggregateRoot
     private MedicalDiagnosis() { } // EF Core
 
     public MedicalDiagnosis(Guid aiScreeningId, Guid doctorId, Guid consultationSessionId,
-        string? diagnosesCode = null, string? diagnosesText = null, string? treatmentPlan = null,
-        string? lifestyleAdvice = null)
+        string? diagnosisCode = null, string? codingSystem = null, string? clinicalFindings = null,
+        string? severityLevel = null, decimal? confidenceLevel = null, string? treatmentPlan = null,
+        string? recommendations = null, string? lifestyleAdvice = null, bool isUrgent = false,
+        string? status = null, DateTime? followUpDate = null, bool isReferralNeeded = false,
+        DateTime? finalizedAt = null)
     {
         AiScreeningId = aiScreeningId;
         DoctorId = doctorId;
         ConsultationSessionId = consultationSessionId;
-        DiagnosesCode = diagnosesCode;
-        DiagnosesText = diagnosesText;
+
+        DiagnosisCode = diagnosisCode;
+        CodingSystem = codingSystem;
+        ClinicalFindings = clinicalFindings;
+        SeverityLevel = severityLevel;
+        ConfidenceLevel = confidenceLevel;
         TreatmentPlan = treatmentPlan;
+        Recommendations = recommendations;
         LifestyleAdvice = lifestyleAdvice;
-        IsReferralNeeded = false;
+        IsUrgent = isUrgent;
+        Status = status;
+        FollowUpDate = followUpDate;
+        IsReferralNeeded = isReferralNeeded;
+        FinalizedAt = finalizedAt;
+        ConfirmedAt = finalizedAt;
     }
 
-    public void UpdateDiagnosis(string? diagnosesCode, string? diagnosesText,
+    public void UpdateClinicalAssessment(
+        string? diagnosisCode,
+        string? codingSystem,
+        string? clinicalFindings,
+        string? severityLevel,
+        decimal? confidenceLevel,
+        string? treatmentPlan,
+        string? recommendations,
+        string? lifestyleAdvice,
+        bool isUrgent,
+        string? status,
+        DateTime? followUpDate,
+        bool isReferralNeeded)
+    {
+        DiagnosisCode = diagnosisCode;
+        CodingSystem = codingSystem;
+        ClinicalFindings = clinicalFindings;
+        SeverityLevel = severityLevel;
+        ConfidenceLevel = confidenceLevel;
+        TreatmentPlan = treatmentPlan;
+        Recommendations = recommendations;
+        LifestyleAdvice = lifestyleAdvice;
+        IsUrgent = isUrgent;
+        Status = status;
+        FollowUpDate = followUpDate;
+        IsReferralNeeded = isReferralNeeded;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateDiagnosis(string? diagnosisCode, string? clinicalFindings,
         string? treatmentPlan, string? lifestyleAdvice)
     {
-        DiagnosesCode = diagnosesCode;
-        DiagnosesText = diagnosesText;
-        TreatmentPlan = treatmentPlan;
-        LifestyleAdvice = lifestyleAdvice;
-        UpdatedAt = DateTime.UtcNow;
+        UpdateClinicalAssessment(
+            diagnosisCode,
+            CodingSystem,
+            clinicalFindings,
+            SeverityLevel,
+            ConfidenceLevel,
+            treatmentPlan,
+            Recommendations,
+            lifestyleAdvice,
+            IsUrgent,
+            Status,
+            FollowUpDate,
+            IsReferralNeeded);
     }
 
     public void SetReferral(bool needed)
@@ -72,6 +129,8 @@ public class MedicalDiagnosis : BaseEntity, IAggregateRoot
     public void Confirm()
     {
         ConfirmedAt = DateTime.UtcNow;
+        FinalizedAt = ConfirmedAt;
+        Status = "Finalized";
         UpdatedAt = DateTime.UtcNow;
     }
 }
