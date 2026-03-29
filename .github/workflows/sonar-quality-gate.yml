@@ -69,11 +69,11 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             QG=$(curl -s -u "${{ secrets.SONAR_TOKEN }}": \
               "${{ secrets.SONAR_HOST_URL }}/api/qualitygates/project_status?projectKey=${{ secrets.SONAR_PROJECT_KEY }}&pullRequest=${{ github.event.pull_request.number }}" | jq -r '.projectStatus.status // "UNKNOWN"')
-            REPORT_URL="${{ secrets.SONAR_HOST_URL }}/dashboard?id=${{ secrets.SONAR_PROJECT_KEY }}&pullRequest=${{ github.event.pull_request.number }}"
+            REPORT_URL="${{ secrets.SONAR_HOST_URL }}/project/overview?id=${{ secrets.SONAR_PROJECT_KEY }}&pullRequest=${{ github.event.pull_request.number }}"
           else
             QG=$(curl -s -u "${{ secrets.SONAR_TOKEN }}": \
               "${{ secrets.SONAR_HOST_URL }}/api/qualitygates/project_status?projectKey=${{ secrets.SONAR_PROJECT_KEY }}&branch=${{ github.ref_name }}" | jq -r '.projectStatus.status // "UNKNOWN"')
-            REPORT_URL="${{ secrets.SONAR_HOST_URL }}/dashboard?id=${{ secrets.SONAR_PROJECT_KEY }}&branch=${{ github.ref_name }}"
+            REPORT_URL="${{ secrets.SONAR_HOST_URL }}/project/overview?id=${{ secrets.SONAR_PROJECT_KEY }}&branch=${{ github.ref_name }}"
           fi
 
           echo "severe_count=$SEVERE" >> "$GITHUB_OUTPUT"
@@ -146,7 +146,7 @@ jobs:
           fi
 
           if [ -z "$REPORT_URL" ]; then
-            REPORT_URL="$SONAR_HOST/dashboard?id=$SONAR_KEY&$SONAR_SCOPE"
+            REPORT_URL="$SONAR_HOST/project/overview?id=$SONAR_KEY&$SONAR_SCOPE"
           fi
 
           # Validate required secrets
@@ -258,11 +258,12 @@ jobs:
           else
             # Create parent
             echo "🎫 Creating new parent ticket..."
+            parent_desc=$(printf 'Quality Gate: %s\nBLOCKER: %s | CRITICAL: %s | MAJOR: %s | HOTSPOTS: %s\n\nReport: %s\nGitHub Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}' "$QG" "$BLOCKER" "$CRITICAL" "$MAJOR" "$HOTSPOT_COUNT" "$REPORT_URL")
             parent_payload=$(jq -n \
               --arg project "$JIRA_PROJECT" \
               --arg issueType "$PARENT_ISSUE_TYPE" \
               --arg summary "🐛 [Sonar] Quality Gate Failed - Multiple Issues Detected" \
-              --arg desc "Quality Gate: $QG\nBLOCKER: $BLOCKER | CRITICAL: $CRITICAL | MAJOR: $MAJOR | HOTSPOTS: $HOTSPOT_COUNT\n\nReport: $REPORT_URL\nGitHub Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+              --arg desc "$parent_desc" \
               '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":$issueType},"priority":{"name":"High"}}}')
             
             parent_resp=$(curl -s -X POST -u "$JIRA_USER:$JIRA_TOKEN" \
@@ -348,22 +349,36 @@ jobs:
             done
           fi
 
-          # Create MAJOR subtasks (top 3)
+          # Create MAJOR subtasks (top 3 grouped by rule+message)
           if [ "$MAJOR" -gt 0 ] && [ -n "$SUBTASK_ISSUE_TYPE" ]; then
-            echo "🟡 Creating MAJOR subtasks (max 3)..."
-            echo "$ISSUES" | jq -c '[.issues[] | select(.severity=="MAJOR")][0:3][]' | while read -r issue; do
-              msg=$(echo "$issue" | jq -r '.message')
-              rule=$(echo "$issue" | jq -r '.rule // "Unknown"')
-              file=$(echo "$issue" | jq -r '.component // "Unknown"')
-              line=$(echo "$issue" | jq -r '.line // "N/A"')
-              issue_key=$(echo "$issue" | jq -r '.key // "N/A"')
-              issue_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&issues=$issue_key&open=$issue_key"
-              desc=$(printf 'Issue: %s\nSeverity: MAJOR\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nIssue URL: %s\nReport: %s\n\nSteps to fix:\n1) Open Sonar issue URL to view compliant examples.\n2) Refactor the code in the target file/line.\n3) Commit and confirm issue count decreases in CI.' "$msg" "$rule" "$file" "$line" "$issue_key" "$issue_url" "$REPORT_URL")
+            echo "🟡 Creating MAJOR subtasks (max 3 groups)..."
+            echo "$ISSUES" | jq -c '
+              [.issues[] | select(.severity=="MAJOR")]
+              | group_by((.rule // "Unknown") + "|" + .message)
+              | map({
+                  message: .[0].message,
+                  rule: (.[0].rule // "Unknown"),
+                  count: length,
+                  samples: (.[0:5] | map({
+                    key: (.key // "N/A"),
+                    file: (.component // "Unknown"),
+                    line: ((.line // "N/A")|tostring)
+                  }))
+                })
+              | .[0:3][]
+            ' | while read -r group; do
+              msg=$(echo "$group" | jq -r '.message')
+              rule=$(echo "$group" | jq -r '.rule')
+              count=$(echo "$group" | jq -r '.count')
+              first_key=$(echo "$group" | jq -r '.samples[0].key')
+              issue_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&issues=$first_key&open=$first_key"
+              sample_list=$(echo "$group" | jq -r '.samples[] | "- " + .key + " | " + .file + ":" + .line')
+              desc=$(printf 'Issue: %s\nSeverity: MAJOR\nRule: %s\nOccurrences: %s\nIssue URL: %s\nReport: %s\n\nExamples (Sonar Key | File:Line):\n%s\n\nSteps to fix:\n1) Open Issue URL to inspect this rule group.\n2) Fix all listed occurrences in Examples.\n3) Push commit and verify MAJOR count drops in next scan.' "$msg" "$rule" "$count" "$issue_url" "$REPORT_URL" "$sample_list")
               
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
                 --arg issueType "$SUBTASK_ISSUE_TYPE" \
-                --arg summary "📌 MAJOR: ${msg:0:50}" \
+                --arg summary "📌 MAJOR x${count}: ${msg:0:40}" \
                 --arg desc "$desc" \
                 --arg parent "$parent_key" \
                 '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":$issueType},"priority":{"name":"Medium"},"parent":{"key":$parent}}}')
@@ -383,22 +398,36 @@ jobs:
             done
           fi
 
-          # Create HOTSPOT subtasks (top 5)
+          # Create HOTSPOT subtasks (top 5 grouped by message)
           if [ "$HOTSPOT_COUNT" -gt 0 ] && [ -n "$SUBTASK_ISSUE_TYPE" ]; then
-            echo "🛡️ Creating HOTSPOT subtasks (max 5)..."
-            echo "$HOTSPOTS" | jq -c '[.hotspots[]][0:5][]' | while read -r hotspot; do
-              msg=$(echo "$hotspot" | jq -r '.message // "Security hotspot requires review"')
-              file=$(echo "$hotspot" | jq -r '.component // "Unknown"')
-              line=$(echo "$hotspot" | jq -r '.line // "N/A"')
-              prob=$(echo "$hotspot" | jq -r '.vulnerabilityProbability // "MEDIUM"')
-              hotspot_key=$(echo "$hotspot" | jq -r '.key // "N/A"')
-              hotspot_url="$SONAR_HOST/security_hotspots?id=$SONAR_KEY&hotspots=$hotspot_key"
-              desc=$(printf 'Issue: %s\nType: SECURITY HOTSPOT\nRisk: %s\nFile: %s (Line %s)\nSonar Key: %s\nHotspot URL: %s\nReport: %s\n\nSteps to fix:\n1) Open the hotspot URL and review risk + recommended secure pattern.\n2) Apply secure coding change in the target file/line.\n3) Re-run scan and ensure hotspot status is reviewed/fixed.' "$msg" "$prob" "$file" "$line" "$hotspot_key" "$hotspot_url" "$REPORT_URL")
+            echo "🛡️ Creating HOTSPOT subtasks (max 5 groups)..."
+            echo "$HOTSPOTS" | jq -c '
+              [.hotspots[]]
+              | group_by(.message)
+              | map({
+                  message: (.[0].message // "Security hotspot requires review"),
+                  risk: (.[0].vulnerabilityProbability // "MEDIUM"),
+                  count: length,
+                  samples: (.[0:5] | map({
+                    key: (.key // "N/A"),
+                    file: (.component // "Unknown"),
+                    line: ((.line // "N/A")|tostring)
+                  }))
+                })
+              | .[0:5][]
+            ' | while read -r group; do
+              msg=$(echo "$group" | jq -r '.message')
+              prob=$(echo "$group" | jq -r '.risk')
+              count=$(echo "$group" | jq -r '.count')
+              first_key=$(echo "$group" | jq -r '.samples[0].key')
+              hotspot_url="$SONAR_HOST/security_hotspots?id=$SONAR_KEY&hotspots=$first_key"
+              sample_list=$(echo "$group" | jq -r '.samples[] | "- " + .key + " | " + .file + ":" + .line')
+              desc=$(printf 'Issue: %s\nType: SECURITY HOTSPOT\nRisk: %s\nOccurrences: %s\nHotspot URL: %s\nReport: %s\n\nExamples (Hotspot Key | File:Line):\n%s\n\nSteps to fix:\n1) Open Hotspot URL and review secure coding recommendation.\n2) Fix all listed occurrences in Examples.\n3) Re-run scan and verify hotspot count decreases.' "$msg" "$prob" "$count" "$hotspot_url" "$REPORT_URL" "$sample_list")
 
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
                 --arg issueType "$SUBTASK_ISSUE_TYPE" \
-                --arg summary "🐛 HOTSPOT: ${msg:0:45}" \
+                --arg summary "🐛 HOTSPOT x${count}: ${msg:0:35}" \
                 --arg desc "$desc" \
                 --arg parent "$parent_key" \
                 '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":$issueType},"priority":{"name":"High"},"parent":{"key":$parent}}}')
@@ -410,7 +439,7 @@ jobs:
               sub_key=$(echo "$sub_resp" | jq -r '.key // empty')
 
               if [ ! -z "$sub_key" ]; then
-                echo "  ✅ $sub_key - $msg"
+                echo "  ✅ $sub_key - $msg (x$count)"
               else
                 echo "  ❌ Failed to create HOTSPOT: $msg"
                 echo "     Jira response: $sub_resp"
