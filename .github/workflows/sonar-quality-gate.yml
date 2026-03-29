@@ -145,6 +145,10 @@ jobs:
             SONAR_SCOPE="branch=${{ github.ref_name }}"
           fi
 
+          if [ -z "$REPORT_URL" ]; then
+            REPORT_URL="$SONAR_HOST/dashboard?id=$SONAR_KEY&$SONAR_SCOPE"
+          fi
+
           # Validate required secrets
           if [ -z "$SONAR_HOST" ] || [ -z "$SONAR_TOKEN" ] || [ -z "$SONAR_KEY" ] || [ -z "$JIRA_TOKEN" ]; then
             echo "❌ Missing required secrets. Please set SONAR_HOST_URL, SONAR_TOKEN, SONAR_PROJECT_KEY, JIRA_API_TOKEN."
@@ -283,7 +287,8 @@ jobs:
               file=$(echo "$issue" | jq -r '.component // "Unknown"')
               line=$(echo "$issue" | jq -r '.line // "N/A"')
               issue_key=$(echo "$issue" | jq -r '.key // "N/A"')
-              desc=$(printf 'Issue: %s\nSeverity: BLOCKER\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nReport: %s' "$msg" "$rule" "$file" "$line" "$issue_key" "$REPORT_URL")
+              issue_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&issues=$issue_key&open=$issue_key"
+              desc=$(printf 'Issue: %s\nSeverity: BLOCKER\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nIssue URL: %s\nReport: %s\n\nSteps to fix:\n1) Open the Sonar issue URL and review the rule details.\n2) Update code at the file/line above to satisfy the rule.\n3) Push commit and verify this subtask issue disappears in next scan.' "$msg" "$rule" "$file" "$line" "$issue_key" "$issue_url" "$REPORT_URL")
               
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
@@ -317,7 +322,8 @@ jobs:
               file=$(echo "$issue" | jq -r '.component // "Unknown"')
               line=$(echo "$issue" | jq -r '.line // "N/A"')
               issue_key=$(echo "$issue" | jq -r '.key // "N/A"')
-              desc=$(printf 'Issue: %s\nSeverity: CRITICAL\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nReport: %s' "$msg" "$rule" "$file" "$line" "$issue_key" "$REPORT_URL")
+              issue_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&issues=$issue_key&open=$issue_key"
+              desc=$(printf 'Issue: %s\nSeverity: CRITICAL\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nIssue URL: %s\nReport: %s\n\nSteps to fix:\n1) Open the Sonar issue URL and review impact/risk.\n2) Patch the code to remove the rule violation.\n3) Run tests and verify issue is closed on next Sonar run.' "$msg" "$rule" "$file" "$line" "$issue_key" "$issue_url" "$REPORT_URL")
               
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
@@ -351,7 +357,8 @@ jobs:
               file=$(echo "$issue" | jq -r '.component // "Unknown"')
               line=$(echo "$issue" | jq -r '.line // "N/A"')
               issue_key=$(echo "$issue" | jq -r '.key // "N/A"')
-              desc=$(printf 'Issue: %s\nSeverity: MAJOR\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nReport: %s' "$msg" "$rule" "$file" "$line" "$issue_key" "$REPORT_URL")
+              issue_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&issues=$issue_key&open=$issue_key"
+              desc=$(printf 'Issue: %s\nSeverity: MAJOR\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nIssue URL: %s\nReport: %s\n\nSteps to fix:\n1) Open Sonar issue URL to view compliant examples.\n2) Refactor the code in the target file/line.\n3) Commit and confirm issue count decreases in CI.' "$msg" "$rule" "$file" "$line" "$issue_key" "$issue_url" "$REPORT_URL")
               
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
@@ -385,7 +392,8 @@ jobs:
               line=$(echo "$hotspot" | jq -r '.line // "N/A"')
               prob=$(echo "$hotspot" | jq -r '.vulnerabilityProbability // "MEDIUM"')
               hotspot_key=$(echo "$hotspot" | jq -r '.key // "N/A"')
-              desc=$(printf 'Issue: %s\nType: SECURITY HOTSPOT\nRisk: %s\nFile: %s (Line %s)\nSonar Key: %s\nReport: %s' "$msg" "$prob" "$file" "$line" "$hotspot_key" "$REPORT_URL")
+              hotspot_url="$SONAR_HOST/security_hotspots?id=$SONAR_KEY&hotspots=$hotspot_key"
+              desc=$(printf 'Issue: %s\nType: SECURITY HOTSPOT\nRisk: %s\nFile: %s (Line %s)\nSonar Key: %s\nHotspot URL: %s\nReport: %s\n\nSteps to fix:\n1) Open the hotspot URL and review risk + recommended secure pattern.\n2) Apply secure coding change in the target file/line.\n3) Re-run scan and ensure hotspot status is reviewed/fixed.' "$msg" "$prob" "$file" "$line" "$hotspot_key" "$hotspot_url" "$REPORT_URL")
 
               payload=$(jq -n \
                 --arg project "$JIRA_PROJECT" \
