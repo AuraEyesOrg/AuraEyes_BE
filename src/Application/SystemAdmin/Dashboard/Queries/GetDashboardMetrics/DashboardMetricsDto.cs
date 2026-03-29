@@ -20,6 +20,53 @@ public class DashboardMetricsDto
 
     public List<MonthlyRevenuePointDto> MonthlyPlatformCommission { get; set; } = new();
     public List<DailyRevenuePointDto> DailyPlatformCommission { get; set; } = new();
+
+    /// <summary>Registration counts per calendar month (Jan = index 0) for sparklines.</summary>
+    public List<int> MonthlyNewDoctorCounts { get; set; } = new();
+
+    public List<int> MonthlyNewOrganisationCounts { get; set; } = new();
+    public List<int> MonthlyNewPatientCounts { get; set; } = new();
+
+    public DashboardPendingActionsDto PendingActions { get; set; } = new();
+    public DashboardSystemStatusDto SystemStatus { get; set; } = new();
+    public List<TopPerformerDoctorDto> TopDoctorsByConsultationRevenue { get; set; } = new();
+    public List<TopPerformerOrganisationDto> TopOrganisationsByRating { get; set; } = new();
+}
+
+public class DashboardPendingActionsDto
+{
+    public int PendingOphthalmologistVerifications { get; set; }
+    public int PendingWithdrawalRequests { get; set; }
+    public int PendingOrganisationOnboarding { get; set; }
+}
+
+public class DashboardSystemStatusDto
+{
+    /// <summary>Sessions with open chat (active consultation window).</summary>
+    public int LiveConsultationSessions { get; set; }
+
+    public bool ApiHealthy { get; set; } = true;
+    public bool DatabaseHealthy { get; set; }
+}
+
+public class TopPerformerDoctorDto
+{
+    public Guid OphthalmologistId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public decimal Revenue { get; set; }
+
+    /// <summary>Aggregate rating from patient feedback (1–5).</summary>
+    public decimal RatingAverage { get; set; }
+
+    public int RatingCount { get; set; }
+}
+
+public class TopPerformerOrganisationDto
+{
+    public Guid OrganisationId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public decimal RatingAverage { get; set; }
+    public int RatingCount { get; set; }
 }
 
 public class UserGrowthMetricDto

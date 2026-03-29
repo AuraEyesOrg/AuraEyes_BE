@@ -185,6 +185,82 @@ public class DashboardMetricsService : IDashboardMetricsService
         var totalDepositRevenueYear = monthlyRevenue.Sum(m => m.Revenue);
         var totalPlatformCommissionYear = monthlyPlatformCommission.Sum(m => m.Revenue);
 
+        var newDoctorsByMonth = await _context.Ophthalmologists.AsNoTracking()
+            .Where(o => o.CreatedAt >= yearStart && o.CreatedAt < nextYearStart)
+            .GroupBy(o => o.CreatedAt.Month)
+            .Select(g => new { Month = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+        var newOrgsByMonth = await _context.Organisations.AsNoTracking()
+            .Where(o => o.CreatedAt >= yearStart && o.CreatedAt < nextYearStart)
+            .GroupBy(o => o.CreatedAt.Month)
+            .Select(g => new { Month = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+        var newPatientsByMonth = await _context.Patients.AsNoTracking()
+            .Where(p => p.CreatedAt >= yearStart && p.CreatedAt < nextYearStart)
+            .GroupBy(p => p.CreatedAt.Month)
+            .Select(g => new { Month = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var doctorMonthMap = newDoctorsByMonth.ToDictionary(x => x.Month, x => x.Count);
+        var orgMonthMap = newOrgsByMonth.ToDictionary(x => x.Month, x => x.Count);
+        var patientMonthMap = newPatientsByMonth.ToDictionary(x => x.Month, x => x.Count);
+        var monthlyNewDoctorCounts = Enumerable.Range(1, 12).Select(m => doctorMonthMap.GetValueOrDefault(m, 0)).ToList();
+        var monthlyNewOrganisationCounts = Enumerable.Range(1, 12).Select(m => orgMonthMap.GetValueOrDefault(m, 0)).ToList();
+        var monthlyNewPatientCounts = Enumerable.Range(1, 12).Select(m => patientMonthMap.GetValueOrDefault(m, 0)).ToList();
+
+        var pendingDoctorVerifications = await _context.Ophthalmologists
+            .CountAsync(o => o.VerificationStatus == VerificationStatus.PendingVerification, cancellationToken);
+        var pendingWithdrawals = await _context.WithdrawalRequests
+            .CountAsync(
+                w => w.Status == PaymentStatus.Pending || w.Status == PaymentStatus.Processing,
+                cancellationToken);
+        var pendingOnboarding = await _context.OrganisationOnboardingRequests
+            .CountAsync(r => r.Status == OrganisationOnboardingStatus.Pending, cancellationToken);
+
+        var liveConsultations = await _context.ConsultationSessions
+            .CountAsync(
+                s => s.ChatStatus == ChatStatus.Open
+                     && s.Status != SessionStatus.Completed
+                     && s.Status != SessionStatus.Cancelled,
+                cancellationToken);
+
+        var databaseHealthy = await _context.Database.CanConnectAsync(cancellationToken);
+
+        // Consultation credits: Deposit or Transfer on ophthalmologist wallets. ReferenceType is usually
+        // "Booking"; legacy rows may omit it — match description so all credited doctors appear in rankings.
+        // Join Users with IgnoreQueryFilters so soft-deleted accounts still contribute to historical revenue.
+        var topDoctorRows = await (
+            from t in _context.WalletTransactions.AsNoTracking()
+            join w in _context.Wallets.AsNoTracking() on t.WalletId equals w.Id
+            join o in _context.Ophthalmologists.AsNoTracking() on w.UserId equals o.UserId
+            join u in _context.Users.IgnoreQueryFilters().AsNoTracking() on o.UserId equals u.Id
+            where w.OwnerType == "Ophthalmologist"
+                  && (t.TransactionType == TransactionType.Deposit
+                      || t.TransactionType == TransactionType.Transfer)
+                  && (t.ReferenceType == "Booking")
+            group t.Amount by new { o.Id, o.RatingAverage, o.RatingCount, FullName = u.FullName } into g
+            select new TopPerformerDoctorDto
+            {
+                OphthalmologistId = g.Key.Id,
+                Name = g.Key.FullName ?? string.Empty,
+                Revenue = g.Sum(),
+                RatingAverage = g.Key.RatingAverage,
+                RatingCount = g.Key.RatingCount
+            }).OrderByDescending(x => x.Revenue).Take(5).ToListAsync(cancellationToken);
+
+        var topOrgRows = await _context.Organisations.AsNoTracking()
+            .OrderByDescending(o => o.RatingAverage)
+            .ThenByDescending(o => o.RatingCount)
+            .Take(5)
+            .Select(o => new TopPerformerOrganisationDto
+            {
+                OrganisationId = o.Id,
+                Name = o.Name,
+                RatingAverage = o.RatingAverage,
+                RatingCount = o.RatingCount
+            })
+            .ToListAsync(cancellationToken);
+
         return new DashboardMetricsDto
         {
             Doctors = new UserGrowthMetricDto
@@ -214,7 +290,24 @@ public class DashboardMetricsService : IDashboardMetricsService
             TotalDepositRevenueYear = totalDepositRevenueYear,
             TotalPlatformCommissionYear = totalPlatformCommissionYear,
             MonthlyPlatformCommission = monthlyPlatformCommission,
-            DailyPlatformCommission = dailyPlatformCommission
+            DailyPlatformCommission = dailyPlatformCommission,
+            MonthlyNewDoctorCounts = monthlyNewDoctorCounts,
+            MonthlyNewOrganisationCounts = monthlyNewOrganisationCounts,
+            MonthlyNewPatientCounts = monthlyNewPatientCounts,
+            PendingActions = new DashboardPendingActionsDto
+            {
+                PendingOphthalmologistVerifications = pendingDoctorVerifications,
+                PendingWithdrawalRequests = pendingWithdrawals,
+                PendingOrganisationOnboarding = pendingOnboarding
+            },
+            SystemStatus = new DashboardSystemStatusDto
+            {
+                LiveConsultationSessions = liveConsultations,
+                ApiHealthy = true,
+                DatabaseHealthy = databaseHealthy
+            },
+            TopDoctorsByConsultationRevenue = topDoctorRows,
+            TopOrganisationsByRating = topOrgRows
         };
     }
 
