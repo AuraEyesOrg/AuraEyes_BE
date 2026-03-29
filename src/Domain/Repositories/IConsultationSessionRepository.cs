@@ -21,6 +21,7 @@ public interface IConsultationSessionRepository : IRepository<ConsultationSessio
     Task<(IReadOnlyList<ConsultationSession> Items, int TotalCount)> GetPagedAsync(
         Guid? patientId = null,
         Guid? ophthalmologistId = null,
+        Guid? aiScreeningId = null,
         ConsultationSessionType? type = null,
         SessionStatus? status = null,
         ChatStatus? chatStatus = null,
