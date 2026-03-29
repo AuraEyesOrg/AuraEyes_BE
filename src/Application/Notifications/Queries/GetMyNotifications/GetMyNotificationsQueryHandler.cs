@@ -36,6 +36,11 @@ public class GetMyNotificationsQueryHandler : IQueryHandler<GetMyNotificationsQu
             .AsNoTracking()
             .Where(n => n.UserId == userId);
 
+        if (request.Type.HasValue)
+        {
+            baseQuery = baseQuery.Where(n => n.Type == request.Type.Value);
+        }
+
         var totalCount = await baseQuery.CountAsync(cancellationToken);
         var unreadCount = await baseQuery.CountAsync(n => !n.IsRead, cancellationToken);
 
@@ -59,6 +64,7 @@ public class GetMyNotificationsQueryHandler : IQueryHandler<GetMyNotificationsQu
                 Title = n.Title,
                 Message = n.Message,
                 Type = n.Type,
+                ReferenceId = n.ReferenceId,
                 IsRead = n.IsRead,
                 Payload = n.Payload,
                 CreatedAt = n.CreatedAt

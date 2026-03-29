@@ -16,13 +16,15 @@ public interface INotificationService
     /// <param name="type">Type of notification for categorization and routing</param>
     /// <param name="payload">Optional payload object containing metadata (will be serialized to JSON)</param>
     /// <param name="cancellationToken">Cancellation token</param>
+    /// <param name="referenceId">Optional explicit domain reference id for fast navigation</param>
     Task SendAsync(
         Guid userId,
         string title,
         string message,
         NotificationType type,
         object? payload = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? referenceId = null);
 
     /// <summary>
     /// Legacy method - sends a simple reminder notification

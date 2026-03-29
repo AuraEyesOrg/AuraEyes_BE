@@ -34,6 +34,11 @@ public record NotificationDto
     public NotificationType Type { get; init; }
 
     /// <summary>
+    /// Optional domain object reference this notification targets
+    /// </summary>
+    public Guid? ReferenceId { get; init; }
+
+    /// <summary>
     /// Whether the notification has been read
     /// </summary>
     public bool IsRead { get; init; }

@@ -1,6 +1,7 @@
 using Application.Notifications.Commands.MarkAllAsRead;
 using Application.Notifications.Commands.MarkAsRead;
 using Application.Notifications.Queries.GetMyNotifications;
+using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -26,6 +27,7 @@ public class NotificationsController : BaseApiController
     /// </summary>
     /// <param name="pageNumber">Page number (1-indexed, default: 1)</param>
     /// <param name="pageSize">Number of items per page (default: 10)</param>
+    /// <param name="type">Optional notification type filter</param>
     /// <returns>Paginated list of notifications with unread count</returns>
     [HttpGet]
     [SwaggerOperation(
@@ -35,12 +37,14 @@ public class NotificationsController : BaseApiController
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetMyNotifications(
         [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 10)
+        [FromQuery] int pageSize = 10,
+        [FromQuery] NotificationType? type = null)
     {
         var query = new GetMyNotificationsQuery
         {
             PageNumber = pageNumber,
-            PageSize = pageSize
+            PageSize = pageSize,
+            Type = type
         };
 
         var result = await _mediator.Send(query);
