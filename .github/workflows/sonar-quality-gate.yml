@@ -145,23 +145,43 @@ jobs:
             SONAR_SCOPE="branch=${{ github.ref_name }}"
           fi
 
-          # Validate credentials
-          if [ -z "$SONAR_HOST" ] || [ -z "$SONAR_TOKEN" ] || [ -z "$JIRA_TOKEN" ]; then
-            echo "❌ Missing required secrets. Skipping Jira ticket creation."
-            exit 0
+          # Validate required secrets
+          if [ -z "$SONAR_HOST" ] || [ -z "$SONAR_TOKEN" ] || [ -z "$SONAR_KEY" ] || [ -z "$JIRA_TOKEN" ]; then
+            echo "❌ Missing required secrets. Please set SONAR_HOST_URL, SONAR_TOKEN, SONAR_PROJECT_KEY, JIRA_API_TOKEN."
+            exit 1
+          fi
+
+          # Normalize host URL to avoid accidental double slashes
+          SONAR_HOST="${SONAR_HOST%/}"
+
+          fetch_sonar_json() {
+            local endpoint="$1"
+            local response
+            response=$(curl -sS --fail-with-body -u "$SONAR_TOKEN:" "$SONAR_HOST$endpoint" 2>&1) || {
+              echo "❌ Sonar API call failed: $SONAR_HOST$endpoint"
+              echo "$response"
+              return 1
+            }
+            echo "$response"
+          }
+
+          # Validate Sonar token early
+          AUTH_CHECK=$(fetch_sonar_json "/api/authentication/validate") || exit 1
+          if [ "$(echo "$AUTH_CHECK" | jq -r '.valid // false')" != "true" ]; then
+            echo "❌ SONAR_TOKEN is invalid or lacks permissions."
+            echo "Response: $AUTH_CHECK"
+            exit 1
           fi
 
           # Fetch issues
           echo "📊 Fetching issues..."
-          ISSUES=$(curl -s -u "$SONAR_TOKEN": "$SONAR_HOST/api/issues/search?componentKeys=$SONAR_KEY&resolved=false&ps=500&$SONAR_SCOPE")
-          HOTSPOTS=$(curl -s -u "$SONAR_TOKEN": "$SONAR_HOST/api/hotspots/search?projectKey=$SONAR_KEY&status=TO_REVIEW&ps=500&$SONAR_SCOPE")
+          ISSUES=$(fetch_sonar_json "/api/issues/search?componentKeys=$SONAR_KEY&resolved=false&ps=500&$SONAR_SCOPE") || exit 1
+          HOTSPOTS=$(fetch_sonar_json "/api/hotspots/search?projectKey=$SONAR_KEY&status=TO_REVIEW&ps=500&$SONAR_SCOPE") || exit 1
 
           if ! echo "$ISSUES" | jq -e '.issues' >/dev/null 2>&1; then
             echo "⚠️ Sonar API did not return issues array. Response:"
             echo "$ISSUES"
-            BLOCKER=0
-            CRITICAL=0
-            MAJOR=0
+            exit 1
           else
             BLOCKER=$(echo "$ISSUES" | jq -r '[.issues[]? | select(.severity=="BLOCKER")] | length')
             CRITICAL=$(echo "$ISSUES" | jq -r '[.issues[]? | select(.severity=="CRITICAL")] | length')
@@ -171,7 +191,7 @@ jobs:
           if ! echo "$HOTSPOTS" | jq -e '.hotspots' >/dev/null 2>&1; then
             echo "⚠️ Sonar API did not return hotspots array. Response:"
             echo "$HOTSPOTS"
-            HOTSPOT_COUNT=0
+            exit 1
           else
             HOTSPOT_COUNT=$(echo "$HOTSPOTS" | jq -r '[.hotspots[]?] | length')
           fi
