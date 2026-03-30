@@ -44,6 +44,7 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
     public async Task<(IReadOnlyList<ConsultationSession> Items, int TotalCount)> GetPagedAsync(
         Guid? patientId = null,
         Guid? ophthalmologistId = null,
+        Guid? aiScreeningId = null,
         ConsultationSessionType? type = null,
         SessionStatus? status = null,
         ChatStatus? chatStatus = null,
@@ -65,6 +66,9 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
 
         if (ophthalmologistId.HasValue)
             query = query.Where(s => s.OphthalmologistId == ophthalmologistId.Value);
+
+        if (aiScreeningId.HasValue)
+            query = query.Where(s => s.AiScreeningId == aiScreeningId.Value);
 
         if (type.HasValue)
             query = query.Where(s => s.Type == type.Value);

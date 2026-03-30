@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260329100352_AddPatientIdToConsentAndConsentWorkflow")]
+    partial class AddPatientIdToConsentAndConsentWorkflow
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -976,92 +979,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.ToTable("WalletTransactions");
                 });
 
-            modelBuilder.Entity("Domain.Entities.Financial.WithdrawalRequest", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("AccountHolderName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("AdminNote")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<string>("BankAccountNumber")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("BankName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("ContractNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<DateTime?>("ProcessedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ProcessedByAdminId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<string>("TransferReference")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("WalletId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("WalletId");
-
-                    b.ToTable("WithdrawalRequests", (string)null);
-                });
-
             modelBuilder.Entity("Domain.Entities.Network.PostAttachment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1262,9 +1179,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
 
-                    b.Property<Guid?>("ConsultationSessionId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Content")
                         .IsRequired()
                         .HasMaxLength(5000)
@@ -1290,11 +1204,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
-                    b.Property<bool>("IsInternalCase")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
                     b.Property<bool>("IsRepost")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -1305,13 +1214,6 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("OriginalPostId")
                         .HasColumnType("uuid");
-
-                    b.Property<int?>("PatientAge")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("PatientGender")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
 
                     b.Property<int>("ReactionCount")
                         .ValueGeneratedOnAdd()
@@ -1344,13 +1246,9 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Category");
 
-                    b.HasIndex("ConsultationSessionId");
-
                     b.HasIndex("CreatedAt");
 
                     b.HasIndex("IsHidden");
-
-                    b.HasIndex("IsInternalCase");
 
                     b.HasIndex("OrganisationId");
 
@@ -1499,9 +1397,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<string>("Payload")
                         .HasColumnType("jsonb");
 
-                    b.Property<Guid?>("ReferenceId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -1555,12 +1450,6 @@ namespace Infrastructure.Persistence.Migrations
                             Key = "FREE_AI_QUOTA",
                             Description = "Free AI screening credits per patient",
                             Value = "3"
-                        },
-                        new
-                        {
-                            Key = "AI_QUOTA_UNIT_PRICE",
-                            Description = "Price per 1 AI quota credit (VND)",
-                            Value = "10000"
                         },
                         new
                         {
@@ -1895,18 +1784,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<Guid>("AiScreeningId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ClinicalFindings")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("CodingSystem")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<decimal?>("ConfidenceLevel")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)");
-
                     b.Property<DateTime?>("ConfirmedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1919,15 +1796,16 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
 
-                    b.Property<string>("DiagnosisCode")
+                    b.Property<string>("DiagnosesCode")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("DiagnosesText")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<Guid>("DoctorId")
                         .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("FinalizedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("FollowUpDate")
                         .HasColumnType("timestamp with time zone");
@@ -1942,26 +1820,9 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
-                    b.Property<bool>("IsUrgent")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
                     b.Property<string>("LifestyleAdvice")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("Recommendations")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("SeverityLevel")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("Status")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("TreatmentPlan")
                         .HasMaxLength(2000)
@@ -2107,10 +1968,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
 
-                    b.Property<int?>("DegreeLevel")
-                        .HasColumnType("integer")
-                        .HasColumnName("DegreeLevel");
-
                     b.Property<DateTime?>("ExpiryDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -2147,7 +2004,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OphthalmologistId");
 
-                    b.ToTable("Certificates", (string)null);
+                    b.ToTable("Certificates");
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.Consent", b =>
@@ -2208,17 +2065,9 @@ namespace Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<decimal?>("ActualMonthlySalary")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
                     b.Property<string>("Bio")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
-
-                    b.Property<decimal?>("CommissionRate")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3006,17 +2855,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasForeignKey("WalletId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("Domain.Entities.Financial.WithdrawalRequest", b =>
-                {
-                    b.HasOne("Domain.Entities.Financial.Wallet", "Wallet")
-                        .WithMany()
-                        .HasForeignKey("WalletId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Wallet");
                 });
 
             modelBuilder.Entity("Domain.Entities.Network.PostAttachment", b =>
