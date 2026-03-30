@@ -34,7 +34,9 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
         int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.AsQueryable();
+        var query = _dbSet
+            .Include(o => o.Certificates)
+            .AsQueryable();
 
         // Apply verification filter
         if (isVerified.HasValue)

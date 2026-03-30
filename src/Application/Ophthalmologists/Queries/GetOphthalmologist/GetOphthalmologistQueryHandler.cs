@@ -1,6 +1,7 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Ophthalmologists.Common;
+using Domain.Enums;
 using Domain.Repositories;
 
 namespace Application.Ophthalmologists.Queries.GetOphthalmologist;
@@ -66,18 +67,64 @@ public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQu
             ActualMonthlySalary = ophthalmologist.ActualMonthlySalary,
             MinPrice = minPrice,
             MaxPrice = maxPrice,
-            Certificates = ophthalmologist.Certificates.Select(c => new CertificateDto
-            {
-                Id = c.Id,
-                Name = c.Name,
-                IssuingAuthority = c.IssuingAuthority,
-                IssuedDate = c.IssuedDate,
-                ExpiryDate = c.ExpiryDate,
-                CertificateUrl = c.CertificateUrl,
-                IsExpired = c.IsExpired
-            }).ToList()
+            Degrees = ophthalmologist.Certificates
+                .Where(c => c.Type == CertificateType.Degree)
+                .OrderByDescending(c => c.IssuedDate)
+                .Select(c => new DegreeDto
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    DegreeLevel = c.DegreeLevel?.ToString(),
+                    IssuingAuthority = c.IssuingAuthority,
+                    IssuedDate = c.IssuedDate,
+                    DegreeUrl = c.CertificateUrl,
+                    Title = GetDegreeTitle(c.DegreeLevel),
+                    Abbreviation = GetDegreeAbbreviation(c.DegreeLevel)
+                })
+                .ToList(),
+            Certificates = ophthalmologist.Certificates
+                .Where(c => c.Type == CertificateType.License)
+                .Select(c => new CertificateDto
+                {
+                    Id = c.Id,
+                    Type = c.Type.ToString(),
+                    Name = c.Name,
+                    DegreeLevel = c.DegreeLevel?.ToString(),
+                    IssuingAuthority = c.IssuingAuthority,
+                    IssuedDate = c.IssuedDate,
+                    ExpiryDate = c.ExpiryDate,
+                    CertificateUrl = c.CertificateUrl,
+                    IsExpired = c.IsExpired
+                })
+                .ToList()
         };
 
         return Result<OphthalmologistDto>.Success(dto);
+    }
+
+    private static string? GetDegreeTitle(DegreeLevel? level)
+    {
+        return level switch
+        {
+            DegreeLevel.Bachelor => "Bachelor",
+            DegreeLevel.Master => "Master",
+            DegreeLevel.Doctor => "Doctor (PhD)",
+            DegreeLevel.AssociateProfessor => "Associate Professor",
+            DegreeLevel.Professor => "Professor",
+            _ => null
+        };
+    }
+
+    private static string? GetDegreeAbbreviation(DegreeLevel? level)
+    {
+        return level switch
+        {
+            DegreeLevel.Bachelor => "B.S.",
+            DegreeLevel.Master => "M.S.",
+            DegreeLevel.Doctor => "Ph.D.",
+            DegreeLevel.AssociateProfessor => "Assoc. Prof.",
+            DegreeLevel.Professor => "Prof.",
+            _ => null
+        };
     }
 }

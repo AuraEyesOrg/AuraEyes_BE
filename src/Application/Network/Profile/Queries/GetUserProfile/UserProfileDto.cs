@@ -19,6 +19,7 @@ public class UserProfileCertificateDto
 {
     public Guid Id { get; set; }
     public string Type { get; set; } = string.Empty;
+    public string? DegreeLevel { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? IssuingAuthority { get; set; }
     public DateTime IssuedDate { get; set; }

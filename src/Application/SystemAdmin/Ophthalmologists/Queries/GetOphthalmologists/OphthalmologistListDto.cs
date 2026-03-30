@@ -3,6 +3,7 @@ namespace Application.SystemAdmin.Ophthalmologists.Queries.GetOphthalmologists;
 public class OphthalmologistCredentialDto
 {
     public Guid Id { get; set; }
+    public string? DegreeLevel { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? IssuingAuthority { get; set; }
     public DateTime IssuedDate { get; set; }

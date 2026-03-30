@@ -10,6 +10,7 @@ public class Certificate : BaseEntity
 {
     public Guid OphthalmologistId { get; private set; }
     public CertificateType Type { get; private set; }
+    public DegreeLevel? DegreeLevel { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string? IssuingAuthority { get; private set; }
     public DateTime IssuedDate { get; private set; }
@@ -22,6 +23,7 @@ public class Certificate : BaseEntity
         Guid ophthalmologistId,
         CertificateType type,
         string name,
+        DegreeLevel? degreeLevel,
         string? issuingAuthority,
         DateTime issuedDate,
         DateTime? expiryDate = null,
@@ -30,8 +32,15 @@ public class Certificate : BaseEntity
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Certificate name cannot be empty", nameof(name));
 
+        if (type == CertificateType.Degree && !degreeLevel.HasValue)
+            throw new ArgumentException("Degree level is required for degree credentials", nameof(degreeLevel));
+
+        if (type != CertificateType.Degree && degreeLevel.HasValue)
+            throw new ArgumentException("Degree level can only be set for degree credentials", nameof(degreeLevel));
+
         OphthalmologistId = ophthalmologistId;
         Type = type;
+        DegreeLevel = degreeLevel;
         Name = name;
         IssuingAuthority = issuingAuthority;
         IssuedDate = issuedDate;
@@ -44,6 +53,7 @@ public class Certificate : BaseEntity
     public void UpdateCertificate(
         CertificateType type,
         string name,
+        DegreeLevel? degreeLevel,
         string? issuingAuthority,
         DateTime issuedDate,
         DateTime? expiryDate,
@@ -52,7 +62,14 @@ public class Certificate : BaseEntity
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Certificate name cannot be empty", nameof(name));
 
+        if (type == CertificateType.Degree && !degreeLevel.HasValue)
+            throw new ArgumentException("Degree level is required for degree credentials", nameof(degreeLevel));
+
+        if (type != CertificateType.Degree && degreeLevel.HasValue)
+            throw new ArgumentException("Degree level can only be set for degree credentials", nameof(degreeLevel));
+
         Type = type;
+        DegreeLevel = degreeLevel;
         Name = name;
         IssuingAuthority = issuingAuthority;
         IssuedDate = issuedDate;

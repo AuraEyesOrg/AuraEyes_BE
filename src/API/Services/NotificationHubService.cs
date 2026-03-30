@@ -71,4 +71,31 @@ public class NotificationHubService : INotificationHubService
         }
     }
 
+    /// <inheritdoc />
+    public async Task BroadcastUnreadCountAsync(
+        Guid userId,
+        int count,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _hubContext.Clients
+                .User(userId.ToString())
+                .SendAsync("ReceiveUnreadCount", count, cancellationToken);
+
+            _logger.LogDebug(
+                "Unread count broadcast to user {UserId}: {Count}",
+                userId,
+                count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to broadcast unread count to user {UserId}",
+                userId);
+            throw;
+        }
+    }
+
 }

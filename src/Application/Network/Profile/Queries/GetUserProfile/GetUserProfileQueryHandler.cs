@@ -51,6 +51,7 @@ public class GetUserProfileQueryHandler : IQueryHandler<GetUserProfileQuery, Use
                 {
                     Id = c.Id,
                     Type = c.Type.ToString(),
+                    DegreeLevel = c.DegreeLevel?.ToString(),
                     Name = c.Name,
                     IssuingAuthority = c.IssuingAuthority,
                     IssuedDate = c.IssuedDate,

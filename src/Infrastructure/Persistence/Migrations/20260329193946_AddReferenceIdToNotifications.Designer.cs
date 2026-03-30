@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260329193946_AddReferenceIdToNotifications")]
+    partial class AddReferenceIdToNotifications
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1895,18 +1898,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<Guid>("AiScreeningId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ClinicalFindings")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("CodingSystem")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<decimal?>("ConfidenceLevel")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)");
-
                     b.Property<DateTime?>("ConfirmedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1919,15 +1910,16 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
 
-                    b.Property<string>("DiagnosisCode")
+                    b.Property<string>("DiagnosesCode")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("DiagnosesText")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<Guid>("DoctorId")
                         .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("FinalizedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("FollowUpDate")
                         .HasColumnType("timestamp with time zone");
@@ -1942,26 +1934,9 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
-                    b.Property<bool>("IsUrgent")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
                     b.Property<string>("LifestyleAdvice")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("Recommendations")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("SeverityLevel")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("Status")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("TreatmentPlan")
                         .HasMaxLength(2000)
@@ -2180,9 +2155,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
-                    b.Property<Guid>("PatientId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime?>("SignedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2196,8 +2168,6 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("AiScreeningId")
                         .IsUnique();
-
-                    b.HasIndex("PatientId");
 
                     b.ToTable("Consents");
                 });
@@ -3192,12 +3162,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasOne("Domain.Entities.Screening.AiScreening", null)
                         .WithOne("Consent")
                         .HasForeignKey("Domain.Entities.Users.Consent", "AiScreeningId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Entities.Users.Patient", null)
-                        .WithMany()
-                        .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
