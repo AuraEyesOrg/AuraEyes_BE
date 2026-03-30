@@ -44,6 +44,7 @@ public class ConsultationSessionsController : BaseApiController
     public async Task<IActionResult> GetSessions(
         [FromQuery] Guid? patientId = null,
         [FromQuery] Guid? ophthalmologistId = null,
+        [FromQuery] Guid? aiScreeningId = null,
         [FromQuery] ConsultationSessionType? type = null,
         [FromQuery] SessionStatus? status = null,
         [FromQuery] ChatStatus? chatStatus = null,
@@ -54,6 +55,7 @@ public class ConsultationSessionsController : BaseApiController
         {
             PatientId = patientId,
             OphthalmologistId = ophthalmologistId,
+            AiScreeningId = aiScreeningId,
             Type = type,
             Status = status,
             ChatStatus = chatStatus,
@@ -157,9 +159,21 @@ public class ConsultationSessionsController : BaseApiController
         {
             SessionId = sessionId,
             DoctorId = request.DoctorId,
+            DiagnosisCode = request.DiagnosisCode,
+            CodingSystem = request.CodingSystem,
+            ClinicalFindings = request.ClinicalFindings,
+            SeverityLevel = request.SeverityLevel,
+            ConfidenceLevel = request.ConfidenceLevel,
+            TreatmentPlan = request.TreatmentPlan,
+            Recommendations = request.Recommendations,
+            LifestyleAdvice = request.LifestyleAdvice,
+            IsUrgent = request.IsUrgent,
+            Status = request.Status,
+            FollowUpDate = request.FollowUpDate,
+            IsReferralNeeded = request.IsReferralNeeded,
+            FinalizedAt = request.FinalizedAt,
             DiagnosesCode = request.DiagnosesCode,
-            DiagnosesText = request.DiagnosesText,
-            TreatmentPlan = request.TreatmentPlan
+            DiagnosesText = request.DiagnosesText
         };
 
         var result = await _mediator.Send(command);
@@ -262,9 +276,25 @@ public record CreateVideoCallSessionRequest
 public record SubmitVerificationReportRequest
 {
     public Guid DoctorId { get; init; }
-    public string DiagnosesCode { get; init; } = string.Empty;
-    public string DiagnosesText { get; init; } = string.Empty;
+
+    // New contract fields.
+    public string? DiagnosisCode { get; init; }
+    public string? CodingSystem { get; init; }
+    public string? ClinicalFindings { get; init; }
+    public string? SeverityLevel { get; init; }
+    public decimal? ConfidenceLevel { get; init; }
     public string? TreatmentPlan { get; init; }
+    public string? Recommendations { get; init; }
+    public string? LifestyleAdvice { get; init; }
+    public bool IsUrgent { get; init; }
+    public string? Status { get; init; }
+    public DateTime? FollowUpDate { get; init; }
+    public bool IsReferralNeeded { get; init; }
+    public DateTime? FinalizedAt { get; init; }
+
+    // Backward-compatible aliases for older FE payloads.
+    public string? DiagnosesCode { get; init; }
+    public string? DiagnosesText { get; init; }
 }
 
 public record SendMessageRequest

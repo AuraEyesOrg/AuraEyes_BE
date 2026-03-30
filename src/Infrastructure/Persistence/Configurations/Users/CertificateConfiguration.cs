@@ -8,9 +8,16 @@ public class CertificateConfiguration : IEntityTypeConfiguration<Certificate>
 {
     public void Configure(EntityTypeBuilder<Certificate> builder)
     {
+        builder.ToTable("Certificates");
+
         builder.Property(e => e.Type)
             .HasConversion<int>()
             .IsRequired();
+
+        builder.Property(e => e.DegreeLevel)
+            .HasConversion<int?>()
+            .HasColumnName("DegreeLevel")
+            .IsRequired(false);
 
         builder.Property(e => e.Name)
             .HasMaxLength(200)

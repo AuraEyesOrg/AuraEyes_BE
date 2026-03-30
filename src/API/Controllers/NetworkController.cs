@@ -6,6 +6,7 @@ using Application.Network.Comments.Commands.DeleteComment;
 using Application.Network.Comments.Queries.GetComments;
 using Application.Network.Posts.Commands.CreatePost;
 using Application.Network.Posts.Commands.CreateRepost;
+using Application.Network.Posts.Commands.ShareConsultationCase;
 using Application.Network.Posts.Commands.DeletePost;
 using Application.Network.Posts.Commands.HidePost;
 using Application.Network.Posts.Commands.UpdatePost;
@@ -137,11 +138,43 @@ public class NetworkController : BaseApiController
             OrganisationId = request.OrganisationId,
             AllowComments = request.AllowComments,
             Attachments = request.Attachments,
-            IsAnonymizationConfirmed = request.IsAnonymizationConfirmed
+            IsAnonymizationConfirmed = request.IsAnonymizationConfirmed,
+            IsInternalCase = request.IsInternalCase,
+            ConsultationSessionId = request.ConsultationSessionId,
+            PatientAge = request.PatientAge,
+            PatientGender = request.PatientGender
         };
 
         var result = await _mediator.Send(command);
         return HandleResult(result, "Post created successfully");
+    }
+
+    /// <summary>
+    /// One-click share of a consultation case to the professional network.
+    /// The payload is generated from consultation data with patient identity masked.
+    /// </summary>
+    [HttpPost("posts/share-consultation")]
+    [Authorize(Policy = Policies.VerifiedOphthalmologist)]
+    [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ShareConsultationCase([FromBody] ShareConsultationCaseRequest request)
+    {
+        if (!_currentUserService.UserId.HasValue || !_currentUserService.ProfileId.HasValue)
+        {
+            return Unauthorized(ApiResponseFactory.Unauthorized("Authenticated doctor profile is required."));
+        }
+
+        var command = new ShareConsultationToNetworkCommand
+        {
+            ConsultationSessionId = request.ConsultationSessionId,
+            CurrentUserId = _currentUserService.UserId.Value,
+            CurrentProfileId = _currentUserService.ProfileId.Value
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result, "Consultation case shared successfully");
     }
 
     /// <summary>
@@ -471,6 +504,15 @@ public class CreatePostRequest
     public bool AllowComments { get; set; } = true;
     public List<IFormFile>? Attachments { get; set; }
     public bool IsAnonymizationConfirmed { get; set; }
+    public bool IsInternalCase { get; set; }
+    public Guid? ConsultationSessionId { get; set; }
+    public int? PatientAge { get; set; }
+    public string? PatientGender { get; set; }
+}
+
+public class ShareConsultationCaseRequest
+{
+    public Guid ConsultationSessionId { get; set; }
 }
 
 public class UpdatePostRequest

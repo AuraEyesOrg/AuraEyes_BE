@@ -168,29 +168,57 @@ public class AuthService : IAuthService
 
         try
         {
-            if (request.Degrees.Count == 0)
+            var normalizedCredentials = NormalizeCredentials(request);
+
+            if (normalizedCredentials.Count == 0)
+            {
+                return Result<RegisterResponse>.Failure("At least one credential is required");
+            }
+
+            if (!normalizedCredentials.Any(c => c.Type == CertificateType.Degree))
             {
                 return Result<RegisterResponse>.Failure("At least one degree is required");
             }
 
-            if (request.Certificates.Count == 0)
+            if (!normalizedCredentials.Any(c => c.Type == CertificateType.License))
             {
-                return Result<RegisterResponse>.Failure("At least one certificate is required");
+                return Result<RegisterResponse>.Failure("At least one license/certificate is required");
             }
 
-            if (request.Certificates.Any(certificate => !certificate.ExpiryDate.HasValue))
+            foreach (var certificate in normalizedCredentials)
             {
-                return Result<RegisterResponse>.Failure("Expiry date is required for every certificate/license");
-            }
+                if (certificate.File is null || certificate.File.Length == 0)
+                {
+                    return Result<RegisterResponse>.Failure("Credential file is required");
+                }
 
-            foreach (var certificate in request.Certificates)
-            {
                 var issuedDateUtc = EnsureUtc(certificate.IssuedDate);
                 var expiryDateUtc = EnsureUtc(certificate.ExpiryDate);
 
-                if (!expiryDateUtc.HasValue || expiryDateUtc.Value <= issuedDateUtc)
+                if (certificate.Type == CertificateType.Degree)
                 {
-                    return Result<RegisterResponse>.Failure("Certificate expiry date must be later than issued date");
+                    if (!certificate.DegreeLevel.HasValue)
+                    {
+                        return Result<RegisterResponse>.Failure("Degree level is required for degree credentials");
+                    }
+
+                    if (expiryDateUtc.HasValue)
+                    {
+                        return Result<RegisterResponse>.Failure("Expiry date must be empty for degree credentials");
+                    }
+                }
+
+                if (certificate.Type == CertificateType.License)
+                {
+                    if (!expiryDateUtc.HasValue)
+                    {
+                        return Result<RegisterResponse>.Failure("Expiry date is required for license credentials");
+                    }
+
+                    if (expiryDateUtc.Value <= issuedDateUtc)
+                    {
+                        return Result<RegisterResponse>.Failure("Certificate expiry date must be later than issued date");
+                    }
                 }
             }
 
@@ -231,61 +259,40 @@ public class AuthService : IAuthService
                 request.WorkingHoursPerWeek,
                 request.ExpectedMonthlySalary);
 
-            foreach (var degree in request.Degrees)
+            foreach (var certificate in normalizedCredentials)
             {
-                if (degree.File is null || degree.File.Length == 0)
+                var file = certificate.File;
+                if (file is null || file.Length == 0)
                 {
-                    return Result<RegisterResponse>.Failure("Degree file is required");
+                    return Result<RegisterResponse>.Failure("Credential file is required");
                 }
 
-                await using var stream = degree.File.OpenReadStream();
+                await using var stream = file.OpenReadStream();
                 var uploadedUrl = await _fileStorageService.SaveFileAsync(
                     stream,
-                    degree.File.FileName,
+                    file.FileName,
                     $"credentials/{user.Id}",
                     cancellationToken);
 
                 uploadedFileUrls.Add(uploadedUrl);
 
-                degreeUrl ??= uploadedUrl;
-
-                var degreeIssuedDateUtc = EnsureUtc(degree.IssuedDate);
-
-                ophthalmologist.AddCertificate(new Certificate(
-                    ophthalmologist.Id,
-                    CertificateType.Degree,
-                    degree.Name,
-                    degree.IssuingAuthority,
-                    degreeIssuedDateUtc,
-                    null,
-                    uploadedUrl));
-            }
-
-            foreach (var certificate in request.Certificates)
-            {
-                if (certificate.File is null || certificate.File.Length == 0)
+                if (certificate.Type == CertificateType.Degree)
                 {
-                    return Result<RegisterResponse>.Failure("Certificate file is required");
+                    degreeUrl ??= uploadedUrl;
                 }
-
-                await using var stream = certificate.File.OpenReadStream();
-                var uploadedUrl = await _fileStorageService.SaveFileAsync(
-                    stream,
-                    certificate.File.FileName,
-                    $"credentials/{user.Id}",
-                    cancellationToken);
-
-                uploadedFileUrls.Add(uploadedUrl);
-
-                licenseUrl ??= uploadedUrl;
+                else if (certificate.Type == CertificateType.License)
+                {
+                    licenseUrl ??= uploadedUrl;
+                }
 
                 var certificateIssuedDateUtc = EnsureUtc(certificate.IssuedDate);
                 var certificateExpiryDateUtc = EnsureUtc(certificate.ExpiryDate);
 
                 ophthalmologist.AddCertificate(new Certificate(
                     ophthalmologist.Id,
-                    CertificateType.License,
+                    certificate.Type,
                     certificate.Name,
+                    certificate.DegreeLevel,
                     certificate.IssuingAuthority,
                     certificateIssuedDateUtc,
                     certificateExpiryDateUtc,
@@ -383,6 +390,61 @@ public class AuthService : IAuthService
 
             return Result<RegisterResponse>.Failure("An error occurred during registration");
         }
+    }
+
+    private static List<CredentialItemDto> NormalizeCredentials(RegisterOphthalmologistRequest request)
+    {
+        if (request.Degrees.Count > 0)
+        {
+            var merged = new List<CredentialItemDto>(request.Degrees.Count + request.Certificates.Count);
+
+            merged.AddRange(request.Degrees.Select(d => new CredentialItemDto
+            {
+                Type = CertificateType.Degree,
+                DegreeLevel = d.DegreeLevel,
+                Name = d.Name,
+                IssuingAuthority = d.IssuingAuthority,
+                IssuedDate = d.IssuedDate,
+                ExpiryDate = null,
+                File = d.File
+            }));
+
+            merged.AddRange(request.Certificates.Select(c => new CredentialItemDto
+            {
+                Type = CertificateType.License,
+                DegreeLevel = null,
+                Name = c.Name,
+                IssuingAuthority = c.IssuingAuthority,
+                IssuedDate = c.IssuedDate,
+                ExpiryDate = c.ExpiryDate,
+                File = c.File
+            }));
+
+            return merged;
+        }
+
+        // Fallback for partially-updated FE clients that send licenses without type.
+        return request.Certificates
+            .Select(c =>
+            {
+                var type = c.Type;
+                if (type == CertificateType.Degree && !c.DegreeLevel.HasValue && c.ExpiryDate.HasValue)
+                {
+                    type = CertificateType.License;
+                }
+
+                return new CredentialItemDto
+                {
+                    Type = type,
+                    DegreeLevel = type == CertificateType.Degree ? c.DegreeLevel : null,
+                    Name = c.Name,
+                    IssuingAuthority = c.IssuingAuthority,
+                    IssuedDate = c.IssuedDate,
+                    ExpiryDate = type == CertificateType.Degree ? null : c.ExpiryDate,
+                    File = c.File
+                };
+            })
+            .ToList();
     }
 
     private static DateTime EnsureUtc(DateTime value)

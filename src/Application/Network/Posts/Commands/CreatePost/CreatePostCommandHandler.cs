@@ -44,6 +44,21 @@ public class CreatePostCommandHandler : ICommandHandler<CreatePostCommand, Guid>
             request.OrganisationId,
             request.AllowComments);
 
+        var hasClinicalMetadata =
+            request.IsInternalCase
+            || request.ConsultationSessionId.HasValue
+            || request.PatientAge.HasValue
+            || !string.IsNullOrWhiteSpace(request.PatientGender);
+
+        if (hasClinicalMetadata)
+        {
+            post.SetClinicalCaseMetadata(
+                request.IsInternalCase,
+                request.ConsultationSessionId,
+                request.PatientAge,
+                request.PatientGender);
+        }
+
         // Handle file uploads
         if (request.Attachments is { Count: > 0 })
         {

@@ -4,6 +4,7 @@ using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Platform;
 using Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Services;
@@ -38,7 +39,8 @@ public class NotificationService : INotificationService
         string message,
         NotificationType type,
         object? payload = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? referenceId = null)
     {
         try
         {
@@ -53,12 +55,15 @@ public class NotificationService : INotificationService
                 });
             }
 
+            referenceId ??= ExtractReferenceId(payloadJson);
+
             // Step B: Create and persist notification entity
             var notification = new Notification(
                 userId,
                 title,
                 message,
                 type,
+                referenceId,
                 payloadJson);
 
             await _notificationRepository.AddAsync(notification, cancellationToken);
@@ -76,12 +81,20 @@ public class NotificationService : INotificationService
                 Title = title,
                 Message = message,
                 Type = type,
+                ReferenceId = referenceId,
                 IsRead = false,
                 Payload = payloadJson,
                 CreatedAt = notification.CreatedAt
             };
 
             await _hubService.BroadcastToUserAsync(userId, notificationDto, cancellationToken);
+
+            var unreadCount = await _notificationRepository
+                .Query()
+                .AsNoTracking()
+                .CountAsync(n => n.UserId == userId && !n.IsRead, cancellationToken);
+
+            await _hubService.BroadcastUnreadCountAsync(userId, unreadCount, cancellationToken);
 
             _logger.LogInformation(
                 "Notification broadcasted via SignalR to User {UserId}",
@@ -106,6 +119,51 @@ public class NotificationService : INotificationService
             message,
             NotificationType.NewConsultationRequest,
             null,
-            cancellationToken);
+            cancellationToken,
+            null);
+    }
+
+    private static Guid? ExtractReferenceId(string? payloadJson)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson))
+            return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(payloadJson);
+            var root = document.RootElement;
+
+            if (root.ValueKind != JsonValueKind.Object)
+                return null;
+
+            var keys = new[]
+            {
+                "consultationId",
+                "sessionId",
+                "appointmentId",
+                "screeningId",
+                "aiScreeningId",
+                "transactionId",
+                "messageId"
+            };
+
+            foreach (var key in keys)
+            {
+                if (!root.TryGetProperty(key, out var value))
+                    continue;
+
+                if (value.ValueKind == JsonValueKind.String
+                    && Guid.TryParse(value.GetString(), out var parsed))
+                {
+                    return parsed;
+                }
+            }
+        }
+        catch
+        {
+            // Ignore malformed payload content and keep reference id unset.
+        }
+
+        return null;
     }
 }

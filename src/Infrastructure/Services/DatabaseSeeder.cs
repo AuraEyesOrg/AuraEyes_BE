@@ -23,10 +23,10 @@ public static class DatabaseSeeder
     /// </summary>
     private static readonly (string Email, string Password, string Role, string FullName)[] DefaultAccounts =
     [
-        ("systemadmin@gmail.com", "Password123!", Roles.SystemAdmin, "System Administrator"),
-        ("orgadmin@gmail.com", "Password123!", Roles.OrgAdmin, "Organization Administrator"),
-        ("ophthalmologist@gmail.com", "Password123!", Roles.Ophthalmologist, "Doctor Ophthalmologist"),
-        ("patient@gmail.com", "Password123!", Roles.Patient, "Patient User")
+        ("systemadmin@gmail.com", "SystemAdmin@123$", Roles.SystemAdmin, "System Administrator"),
+        ("orgadmin@gmail.com", "OrgAdmin@123$", Roles.OrgAdmin, "Organization Administrator"),
+        ("ophthalmologist@gmail.com", "Ophthalmologist@123$", Roles.Ophthalmologist, "Doctor Ophthalmologist"),
+        ("patient@gmail.com", "Patient@123$", Roles.Patient, "Patient User")
     ];
 
     public static async Task SeedAsync(
@@ -55,17 +55,14 @@ public static class DatabaseSeeder
 
             // Step 2: Seed default accounts (AspNetUsers + AspNetUserRoles)
             await SeedDefaultAccountsAsync(userManager, logger);
+
+            // Step 3: Seed domain entities (Organisation, Ophthalmologist, Patient)
+            await SeedDomainEntitiesAsync(context, userManager, logger);
         }
         else
         {
             logger?.LogInformation("Roles already exist. Skipping initial account seed.");
         }
-
-        // Step 3: Seed domain entities (Organisation, Ophthalmologist, Patient)
-        // Always runs — idempotent, skips if entities already exist.
-        // This ensures domain profiles are created even if the server was restarted
-        // after roles were seeded but before domain entities were created.
-        await SeedDomainEntitiesAsync(context, userManager, logger);
 
         // Step 4: Seed permissions + default role assignments
         // Idempotent — runs on every startup so new permissions defined in code

@@ -21,4 +21,6 @@ public class OphthalmologistListDto
     public int RatingCount { get; set; }
     public decimal? MinPrice { get; set; }
     public decimal? MaxPrice { get; set; }
+    public List<DegreeDto> Degrees { get; set; } = new();
+    public List<CertificateDto> Certificates { get; set; } = new();
 }

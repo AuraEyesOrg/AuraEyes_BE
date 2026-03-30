@@ -97,6 +97,7 @@ public class AdminQueryService : IAdminQueryService
                 Credential = new OphthalmologistCredentialDto
                 {
                     Id = c.Id,
+                    DegreeLevel = c.DegreeLevel.HasValue ? c.DegreeLevel.Value.ToString() : null,
                     Name = c.Name,
                     IssuingAuthority = c.IssuingAuthority,
                     IssuedDate = c.IssuedDate,

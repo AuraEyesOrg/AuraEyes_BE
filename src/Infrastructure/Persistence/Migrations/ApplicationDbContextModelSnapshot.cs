@@ -1262,6 +1262,9 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
 
+                    b.Property<Guid?>("ConsultationSessionId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Content")
                         .IsRequired()
                         .HasMaxLength(5000)
@@ -1287,6 +1290,11 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<bool>("IsInternalCase")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<bool>("IsRepost")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -1297,6 +1305,13 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("OriginalPostId")
                         .HasColumnType("uuid");
+
+                    b.Property<int?>("PatientAge")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PatientGender")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<int>("ReactionCount")
                         .ValueGeneratedOnAdd()
@@ -1329,9 +1344,13 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Category");
 
+                    b.HasIndex("ConsultationSessionId");
+
                     b.HasIndex("CreatedAt");
 
                     b.HasIndex("IsHidden");
+
+                    b.HasIndex("IsInternalCase");
 
                     b.HasIndex("OrganisationId");
 
@@ -1479,6 +1498,9 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Payload")
                         .HasColumnType("jsonb");
+
+                    b.Property<Guid?>("ReferenceId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -1873,6 +1895,18 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<Guid>("AiScreeningId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ClinicalFindings")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("CodingSystem")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal?>("ConfidenceLevel")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
                     b.Property<DateTime?>("ConfirmedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1885,16 +1919,15 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
 
-                    b.Property<string>("DiagnosesCode")
+                    b.Property<string>("DiagnosisCode")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<string>("DiagnosesText")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
                     b.Property<Guid>("DoctorId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("FinalizedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("FollowUpDate")
                         .HasColumnType("timestamp with time zone");
@@ -1909,9 +1942,26 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<bool>("IsUrgent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("LifestyleAdvice")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Recommendations")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("SeverityLevel")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("TreatmentPlan")
                         .HasMaxLength(2000)
@@ -2057,6 +2107,10 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
 
+                    b.Property<int?>("DegreeLevel")
+                        .HasColumnType("integer")
+                        .HasColumnName("DegreeLevel");
+
                     b.Property<DateTime?>("ExpiryDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -2093,7 +2147,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OphthalmologistId");
 
-                    b.ToTable("Certificates");
+                    b.ToTable("Certificates", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.Consent", b =>
@@ -2126,6 +2180,9 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("SignedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2139,6 +2196,8 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("AiScreeningId")
                         .IsUnique();
+
+                    b.HasIndex("PatientId");
 
                     b.ToTable("Consents");
                 });
@@ -3133,6 +3192,12 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasOne("Domain.Entities.Screening.AiScreening", null)
                         .WithOne("Consent")
                         .HasForeignKey("Domain.Entities.Users.Consent", "AiScreeningId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Users.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

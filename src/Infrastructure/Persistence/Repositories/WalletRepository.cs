@@ -19,6 +19,12 @@ public class WalletRepository : Repository<Wallet>, IWalletRepository
             .FirstOrDefaultAsync(w => w.UserId == userId, cancellationToken);
     }
 
+    public async Task<Wallet?> GetSystemWalletAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .FirstOrDefaultAsync(w => w.OwnerType == "System", cancellationToken);
+    }
+
     public async Task<Wallet?> GetByIdWithTransactionsAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _dbSet
@@ -78,11 +84,12 @@ public class WalletRepository : Repository<Wallet>, IWalletRepository
 
         var transactionsCount = monthTransactions.Count;
 
-        // Deposits, Refunds, Bonuses are positive flow
+        // Deposits, refunds, bonuses, and transfers (e.g. consultation credit to doctor) are positive inflow
         var totalDeposits = monthTransactions
             .Where(t => t.TransactionType == Domain.Enums.TransactionType.Deposit ||
                         t.TransactionType == Domain.Enums.TransactionType.Refund ||
-                        t.TransactionType == Domain.Enums.TransactionType.Bonus)
+                        t.TransactionType == Domain.Enums.TransactionType.Bonus ||
+                        t.TransactionType == Domain.Enums.TransactionType.Transfer)
             .Sum(t => t.Amount);
 
         // Payments, Withdrawals are negative flow
