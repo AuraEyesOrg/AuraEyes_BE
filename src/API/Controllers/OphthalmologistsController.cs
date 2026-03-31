@@ -6,6 +6,7 @@ using Application.Ophthalmologists.Commands.DeleteOphthalmologist;
 using Application.Ophthalmologists.Commands.UnverifyOphthalmologist;
 using Application.Ophthalmologists.Commands.UpdateOphthalmologist;
 using Application.Ophthalmologists.Commands.VerifyOphthalmologist;
+using Application.Ophthalmologists.Commands.UploadCredentials;
 using Application.Ophthalmologists.Common;
 using Application.Patients.Commands.UploadAvatar;
 using Application.Ophthalmologists.Contracts.GetMyContract;
@@ -178,6 +179,8 @@ public class OphthalmologistsController : BaseApiController
             Address = request.Address,
             Bio = request.Bio,
             YearsOfExperience = request.YearsOfExperience,
+            DegreeUrl = request.DegreeUrl,
+            LicenseUrl = request.LicenseUrl
         };
 
         var result = await _mediator.Send(command, cancellationToken);
@@ -270,6 +273,32 @@ public class OphthalmologistsController : BaseApiController
         return HandleResult(result, "Ophthalmologist verification revoked successfully.");
     }
 
+    /// <summary>
+    /// Upload new credentials/certificates for existing ophthalmologist.
+    /// </summary>
+    [HttpPost("~/api/ophthalmologist/profile/certificates")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UploadCredentials(
+        [FromForm] UploadCredentialsRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (_currentUserService.ProfileId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found in token"));
+
+        var command = new UploadCredentialsCommand
+        {
+            OphthalmologistId = _currentUserService.ProfileId.Value,
+            Certificates = request.Certificates
+        };
+
+        var result = await _mediator.Send(command, cancellationToken);
+        return HandleResult(result, "Credentials uploaded successfully");
+    }
+
     // =========================================================================
     // CONTRACT ENDPOINTS (for the authenticated ophthalmologist)
     // =========================================================================
@@ -358,4 +387,11 @@ public record UpdateOphthalmologistProfileRequest
     public string? Address { get; init; }
     public string? Bio { get; init; }
     public int YearsOfExperience { get; init; }
+    public string? DegreeUrl { get; init; }
+    public string? LicenseUrl { get; init; }
+}
+
+public record UploadCredentialsRequest
+{
+    public List<UploadCredentialItemDto> Certificates { get; init; } = new();
 }

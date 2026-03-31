@@ -42,4 +42,14 @@ public record UpdateOphthalmologistCommand : ICommand
     /// Updated years of experience.
     /// </summary>
     public int YearsOfExperience { get; init; }
+
+    /// <summary>
+    /// Updated degree certification URL.
+    /// </summary>
+    public string? DegreeUrl { get; init; }
+
+    /// <summary>
+    /// Updated license certification URL.
+    /// </summary>
+    public string? LicenseUrl { get; init; }
 }

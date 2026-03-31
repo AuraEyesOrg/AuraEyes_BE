@@ -18,5 +18,10 @@ public enum VerificationStatus
     /// <summary>
     /// Rejected by admin.
     /// </summary>
-    Rejected = 2
+    Rejected = 2,
+
+    /// <summary>
+    /// Existing verified ophthalmologist uploading new credentials.
+    /// </summary>
+    PendingUpdate = 3
 }

@@ -135,6 +135,17 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
     {
         if (licenseUrl != null) LicenseUrl = licenseUrl;
         if (degreeUrl != null) DegreeUrl = degreeUrl;
+        
+        if (VerificationStatus == VerificationStatus.Approved)
+        {
+            VerificationStatus = VerificationStatus.PendingUpdate;
+            IsVerified = false;
+        }
+        else if (VerificationStatus == VerificationStatus.Rejected)
+        {
+            VerificationStatus = VerificationStatus.PendingVerification;
+        }
+
         UpdatedAt = DateTime.UtcNow;
     }
 
