@@ -46,9 +46,17 @@ public class AdminQueryService : IAdminQueryService
 
         if (!string.IsNullOrWhiteSpace(verificationStatus))
         {
-            if (Enum.TryParse<VerificationStatus>(verificationStatus, true, out var status))
+            var statusFilters = verificationStatus
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(value => Enum.TryParse<VerificationStatus>(value, true, out var parsed) ? parsed : (VerificationStatus?)null)
+                .Where(value => value.HasValue)
+                .Select(value => value!.Value)
+                .Distinct()
+                .ToList();
+
+            if (statusFilters.Count > 0)
             {
-                query = query.Where(x => x.Ophthalmologist.VerificationStatus == status);
+                query = query.Where(x => statusFilters.Contains(x.Ophthalmologist.VerificationStatus));
             }
         }
 

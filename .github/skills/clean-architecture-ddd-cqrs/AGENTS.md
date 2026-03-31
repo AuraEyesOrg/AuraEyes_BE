@@ -345,10 +345,10 @@ public class CreateOrderCommandValidator : AbstractValidator<CreateOrderCommand>
         {
             item.RuleFor(i => i.ProductName)
                 .NotEmpty().WithMessage("Product name is required");
-            
+
             item.RuleFor(i => i.Price)
                 .GreaterThan(0).WithMessage("Price must be greater than zero");
-            
+
             item.RuleFor(i => i.Quantity)
                 .GreaterThan(0).WithMessage("Quantity must be greater than zero");
         });
@@ -653,11 +653,11 @@ public async Task<IActionResult> CreateOrder([FromBody] CreateOrderRequest reque
 {
     if (string.IsNullOrEmpty(request.CustomerName))
         return BadRequest("Customer name required");
-    
+
     var order = new Order { CustomerName = request.CustomerName };
     _context.Orders.Add(order);
     await _context.SaveChangesAsync();
-    
+
     return Ok(order);
 }
 ```
@@ -859,7 +859,7 @@ public static class DependencyInjection
                 b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
 
         // Unit of Work
-        services.AddScoped<IUnitOfWork>(provider => 
+        services.AddScoped<IUnitOfWork>(provider =>
             provider.GetRequiredService<ApplicationDbContext>());
 
         // Generic Repository
@@ -979,14 +979,14 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         var requestName = typeof(TRequest).Name;
-        
+
         _logger.LogInformation("Handling {RequestName}", requestName);
 
         var stopwatch = Stopwatch.StartNew();
         var response = await next();
         stopwatch.Stop();
 
-        _logger.LogInformation("Handled {RequestName} in {ElapsedMilliseconds}ms", 
+        _logger.LogInformation("Handled {RequestName} in {ElapsedMilliseconds}ms",
             requestName, stopwatch.ElapsedMilliseconds);
 
         return response;
@@ -1093,20 +1093,20 @@ When adding a new feature `[Entity]`:
 
 ### 8.2 Naming Conventions
 
-| Type | Convention | Example |
-|------|------------|---------|
-| Entity | PascalCase, singular | `Product`, `Order` |
-| Value Object | PascalCase, descriptive | `Money`, `Address` |
-| Command | `[Verb][Entity]Command` | `CreateProductCommand` |
-| Query | `Get[Entity]Query` | `GetProductQuery` |
-| Handler | `[CommandName]Handler` | `CreateProductCommandHandler` |
-| Validator | `[CommandName]Validator` | `CreateProductCommandValidator` |
-| DTO | `[Entity]Dto` | `ProductDto`, `ProductListDto` |
-| Repository Interface | `I[Entity]Repository` | `IProductRepository` |
-| Repository Impl | `[Entity]Repository` | `ProductRepository` |
-| Configuration | `[Entity]Configuration` | `ProductConfiguration` |
-| Controller | `[Entities]Controller` | `ProductsController` |
-| Event | `[Entity][Action]Event` | `ProductCreatedEvent` |
+| Type                 | Convention               | Example                         |
+| -------------------- | ------------------------ | ------------------------------- |
+| Entity               | PascalCase, singular     | `Product`, `Order`              |
+| Value Object         | PascalCase, descriptive  | `Money`, `Address`              |
+| Command              | `[Verb][Entity]Command`  | `CreateProductCommand`          |
+| Query                | `Get[Entity]Query`       | `GetProductQuery`               |
+| Handler              | `[CommandName]Handler`   | `CreateProductCommandHandler`   |
+| Validator            | `[CommandName]Validator` | `CreateProductCommandValidator` |
+| DTO                  | `[Entity]Dto`            | `ProductDto`, `ProductListDto`  |
+| Repository Interface | `I[Entity]Repository`    | `IProductRepository`            |
+| Repository Impl      | `[Entity]Repository`     | `ProductRepository`             |
+| Configuration        | `[Entity]Configuration`  | `ProductConfiguration`          |
+| Controller           | `[Entities]Controller`   | `ProductsController`            |
+| Event                | `[Entity][Action]Event`  | `ProductCreatedEvent`           |
 
 ### 8.3 File Location Rules
 

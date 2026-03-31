@@ -71,20 +71,39 @@ public class UploadCredentialsCommandHandler : ICommandHandler<UploadCredentials
 
         if (hasChanges)
         {
+            ophthalmologist.SubmitCredentialReviewRequest();
+
             await _repository.UpdateAsync(ophthalmologist, cancellationToken);  
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            if (oldStatus == VerificationStatus.Approved && ophthalmologist.VerificationStatus == VerificationStatus.PendingUpdate)
+            if (ophthalmologist.VerificationStatus is VerificationStatus.PendingVerification or VerificationStatus.PendingUpdate)
             {
+                var verificationFlowType = ophthalmologist.VerificationStatus == VerificationStatus.PendingUpdate
+                    ? "CredentialUpdateReview"
+                    : "OnboardingVerification";
+                var notificationTitle = ophthalmologist.VerificationStatus == VerificationStatus.PendingUpdate
+                    ? "Chờ duyệt cập nhật chứng chỉ"
+                    : "Chờ duyệt hồ sơ onboarding bác sĩ";
+                var notificationMessage = ophthalmologist.VerificationStatus == VerificationStatus.PendingUpdate
+                    ? "Một bác sĩ vừa cập nhật chứng chỉ. Vui lòng vào mục Verification để duyệt."
+                    : "Một bác sĩ vừa nộp hồ sơ chứng chỉ onboarding. Vui lòng vào mục Verification để duyệt.";
+
                 var (systemAdmins, _) = await _identityService.GetUsersAsync(roleFilter: "SystemAdmin", pageNumber: 1, pageSize: 1000, cancellationToken: cancellationToken);
                 foreach (var admin in systemAdmins)
                 {
                     await _notificationService.SendAsync(  
                         admin.Id,
-                        "Chờ duyệt chứng chỉ",
-                        $"Một bác sĩ vừa cập nhật thêm chứng chỉ, vui lòng kiểm tra và duyệt lại.",
+                        notificationTitle,
+                        notificationMessage,
                         NotificationType.SystemAlert,
-                        payload: new { action = "pending_update_verification" },
+                        payload: new
+                        {
+                            action = "verification_request_submitted",
+                            verificationFlowType,
+                            ophthalmologistId = ophthalmologist.Id,
+                            previousStatus = oldStatus.ToString(),
+                            currentStatus = ophthalmologist.VerificationStatus.ToString()
+                        },
                         cancellationToken: cancellationToken,
                         referenceId: ophthalmologist.Id);
                 }
