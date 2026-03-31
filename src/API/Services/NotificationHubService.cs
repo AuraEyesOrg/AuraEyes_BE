@@ -47,31 +47,6 @@ public class NotificationHubService : INotificationHubService
     }
 
     /// <inheritdoc />
-    public async Task BroadcastToGroupAsync(
-        string groupName,
-        NotificationDto notification,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            await _hubContext.Clients
-                .Group(groupName)
-                .SendAsync("ReceiveNotification", notification, cancellationToken);
-
-            _logger.LogDebug(
-                "Notification broadcast to group {GroupName}: {Title}",
-                groupName, notification.Title);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex,
-                "Failed to broadcast notification to group {GroupName}",
-                groupName);
-            throw;
-        }
-    }
-
-    /// <inheritdoc />
     public async Task BroadcastUnreadCountAsync(
         Guid userId,
         int count,

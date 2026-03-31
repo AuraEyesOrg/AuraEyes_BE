@@ -60,6 +60,3 @@ public class UpdateOphthalmologistCommandHandler : ICommandHandler<UpdateOphthal
         return Result.Success();
     }
 }
-        return Result.Success();
-    }
-}

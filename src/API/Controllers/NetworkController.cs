@@ -383,8 +383,7 @@ public class NetworkController : BaseApiController
     public async Task<IActionResult> ToggleSavePost(Guid postId, [FromBody] ToggleSavePostRequest? request = null)
     {
         // Prevent SystemAdmin from saving posts
-        var user = await _identityService.GetUserByIdAsync(_currentUserService.UserId!.Value);
-        if (user?.Roles.Any(r => r.Name == Roles.SystemAdmin) == true)
+        if (_currentUserService.IsInRole(Roles.SystemAdmin))
         {
             return Forbid("SystemAdmin users are not allowed to save posts");
         }
