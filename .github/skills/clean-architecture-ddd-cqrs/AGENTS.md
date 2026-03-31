@@ -629,6 +629,20 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
 
 Controllers are thin, only dispatching to MediatR.
 
+### 5.0 Hard Boundary Rule
+
+Controllers MUST NOT inject `IRepository<>`, specific repositories (e.g. `IOphthalmologistRepository`), `DbContext`, or access persistence APIs directly.
+
+Required flow:
+
+`Controller -> Command/Query -> Handler -> Repository/DbContext (Infrastructure)`
+
+Anti-patterns to reject in reviews:
+
+- Constructor injection of repositories in controllers
+- `[FromServices]` repositories inside controller actions
+- Direct LINQ/EF data access in controllers
+
 ### 5.1 Controller Structure
 
 **Incorrect: Fat controller with business logic**
