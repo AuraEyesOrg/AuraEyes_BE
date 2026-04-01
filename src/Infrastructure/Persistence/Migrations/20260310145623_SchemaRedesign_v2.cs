@@ -287,10 +287,10 @@ namespace Infrastructure.Persistence.Migrations
                 columns: new[] { "Key", "Description", "Value" },
                 values: new object[,]
                 {
-                    { "AI_QUOTA_BUNDLE", "Credits per paid bundle", "5" },
-                    { "AI_QUOTA_PRICE", "Price per 5 additional AI credits (VND)", "50000" },
-                    { "DEFAULT_PLATFORM_COMMISSION", "Default platform commission rate (20%)", "0.20" },
-                    { "FREE_AI_QUOTA", "Free AI screening credits per patient", "3" }
+                    { "AI_QUOTA_UNIT_PRICE", "Price per 1 AI quota credit (VND)", "10000" },
+                    { "FREE_AI_QUOTA", "Free AI screening credits per patient", "5" },
+                    { "MIN_ADVANCE_BOOKING_HOURS", null, "0.5" },
+                    { "TRUSTED_EYE_HEALTH_DOMAINS", null, "vinmec.com,vnio.vn,benhvienmat.com,matsaigon.com,matquocte.vn,medlatec.vn,hellobacsi.com" }
                 });
 
             migrationBuilder.CreateIndex(

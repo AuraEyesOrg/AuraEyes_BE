@@ -21,6 +21,7 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
     private readonly Domain.Common.IUnitOfWork _unitOfWork;
     private readonly IIdentityService _identityService;
     private readonly IEmailService _emailService;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<VerifyOphthalmologistCommandHandler> _logger;
 
     public VerifyOphthalmologistCommandHandler(
@@ -30,6 +31,7 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
         Domain.Common.IUnitOfWork unitOfWork,
         IIdentityService identityService,
         IEmailService emailService,
+        INotificationService notificationService,
         ILogger<VerifyOphthalmologistCommandHandler> logger)
     {
         _ophthalmologistRepository = ophthalmologistRepository;
@@ -38,6 +40,7 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
         _unitOfWork = unitOfWork;
         _identityService = identityService;
         _emailService = emailService;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -50,6 +53,10 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
         {
             return Result<string>.Failure("Ophthalmologist not found");
         }
+
+        var reviewFlowType = ophthalmologist.VerificationStatus == VerificationStatus.PendingUpdate
+            ? "CredentialUpdateReview"
+            : "OnboardingVerification";
 
         if (request.Approve)
         {
@@ -86,6 +93,24 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
             var userDto = await _identityService.GetUserByIdAsync(ophthalmologist.UserId, cancellationToken);
             if (userDto != null)
             {
+                await _notificationService.SendAsync(
+                    ophthalmologist.UserId,
+                    request.Approve ? "Hồ sơ xác minh đã được duyệt" : "Hồ sơ xác minh bị từ chối",
+                    request.Approve
+                        ? "System Admin đã duyệt hồ sơ xác minh của bạn."
+                        : "System Admin đã từ chối hồ sơ xác minh của bạn. Vui lòng xem lý do và cập nhật lại.",
+                    NotificationType.SystemAlert,
+                    payload: new
+                    {
+                        action = "verification_review_completed",
+                        reviewFlowType,
+                        approved = request.Approve,
+                        rejectionReason = request.RejectionReason,
+                        ophthalmologistId = request.OphthalmologistId
+                    },
+                    cancellationToken: cancellationToken,
+                    referenceId: request.OphthalmologistId);
+
                 if (request.Approve)
                 {
                     await _emailService.SendAsync(

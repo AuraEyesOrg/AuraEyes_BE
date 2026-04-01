@@ -138,6 +138,21 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void SubmitCredentialReviewRequest()
+    {
+        var previousStatus = VerificationStatus;
+
+        // First-time or re-submission flow stays in PendingVerification.
+        // Already-approved doctors move to PendingUpdate for re-review.
+        VerificationStatus = previousStatus == VerificationStatus.Approved
+            ? VerificationStatus.PendingUpdate
+            : VerificationStatus.PendingVerification;
+
+        IsVerified = false;
+        RejectionReason = null;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void ApplyNewRating(int rating)
     {
         if (rating < 1 || rating > 5)

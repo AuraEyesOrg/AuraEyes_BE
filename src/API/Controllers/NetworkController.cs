@@ -373,12 +373,21 @@ public class NetworkController : BaseApiController
 
     /// <summary>
     /// Toggle save/unsave a post.
+    /// SystemAdmin users are not allowed to save posts.
     /// </summary>
     [HttpPost("posts/{postId:guid}/save")]
+    [Authorize]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ToggleSavePost(Guid postId, [FromBody] ToggleSavePostRequest? request = null)
     {
+        // Prevent SystemAdmin from saving posts
+        if (_currentUserService.IsInRole(Roles.SystemAdmin))
+        {
+            return Forbid("SystemAdmin users are not allowed to save posts");
+        }
+
         var command = new ToggleSavePostCommand
         {
             UserId = _currentUserService.UserId!.Value,

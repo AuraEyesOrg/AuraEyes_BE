@@ -36,7 +36,7 @@ public class OphthalmologistsController : BaseApiController
     /// Get ophthalmologists with pagination and filtering
     /// </summary>
     /// <param name="searchTerm">Search by name, email, or phone</param>
-    /// <param name="verificationStatus">Filter: PendingVerification, Approved, Rejected</param>
+    /// <param name="verificationStatus">Filter: PendingVerification, PendingUpdate, Approved, Rejected. Multiple values can be comma-separated.</param>
     /// <param name="pageNumber">Page number (default: 1)</param>
     /// <param name="pageSize">Page size (default: 10)</param>
     [HttpGet]
