@@ -36,6 +36,7 @@ public class AuthService : IAuthService
     private readonly IContractRepository _contractRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly GoogleAuthSettings _googleAuthSettings;
     private readonly ILogger<AuthService> _logger;
 
@@ -52,6 +53,7 @@ public class AuthService : IAuthService
         IContractRepository contractRepository,
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager,
+        SignInManager<ApplicationUser> signInManager,
         IOptions<GoogleAuthSettings> googleAuthSettings,
         ILogger<AuthService> logger)
     {
@@ -67,6 +69,7 @@ public class AuthService : IAuthService
         _contractRepository = contractRepository;
         _unitOfWork = unitOfWork;
         _userManager = userManager;
+        _signInManager = signInManager;
         _googleAuthSettings = googleAuthSettings.Value;
         _logger = logger;
     }
@@ -595,14 +598,26 @@ public class AuthService : IAuthService
                 return Result<LoginResponse>.Unauthorized("Account is deactivated. Please contact support.");
             }
 
-            if (!await _userManager.CheckPasswordAsync(user, request.Password))
+            if (await _userManager.IsLockedOutAsync(user))
             {
-                return Result<LoginResponse>.Unauthorized("Invalid email or password");
+                return Result<LoginResponse>.Unauthorized("Account is temporarily locked due to multiple failed attempts. Please try again later.");
             }
 
-            if (!user.EmailConfirmed)
+            var signInResult = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
+
+            if (signInResult.IsLockedOut)
+            {
+                return Result<LoginResponse>.Unauthorized("Account is temporarily locked due to multiple failed attempts. Please try again later.");
+            }
+
+            if (signInResult.IsNotAllowed)
             {
                 return Result<LoginResponse>.Unauthorized("Please confirm your email before logging in.");
+            }
+
+            if (!signInResult.Succeeded && !signInResult.RequiresTwoFactor)
+            {
+                return Result<LoginResponse>.Unauthorized("Invalid email or password");
             }
 
             // Check ophthalmologist verification status — reject if credentials were denied
@@ -618,8 +633,8 @@ public class AuthService : IAuthService
                 }
             }
 
-            // Check if 2FA is enabled
-            if (await _userManager.GetTwoFactorEnabledAsync(user))
+            // 2FA may be requested by SignInManager pre-check or enabled at user level.
+            if (signInResult.RequiresTwoFactor || await _userManager.GetTwoFactorEnabledAsync(user))
             {
                 _logger.LogInformation("2FA required for user: {Email}", request.Email);
                 return Result<LoginResponse>.Success(LoginResponse.TwoFactorRequired(user.Id));
