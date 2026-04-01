@@ -17,6 +17,9 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 10
 
+    environment:
+      name: production
+
     env:
       DEPLOY_DIR: /dulieu/phuoc/AuraEyes
       API_PORT: 5060
