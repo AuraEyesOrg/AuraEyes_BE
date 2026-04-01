@@ -6,6 +6,7 @@ using Application.Ophthalmologists.Commands.DeleteOphthalmologist;
 using Application.Ophthalmologists.Commands.UnverifyOphthalmologist;
 using Application.Ophthalmologists.Commands.UpdateOphthalmologist;
 using Application.Ophthalmologists.Commands.VerifyOphthalmologist;
+using Application.Ophthalmologists.Commands.UploadCredentials;
 using Application.Ophthalmologists.Common;
 using Application.Patients.Commands.UploadAvatar;
 using Application.Ophthalmologists.Contracts.GetMyContract;
@@ -14,6 +15,7 @@ using Application.Ophthalmologists.Queries.GetDashboardMetrics;
 using Application.Ophthalmologists.Queries.GetOphthalmologist;
 using Application.Ophthalmologists.Queries.GetOphthalmologists;
 using Application.SystemAdmin.Contracts.Common;
+using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -152,6 +154,25 @@ public class OphthalmologistsController : BaseApiController
     }
 
     /// <summary>
+    /// Get current authenticated ophthalmologist profile (alias endpoint for settings page).
+    /// </summary>
+    [HttpGet("~/api/ophthalmologists/me")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<OphthalmologistDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetCurrentOphthalmologist(CancellationToken cancellationToken)
+    {
+        if (_currentUserService.ProfileId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found in token"));
+
+        var result = await _mediator.Send(
+            new GetOphthalmologistQuery(_currentUserService.ProfileId.Value),
+            cancellationToken);
+
+        return HandleResult(result, "Profile retrieved successfully");
+    }
+
+    /// <summary>
     /// Update current authenticated ophthalmologist profile information.
     /// </summary>
     [HttpPut("~/api/ophthalmologist/profile")]
@@ -221,6 +242,86 @@ public class OphthalmologistsController : BaseApiController
 
         var result = await _mediator.Send(command, cancellationToken);
         return HandleResult(result, "Avatar uploaded successfully");
+    }
+
+    /// <summary>
+    /// Upload certificates/credentials (degrees and licenses) for the authenticated ophthalmologist.
+    /// Supports incremental uploads after initial registration.
+    /// </summary>
+    [HttpPost("~/api/ophthalmologist/profile/certificates")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UploadCertificates(
+        CancellationToken cancellationToken)
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
+
+        if (_currentUserService.ProfileId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found in token"));
+
+        var form = await Request.ReadFormAsync(cancellationToken);
+        var certificates = new List<UploadCredentialItemDto>();
+
+        // Parse certificates from form data
+        // Expected format: certificates[0][type], certificates[0][name], certificates[0][file], etc.
+        var certificateCount = form.Keys
+            .Where(k => k.StartsWith("certificates["))
+            .Select(k => int.Parse(k.Split('[', ']')[1]))
+            .Distinct()
+            .Count();
+
+        for (int i = 0; i < certificateCount; i++)
+        {
+            var typeStr = form[$"certificates[{i}][type]"].FirstOrDefault();
+            var name = form[$"certificates[{i}][name]"].FirstOrDefault();
+            var issuingAuthority = form[$"certificates[{i}][issuingAuthority]"].FirstOrDefault();
+            var issuedDateStr = form[$"certificates[{i}][issuedDate]"].FirstOrDefault();
+            var expiryDateStr = form[$"certificates[{i}][expiryDate]"].FirstOrDefault();
+            var file = form.Files.FirstOrDefault(f => f.Name == $"certificates[{i}][file]");
+
+            if (file?.Length > 0 &&
+                !string.IsNullOrEmpty(typeStr) &&
+                !string.IsNullOrEmpty(name) &&
+                !string.IsNullOrEmpty(issuingAuthority) &&
+                DateTime.TryParse(issuedDateStr, out var issuedDate))
+            {
+                var certificate = new UploadCredentialItemDto
+                {
+                    Type = Enum.Parse<CertificateType>(typeStr ?? "License"),
+                    Name = name,
+                    IssuingAuthority = issuingAuthority,
+                    IssuedDate = issuedDate,
+                    ExpiryDate = DateTime.TryParse(expiryDateStr, out var expiryDate) ? expiryDate : null,
+                    File = file
+                };
+
+                // Set DegreeLevel for degrees
+                if (certificate.Type == CertificateType.Degree)
+                {
+                    var degreeLevelStr = form[$"certificates[{i}][degreeLevel]"].FirstOrDefault();
+                    if (Enum.TryParse<DegreeLevel>(degreeLevelStr ?? "Bachelor", out var degreeLevel))
+                        certificate.DegreeLevel = degreeLevel;
+                }
+
+                certificates.Add(certificate);
+            }
+        }
+
+        if (certificates.Count == 0)
+            return BadRequest(ApiResponseFactory.Error("No valid certificates provided"));
+
+        var command = new UploadCredentialsCommand
+        {
+            OphthalmologistId = _currentUserService.ProfileId.Value,
+            Certificates = certificates
+        };
+
+        var result = await _mediator.Send(command, cancellationToken);
+        return HandleResult(result, "Certificates uploaded successfully. Awaiting verification.");
     }
 
     /// <summary>

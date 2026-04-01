@@ -35,32 +35,76 @@ public class DashboardMetricsService : IDashboardMetricsService
         var nextMonthStart = currentMonthStart.AddMonths(1);
         var previousMonthStart = currentMonthStart.AddMonths(-1);
 
-        var doctorTotal = await _context.Ophthalmologists.CountAsync(cancellationToken);
-        var organisationTotal = await _context.Organisations.CountAsync(cancellationToken);
-        var patientTotal = await _context.Patients.CountAsync(cancellationToken);
+        var doctorTotalCount = await _context.Ophthalmologists.AsNoTracking()
+            .CountAsync(cancellationToken);
+        var doctorCurrentMonthCount = await _context.Ophthalmologists.AsNoTracking()
+            .CountAsync(item => item.CreatedAt >= currentMonthStart && item.CreatedAt < nextMonthStart, cancellationToken);
+        var doctorPreviousMonthCount = await _context.Ophthalmologists.AsNoTracking()
+            .CountAsync(item => item.CreatedAt >= previousMonthStart && item.CreatedAt < currentMonthStart, cancellationToken);
 
-        var doctorCurrentMonth = await _context.Ophthalmologists
-            .CountAsync(o => o.CreatedAt >= currentMonthStart && o.CreatedAt < nextMonthStart, cancellationToken);
-        var doctorPreviousMonth = await _context.Ophthalmologists
-            .CountAsync(o => o.CreatedAt >= previousMonthStart && o.CreatedAt < currentMonthStart, cancellationToken);
+        var doctorStats = new
+        {
+            Total = doctorTotalCount,
+            CurrentMonth = doctorCurrentMonthCount,
+            PreviousMonth = doctorPreviousMonthCount
+        };
 
-        var organisationCurrentMonth = await _context.Organisations
-            .CountAsync(o => o.CreatedAt >= currentMonthStart && o.CreatedAt < nextMonthStart, cancellationToken);
-        var organisationPreviousMonth = await _context.Organisations
-            .CountAsync(o => o.CreatedAt >= previousMonthStart && o.CreatedAt < currentMonthStart, cancellationToken);
+        var organisationTotalCount = await _context.Organisations.AsNoTracking()
+            .CountAsync(cancellationToken);
+        var organisationCurrentMonthCount = await _context.Organisations.AsNoTracking()
+            .CountAsync(item => item.CreatedAt >= currentMonthStart && item.CreatedAt < nextMonthStart, cancellationToken);
+        var organisationPreviousMonthCount = await _context.Organisations.AsNoTracking()
+            .CountAsync(item => item.CreatedAt >= previousMonthStart && item.CreatedAt < currentMonthStart, cancellationToken);
 
-        var patientCurrentMonth = await _context.Patients
-            .CountAsync(p => p.CreatedAt >= currentMonthStart && p.CreatedAt < nextMonthStart, cancellationToken);
-        var patientPreviousMonth = await _context.Patients
-            .CountAsync(p => p.CreatedAt >= previousMonthStart && p.CreatedAt < currentMonthStart, cancellationToken);
+        var organisationStats = new
+        {
+            Total = organisationTotalCount,
+            CurrentMonth = organisationCurrentMonthCount,
+            PreviousMonth = organisationPreviousMonthCount
+        };
 
-        var completedDeposits = await _context.DepositRequests
-            .Where(deposit => deposit.Status == PaymentStatus.Completed)
-            .ToListAsync(cancellationToken);
+        var patientTotalCount = await _context.Patients.AsNoTracking()
+            .CountAsync(cancellationToken);
+        var patientCurrentMonthCount = await _context.Patients.AsNoTracking()
+            .CountAsync(item => item.CreatedAt >= currentMonthStart && item.CreatedAt < nextMonthStart, cancellationToken);
+        var patientPreviousMonthCount = await _context.Patients.AsNoTracking()
+            .CountAsync(item => item.CreatedAt >= previousMonthStart && item.CreatedAt < currentMonthStart, cancellationToken);
+
+        var patientStats = new
+        {
+            Total = patientTotalCount,
+            CurrentMonth = patientCurrentMonthCount,
+            PreviousMonth = patientPreviousMonthCount
+        };
+        var doctorTotal = doctorStats?.Total ?? 0;
+        var doctorCurrentMonth = doctorStats?.CurrentMonth ?? 0;
+        var doctorPreviousMonth = doctorStats?.PreviousMonth ?? 0;
+
+        var organisationTotal = organisationStats?.Total ?? 0;
+        var organisationCurrentMonth = organisationStats?.CurrentMonth ?? 0;
+        var organisationPreviousMonth = organisationStats?.PreviousMonth ?? 0;
+
+        var patientTotal = patientStats?.Total ?? 0;
+        var patientCurrentMonth = patientStats?.CurrentMonth ?? 0;
+        var patientPreviousMonth = patientStats?.PreviousMonth ?? 0;
 
         var yearStart = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var nextYearStart = yearStart.AddYears(1);
-        var monthlyRevenueRaw = await _context.DepositRequests
+
+        var paymentMethodRevenueRaw = await _context.DepositRequests.AsNoTracking()
+            .Where(deposit =>
+                deposit.Status == PaymentStatus.Completed &&
+                (deposit.CompletedAt ?? deposit.CreatedAt) >= yearStart &&
+                (deposit.CompletedAt ?? deposit.CreatedAt) < nextYearStart)
+            .GroupBy(deposit => deposit.PaymentMethod)
+            .Select(group => new
+            {
+                PaymentMethod = group.Key,
+                Amount = group.Sum(item => item.Amount)
+            })
+            .ToListAsync(cancellationToken);
+
+        var monthlyRevenueRaw = await _context.DepositRequests.AsNoTracking()
             .Where(deposit =>
                 deposit.Status == PaymentStatus.Completed &&
                 (deposit.CompletedAt ?? deposit.CreatedAt) >= yearStart &&
@@ -75,7 +119,7 @@ public class DashboardMetricsService : IDashboardMetricsService
 
         var sevenDaysStart = now.Date.AddDays(-6);
         var nextDay = now.Date.AddDays(1);
-        var dailyRevenueRaw = await _context.DepositRequests
+        var dailyRevenueRaw = await _context.DepositRequests.AsNoTracking()
             .Where(deposit =>
                 deposit.Status == PaymentStatus.Completed &&
                 (deposit.CompletedAt ?? deposit.CreatedAt) >= sevenDaysStart &&
@@ -87,16 +131,15 @@ public class DashboardMetricsService : IDashboardMetricsService
                 Revenue = group.Sum(item => item.Amount)
             })
             .ToListAsync(cancellationToken);
-        var totalDepositAmount = completedDeposits.Sum(deposit => deposit.Amount);
+        var totalDepositAmount = paymentMethodRevenueRaw.Sum(item => item.Amount);
 
-        var paymentMethodBreakdown = completedDeposits
-            .GroupBy(deposit => deposit.PaymentMethod)
-            .Select(group =>
+        var paymentMethodBreakdown = paymentMethodRevenueRaw
+            .Select(item =>
             {
-                var amount = group.Sum(item => item.Amount);
+                var amount = item.Amount;
                 return new PaymentMethodRevenueDto
                 {
-                    PaymentMethod = group.Key.ToString(),
+                    PaymentMethod = item.PaymentMethod.ToString(),
                     Amount = amount,
                     Percentage = totalDepositAmount <= 0m ? 0m : Math.Round(amount / totalDepositAmount * 100m, 1)
                 };
@@ -321,30 +364,48 @@ public class DashboardMetricsService : IDashboardMetricsService
 
     public async Task<PagedResult<RecentScreeningDto>> GetRecentScreeningsAsync(int pageNumber, int pageSize, CancellationToken cancellationToken = default)
     {
-        var query = from screening in _context.AiScreenings.AsNoTracking()
-                    join patient in _context.Patients.AsNoTracking() on screening.PatientId equals patient.Id
-                    join user in _context.Users.AsNoTracking() on patient.UserId equals user.Id
-                    join result in _context.ScreeningResults.AsNoTracking() on screening.Id equals result.AiScreeningId into resultJoin
-                    from result in resultJoin.DefaultIfEmpty()
-                    select new
-                    {
-                        screening.Id,
-                        screening.CreatedAt,
-                        screening.ProcessedAt,
-                        PatientId = patient.Id,
-                        PatientName = user.FullName,
-                        RiskLevel = result != null ? result.RiskLevel.ToString() : null,
-                        IsCritical = result != null && (result.RiskLevel == RiskLevel.High || result.RiskLevel == RiskLevel.Critical)
-                    };
+        var visibleScreeningsQuery =
+            from screening in _context.AiScreenings.AsNoTracking()
+            join patient in _context.Patients.AsNoTracking() on screening.PatientId equals patient.Id
+            join user in _context.Users.AsNoTracking() on patient.UserId equals user.Id
+            select new
+            {
+                screening.Id,
+                screening.PatientId,
+                screening.CreatedAt,
+                screening.ProcessedAt,
+                PatientName = user.FullName
+            };
 
-        var totalCount = await query.CountAsync(cancellationToken);
-        var records = await query
-            .OrderByDescending(item => item.CreatedAt)
+        var totalCount = await visibleScreeningsQuery.CountAsync(cancellationToken);
+
+        var screeningRiskQuery = _context.ScreeningResults.AsNoTracking()
+            .GroupBy(result => result.AiScreeningId)
+            .Select(group => new
+            {
+                AiScreeningId = group.Key,
+                RiskLevel = group.Select(item => (RiskLevel?)item.RiskLevel).FirstOrDefault()
+            });
+
+        var pageRows = await (
+            from screening in visibleScreeningsQuery
+            join risk in screeningRiskQuery on screening.Id equals risk.AiScreeningId into riskJoin
+            from risk in riskJoin.DefaultIfEmpty()
+            orderby screening.CreatedAt descending
+            select new
+            {
+                screening.Id,
+                screening.PatientId,
+                screening.PatientName,
+                screening.CreatedAt,
+                screening.ProcessedAt,
+                RiskLevel = risk != null ? risk.RiskLevel : null
+            })
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        var items = records.Select(item => new RecentScreeningDto
+        var items = pageRows.Select(item => new RecentScreeningDto
         {
             Id = item.Id,
             ScreeningCode = $"SCR-{item.CreatedAt:yyyyMMdd}-{item.Id.ToString().Substring(0, 6).ToUpperInvariant()}",
@@ -353,8 +414,8 @@ public class DashboardMetricsService : IDashboardMetricsService
             ClinicId = null,
             ClinicName = null,
             Status = item.ProcessedAt.HasValue ? "Completed" : "Analyzing",
-            RiskLevel = item.RiskLevel,
-            IsCritical = item.IsCritical,
+            RiskLevel = item.RiskLevel?.ToString(),
+            IsCritical = item.RiskLevel == RiskLevel.High || item.RiskLevel == RiskLevel.Critical,
             CreatedAt = item.CreatedAt,
             CompletedAt = item.ProcessedAt
         }).ToList();

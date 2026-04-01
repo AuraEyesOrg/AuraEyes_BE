@@ -18,5 +18,10 @@ public enum VerificationStatus
     /// <summary>
     /// Rejected by admin.
     /// </summary>
-    Rejected = 2
+    Rejected = 2,
+
+    /// <summary>
+    /// Previously approved profile uploaded new credentials and is awaiting re-verification.
+    /// </summary>
+    PendingUpdate = 3
 }

@@ -3,9 +3,11 @@ using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Users;
 using Domain.Repositories;
+using Infrastructure.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Infrastructure.Services;
 
@@ -18,18 +20,21 @@ namespace Infrastructure.Services;
 public class ConsultationStateWorker : BackgroundService
 {
     private static readonly TimeSpan CheckInterval = TimeSpan.FromSeconds(15);
-    private static readonly TimeSpan SlotDuration = TimeSpan.FromMinutes(60);
     private static readonly TimeSpan GracePeriod = TimeSpan.FromHours(2);
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<ConsultationStateWorker> _logger;
+    private readonly TimeSpan _slotDuration;
 
     public ConsultationStateWorker(
         IServiceScopeFactory scopeFactory,
+        IOptions<GoogleMeetSettings> googleMeetSettings,
         ILogger<ConsultationStateWorker> logger)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
+        var durationMinutes = Math.Max(1, googleMeetSettings.Value.DefaultDurationMinutes);
+        _slotDuration = TimeSpan.FromMinutes(durationMinutes);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -119,7 +124,7 @@ public class ConsultationStateWorker : BackgroundService
         CancellationToken cancellationToken)
     {
         var sessions = await sessionRepo.GetSessionsPastGracePeriodAsync(
-            SlotDuration, GracePeriod, cancellationToken);
+            _slotDuration, GracePeriod, cancellationToken);
 
         if (sessions.Count == 0) return;
 
