@@ -68,6 +68,14 @@ public class PatientResourcesController : BaseApiController
         _logger.LogInformation("SerpApi search query: {Query}", searchQuery);
 
         var serpBaseUrl = _configuration["SerpApi:BaseUrl"];
+        if (string.IsNullOrWhiteSpace(serpBaseUrl))
+        {
+            _logger.LogWarning("SerpApi base URL is missing. Returning empty educational resource list.");
+            return OkResponse<IReadOnlyList<PatientEducationalResourceDto>>(
+                Array.Empty<PatientEducationalResourceDto>(),
+                "SerpApi base URL is not configured.");
+        }
+
         var queryParams = new Dictionary<string, string?>
         {
             { "engine", "google" },
