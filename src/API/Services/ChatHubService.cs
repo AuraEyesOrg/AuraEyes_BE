@@ -73,4 +73,31 @@ public class ChatHubService : IChatHubService
             throw;
         }
     }
+
+    /// <inheritdoc />
+    public async Task BroadcastTypingIndicatorAsync(
+        Guid userId,
+        TypingIndicatorRealtimeDto payload,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _hubContext.Clients
+                .User(userId.ToString())
+                .SendAsync("TypingIndicatorChanged", payload, cancellationToken);
+
+            _logger.LogDebug(
+                "Typing indicator broadcast to UserId={UserId} for SessionId={SessionId}, IsTyping={IsTyping}",
+                userId,
+                payload.SessionId,
+                payload.IsTyping);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to broadcast typing indicator event to user {UserId}",
+                userId);
+            throw;
+        }
+    }
 }

@@ -1,9 +1,11 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.ConsultationSessions.Commands.EndSession;
 using Domain.Common;
 using Domain.Entities.Users;
 using Domain.Repositories;
 using Infrastructure.Settings;
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -66,10 +68,18 @@ public class ConsultationStateWorker : BackgroundService
         var patientRepo = scope.ServiceProvider.GetRequiredService<IRepository<Patient>>();
         var ophthalmologistRepo = scope.ServiceProvider.GetRequiredService<IRepository<Ophthalmologist>>();
         var chatHubService = scope.ServiceProvider.GetRequiredService<IChatHubService>();
+        var sender = scope.ServiceProvider.GetRequiredService<ISender>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
         await OpenReadySessionsAsync(sessionRepo, patientRepo, ophthalmologistRepo, chatHubService, unitOfWork, cancellationToken);
-        await ArchiveExpiredSessionsAsync(sessionRepo, patientRepo, ophthalmologistRepo, chatHubService, unitOfWork, cancellationToken);
+        await ArchiveExpiredSessionsAsync(
+            sessionRepo,
+            patientRepo,
+            ophthalmologistRepo,
+            chatHubService,
+            sender,
+            unitOfWork,
+            cancellationToken);
     }
 
     private async Task OpenReadySessionsAsync(
@@ -120,6 +130,7 @@ public class ConsultationStateWorker : BackgroundService
         IRepository<Patient> patientRepo,
         IRepository<Ophthalmologist> ophthalmologistRepo,
         IChatHubService chatHubService,
+        ISender sender,
         IUnitOfWork unitOfWork,
         CancellationToken cancellationToken)
     {
@@ -128,17 +139,52 @@ public class ConsultationStateWorker : BackgroundService
 
         if (sessions.Count == 0) return;
 
-        _logger.LogInformation("Archiving {Count} session(s) past grace period", sessions.Count);
+        _logger.LogInformation("Auto-completing {Count} session(s) past grace period", sessions.Count);
+
+        var closedSessions = new List<(Guid SessionId, Guid PatientId, Guid? OphthalmologistId)>();
+        var closedBySystemCount = 0;
 
         foreach (var session in sessions)
         {
-            session.CompleteBySystem();
-            await sessionRepo.UpdateAsync(session, cancellationToken);
+            if (!session.OphthalmologistId.HasValue)
+            {
+                session.CompleteBySystem();
+                await sessionRepo.UpdateAsync(session, cancellationToken);
+                closedSessions.Add((session.Id, session.PatientId, session.OphthalmologistId));
+                closedBySystemCount++;
+
+                _logger.LogWarning(
+                    "Session {SessionId} has no assigned doctor. Closed by system without payout.",
+                    session.Id);
+
+                continue;
+            }
+
+            var result = await sender.Send(
+                new EndSessionCommand
+                {
+                    SessionId = session.Id,
+                    DoctorId = session.OphthalmologistId.Value,
+                    Reason = "GracePeriodExpired"
+                },
+                cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                _logger.LogWarning(
+                    "Failed to auto-complete session {SessionId}: {Error}",
+                    session.Id,
+                    result.ErrorMessage);
+                continue;
+            }
+
+            closedSessions.Add((session.Id, session.PatientId, session.OphthalmologistId));
         }
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        if (closedBySystemCount > 0)
+            await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        foreach (var session in sessions)
+        foreach (var session in closedSessions)
         {
             var userIds = await ResolveParticipantUserIdsAsync(
                 session.PatientId, session.OphthalmologistId,
@@ -148,7 +194,7 @@ public class ConsultationStateWorker : BackgroundService
                 userIds,
                 new RoomStateChangedDto
                 {
-                    SessionId = session.Id,
+                    SessionId = session.SessionId,
                     Event = "ROOM_CLOSED",
                     Timestamp = DateTime.UtcNow
                 },
@@ -156,7 +202,7 @@ public class ConsultationStateWorker : BackgroundService
 
             _logger.LogInformation(
                 "ROOM_CLOSED for session {SessionId} (grace period expired)",
-                session.Id);
+                session.SessionId);
         }
     }
 

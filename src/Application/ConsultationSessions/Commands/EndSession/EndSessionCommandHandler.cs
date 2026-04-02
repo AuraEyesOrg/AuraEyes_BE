@@ -59,7 +59,10 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
         try
         {
             // ── 1. Complete the session ──
-            session.EndSession(request.DoctorId);
+            var closingReason = string.IsNullOrWhiteSpace(request.Reason)
+                ? "DoctorFinished"
+                : request.Reason.Trim();
+            session.EndSession(request.DoctorId, closingReason);
 
             // ── 2. Complete the linked slot ──
             if (session.AppointmentSlotId.HasValue)
