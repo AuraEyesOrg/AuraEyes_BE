@@ -138,9 +138,9 @@ public class PatientSearchController : BaseApiController
 
         var result = await _mediator.Send(query);
 
-        if (lite && result.IsSuccess && result.Value != null)
+        if (lite && result.IsSuccess && result.Data != null)
         {
-            var liteItems = result.Value.Items.Select(x => new 
+            var liteItems = result.Data.Items.Select(x => new
             {
                 id = x.Id,
                 date = x.Date.ToString("yyyy-MM-dd"),
@@ -149,7 +149,7 @@ public class PatientSearchController : BaseApiController
                 cost = x.Cost,
                 doctorId = x.OphthalId
             }).ToList();
-            
+
             return Ok(liteItems);
         }
 

@@ -3,7 +3,6 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Ophthalmologists.Contracts.GetMyContract;
 using Application.Ophthalmologists.Contracts.UploadSignedContract;
-using Application.Common.Interfaces;
 using Application.Organisations.Queries.GetDashboardMetrics;
 using Application.Scheduling.Appointments.Common;
 using Application.Scheduling.Appointments.Queries.GetOrganisationAppointments;
