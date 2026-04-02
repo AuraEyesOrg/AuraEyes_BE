@@ -121,7 +121,8 @@ public class PatientSearchController : BaseApiController
         [FromQuery] DateOnly? fromDate = null,
         [FromQuery] DateOnly? toDate = null,
         [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 10)
+        [FromQuery] int pageSize = 10,
+        [FromQuery] bool lite = false)
     {
         var query = new GetAppointmentSlotsQuery
         {
@@ -136,6 +137,22 @@ public class PatientSearchController : BaseApiController
         };
 
         var result = await _mediator.Send(query);
+
+        if (lite && result.IsSuccess && result.Value != null)
+        {
+            var liteItems = result.Value.Items.Select(x => new 
+            {
+                id = x.Id,
+                date = x.Date.ToString("yyyy-MM-dd"),
+                startTime = x.StartTime.ToString("HH:mm"),
+                endTime = x.EndTime.ToString("HH:mm"),
+                cost = x.Cost,
+                doctorId = x.OphthalId
+            }).ToList();
+            
+            return Ok(liteItems);
+        }
+
         return HandleResult(result);
     }
 

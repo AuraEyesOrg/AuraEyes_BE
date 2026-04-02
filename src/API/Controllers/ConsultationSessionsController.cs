@@ -26,13 +26,19 @@ public class ConsultationSessionsController : BaseApiController
 {
     private readonly IMediator _mediator;
     private readonly ICurrentUserService _currentUser;
+    private readonly IFileStorageService _fileStorageService;
+    private readonly ILogger<ConsultationSessionsController> _logger;
 
     public ConsultationSessionsController(
         IMediator mediator,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        IFileStorageService fileStorageService,
+        ILogger<ConsultationSessionsController> logger)
     {
         _mediator = mediator;
         _currentUser = currentUser;
+        _fileStorageService = fileStorageService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -209,6 +215,87 @@ public class ConsultationSessionsController : BaseApiController
     }
 
     /// <summary>
+    /// Upload chat images for consultation conversations.
+    /// Uses a dedicated storage folder separate from AI screening uploads.
+    /// </summary>
+    [HttpPost("upload-images")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponse<UploadChatImagesResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> UploadChatImages(
+        [FromForm] List<IFormFile> images,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUser.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
+
+        if (images is null || images.Count == 0)
+            return BadRequest(ApiResponseFactory.Error("No images provided"));
+
+        if (images.Count > 10)
+            return BadRequest(ApiResponseFactory.Error("Maximum 10 images allowed"));
+
+        var allowedTypes = new[]
+        {
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/bmp",
+            "image/tiff",
+            "image/x-tiff",
+            "image/webp"
+        };
+
+        var uploadedUrls = new List<string>();
+
+        try
+        {
+            foreach (var image in images)
+            {
+                if (image.Length == 0)
+                    return BadRequest(ApiResponseFactory.Error($"File '{image.FileName}' is empty"));
+
+                if (image.Length > 50 * 1024 * 1024)
+                    return BadRequest(ApiResponseFactory.Error($"File '{image.FileName}' exceeds 50MB limit"));
+
+                if (!allowedTypes.Contains(image.ContentType?.ToLowerInvariant() ?? string.Empty))
+                    return BadRequest(ApiResponseFactory.Error(
+                        $"File '{image.FileName}' has unsupported format. Only JPG, JPEG, PNG, BMP, TIFF, and WebP are allowed"));
+
+                await using var stream = image.OpenReadStream();
+                var url = await _fileStorageService.SaveFileAsync(
+                    stream,
+                    image.FileName,
+                    $"consultation-chat/{_currentUser.UserId}/images",
+                    cancellationToken);
+
+                uploadedUrls.Add(url);
+
+                _logger.LogInformation(
+                    "Uploaded consultation chat image to storage: {Url}",
+                    url);
+            }
+
+            return Ok(ApiResponseFactory.Success(
+                new UploadChatImagesResponse
+                {
+                    UploadedUrls = uploadedUrls,
+                    Count = uploadedUrls.Count
+                },
+                "Chat images uploaded successfully"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error uploading consultation chat images");
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                ApiResponseFactory.Error($"Failed to upload chat images: {ex.Message}"));
+        }
+    }
+
+    /// <summary>
     /// Cancel a session. Deletes the associated Google Calendar event if present.
     /// </summary>
     [HttpPost("{sessionId:guid}/cancel")]
@@ -311,6 +398,12 @@ public record CancelSessionRequest
 public record EndSessionRequest
 {
     public Guid DoctorId { get; init; }
+}
+
+public record UploadChatImagesResponse
+{
+    public List<string> UploadedUrls { get; init; } = new();
+    public int Count { get; init; }
 }
 
 #endregion
