@@ -20,6 +20,15 @@ public interface IIdentityService
         string role,
         CancellationToken cancellationToken = default);
 
+    Task<(bool Succeeded, Guid? UserId, string[] Errors)> CreateUserWalkInPatientAsync(
+        string email,
+        string password,
+        string fullName,
+        string role,
+        Guid? organizationId = null,
+        UserProfileWalkInDto? userProfile = null,
+        CancellationToken cancellationToken = default);
+
     Task<bool> CheckPasswordAsync(Guid userId, string password);
 
     Task<UserDto?> GetUserByEmailAsync(string email, CancellationToken cancellationToken = default);
@@ -151,6 +160,14 @@ public interface IIdentityService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Update user OrganizationId.
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> UpdateUserOrganizationAsync(
+        Guid userId,
+        Guid? organizationId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Change user password.
     /// </summary>
     Task<(bool Succeeded, string[] Errors)> ChangePasswordAsync(
@@ -221,3 +238,15 @@ public record UserDetailsDto
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
 }
+
+/// <summary>
+/// User profile DTO for cross-layer communication.
+/// </summary>
+public record UserProfileWalkInDto(
+    string FullName,
+    string? PhoneNumber,
+    DateTime? DateOfBirth,
+    int? Gender,
+    string? Address,
+    string? AvatarUrl
+);
