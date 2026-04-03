@@ -1,0 +1,106 @@
+using Application.Common.Interfaces;
+using Application.Common.Models;
+using Domain.Common;
+using Domain.Entities.Users;
+using Microsoft.Extensions.Logging;
+
+namespace Application.OrganisationPatients.Commands.CreateWalkInPatient;
+
+public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPatientCommand, Guid>
+{
+    private readonly IIdentityService _identityService;
+    private readonly IRepository<Patient> _patientRepository;
+    private readonly IRepository<Organisation> _orgRepository;
+    private readonly ICurrentUserService _currentUserService;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<CreateWalkInPatientCommandHandler> _logger;
+
+    public CreateWalkInPatientCommandHandler(
+        IIdentityService identityService,
+        IRepository<Patient> patientRepository,
+        IRepository<Organisation> orgRepository,
+        ICurrentUserService currentUserService,
+        IUnitOfWork unitOfWork,
+        ILogger<CreateWalkInPatientCommandHandler> logger)
+    {
+        _identityService = identityService;
+        _patientRepository = patientRepository;
+        _orgRepository = orgRepository;
+        _currentUserService = currentUserService;
+        _unitOfWork = unitOfWork;
+        _logger = logger;
+    }
+
+    public async Task<Result<Guid>> Handle(CreateWalkInPatientCommand request, CancellationToken cancellationToken)
+    {
+        var adminId = _currentUserService.UserId;
+        if (adminId is null)
+        {
+            return Result<Guid>.Unauthorized("User not authenticated");
+        }
+
+        var orgs = await _orgRepository.FindAsync(o => o.OwnerId == adminId.Value, cancellationToken);
+        var org = orgs.FirstOrDefault();
+
+        if (org is null)
+        {
+            return Result<Guid>.NotFound("Organisation not found");
+        }
+
+        var uniqueSuffix = Guid.NewGuid().ToString("N").Substring(0, 8);
+        var email = string.IsNullOrWhiteSpace(request.Email)
+            ? $"walkin_{uniqueSuffix}@auraeyes.local"
+            : request.Email;
+
+        var password = "TempPass123!";
+
+        int? genderId = string.IsNullOrWhiteSpace(request.Gender) ? null
+            : request.Gender.StartsWith("M", StringComparison.OrdinalIgnoreCase) ? 1
+            : request.Gender.StartsWith("F", StringComparison.OrdinalIgnoreCase) ? 2 : 3;
+
+        var userProfile = new UserProfileWalkInDto(
+            FullName: request.FullName,
+            PhoneNumber: request.PhoneNumber,
+            DateOfBirth: request.DateOfBirth,
+            Gender: genderId,
+            Address: null,
+            AvatarUrl: null
+        );
+
+        var createResult = await _identityService.CreateUserWalkInPatientAsync(
+            email: email,
+            password: password,
+            fullName: request.FullName,
+            role: "Patient",
+            organizationId: org.Id,
+            userProfile: userProfile,
+            cancellationToken: cancellationToken);
+
+        if (!createResult.Succeeded)
+        {
+            var errors = string.Join(", ", createResult.Errors);
+            return Result<Guid>.Failure($"Failed to create user: {errors}");
+        }
+
+        try
+        {
+            var userId = createResult.UserId!.Value;
+
+            var patient = new Patient(userId);
+            patient.UpdateProfile(null, null);
+
+            await _patientRepository.AddAsync(patient, cancellationToken);
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Walk-in patient {PatientId} created by OrgAdmin {AdminId}", userId, adminId);
+
+            return Result<Guid>.Success(patient.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating walk-in patient profile");
+            return Result<Guid>.Failure($"Failed to create patient profile: {ex.Message}");
+        }
+    }
+}
