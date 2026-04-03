@@ -51,8 +51,12 @@ public class SubmitVerificationReportCommandHandler
         if (session is null)
             return Result.NotFound($"Session '{request.SessionId}' not found.");
 
-        if (session.Type != ConsultationSessionType.Verification)
-            return Result.Failure("Only verification sessions accept reports.");
+        var acceptsReport =
+            session.Type == ConsultationSessionType.Verification ||
+            session.Type == ConsultationSessionType.VideoCall;
+
+        if (!acceptsReport)
+            return Result.Failure("Only verification or video call sessions accept reports.");
 
         if (session.OphthalmologistId.HasValue && session.OphthalmologistId.Value != request.DoctorId)
             return Result.Forbidden("You are not assigned to this session.");
