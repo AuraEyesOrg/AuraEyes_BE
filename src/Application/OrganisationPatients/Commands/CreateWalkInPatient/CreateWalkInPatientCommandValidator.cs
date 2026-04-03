@@ -4,6 +4,8 @@ namespace Application.OrganisationPatients.Commands.CreateWalkInPatient;
 
 public class CreateWalkInPatientCommandValidator : AbstractValidator<CreateWalkInPatientCommand>
 {
+    private const int MinimumAgeYears = 16;
+
     public CreateWalkInPatientCommandValidator()
     {
         RuleFor(x => x.FullName)
@@ -17,10 +19,17 @@ public class CreateWalkInPatientCommandValidator : AbstractValidator<CreateWalkI
 
         RuleFor(x => x.DateOfBirth)
             .NotEmpty().WithMessage("Date of Birth is required")
-            .LessThan(DateTime.UtcNow).WithMessage("Date of Birth cannot be in the future");
+            .LessThan(DateTime.UtcNow.Date).WithMessage("Date of Birth cannot be in the future")
+            .Must(BeAtLeastMinimumAge).WithMessage($"Patient must be at least {MinimumAgeYears} years old");
             
         RuleFor(x => x.Email)
             .EmailAddress().When(x => !string.IsNullOrEmpty(x.Email))
             .WithMessage("Invalid email format");
+    }
+
+    private static bool BeAtLeastMinimumAge(DateTime dateOfBirth)
+    {
+        var today = DateTime.UtcNow.Date;
+        return dateOfBirth.Date <= today.AddYears(-MinimumAgeYears);
     }
 }
