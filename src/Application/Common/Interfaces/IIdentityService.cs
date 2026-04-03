@@ -35,6 +35,11 @@ public interface IIdentityService
 
     Task<UserDto?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
+    Task<bool> IsPhoneNumberInUseByOrganizationAsync(
+        Guid organizationId,
+        string phoneNumber,
+        CancellationToken cancellationToken = default);
+
     Task<bool> IsEmailConfirmedAsync(Guid userId);
 
     Task<bool> IsUserActiveAsync(Guid userId);

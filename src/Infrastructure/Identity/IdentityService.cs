@@ -162,6 +162,31 @@ public class IdentityService : IIdentityService
         return user == null ? null : MapToDto(user);
     }
 
+    public async Task<bool> IsPhoneNumberInUseByOrganizationAsync(
+        Guid organizationId,
+        string phoneNumber,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedPhoneNumber = NormalizePhone(phoneNumber);
+        if (string.IsNullOrWhiteSpace(normalizedPhoneNumber))
+        {
+            return false;
+        }
+
+        var existingPhoneNumbers = await _userManager.Users
+            .Where(u =>
+                u.OrganizationId == organizationId &&
+                !u.IsDeleted &&
+                u.PhoneNumber != null &&
+                u.PhoneNumber != string.Empty)
+            .Select(u => u.PhoneNumber!)
+            .ToListAsync(cancellationToken);
+
+        return existingPhoneNumbers
+            .Select(NormalizePhone)
+            .Any(p => p == normalizedPhoneNumber);
+    }
+
     public async Task<bool> IsEmailConfirmedAsync(Guid userId)
     {
         var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -321,6 +346,13 @@ public class IdentityService : IIdentityService
             user.TwoFactorEnabled,
             user.AvatarUrl
         );
+    }
+
+    private static string NormalizePhone(string phoneNumber)
+    {
+        return new string(phoneNumber
+            .Where(char.IsDigit)
+            .ToArray());
     }
 
     #region Two-Factor Authentication (2FA)

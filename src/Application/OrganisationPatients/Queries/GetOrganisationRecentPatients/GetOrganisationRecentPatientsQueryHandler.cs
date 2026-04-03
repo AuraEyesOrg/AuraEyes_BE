@@ -29,6 +29,7 @@ public sealed class GetOrganisationRecentPatientsQueryHandler
             Name = r.Name,
             Age = r.Age,
             Gender = r.Gender,
+            PhoneNumber = r.PhoneNumber,
             LastScreening = r.LastScreening,
             AiPrediction = r.AiPrediction,
             Confidence = r.Confidence,

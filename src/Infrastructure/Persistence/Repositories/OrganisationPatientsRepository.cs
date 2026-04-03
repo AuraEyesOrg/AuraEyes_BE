@@ -135,6 +135,7 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
                 Name = string.IsNullOrWhiteSpace(u.FullName) ? (u.Email ?? "Patient") : u.FullName,
                 Age = ComputeAge(u.DateOfBirth),
                 Gender = MapGender(u.Gender),
+                PhoneNumber = u.PhoneNumber ?? string.Empty,
                 LastScreening = scr?.CreatedAt ?? u.CreatedAt,
                 AiPrediction = scr != null ? (TryGetPrimaryClassName(scr.RawJsonOutput) ?? "AI prediction") : "No screening yet",
                 Confidence = latest?.ConfidenceScore ?? 0,

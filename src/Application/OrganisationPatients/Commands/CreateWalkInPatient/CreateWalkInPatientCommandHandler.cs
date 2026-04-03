@@ -47,6 +47,23 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
             return Result<Guid>.NotFound("Organisation not found");
         }
 
+        var phoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber)
+            ? null
+            : request.PhoneNumber.Trim();
+
+        if (phoneNumber is not null)
+        {
+            var isPhoneInUse = await _identityService.IsPhoneNumberInUseByOrganizationAsync(
+                org.Id,
+                phoneNumber,
+                cancellationToken);
+
+            if (isPhoneInUse)
+            {
+                return Result<Guid>.Conflict("Phone number already exists in this organisation");
+            }
+        }
+
         var uniqueSuffix = Guid.NewGuid().ToString("N").Substring(0, 8);
         var email = string.IsNullOrWhiteSpace(request.Email)
             ? $"walkin_{uniqueSuffix}@auraeyes.local"
@@ -60,7 +77,7 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
 
         var userProfile = new UserProfileWalkInDto(
             FullName: request.FullName,
-            PhoneNumber: request.PhoneNumber,
+            PhoneNumber: phoneNumber,
             DateOfBirth: request.DateOfBirth,
             Gender: genderId,
             Address: null,
@@ -78,10 +95,11 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
 
         if (!createResult.Succeeded)
         {
-            var errors = string.Join(", ", createResult.Errors);
-            return Result<Guid>.Failure($"Failed to create user: {errors}");
+            return Result<Guid>.Failure(
+                message: createResult.Errors[0]
+            );
         }
-
+    
         try
         {
             var userId = createResult.UserId!.Value;
