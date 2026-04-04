@@ -29,6 +29,7 @@ public class DashboardMetricsDto
 
     public DashboardPendingActionsDto PendingActions { get; set; } = new();
     public DashboardSystemStatusDto SystemStatus { get; set; } = new();
+    public DashboardBetterStackDto BetterStack { get; set; } = new();
     public List<TopPerformerDoctorDto> TopDoctorsByConsultationRevenue { get; set; } = new();
     public List<TopPerformerOrganisationDto> TopOrganisationsByRating { get; set; } = new();
 }
@@ -47,6 +48,21 @@ public class DashboardSystemStatusDto
 
     public bool ApiHealthy { get; set; } = true;
     public bool DatabaseHealthy { get; set; }
+}
+
+public class DashboardBetterStackDto
+{
+    public bool Enabled { get; set; }
+    public string? EmbedUrl { get; set; }
+    public List<DashboardBackgroundMonitorDto> Monitors { get; set; } = new();
+}
+
+public class DashboardBackgroundMonitorDto
+{
+    public string Key { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public bool Configured { get; set; }
 }
 
 public class TopPerformerDoctorDto

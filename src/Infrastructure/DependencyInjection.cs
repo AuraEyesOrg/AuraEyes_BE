@@ -67,6 +67,9 @@ public static class DependencyInjection
         // Google Auth Settings (for Google Login)
         services.Configure<GoogleAuthSettings>(configuration.GetSection(GoogleAuthSettings.SectionName));
 
+        // BetterStack settings
+        services.Configure<BetterStackSettings>(configuration.GetSection(BetterStackSettings.SectionName));
+
         // ASP.NET Core Identity configuration
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
         {
@@ -198,6 +201,7 @@ public static class DependencyInjection
         services.AddScoped<IAiQuotaService, AiQuotaService>();
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
         services.AddScoped<ISystemSettingService, SystemSettingService>();
+        services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
