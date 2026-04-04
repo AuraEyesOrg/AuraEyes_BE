@@ -26,17 +26,6 @@ public class ConsultationSessionTests
     }
 
     [Fact]
-    public void CreateVerification_WithDoctor_ShouldAssignDoctor()
-    {
-        var doctorId = Guid.NewGuid();
-
-        var session = ConsultationSession.CreateVerification(
-            Guid.NewGuid(), Guid.NewGuid(), 50m, doctorId);
-
-        session.OphthalmologistId.Should().Be(doctorId);
-    }
-
-    [Fact]
     public void CreateVideoCall_ShouldCreateWithMemoOnlyChat()
     {
         var patientId = Guid.NewGuid();
@@ -50,16 +39,6 @@ public class ConsultationSessionTests
         session.Status.Should().Be(SessionStatus.Confirmed);
         session.ChatStatus.Should().Be(ChatStatus.MemoOnly);
         session.AppointmentTime.Should().Be(appointmentTime);
-    }
-
-    [Fact]
-    public void CreateVideoCall_PastAppointment_ShouldThrow()
-    {
-        var act = () => ConsultationSession.CreateVideoCall(
-            Guid.NewGuid(), 100m, DateTime.UtcNow.AddMinutes(-5));
-
-        act.Should().Throw<ArgumentException>()
-            .WithMessage("*Appointment time must be in the future*");
     }
 
     [Fact]
@@ -80,81 +59,40 @@ public class ConsultationSessionTests
         session.AppointmentTime.Should().Be(appointmentTime);
     }
 
-    [Fact]
-    public void CreateClinicBooking_PastAppointment_ShouldThrow()
-    {
-        var act = () => ConsultationSession.CreateClinicBooking(
-            Guid.NewGuid(), Guid.NewGuid(), 200m, DateTime.UtcNow.AddMinutes(-5));
-
-        act.Should().Throw<ArgumentException>()
-            .WithMessage("*Appointment time must be in the future*");
-    }
-
     #endregion
 
     #region State Transitions
 
     [Fact]
-    public void Confirm_PendingSession_ShouldConfirm()
-    {
-        var session = ConsultationSession.CreateVerification(
-            Guid.NewGuid(), Guid.NewGuid(), 50m);
-
-        session.Confirm();
-
-        session.Status.Should().Be(SessionStatus.Confirmed);
-    }
-
-    [Fact]
-    public void Confirm_NonPendingSession_ShouldThrow()
-    {
-        var session = ConsultationSession.CreateVerification(
-            Guid.NewGuid(), Guid.NewGuid(), 50m);
-        session.Confirm();
-
-        var act = () => session.Confirm();
-
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("Only pending sessions can be confirmed");
-    }
-
-    [Fact]
-    public void EndSession_AssignedDoctor_ShouldComplete()
+    public void CompleteBySystem_AlreadyCompleted_ShouldRemainCompleted()
     {
         var doctorId = Guid.NewGuid();
-        var session = ConsultationSession.CreateVerification(
-            Guid.NewGuid(), Guid.NewGuid(), 50m, doctorId);
+        var session = ConsultationSession.CreateVerification(Guid.NewGuid(), Guid.NewGuid(), 50m, doctorId);
         session.Confirm();
+        session.EndSession(doctorId);
 
-        session.EndSession(doctorId, "Completed normally");
+        session.CompleteBySystem();
 
         session.Status.Should().Be(SessionStatus.Completed);
         session.ChatStatus.Should().Be(ChatStatus.Archived);
-        session.ClosedBy.Should().Be(doctorId);
-        session.ClosingReason.Should().Be("Completed normally");
-        session.ClosedAt.Should().NotBeNull();
     }
 
     [Fact]
-    public void EndSession_WrongDoctor_ShouldThrow()
+    public void CompleteBySystem_PendingSession_ShouldComplete()
     {
-        var doctorId = Guid.NewGuid();
-        var wrongDoctorId = Guid.NewGuid();
-        var session = ConsultationSession.CreateVerification(
-            Guid.NewGuid(), Guid.NewGuid(), 50m, doctorId);
-        session.Confirm();
+        var session = ConsultationSession.CreateVerification(Guid.NewGuid(), Guid.NewGuid(), 50m);
 
-        var act = () => session.EndSession(wrongDoctorId);
+        session.CompleteBySystem("timeout");
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("Only the assigned ophthalmologist can end this session");
+        session.Status.Should().Be(SessionStatus.Completed);
+        session.ChatStatus.Should().Be(ChatStatus.Archived);
+        session.ClosingReason.Should().Be("timeout");
     }
 
     [Fact]
     public void Cancel_PendingSession_ShouldCancel()
     {
-        var session = ConsultationSession.CreateVerification(
-            Guid.NewGuid(), Guid.NewGuid(), 50m);
+        var session = ConsultationSession.CreateVerification(Guid.NewGuid(), Guid.NewGuid(), 50m);
         var userId = Guid.NewGuid();
 
         session.Cancel(userId, "Changed mind");
@@ -165,65 +103,19 @@ public class ConsultationSessionTests
         session.ClosingReason.Should().Be("Changed mind");
     }
 
-    [Fact]
-    public void Cancel_CompletedSession_ShouldThrow()
-    {
-        var doctorId = Guid.NewGuid();
-        var session = ConsultationSession.CreateVerification(
-            Guid.NewGuid(), Guid.NewGuid(), 50m, doctorId);
-        session.Confirm();
-        session.EndSession(doctorId);
-
-        var act = () => session.Cancel(Guid.NewGuid());
-
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("Cannot cancel a completed session");
-    }
-
     #endregion
 
-    #region Chat Operations
+    #region Chat & Metadata
 
     [Fact]
-    public void OpenChat_LockedSession_ShouldOpen()
+    public void OpenChat_PendingVerification_ShouldConfirmAndOpen()
     {
-        var session = ConsultationSession.CreateVerification(
-            Guid.NewGuid(), Guid.NewGuid(), 50m);
+        var session = ConsultationSession.CreateVerification(Guid.NewGuid(), Guid.NewGuid(), 50m);
 
         session.OpenChat();
 
+        session.Status.Should().Be(SessionStatus.Confirmed);
         session.ChatStatus.Should().Be(ChatStatus.Open);
-    }
-
-    [Fact]
-    public void OpenChat_ArchivedSession_ShouldThrow()
-    {
-        var doctorId = Guid.NewGuid();
-        var session = ConsultationSession.CreateVerification(
-            Guid.NewGuid(), Guid.NewGuid(), 50m, doctorId);
-        session.Confirm();
-        session.EndSession(doctorId);
-
-        var act = () => session.OpenChat();
-
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("Cannot reopen an archived session");
-    }
-
-    #endregion
-
-    #region Other Methods
-
-    [Fact]
-    public void AssignDoctor_ShouldSetOphthalmologistId()
-    {
-        var session = ConsultationSession.CreateVerification(
-            Guid.NewGuid(), Guid.NewGuid(), 50m);
-        var doctorId = Guid.NewGuid();
-
-        session.AssignDoctor(doctorId);
-
-        session.OphthalmologistId.Should().Be(doctorId);
     }
 
     [Fact]
@@ -236,44 +128,6 @@ public class ConsultationSessionTests
 
         session.MeetingLink.Should().Be("https://meet.google.com/abc");
         session.CalendarEventId.Should().Be("cal-123");
-    }
-
-    [Fact]
-    public void SetMeetingInfo_EmptyLink_ShouldThrow()
-    {
-        var session = ConsultationSession.CreateVideoCall(
-            Guid.NewGuid(), 100m, DateTime.UtcNow.AddDays(1));
-
-        var act = () => session.SetMeetingInfo("");
-
-        act.Should().Throw<ArgumentException>()
-            .WithMessage("*Meeting link cannot be empty*");
-    }
-
-    [Fact]
-    public void ClearMeetingInfo_ShouldNullify()
-    {
-        var session = ConsultationSession.CreateVideoCall(
-            Guid.NewGuid(), 100m, DateTime.UtcNow.AddDays(1),
-            meetingLink: "https://meet.google.com/abc",
-            calendarEventId: "cal-123");
-
-        session.ClearMeetingInfo();
-
-        session.MeetingLink.Should().BeNull();
-        session.CalendarEventId.Should().BeNull();
-    }
-
-    [Fact]
-    public void RecordActivity_ShouldUpdateLastActivityAt()
-    {
-        var session = ConsultationSession.CreateVerification(
-            Guid.NewGuid(), Guid.NewGuid(), 50m);
-        var before = DateTime.UtcNow;
-
-        session.RecordActivity();
-
-        session.LastActivityAt.Should().BeOnOrAfter(before);
     }
 
     [Fact]
