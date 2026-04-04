@@ -14,32 +14,32 @@ This document catalogs all unit tests for the **AuraEyes Backend** application. 
 The latest test batch focuses on the wallet workflow end to end at the unit-test level:
 
 - Domain entities:
-	- [Entities/AppointmentTests.cs](tests/Domain.UnitTests/Entities/AppointmentTests.cs)
-	- [Entities/AppointmentSlotTests.cs](tests/Domain.UnitTests/Entities/AppointmentSlotTests.cs)
-	- [Entities/ConsultationSessionTests.cs](tests/Domain.UnitTests/Entities/ConsultationSessionTests.cs)
-	- [Entities/ScheduleTemplateTests.cs](tests/Domain.UnitTests/Entities/ScheduleTemplateTests.cs)
-	- [Entities/AiScreeningTests.cs](tests/Domain.UnitTests/Entities/AiScreeningTests.cs)
-	- [Entities/ScreeningResultTests.cs](tests/Domain.UnitTests/Entities/ScreeningResultTests.cs)
-	- [Entities/RetinalImageTests.cs](tests/Domain.UnitTests/Entities/RetinalImageTests.cs)
-	- [Entities/MedicalDiagnosisTests.cs](tests/Domain.UnitTests/Entities/MedicalDiagnosisTests.cs)
-	- [Entities/DepositRequestTests.cs](tests/Domain.UnitTests/Entities/DepositRequestTests.cs)
-	- [Entities/WithdrawalRequestTests.cs](tests/Domain.UnitTests/Entities/WithdrawalRequestTests.cs)
-	- [Entities/WalletTransactionTests.cs](tests/Domain.UnitTests/Entities/WalletTransactionTests.cs)
+  - [Entities/AppointmentTests.cs](tests/Domain.UnitTests/Entities/AppointmentTests.cs)
+  - [Entities/AppointmentSlotTests.cs](tests/Domain.UnitTests/Entities/AppointmentSlotTests.cs)
+  - [Entities/ConsultationSessionTests.cs](tests/Domain.UnitTests/Entities/ConsultationSessionTests.cs)
+  - [Entities/ScheduleTemplateTests.cs](tests/Domain.UnitTests/Entities/ScheduleTemplateTests.cs)
+  - [Entities/AiScreeningTests.cs](tests/Domain.UnitTests/Entities/AiScreeningTests.cs)
+  - [Entities/ScreeningResultTests.cs](tests/Domain.UnitTests/Entities/ScreeningResultTests.cs)
+  - [Entities/RetinalImageTests.cs](tests/Domain.UnitTests/Entities/RetinalImageTests.cs)
+  - [Entities/MedicalDiagnosisTests.cs](tests/Domain.UnitTests/Entities/MedicalDiagnosisTests.cs)
+  - [Entities/DepositRequestTests.cs](tests/Domain.UnitTests/Entities/DepositRequestTests.cs)
+  - [Entities/WithdrawalRequestTests.cs](tests/Domain.UnitTests/Entities/WithdrawalRequestTests.cs)
+  - [Entities/WalletTransactionTests.cs](tests/Domain.UnitTests/Entities/WalletTransactionTests.cs)
 - Application validators:
-	- [Validators/CreateDepositCommandValidatorTests.cs](tests/Application.UnitTests/Validators/CreateDepositCommandValidatorTests.cs)
-	- [Validators/CreateWithdrawalRequestCommandValidatorTests.cs](tests/Application.UnitTests/Validators/CreateWithdrawalRequestCommandValidatorTests.cs)
-	- [Validators/VerifyPaymentCommandValidatorTests.cs](tests/Application.UnitTests/Validators/VerifyPaymentCommandValidatorTests.cs)
+  - [Validators/CreateDepositCommandValidatorTests.cs](tests/Application.UnitTests/Validators/CreateDepositCommandValidatorTests.cs)
+  - [Validators/CreateWithdrawalRequestCommandValidatorTests.cs](tests/Application.UnitTests/Validators/CreateWithdrawalRequestCommandValidatorTests.cs)
+  - [Validators/VerifyPaymentCommandValidatorTests.cs](tests/Application.UnitTests/Validators/VerifyPaymentCommandValidatorTests.cs)
 - Application handlers:
-	- [Handlers/CreateDepositCommandHandlerTests.cs](tests/Application.UnitTests/Handlers/CreateDepositCommandHandlerTests.cs)
-	- [Handlers/CreateWithdrawalRequestCommandHandlerTests.cs](tests/Application.UnitTests/Handlers/CreateWithdrawalRequestCommandHandlerTests.cs)
-	- [Handlers/VerifyPaymentCommandHandlerTests.cs](tests/Application.UnitTests/Handlers/VerifyPaymentCommandHandlerTests.cs)
+  - [Handlers/CreateDepositCommandHandlerTests.cs](tests/Application.UnitTests/Handlers/CreateDepositCommandHandlerTests.cs)
+  - [Handlers/CreateWithdrawalRequestCommandHandlerTests.cs](tests/Application.UnitTests/Handlers/CreateWithdrawalRequestCommandHandlerTests.cs)
+  - [Handlers/VerifyPaymentCommandHandlerTests.cs](tests/Application.UnitTests/Handlers/VerifyPaymentCommandHandlerTests.cs)
 - API controllers:
-	- [Controllers/BaseApiControllerTests.cs](tests/API.UnitTests/Controllers/BaseApiControllerTests.cs)
-	- [Controllers/PatientProfileControllerTests.cs](tests/API.UnitTests/Controllers/PatientProfileControllerTests.cs)
-	- [Controllers/WalletsControllerTests.cs](tests/API.UnitTests/Controllers/WalletsControllerTests.cs)
+  - [Controllers/BaseApiControllerTests.cs](tests/API.UnitTests/Controllers/BaseApiControllerTests.cs)
+  - [Controllers/PatientProfileControllerTests.cs](tests/API.UnitTests/Controllers/PatientProfileControllerTests.cs)
+  - [Controllers/WalletsControllerTests.cs](tests/API.UnitTests/Controllers/WalletsControllerTests.cs)
 - Infrastructure services:
-	- [Services/DateTimeServiceTests.cs](tests/Infrastructure.UnitTests/Services/DateTimeServiceTests.cs)
-	- [Services/SystemSettingServiceTests.cs](tests/Infrastructure.UnitTests/Services/SystemSettingServiceTests.cs)
+  - [Services/DateTimeServiceTests.cs](tests/Infrastructure.UnitTests/Services/DateTimeServiceTests.cs)
+  - [Services/SystemSettingServiceTests.cs](tests/Infrastructure.UnitTests/Services/SystemSettingServiceTests.cs)
 
 These tests cover:
 
