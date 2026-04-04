@@ -42,12 +42,23 @@ public class ConsultationStateWorker : BackgroundService
             {
                 await ProcessStateTransitionsAsync(stoppingToken);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+            {
+                _logger.LogWarning("ConsultationStateWorker cycle was canceled by infrastructure timeout and will retry.");
+            }
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
                 _logger.LogError(ex, "Error in ConsultationStateWorker cycle");
             }
 
-            await Task.Delay(CheckInterval, stoppingToken);
+            try
+            {
+                await Task.Delay(CheckInterval, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
         }
 
         _logger.LogInformation("ConsultationStateWorker stopped");
