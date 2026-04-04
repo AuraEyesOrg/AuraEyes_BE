@@ -147,6 +147,117 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         return list;
     }
 
+    public async Task<IReadOnlyList<OrganisationScreeningHistoryReadModel>> GetScreeningHistoryForOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        var appUser = await _context.Set<ApplicationUser>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == orgAdminUserId, cancellationToken);
+
+        if (appUser?.OrganizationId is null)
+            return Array.Empty<OrganisationScreeningHistoryReadModel>();
+
+        var organisationId = appUser.OrganizationId.Value;
+        take = Math.Clamp(take, 1, 100);
+
+        var screenings = await (
+            from scr in _context.Set<AiScreening>().AsNoTracking()
+            join p in _context.Set<Patient>().AsNoTracking() on scr.PatientId equals p.Id
+            join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
+            where u.OrganizationId == organisationId && !u.IsDeleted && !scr.IsDeleted
+            orderby scr.CreatedAt descending
+            select new
+            {
+                scr.Id,
+                scr.PatientId,
+                PatientName = string.IsNullOrWhiteSpace(u.FullName)
+                    ? (u.Email ?? "Patient")
+                    : u.FullName,
+                scr.CreatedAt,
+                scr.ProcessedAt,
+                ImagesCount = scr.RetinalImages.Count,
+                scr.RawJsonOutput
+            }
+        )
+        .Take(take)
+        .ToListAsync(cancellationToken);
+
+        if (screenings.Count == 0)
+            return Array.Empty<OrganisationScreeningHistoryReadModel>();
+
+        var screeningIdSet = screenings.Select(s => s.Id).ToHashSet();
+
+        var latestResults = await _context.Set<ScreeningResult>()
+            .AsNoTracking()
+            .Where(r => screeningIdSet.Contains(r.AiScreeningId))
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var resultByScreeningId = latestResults
+            .GroupBy(r => r.AiScreeningId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var latestDiagnoses = await _context.Set<MedicalDiagnosis>()
+            .AsNoTracking()
+            .Where(d => screeningIdSet.Contains(d.AiScreeningId))
+            .OrderByDescending(d => d.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var diagnosisByScreeningId = latestDiagnoses
+            .GroupBy(d => d.AiScreeningId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var history = new List<OrganisationScreeningHistoryReadModel>(screenings.Count);
+
+        foreach (var item in screenings)
+        {
+            resultByScreeningId.TryGetValue(item.Id, out var latestResult);
+            diagnosisByScreeningId.TryGetValue(item.Id, out var latestDiagnosis);
+
+            history.Add(new OrganisationScreeningHistoryReadModel
+            {
+                ScreeningId = item.Id,
+                PatientId = item.PatientId,
+                PatientName = item.PatientName,
+                CreatedAt = item.CreatedAt,
+                ProcessedAt = item.ProcessedAt,
+                ImagesCount = item.ImagesCount,
+                LatestRiskLevel = latestResult?.RiskLevel.ToString(),
+                ConfidenceScore = latestResult?.ConfidenceScore,
+                AiPrimaryLabel = TryGetPrimaryClassName(item.RawJsonOutput),
+                Status = MapScreeningStatus(latestResult, latestDiagnosis)
+            });
+        }
+
+        return history;
+    }
+
+    public async Task<bool> IsPatientManagedByOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        Guid patientId,
+        CancellationToken cancellationToken = default)
+    {
+        var organisationId = await _context.Set<ApplicationUser>()
+            .AsNoTracking()
+            .Where(u => u.Id == orgAdminUserId && !u.IsDeleted)
+            .Select(u => u.OrganizationId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!organisationId.HasValue)
+            return false;
+
+        return await (
+            from p in _context.Set<Patient>().AsNoTracking()
+            join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
+            where p.Id == patientId
+                  && !u.IsDeleted
+                  && u.OrganizationId == organisationId.Value
+            select p.Id
+        ).AnyAsync(cancellationToken);
+    }
+
     private static int ComputeAge(DateTime? dob)
     {
         if (dob is null) return 0;
@@ -179,6 +290,17 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
             return "archived";
 
         return "reviewed";
+    }
+
+    private static string MapScreeningStatus(ScreeningResult? result, MedicalDiagnosis? diagnosis)
+    {
+        if (diagnosis?.ConfirmedAt.HasValue == true || diagnosis?.IsReferralNeeded == true)
+            return "completed";
+
+        if (result is not null)
+            return "saved";
+
+        return "pending";
     }
 
     private static string MapPriority(Domain.Enums.RiskLevel? risk, MedicalDiagnosis? d)
