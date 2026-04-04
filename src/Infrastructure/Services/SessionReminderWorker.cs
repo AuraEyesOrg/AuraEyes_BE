@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Domain.Common;
+using Domain.Enums;
 using Domain.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -85,9 +86,18 @@ public class SessionReminderWorker : BackgroundService
 
             await notificationService.SendAsync(
                 session.OphthalmologistId.Value,
-                $"Reminder: Session #{session.Id} has been inactive for {daysSinceActivity} day(s). " +
-                "Please review or end the session.",
-                cancellationToken);
+                "Inactive consultation reminder",
+                $"Session #{session.Id} has been inactive for {daysSinceActivity} day(s). Please review or end the session.",
+                NotificationType.NewConsultationRequest,
+                new
+                {
+                    sessionId = session.Id,
+                    consultationId = session.Id,
+                    reminderType = "stale_session",
+                    daysSinceActivity
+                },
+                cancellationToken,
+                session.Id);
 
             session.RecordReminderSent();
             remindersSent++;
