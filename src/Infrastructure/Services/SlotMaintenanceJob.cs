@@ -12,11 +12,16 @@ namespace Infrastructure.Services;
 public class SlotMaintenanceJob
 {
     private readonly ApplicationDbContext _context;
+    private readonly IBetterStackHeartbeatService _betterStackHeartbeat;
     private readonly ILogger<SlotMaintenanceJob> _logger;
 
-    public SlotMaintenanceJob(ApplicationDbContext context, ILogger<SlotMaintenanceJob> logger)
+    public SlotMaintenanceJob(
+        ApplicationDbContext context,
+        IBetterStackHeartbeatService betterStackHeartbeat,
+        ILogger<SlotMaintenanceJob> logger)
     {
         _context = context;
+        _betterStackHeartbeat = betterStackHeartbeat;
         _logger = logger;
     }
 
@@ -26,28 +31,40 @@ public class SlotMaintenanceJob
     /// </summary>
     public async Task ExpireUnusedSlotsAsync(CancellationToken cancellationToken = default)
     {
+        await _betterStackHeartbeat.NotifyStartedAsync(BetterStackMonitor.SlotMaintenance, cancellationToken);
+
         var utcNow = DateTime.UtcNow;
         var utcDate = DateOnly.FromDateTime(utcNow);
         var utcTime = TimeOnly.FromDateTime(utcNow);
 
-        _logger.LogInformation(
-            "Starting slot expiration maintenance at {UtcNow}. Date={UtcDate}, Time={UtcTime}",
-            utcNow,
-            utcDate,
-            utcTime);
+        try
+        {
+            _logger.LogInformation(
+                "Starting slot expiration maintenance at {UtcNow}. Date={UtcDate}, Time={UtcTime}",
+                utcNow,
+                utcDate,
+                utcTime);
 
-        var expiredCount = await _context.AppointmentSlots
-            .Where(slot =>
-                slot.Status == ScheduleStatus.Available &&
-                slot.BookedCount == 0 &&
-                (slot.Date < utcDate || (slot.Date == utcDate && slot.StartTime < utcTime)))
-            .ExecuteUpdateAsync(updates => updates
-                .SetProperty(slot => slot.Status, ScheduleStatus.Expired)
-                .SetProperty(slot => slot.UpdatedAt, utcNow),
-                cancellationToken);
+            var expiredCount = await _context.AppointmentSlots
+                .Where(slot =>
+                    slot.Status == ScheduleStatus.Available &&
+                    slot.BookedCount == 0 &&
+                    (slot.Date < utcDate || (slot.Date == utcDate && slot.StartTime < utcTime)))
+                .ExecuteUpdateAsync(updates => updates
+                    .SetProperty(slot => slot.Status, ScheduleStatus.Expired)
+                    .SetProperty(slot => slot.UpdatedAt, utcNow),
+                    cancellationToken);
 
-        _logger.LogInformation(
-            "Slot expiration maintenance completed. Expired {ExpiredCount} slot(s).",
-            expiredCount);
+            _logger.LogInformation(
+                "Slot expiration maintenance completed. Expired {ExpiredCount} slot(s).",
+                expiredCount);
+
+            await _betterStackHeartbeat.NotifySucceededAsync(BetterStackMonitor.SlotMaintenance, cancellationToken);
+        }
+        catch (Exception)
+        {
+            await _betterStackHeartbeat.NotifyFailedAsync(BetterStackMonitor.SlotMaintenance, cancellationToken);
+            throw;
+        }
     }
 }

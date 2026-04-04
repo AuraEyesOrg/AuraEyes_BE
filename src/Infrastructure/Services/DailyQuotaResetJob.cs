@@ -13,17 +13,23 @@ namespace Infrastructure.Services;
 public class DailyQuotaResetJob
 {
     private readonly ApplicationDbContext _context;
+    private readonly IBetterStackHeartbeatService _betterStackHeartbeat;
     private readonly ILogger<DailyQuotaResetJob> _logger;
 
-    public DailyQuotaResetJob(ApplicationDbContext context, ILogger<DailyQuotaResetJob> logger)
+    public DailyQuotaResetJob(
+        ApplicationDbContext context,
+        IBetterStackHeartbeatService betterStackHeartbeat,
+        ILogger<DailyQuotaResetJob> logger)
     {
         _context = context;
+        _betterStackHeartbeat = betterStackHeartbeat;
         _logger = logger;
     }
 
     public async Task ExecuteAsync()
     {
         _logger.LogInformation("Starting daily AI quota reset job at {Time} UTC", DateTime.UtcNow);
+        await _betterStackHeartbeat.NotifyStartedAsync(BetterStackMonitor.DailyQuotaReset);
 
         try
         {
@@ -38,10 +44,13 @@ public class DailyQuotaResetJob
             _logger.LogInformation(
                 "Daily quota reset completed. Reset {PatientCount} patients, {OrgCount} organisations",
                 patientResetCount, orgResetCount);
+
+            await _betterStackHeartbeat.NotifySucceededAsync(BetterStackMonitor.DailyQuotaReset);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to execute daily quota reset job");
+            await _betterStackHeartbeat.NotifyFailedAsync(BetterStackMonitor.DailyQuotaReset);
             throw;
         }
     }
