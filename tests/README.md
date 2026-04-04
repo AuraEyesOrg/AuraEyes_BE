@@ -9,21 +9,67 @@ This document catalogs all unit tests for the **AuraEyes Backend** application. 
 - **NSubstitute** — Mocking framework
 - **FluentValidation.TestHelper** — Validator testing
 
+## Recent Additions
+
+The latest test batch focuses on the wallet workflow end to end at the unit-test level:
+
+- Domain entities:
+	- [Entities/AppointmentTests.cs](tests/Domain.UnitTests/Entities/AppointmentTests.cs)
+	- [Entities/AppointmentSlotTests.cs](tests/Domain.UnitTests/Entities/AppointmentSlotTests.cs)
+	- [Entities/ConsultationSessionTests.cs](tests/Domain.UnitTests/Entities/ConsultationSessionTests.cs)
+	- [Entities/ScheduleTemplateTests.cs](tests/Domain.UnitTests/Entities/ScheduleTemplateTests.cs)
+	- [Entities/AiScreeningTests.cs](tests/Domain.UnitTests/Entities/AiScreeningTests.cs)
+	- [Entities/ScreeningResultTests.cs](tests/Domain.UnitTests/Entities/ScreeningResultTests.cs)
+	- [Entities/RetinalImageTests.cs](tests/Domain.UnitTests/Entities/RetinalImageTests.cs)
+	- [Entities/MedicalDiagnosisTests.cs](tests/Domain.UnitTests/Entities/MedicalDiagnosisTests.cs)
+	- [Entities/DepositRequestTests.cs](tests/Domain.UnitTests/Entities/DepositRequestTests.cs)
+	- [Entities/WithdrawalRequestTests.cs](tests/Domain.UnitTests/Entities/WithdrawalRequestTests.cs)
+	- [Entities/WalletTransactionTests.cs](tests/Domain.UnitTests/Entities/WalletTransactionTests.cs)
+- Application validators:
+	- [Validators/CreateDepositCommandValidatorTests.cs](tests/Application.UnitTests/Validators/CreateDepositCommandValidatorTests.cs)
+	- [Validators/CreateWithdrawalRequestCommandValidatorTests.cs](tests/Application.UnitTests/Validators/CreateWithdrawalRequestCommandValidatorTests.cs)
+	- [Validators/VerifyPaymentCommandValidatorTests.cs](tests/Application.UnitTests/Validators/VerifyPaymentCommandValidatorTests.cs)
+- Application handlers:
+	- [Handlers/CreateDepositCommandHandlerTests.cs](tests/Application.UnitTests/Handlers/CreateDepositCommandHandlerTests.cs)
+	- [Handlers/CreateWithdrawalRequestCommandHandlerTests.cs](tests/Application.UnitTests/Handlers/CreateWithdrawalRequestCommandHandlerTests.cs)
+	- [Handlers/VerifyPaymentCommandHandlerTests.cs](tests/Application.UnitTests/Handlers/VerifyPaymentCommandHandlerTests.cs)
+- API controllers:
+	- [Controllers/BaseApiControllerTests.cs](tests/API.UnitTests/Controllers/BaseApiControllerTests.cs)
+	- [Controllers/PatientProfileControllerTests.cs](tests/API.UnitTests/Controllers/PatientProfileControllerTests.cs)
+	- [Controllers/WalletsControllerTests.cs](tests/API.UnitTests/Controllers/WalletsControllerTests.cs)
+- Infrastructure services:
+	- [Services/DateTimeServiceTests.cs](tests/Infrastructure.UnitTests/Services/DateTimeServiceTests.cs)
+	- [Services/SystemSettingServiceTests.cs](tests/Infrastructure.UnitTests/Services/SystemSettingServiceTests.cs)
+
+These tests cover:
+
+- PayOS-only deposit creation flow
+- Wallet creation when a user does not yet have one
+- Withdrawal request authorization, balance, and contract-number behavior
+- Payment verification for completed, cancelled, paid, and missing-wallet scenarios
+- Deposit and withdrawal domain state transitions and validation rules
+- Controller success paths, auth guards, ownership checks, file validation, and PayOS webhook acknowledgments
+- Scheduling and screening entity behavior for appointments, slots, AI screening, retinal images, and medical diagnoses
+
 ## Test Summary
 
 | Project                  | Tests   | Status             |
 | ------------------------ | ------- | ------------------ |
-| Domain.UnitTests         | 108     | ✅ All Passing     |
-| Application.UnitTests    | 41      | ✅ All Passing     |
-| Infrastructure.UnitTests | 42      | ✅ All Passing     |
-| API.UnitTests            | 39      | ✅ All Passing     |
-| **Total**                | **230** | ✅ **All Passing** |
+| Domain.UnitTests         | 506     | ✅ All Passing     |
+| Application.UnitTests    | 322     | ✅ All Passing     |
+| Infrastructure.UnitTests | 113     | ✅ All Passing     |
+| API.UnitTests            | 51      | ✅ All Passing     |
+| **Total**                | **992** | ✅ **All Passing** |
 
 ## Running Tests
 
 ```bash
 # Run all tests
 dotnet test
+
+# Run only the wallet-related suites
+dotnet test tests/Domain.UnitTests/Domain.UnitTests.csproj
+dotnet test tests/Application.UnitTests/Application.UnitTests.csproj
 
 # Run specific project
 dotnet test tests/Domain.UnitTests
@@ -434,17 +480,21 @@ Tests for API controllers and HTTP response handling.
 ## Architecture Coverage
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        API Layer (39)                        │
-│  Controllers: BaseApiController, Wallets, PatientProfile     │
-├─────────────────────────────────────────────────────────────┤
-│                   Application Layer (41)                     │
-│  Validators, Handlers, Behaviors, Result Model               │
-├─────────────────────────────────────────────────────────────┤
-│                  Infrastructure Layer (42)                    │
-│  TokenService, DateTimeService, JwtSettings, Settings        │
-├─────────────────────────────────────────────────────────────┤
-│                      Domain Layer (108)                      │
-│  Entities, Value Objects, Base Classes, Exceptions           │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                          API Layer (51)                               │
+│  Controllers: BaseApiController, Wallets, PatientProfile             │
+├──────────────────────────────────────────────────────────────────────┤
+│                      Application Layer (322)                         │
+│  25 Validators, 6 Handlers, 3 Behaviors, Result Model                │
+├──────────────────────────────────────────────────────────────────────┤
+│                    Infrastructure Layer (113)                         │
+│  TokenService, RefreshTokenService, DateTimeService, EmailTemplates  │
+│  JwtSettings, Settings (Smtp, PayOS, Supabase, Google*, Admin)       │
+│  SystemSettingService                                                │
+├──────────────────────────────────────────────────────────────────────┤
+│                        Domain Layer (506)                            │
+│  24+ Entities, 2 Value Objects, Base Classes, Exceptions             │
+│  Full coverage: Financial, Consultation, Contracts, Network,         │
+│  Platform, Authorization, Scheduling, Screening, Users               │
+└──────────────────────────────────────────────────────────────────────┘
 ```
