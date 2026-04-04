@@ -16,7 +16,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace API.Controllers;
+namespace API.Controllers.Organization;
 
 [Route("api/organisations")]
 public class OrganisationsController : BaseApiController

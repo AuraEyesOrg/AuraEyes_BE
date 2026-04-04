@@ -8,7 +8,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace API.Controllers;
+namespace API.Controllers.Organization;
 
 [Route("api/organisations/patients")]
 [Authorize(Policy = Policies.OrgAdminOnly)]

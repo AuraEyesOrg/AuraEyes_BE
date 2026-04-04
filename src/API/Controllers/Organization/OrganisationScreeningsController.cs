@@ -11,7 +11,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace API.Controllers;
+namespace API.Controllers.Organization;
 
 /// <summary>
 /// Organisation AI Screening endpoints.
