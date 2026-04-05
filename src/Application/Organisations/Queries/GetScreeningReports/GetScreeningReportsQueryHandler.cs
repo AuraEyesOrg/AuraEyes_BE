@@ -19,40 +19,27 @@ public sealed class GetScreeningReportsQueryHandler
         GetScreeningReportsQuery request,
         CancellationToken cancellationToken)
     {
-        var allPatients = await _orgPatientsRepo.GetRecentPatientsForOrganisationAdminAsync(
-            request.OrgAdminUserId, 1000, cancellationToken);
-
-        var highRisk = allPatients.Count(p => p.Priority == "high");
-        var mediumRisk = allPatients.Count(p => p.Priority == "medium");
-        var lowRisk = allPatients.Count(p => p.Priority == "low");
-        var avgConfidence = allPatients.Count > 0
-            ? allPatients.Average(p => p.Confidence)
-            : 0m;
-
-        // Monthly breakdown for last 6 months
-        var monthly = allPatients
-            .GroupBy(p => p.LastScreening.ToString("yyyy-MM"))
-            .OrderByDescending(g => g.Key)
-            .Take(6)
-            .Select(g => new OrgMonthlyScreeningCount
-            {
-                Month = g.Key,
-                Count = g.Count(),
-                HighRisk = g.Count(p => p.Priority == "high"),
-                ModerateRisk = g.Count(p => p.Priority == "medium"),
-                LowRisk = g.Count(p => p.Priority == "low")
-            })
-            .OrderBy(m => m.Month)
-            .ToList();
+        var report = await _orgPatientsRepo.GetScreeningReportForOrganisationAdminAsync(
+            request.OrgAdminUserId,
+            cancellationToken);
 
         return Result<OrgScreeningReportDto>.Success(new OrgScreeningReportDto
         {
-            TotalScreenings = allPatients.Count,
-            HighRiskCount = highRisk,
-            ModerateRiskCount = mediumRisk,
-            LowRiskCount = lowRisk,
-            AverageConfidence = Math.Round(avgConfidence, 1),
-            MonthlyBreakdown = monthly
+            TotalScreenings = report.TotalScreenings,
+            HighRiskCount = report.HighRiskCount,
+            ModerateRiskCount = report.ModerateRiskCount,
+            LowRiskCount = report.LowRiskCount,
+            AverageConfidence = Math.Round(report.AverageConfidence, 1),
+            MonthlyBreakdown = report.MonthlyBreakdown
+                .Select(m => new OrgMonthlyScreeningCount
+                {
+                    Month = m.Month,
+                    Count = m.Count,
+                    HighRisk = m.HighRisk,
+                    ModerateRisk = m.ModerateRisk,
+                    LowRisk = m.LowRisk
+                })
+                .ToList()
         });
     }
 }

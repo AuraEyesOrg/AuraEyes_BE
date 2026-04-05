@@ -28,6 +28,32 @@ public sealed record OrganisationScreeningHistoryReadModel
     public string Status { get; init; } = "pending";
 }
 
+public sealed record OrganisationMonthlyScreeningCountReadModel
+{
+    public string Month { get; init; } = string.Empty;
+    public int Count { get; init; }
+    public int HighRisk { get; init; }
+    public int ModerateRisk { get; init; }
+    public int LowRisk { get; init; }
+}
+
+public sealed record OrganisationScreeningReportReadModel
+{
+    public int TotalScreenings { get; init; }
+    public int HighRiskCount { get; init; }
+    public int ModerateRiskCount { get; init; }
+    public int LowRiskCount { get; init; }
+    public decimal AverageConfidence { get; init; }
+    public IReadOnlyList<OrganisationMonthlyScreeningCountReadModel> MonthlyBreakdown { get; init; }
+        = Array.Empty<OrganisationMonthlyScreeningCountReadModel>();
+}
+
+public sealed record OrganisationScreeningCountsReadModel
+{
+    public int TotalScreeningsAllTime { get; init; }
+    public int TotalScreeningsFromDate { get; init; }
+}
+
 public interface IOrganisationPatientsRepository
 {
     Task<IReadOnlyList<OrganisationRecentPatientReadModel>> GetRecentPatientsForOrganisationAdminAsync(
@@ -38,6 +64,15 @@ public interface IOrganisationPatientsRepository
     Task<IReadOnlyList<OrganisationScreeningHistoryReadModel>> GetScreeningHistoryForOrganisationAdminAsync(
         Guid orgAdminUserId,
         int take,
+        CancellationToken cancellationToken = default);
+
+    Task<OrganisationScreeningReportReadModel> GetScreeningReportForOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        CancellationToken cancellationToken = default);
+
+    Task<OrganisationScreeningCountsReadModel> GetScreeningCountsForOrganisationAsync(
+        Guid organisationId,
+        DateTime fromUtc,
         CancellationToken cancellationToken = default);
 
     Task<bool> IsPatientManagedByOrganisationAdminAsync(

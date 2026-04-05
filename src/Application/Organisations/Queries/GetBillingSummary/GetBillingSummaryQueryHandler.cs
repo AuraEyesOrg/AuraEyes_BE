@@ -31,17 +31,15 @@ public sealed class GetBillingSummaryQueryHandler
         if (org is null)
             return Result<OrgBillingSummaryDto>.NotFound("Organisation not found.");
 
-        var allPatients = await _orgPatientsRepo.GetRecentPatientsForOrganisationAdminAsync(
-            request.OrgAdminUserId, 1000, cancellationToken);
-
         var now = DateTime.UtcNow;
         var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        var thisMonthCount = allPatients.Count(p => p.LastScreening >= monthStart);
+        var screeningCounts = await _orgPatientsRepo.GetScreeningCountsForOrganisationAsync(
+            org.Id, monthStart, cancellationToken);
 
         return Result<OrgBillingSummaryDto>.Success(new OrgBillingSummaryDto
         {
-            TotalScreeningsThisMonth = thisMonthCount,
-            TotalScreeningsAllTime = allPatients.Count,
+            TotalScreeningsThisMonth = screeningCounts.TotalScreeningsFromDate,
+            TotalScreeningsAllTime = screeningCounts.TotalScreeningsAllTime,
             RemainingQuota = org.PurchasedAiQuota,
             UsedQuotaToday = org.UsedAiQuota,
             PurchasedQuota = org.PurchasedAiQuota

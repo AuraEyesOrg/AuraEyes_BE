@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
@@ -69,7 +70,7 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
             ? $"walkin_{uniqueSuffix}@auraeyes.local"
             : request.Email;
 
-        var password = "TempPass123!";
+        var password = GenerateStrongRandomPassword();
 
         int? genderId = string.IsNullOrWhiteSpace(request.Gender) ? null
             : request.Gender.StartsWith("M", StringComparison.OrdinalIgnoreCase) ? 1
@@ -120,5 +121,40 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
             _logger.LogError(ex, "Error creating walk-in patient profile");
             return Result<Guid>.Failure($"Failed to create patient profile: {ex.Message}");
         }
+    }
+
+    private static string GenerateStrongRandomPassword(int length = 20)
+    {
+        const string lowercase = "abcdefghijklmnopqrstuvwxyz";
+        const string uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const string digits = "0123456789";
+        const string symbols = "!@#$%^&*()-_=+[]{}<>?";
+
+        if (length < 8)
+        {
+            throw new ArgumentOutOfRangeException(nameof(length), "Password length must be at least 8.");
+        }
+
+        var allCharacters = string.Concat(lowercase, uppercase, digits, symbols);
+        var passwordChars = new List<char>(length)
+        {
+            lowercase[RandomNumberGenerator.GetInt32(lowercase.Length)],
+            uppercase[RandomNumberGenerator.GetInt32(uppercase.Length)],
+            digits[RandomNumberGenerator.GetInt32(digits.Length)],
+            symbols[RandomNumberGenerator.GetInt32(symbols.Length)]
+        };
+
+        while (passwordChars.Count < length)
+        {
+            passwordChars.Add(allCharacters[RandomNumberGenerator.GetInt32(allCharacters.Length)]);
+        }
+
+        for (var i = passwordChars.Count - 1; i > 0; i--)
+        {
+            var swapIndex = RandomNumberGenerator.GetInt32(i + 1);
+            (passwordChars[i], passwordChars[swapIndex]) = (passwordChars[swapIndex], passwordChars[i]);
+        }
+
+        return new string(passwordChars.ToArray());
     }
 }
