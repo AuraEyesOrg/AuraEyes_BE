@@ -9,6 +9,7 @@ public sealed record OrganisationRecentPatientDto
     public string Name { get; init; } = string.Empty;
     public int Age { get; init; }
     public string Gender { get; init; } = string.Empty; // "M" | "F"
+    public string PhoneNumber { get; init; } = string.Empty;
     public DateTime LastScreening { get; init; }
 
     public string AiPrediction { get; init; } = string.Empty;

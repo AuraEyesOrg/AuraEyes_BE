@@ -3,11 +3,12 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.OrganisationPatients;
 using Application.OrganisationPatients.Queries.GetOrganisationRecentPatients;
+using Application.OrganisationPatients.Commands.CreateWalkInPatient;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace API.Controllers;
+namespace API.Controllers.Organization;
 
 [Route("api/organisations/patients")]
 [Authorize(Policy = Policies.OrgAdminOnly)]
@@ -39,6 +40,20 @@ public class OrganisationPatientsController : BaseApiController
             cancellationToken);
 
         return HandleResult(result, "Recent patients loaded");
+    }
+
+    [HttpPost("walk-in")]
+    [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CreateWalkInPatient(
+        [FromBody] CreateWalkInPatientCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUser.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Unable to resolve current user."));
+
+        var result = await _mediator.Send(command, cancellationToken);
+        return HandleResult(result, "Walk-in patient created successfully");
     }
 }
 
