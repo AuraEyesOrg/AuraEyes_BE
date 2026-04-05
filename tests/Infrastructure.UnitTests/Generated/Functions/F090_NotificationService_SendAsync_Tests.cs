@@ -11,12 +11,12 @@ public class F090_NotificationService_SendAsync_Tests
 
     public static IEnumerable<object[]> ReturnCases()
     {
-            yield break;
+        yield break;
     }
 
     public static IEnumerable<object[]> LogCases()
     {
-            yield break;
+        yield break;
     }
 
     [Fact]
