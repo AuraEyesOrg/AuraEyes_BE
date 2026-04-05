@@ -38,84 +38,86 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
             .Select(cs => cs.AiScreeningId!.Value)
             .Distinct();
 
-        var orgPatients = await (
+        var topPatients = await (
             from u in _context.Set<ApplicationUser>().AsNoTracking()
             where u.OrganizationId == organisationId && !u.IsDeleted
             join p in _context.Set<Patient>().AsNoTracking() on u.Id equals p.UserId
-            select new { PatientUser = u, Patient = p }
-        ).ToListAsync(cancellationToken);
-
-        var screeningRows = await (
-            from scr in _context.Set<AiScreening>().AsNoTracking()
-            join p in _context.Set<Patient>().AsNoTracking() on scr.PatientId equals p.Id
-            join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
-            join screeningId in organisationScreeningIds on scr.Id equals screeningId
-            orderby scr.CreatedAt descending
-            select new { Screening = scr, Patient = p, PatientUser = u }
-        ).ToListAsync(cancellationToken);
-
-        var uniquePatients = new Dictionary<Guid, (ApplicationUser User, Patient Patient, AiScreening? LatestScreening)>();
-
-        foreach (var row in orgPatients)
-        {
-            uniquePatients[row.Patient.Id] = (row.PatientUser, row.Patient, null);
-        }
-
-        foreach (var row in screeningRows)
-        {
-            if (!uniquePatients.TryGetValue(row.Patient.Id, out var existing))
+            let latestScreeningId = (
+                from scr in _context.Set<AiScreening>().AsNoTracking()
+                join screeningId in organisationScreeningIds on scr.Id equals screeningId
+                where scr.PatientId == p.Id
+                orderby scr.CreatedAt descending
+                select (Guid?)scr.Id
+            ).FirstOrDefault()
+            let latestScreeningCreatedAt = (
+                from scr in _context.Set<AiScreening>().AsNoTracking()
+                join screeningId in organisationScreeningIds on scr.Id equals screeningId
+                where scr.PatientId == p.Id
+                orderby scr.CreatedAt descending
+                select (DateTime?)scr.CreatedAt
+            ).FirstOrDefault()
+            orderby latestScreeningCreatedAt ?? u.CreatedAt descending
+            select new
             {
-                uniquePatients[row.Patient.Id] = (row.PatientUser, row.Patient, row.Screening);
+                PatientUser = u,
+                Patient = p,
+                LatestScreeningId = latestScreeningId
             }
-            else
-            {
-                if (existing.LatestScreening == null || row.Screening.CreatedAt > existing.LatestScreening.CreatedAt)
-                {
-                    uniquePatients[row.Patient.Id] = (row.PatientUser, row.Patient, row.Screening);
-                }
-            }
-        }
+        )
+        .Take(take)
+        .ToListAsync(cancellationToken);
 
-        if (uniquePatients.Count == 0)
+        if (topPatients.Count == 0)
             return Array.Empty<OrganisationRecentPatientReadModel>();
 
-        var orderedPatients = uniquePatients.Values
-            .OrderByDescending(x => x.LatestScreening?.CreatedAt ?? x.User.CreatedAt)
-            .Take(take)
-            .ToList();
-
-        var screeningIdSet = orderedPatients
-            .Where(x => x.LatestScreening != null)
-            .Select(x => x.LatestScreening!.Id)
+        var screeningIdSet = topPatients
+            .Where(x => x.LatestScreeningId.HasValue)
+            .Select(x => x.LatestScreeningId!.Value)
             .ToHashSet();
 
-        var latestResults = await _context.Set<ScreeningResult>()
-            .AsNoTracking()
-            .Where(r => screeningIdSet.Contains(r.AiScreeningId))
-            .OrderByDescending(r => r.CreatedAt)
-            .ToListAsync(cancellationToken);
+        var screeningById = screeningIdSet.Count == 0
+            ? new Dictionary<Guid, AiScreening>()
+            : await _context.Set<AiScreening>()
+                .AsNoTracking()
+                .Where(s => screeningIdSet.Contains(s.Id))
+                .ToDictionaryAsync(s => s.Id, cancellationToken);
+
+        var latestResults = screeningIdSet.Count == 0
+            ? new List<ScreeningResult>()
+            : await _context.Set<ScreeningResult>()
+                .AsNoTracking()
+                .Where(r => screeningIdSet.Contains(r.AiScreeningId))
+                .OrderByDescending(r => r.CreatedAt)
+                .ToListAsync(cancellationToken);
 
         var resultByScreeningId = latestResults
             .GroupBy(r => r.AiScreeningId)
             .ToDictionary(g => g.Key, g => g.First());
 
-        var latestDiagnoses = await _context.Set<MedicalDiagnosis>()
-            .AsNoTracking()
-            .Where(d => screeningIdSet.Contains(d.AiScreeningId))
-            .OrderByDescending(d => d.CreatedAt)
-            .ToListAsync(cancellationToken);
+        var latestDiagnoses = screeningIdSet.Count == 0
+            ? new List<MedicalDiagnosis>()
+            : await _context.Set<MedicalDiagnosis>()
+                .AsNoTracking()
+                .Where(d => screeningIdSet.Contains(d.AiScreeningId))
+                .OrderByDescending(d => d.CreatedAt)
+                .ToListAsync(cancellationToken);
 
         var diagByScreeningId = latestDiagnoses
             .GroupBy(d => d.AiScreeningId)
             .ToDictionary(g => g.Key, g => g.First());
 
-        var list = new List<OrganisationRecentPatientReadModel>(orderedPatients.Count);
+        var list = new List<OrganisationRecentPatientReadModel>(topPatients.Count);
 
-        foreach (var row in orderedPatients)
+        foreach (var row in topPatients)
         {
             var p = row.Patient;
-            var u = row.User;
-            var scr = row.LatestScreening;
+            var u = row.PatientUser;
+            AiScreening? scr = null;
+
+            if (row.LatestScreeningId is Guid screeningId)
+            {
+                screeningById.TryGetValue(screeningId, out scr);
+            }
 
             ScreeningResult? latest = null;
             MedicalDiagnosis? diag = null;

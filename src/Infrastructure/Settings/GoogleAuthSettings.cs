@@ -3,7 +3,7 @@ namespace Infrastructure.Settings;
 /// <summary>
 /// Google OAuth authentication settings for ID token validation.
 /// </summary>
-public class GoogleAuthSettings
+public sealed class GoogleAuthSettings
 {
     public const string SectionName = "GoogleAuth";
 

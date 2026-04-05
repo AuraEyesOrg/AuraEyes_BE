@@ -1,6 +1,6 @@
 namespace Infrastructure.Settings;
 
-public class BetterStackSettings
+public sealed class BetterStackSettings
 {
     public const string SectionName = "BetterStack";
 
