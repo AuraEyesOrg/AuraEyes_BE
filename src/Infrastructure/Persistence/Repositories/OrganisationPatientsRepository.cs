@@ -236,6 +236,136 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         return history;
     }
 
+    public async Task<OrganisationScreeningCountsReadModel> GetScreeningCountsForOrganisationAsync(
+        Guid organisationId,
+        DateTime fromUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var organisationScreeningIds = _context.Set<ConsultationSession>()
+            .AsNoTracking()
+            .Where(cs => cs.OrganisationId == organisationId && cs.AiScreeningId != null)
+            .Select(cs => cs.AiScreeningId!.Value)
+            .Distinct();
+
+        var screeningsQuery = _context.Set<AiScreening>()
+            .AsNoTracking()
+            .Where(scr => organisationScreeningIds.Contains(scr.Id));
+
+        var allTimeCountTask = screeningsQuery.CountAsync(cancellationToken);
+        var fromDateCountTask = screeningsQuery.CountAsync(scr => scr.CreatedAt >= fromUtc, cancellationToken);
+
+        await Task.WhenAll(allTimeCountTask, fromDateCountTask);
+
+        return new OrganisationScreeningCountsReadModel
+        {
+            TotalScreeningsAllTime = allTimeCountTask.Result,
+            TotalScreeningsFromDate = fromDateCountTask.Result
+        };
+    }
+
+    public async Task<OrganisationScreeningReportReadModel> GetScreeningReportForOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var appUser = await _context.Set<ApplicationUser>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == orgAdminUserId, cancellationToken);
+
+        if (appUser?.OrganizationId is null)
+            return new OrganisationScreeningReportReadModel();
+
+        var organisationId = appUser.OrganizationId.Value;
+
+        var screeningEvents =
+            from scr in _context.Set<AiScreening>().AsNoTracking()
+            join p in _context.Set<Patient>().AsNoTracking() on scr.PatientId equals p.Id
+            join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
+            where u.OrganizationId == organisationId && !u.IsDeleted && !scr.IsDeleted
+            select new
+            {
+                scr.CreatedAt,
+                LatestRiskLevel = _context.Set<ScreeningResult>()
+                    .AsNoTracking()
+                    .Where(r => r.AiScreeningId == scr.Id)
+                    .OrderByDescending(r => r.CreatedAt)
+                    .Select(r => (Domain.Enums.RiskLevel?)r.RiskLevel)
+                    .FirstOrDefault(),
+                LatestConfidence = _context.Set<ScreeningResult>()
+                    .AsNoTracking()
+                    .Where(r => r.AiScreeningId == scr.Id)
+                    .OrderByDescending(r => r.CreatedAt)
+                    .Select(r => (decimal?)r.ConfidenceScore)
+                    .FirstOrDefault(),
+                IsReferralNeeded = _context.Set<MedicalDiagnosis>()
+                    .AsNoTracking()
+                    .Where(d => d.AiScreeningId == scr.Id)
+                    .OrderByDescending(d => d.CreatedAt)
+                    .Select(d => (bool?)d.IsReferralNeeded)
+                    .FirstOrDefault() ?? false
+            };
+
+        var totals = await screeningEvents
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                HighRisk = g.Count(x =>
+                    x.IsReferralNeeded
+                    || x.LatestRiskLevel == Domain.Enums.RiskLevel.Critical
+                    || x.LatestRiskLevel == Domain.Enums.RiskLevel.High),
+                ModerateRisk = g.Count(x =>
+                    !x.IsReferralNeeded
+                    && x.LatestRiskLevel == Domain.Enums.RiskLevel.Moderate),
+                AverageConfidence = g.Average(x => x.LatestConfidence ?? 0m)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (totals is null)
+            return new OrganisationScreeningReportReadModel();
+
+        var monthlyRows = await screeningEvents
+            .GroupBy(x => new { x.CreatedAt.Year, x.CreatedAt.Month })
+            .Select(g => new
+            {
+                g.Key.Year,
+                g.Key.Month,
+                Count = g.Count(),
+                HighRisk = g.Count(x =>
+                    x.IsReferralNeeded
+                    || x.LatestRiskLevel == Domain.Enums.RiskLevel.Critical
+                    || x.LatestRiskLevel == Domain.Enums.RiskLevel.High),
+                ModerateRisk = g.Count(x =>
+                    !x.IsReferralNeeded
+                    && x.LatestRiskLevel == Domain.Enums.RiskLevel.Moderate)
+            })
+            .OrderByDescending(x => x.Year)
+            .ThenByDescending(x => x.Month)
+            .Take(6)
+            .ToListAsync(cancellationToken);
+
+        var monthly = monthlyRows
+            .Select(x => new OrganisationMonthlyScreeningCountReadModel
+            {
+                Month = $"{x.Year:D4}-{x.Month:D2}",
+                Count = x.Count,
+                HighRisk = x.HighRisk,
+                ModerateRisk = x.ModerateRisk,
+                LowRisk = x.Count - x.HighRisk - x.ModerateRisk
+            })
+            .OrderBy(x => x.Month)
+            .ToList();
+
+        return new OrganisationScreeningReportReadModel
+        {
+            TotalScreenings = totals.Total,
+            HighRiskCount = totals.HighRisk,
+            ModerateRiskCount = totals.ModerateRisk,
+            LowRiskCount = totals.Total - totals.HighRisk - totals.ModerateRisk,
+            AverageConfidence = totals.AverageConfidence,
+            MonthlyBreakdown = monthly
+        };
+    }
+
     public async Task<bool> IsPatientManagedByOrganisationAdminAsync(
         Guid orgAdminUserId,
         Guid patientId,

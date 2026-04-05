@@ -173,12 +173,23 @@ public class IdentityService : IIdentityService
             return false;
         }
 
+        var candidateSuffix = GetCandidatePhoneSuffix(normalizedPhoneNumber);
+
         var existingPhoneNumbers = await _userManager.Users
             .Where(u =>
                 u.OrganizationId == organizationId &&
                 !u.IsDeleted &&
                 u.PhoneNumber != null &&
                 u.PhoneNumber != string.Empty)
+            .Where(u =>
+                u.PhoneNumber!
+                    .Replace(" ", string.Empty)
+                    .Replace("-", string.Empty)
+                    .Replace(".", string.Empty)
+                    .Replace("(", string.Empty)
+                    .Replace(")", string.Empty)
+                    .Replace("+", string.Empty)
+                    .EndsWith(candidateSuffix))
             .Select(u => u.PhoneNumber!)
             .ToListAsync(cancellationToken);
 
@@ -353,6 +364,17 @@ public class IdentityService : IIdentityService
         return new string(phoneNumber
             .Where(char.IsDigit)
             .ToArray());
+    }
+
+    private static string GetCandidatePhoneSuffix(string normalizedPhoneNumber)
+    {
+        const int CandidateSuffixLength = 8;
+        if (normalizedPhoneNumber.Length <= CandidateSuffixLength)
+        {
+            return normalizedPhoneNumber;
+        }
+
+        return normalizedPhoneNumber[^CandidateSuffixLength..];
     }
 
     #region Two-Factor Authentication (2FA)
