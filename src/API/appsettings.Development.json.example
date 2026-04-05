@@ -13,6 +13,38 @@
     "ServerEnabled": false,
     "WorkerCount": 1
   },
+  "BetterStack": {
+    "Dashboard": {
+      "EmbedUrl": ""
+    },
+    "Heartbeats": {
+      "DailyQuotaReset": {
+        "PingUrl": "",
+        "StartUrl": "",
+        "FailUrl": ""
+      },
+      "SlotMaintenance": {
+        "PingUrl": "",
+        "StartUrl": "",
+        "FailUrl": ""
+      },
+      "SessionReminderWorker": {
+        "PingUrl": "",
+        "StartUrl": "",
+        "FailUrl": ""
+      },
+      "ReservationExpirationWorker": {
+        "PingUrl": "",
+        "StartUrl": "",
+        "FailUrl": ""
+      },
+      "ConsultationStateWorker": {
+        "PingUrl": "",
+        "StartUrl": "",
+        "FailUrl": ""
+      }
+    }
+  },
   "AdminNotifications": {
     "OrganisationOnboardingEmail": "systemadmin@gmail.com"
   }

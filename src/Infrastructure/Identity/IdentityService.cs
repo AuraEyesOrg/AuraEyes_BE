@@ -83,6 +83,61 @@ public class IdentityService : IIdentityService
         return (addRoleResult.Succeeded, addRoleResult.Errors.Select(e => e.Description).ToArray());
     }
 
+    public async Task<(bool Succeeded, Guid? UserId, string[] Errors)> CreateUserWalkInPatientAsync(
+        string email,
+        string password,
+        string fullName,
+        string role,
+        Guid? organizationId = null,
+        UserProfileWalkInDto? userProfile = null,
+        CancellationToken cancellationToken = default)
+    {
+        var user = new ApplicationUser
+        {
+            UserName = email,
+            Email = email,
+            FullName = fullName,
+            OrganizationId = organizationId
+        };
+
+        if (userProfile != null)
+        {
+            user.PhoneNumber = userProfile.PhoneNumber;
+            user.DateOfBirth = userProfile.DateOfBirth;
+            if (userProfile.Gender.HasValue)
+            {
+                user.Gender = (Domain.Enums.Gender)userProfile.Gender.Value;
+            }
+            user.Address = userProfile.Address;
+            user.AvatarUrl = userProfile.AvatarUrl;
+            if (!string.IsNullOrEmpty(userProfile.FullName))
+            {
+                user.FullName = userProfile.FullName;
+            }
+        }
+
+        var result = await _userManager.CreateAsync(user, password);
+
+        if (!result.Succeeded)
+        {
+            return (false, null, result.Errors.Select(e => e.Description).ToArray());
+        }
+
+        // Ensure role exists
+        if (!await _roleManager.RoleExistsAsync(role))
+        {
+            var roleResult = await _roleManager.CreateAsync(new ApplicationRole(role));
+            if (!roleResult.Succeeded)
+            {
+                return (false, null, roleResult.Errors.Select(e => e.Description).ToArray());
+            }
+        }
+
+        var addRoleResult = await _userManager.AddToRoleAsync(user, role);
+
+        return (addRoleResult.Succeeded, user.Id, addRoleResult.Errors.Select(e => e.Description).ToArray());
+    }
+
     public async Task<bool> CheckPasswordAsync(Guid userId, string password)
     {
         var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -105,6 +160,42 @@ public class IdentityService : IIdentityService
             .FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted, cancellationToken);
 
         return user == null ? null : MapToDto(user);
+    }
+
+    public async Task<bool> IsPhoneNumberInUseByOrganizationAsync(
+        Guid organizationId,
+        string phoneNumber,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedPhoneNumber = NormalizePhone(phoneNumber);
+        if (string.IsNullOrWhiteSpace(normalizedPhoneNumber))
+        {
+            return false;
+        }
+
+        var candidateSuffix = GetCandidatePhoneSuffix(normalizedPhoneNumber);
+
+        var existingPhoneNumbers = await _userManager.Users
+            .Where(u =>
+                u.OrganizationId == organizationId &&
+                !u.IsDeleted &&
+                u.PhoneNumber != null &&
+                u.PhoneNumber != string.Empty)
+            .Where(u =>
+                u.PhoneNumber!
+                    .Replace(" ", string.Empty)
+                    .Replace("-", string.Empty)
+                    .Replace(".", string.Empty)
+                    .Replace("(", string.Empty)
+                    .Replace(")", string.Empty)
+                    .Replace("+", string.Empty)
+                    .EndsWith(candidateSuffix))
+            .Select(u => u.PhoneNumber!)
+            .ToListAsync(cancellationToken);
+
+        return existingPhoneNumbers
+            .Select(NormalizePhone)
+            .Any(p => p == normalizedPhoneNumber);
     }
 
     public async Task<bool> IsEmailConfirmedAsync(Guid userId)
@@ -266,6 +357,24 @@ public class IdentityService : IIdentityService
             user.TwoFactorEnabled,
             user.AvatarUrl
         );
+    }
+
+    private static string NormalizePhone(string phoneNumber)
+    {
+        return new string(phoneNumber
+            .Where(char.IsDigit)
+            .ToArray());
+    }
+
+    private static string GetCandidatePhoneSuffix(string normalizedPhoneNumber)
+    {
+        const int CandidateSuffixLength = 8;
+        if (normalizedPhoneNumber.Length <= CandidateSuffixLength)
+        {
+            return normalizedPhoneNumber;
+        }
+
+        return normalizedPhoneNumber[^CandidateSuffixLength..];
     }
 
     #region Two-Factor Authentication (2FA)
@@ -642,6 +751,22 @@ public class IdentityService : IIdentityService
             return (false, new[] { "User not found" });
 
         user.AvatarUrl = avatarUrl;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var result = await _userManager.UpdateAsync(user);
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<(bool Succeeded, string[] Errors)> UpdateUserOrganizationAsync(
+        Guid userId,
+        Guid? organizationId,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null || user.IsDeleted)
+            return (false, new[] { "User not found" });
+
+        user.OrganizationId = organizationId;
         user.UpdatedAt = DateTime.UtcNow;
 
         var result = await _userManager.UpdateAsync(user);

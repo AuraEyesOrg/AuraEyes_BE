@@ -6,6 +6,7 @@ public sealed record OrganisationRecentPatientReadModel
     public string Name { get; init; } = string.Empty;
     public int Age { get; init; }
     public string Gender { get; init; } = string.Empty;
+    public string PhoneNumber { get; init; } = string.Empty;
     public DateTime LastScreening { get; init; }
     public string AiPrediction { get; init; } = string.Empty;
     public decimal Confidence { get; init; }
@@ -13,10 +14,69 @@ public sealed record OrganisationRecentPatientReadModel
     public string Priority { get; init; } = "low";
 }
 
+public sealed record OrganisationScreeningHistoryReadModel
+{
+    public Guid ScreeningId { get; init; }
+    public Guid PatientId { get; init; }
+    public string PatientName { get; init; } = string.Empty;
+    public DateTime CreatedAt { get; init; }
+    public DateTime? ProcessedAt { get; init; }
+    public int ImagesCount { get; init; }
+    public string? LatestRiskLevel { get; init; }
+    public decimal? ConfidenceScore { get; init; }
+    public string? AiPrimaryLabel { get; init; }
+    public string Status { get; init; } = "pending";
+}
+
+public sealed record OrganisationMonthlyScreeningCountReadModel
+{
+    public string Month { get; init; } = string.Empty;
+    public int Count { get; init; }
+    public int HighRisk { get; init; }
+    public int ModerateRisk { get; init; }
+    public int LowRisk { get; init; }
+}
+
+public sealed record OrganisationScreeningReportReadModel
+{
+    public int TotalScreenings { get; init; }
+    public int HighRiskCount { get; init; }
+    public int ModerateRiskCount { get; init; }
+    public int LowRiskCount { get; init; }
+    public decimal AverageConfidence { get; init; }
+    public IReadOnlyList<OrganisationMonthlyScreeningCountReadModel> MonthlyBreakdown { get; init; }
+        = Array.Empty<OrganisationMonthlyScreeningCountReadModel>();
+}
+
+public sealed record OrganisationScreeningCountsReadModel
+{
+    public int TotalScreeningsAllTime { get; init; }
+    public int TotalScreeningsFromDate { get; init; }
+}
+
 public interface IOrganisationPatientsRepository
 {
     Task<IReadOnlyList<OrganisationRecentPatientReadModel>> GetRecentPatientsForOrganisationAdminAsync(
         Guid orgAdminUserId,
         int take,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<OrganisationScreeningHistoryReadModel>> GetScreeningHistoryForOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        int take,
+        CancellationToken cancellationToken = default);
+
+    Task<OrganisationScreeningReportReadModel> GetScreeningReportForOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        CancellationToken cancellationToken = default);
+
+    Task<OrganisationScreeningCountsReadModel> GetScreeningCountsForOrganisationAsync(
+        Guid organisationId,
+        DateTime fromUtc,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> IsPatientManagedByOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        Guid patientId,
         CancellationToken cancellationToken = default);
 }

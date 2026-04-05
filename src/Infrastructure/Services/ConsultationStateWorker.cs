@@ -25,15 +25,18 @@ public class ConsultationStateWorker : BackgroundService
     private static readonly TimeSpan GracePeriod = TimeSpan.FromHours(2);
 
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IBetterStackHeartbeatService _betterStackHeartbeat;
     private readonly ILogger<ConsultationStateWorker> _logger;
     private readonly TimeSpan _slotDuration;
 
     public ConsultationStateWorker(
         IServiceScopeFactory scopeFactory,
+        IBetterStackHeartbeatService betterStackHeartbeat,
         IOptions<GoogleMeetSettings> googleMeetSettings,
         ILogger<ConsultationStateWorker> logger)
     {
         _scopeFactory = scopeFactory;
+        _betterStackHeartbeat = betterStackHeartbeat;
         _logger = logger;
         var durationMinutes = Math.Max(1, googleMeetSettings.Value.DefaultDurationMinutes);
         _slotDuration = TimeSpan.FromMinutes(durationMinutes);
@@ -47,10 +50,13 @@ public class ConsultationStateWorker : BackgroundService
         {
             try
             {
+                await _betterStackHeartbeat.NotifyStartedAsync(BetterStackMonitor.ConsultationStateWorker, stoppingToken);
                 await ProcessStateTransitionsAsync(stoppingToken);
+                await _betterStackHeartbeat.NotifySucceededAsync(BetterStackMonitor.ConsultationStateWorker, stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                await _betterStackHeartbeat.NotifyFailedAsync(BetterStackMonitor.ConsultationStateWorker, stoppingToken);
                 _logger.LogError(ex, "Error in ConsultationStateWorker cycle");
             }
 

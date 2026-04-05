@@ -19,13 +19,16 @@ public class SessionReminderWorker : BackgroundService
     private static readonly TimeSpan ReminderCooldown = TimeSpan.FromHours(48);
 
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IBetterStackHeartbeatService _betterStackHeartbeat;
     private readonly ILogger<SessionReminderWorker> _logger;
 
     public SessionReminderWorker(
         IServiceScopeFactory scopeFactory,
+        IBetterStackHeartbeatService betterStackHeartbeat,
         ILogger<SessionReminderWorker> logger)
     {
         _scopeFactory = scopeFactory;
+        _betterStackHeartbeat = betterStackHeartbeat;
         _logger = logger;
     }
 
@@ -37,10 +40,13 @@ public class SessionReminderWorker : BackgroundService
         {
             try
             {
+                await _betterStackHeartbeat.NotifyStartedAsync(BetterStackMonitor.SessionReminderWorker, stoppingToken);
                 await CheckAndNotifyStaleSessionsAsync(stoppingToken);
+                await _betterStackHeartbeat.NotifySucceededAsync(BetterStackMonitor.SessionReminderWorker, stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                await _betterStackHeartbeat.NotifyFailedAsync(BetterStackMonitor.SessionReminderWorker, stoppingToken);
                 _logger.LogError(ex, "Error in SessionReminderWorker cycle");
             }
 
