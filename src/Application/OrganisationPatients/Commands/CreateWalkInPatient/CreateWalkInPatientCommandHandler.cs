@@ -82,7 +82,8 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
             DateOfBirth: request.DateOfBirth,
             Gender: genderId,
             Address: null,
-            AvatarUrl: null
+            AvatarUrl: null,
+            CitizenId: request.CitizenId
         );
 
         var createResult = await _identityService.CreateUserWalkInPatientAsync(
@@ -100,7 +101,7 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
                 message: createResult.Errors[0]
             );
         }
-    
+
         try
         {
             var userId = createResult.UserId!.Value;

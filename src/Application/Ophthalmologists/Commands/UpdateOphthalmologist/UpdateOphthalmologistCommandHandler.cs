@@ -46,6 +46,7 @@ public class UpdateOphthalmologistCommandHandler : ICommandHandler<UpdateOphthal
                 null,
                 null,
                 request.Address,
+                null,
                 cancellationToken);
 
             if (!succeeded)
