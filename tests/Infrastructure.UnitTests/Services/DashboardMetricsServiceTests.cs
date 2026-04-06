@@ -22,7 +22,8 @@ public class DashboardMetricsServiceTests
     {
         await using var ctx = CreateContext();
         var aiQuota = Substitute.For<IAiQuotaService>();
-        var sut = new DashboardMetricsService(ctx, aiQuota);
+        var heartbeat = Substitute.For<IBetterStackHeartbeatService>();
+        var sut = new DashboardMetricsService(ctx, aiQuota, heartbeat);
 
         var result = await sut.GetSystemAdminMetricsAsync();
 
@@ -37,7 +38,8 @@ public class DashboardMetricsServiceTests
     {
         await using var ctx = CreateContext();
         var aiQuota = Substitute.For<IAiQuotaService>();
-        var sut = new DashboardMetricsService(ctx, aiQuota);
+        var heartbeat = Substitute.For<IBetterStackHeartbeatService>();
+        var sut = new DashboardMetricsService(ctx, aiQuota, heartbeat);
 
         var page = await sut.GetRecentScreeningsAsync(1, 10);
 
@@ -51,7 +53,8 @@ public class DashboardMetricsServiceTests
     {
         await using var ctx = CreateContext();
         var aiQuota = Substitute.For<IAiQuotaService>();
-        var sut = new DashboardMetricsService(ctx, aiQuota);
+        var heartbeat = Substitute.For<IBetterStackHeartbeatService>();
+        var sut = new DashboardMetricsService(ctx, aiQuota, heartbeat);
 
         var trends = await sut.GetScreeningVolumeTrendsAsync("monthly", 6);
 
@@ -63,7 +66,8 @@ public class DashboardMetricsServiceTests
     {
         await using var ctx = CreateContext();
         var aiQuota = Substitute.For<IAiQuotaService>();
-        var sut = new DashboardMetricsService(ctx, aiQuota);
+        var heartbeat = Substitute.For<IBetterStackHeartbeatService>();
+        var sut = new DashboardMetricsService(ctx, aiQuota, heartbeat);
 
         var trends = await sut.GetScreeningVolumeTrendsAsync("not-a-valid-range", 3);
 
@@ -76,7 +80,8 @@ public class DashboardMetricsServiceTests
     {
         await using var ctx = CreateContext();
         var aiQuota = Substitute.For<IAiQuotaService>();
-        var sut = new DashboardMetricsService(ctx, aiQuota);
+        var heartbeat = Substitute.For<IBetterStackHeartbeatService>();
+        var sut = new DashboardMetricsService(ctx, aiQuota, heartbeat);
 
         var analysis = await sut.GetPopulationRiskAnalysisAsync();
 
@@ -88,7 +93,8 @@ public class DashboardMetricsServiceTests
     {
         await using var ctx = CreateContext();
         var aiQuota = Substitute.For<IAiQuotaService>();
-        var sut = new DashboardMetricsService(ctx, aiQuota);
+        var heartbeat = Substitute.For<IBetterStackHeartbeatService>();
+        var sut = new DashboardMetricsService(ctx, aiQuota, heartbeat);
 
         var health = await sut.GetSystemHealthAsync();
 
@@ -100,7 +106,8 @@ public class DashboardMetricsServiceTests
     {
         await using var ctx = CreateContext();
         var aiQuota = Substitute.For<IAiQuotaService>();
-        var sut = new DashboardMetricsService(ctx, aiQuota);
+        var heartbeat = Substitute.For<IBetterStackHeartbeatService>();
+        var sut = new DashboardMetricsService(ctx, aiQuota, heartbeat);
 
         var metrics = await sut.GetOphthalmologistMetricsAsync(Guid.NewGuid());
 

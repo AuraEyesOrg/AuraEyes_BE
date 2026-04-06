@@ -40,6 +40,11 @@ public interface IIdentityService
         string phoneNumber,
         CancellationToken cancellationToken = default);
 
+    Task<bool> IsCitizenIdInUseByOrganizationAsync(
+        Guid organizationId,
+        string citizenId,
+        CancellationToken cancellationToken = default);
+
     Task<bool> IsEmailConfirmedAsync(Guid userId);
 
     Task<bool> IsUserActiveAsync(Guid userId);

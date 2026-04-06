@@ -199,6 +199,20 @@ public class IdentityService : IIdentityService
             .Any(p => p == normalizedPhoneNumber);
     }
 
+    public async Task<bool> IsCitizenIdInUseByOrganizationAsync(
+        Guid organizationId,
+        string citizenId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(citizenId))
+        {
+            return false;
+        }
+
+        return await _userManager.Users
+            .AnyAsync(u => u.OrganizationId == organizationId && u.CitizenId == citizenId && !u.IsDeleted, cancellationToken);
+    }
+
     public async Task<bool> IsEmailConfirmedAsync(Guid userId)
     {
         var user = await _userManager.FindByIdAsync(userId.ToString());

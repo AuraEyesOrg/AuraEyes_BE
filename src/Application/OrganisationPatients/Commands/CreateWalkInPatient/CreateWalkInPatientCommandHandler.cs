@@ -65,6 +65,23 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
             }
         }
 
+        var citizenId = string.IsNullOrWhiteSpace(request.CitizenId)
+            ? null
+            : request.CitizenId.Trim();
+
+        if (citizenId is not null)
+        {
+            var isCitizenIdInUse = await _identityService.IsCitizenIdInUseByOrganizationAsync(
+                org.Id,
+                citizenId,
+                cancellationToken);
+
+            if (isCitizenIdInUse)
+            {
+                return Result<Guid>.Conflict("Citizen ID already exists in this organisation");
+            }
+        }
+
         var uniqueSuffix = Guid.NewGuid().ToString("N").Substring(0, 8);
         var email = string.IsNullOrWhiteSpace(request.Email)
             ? $"walkin_{uniqueSuffix}@auraeyes.local"
