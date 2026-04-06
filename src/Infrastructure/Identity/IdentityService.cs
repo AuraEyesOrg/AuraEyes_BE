@@ -110,6 +110,7 @@ public class IdentityService : IIdentityService
             }
             user.Address = userProfile.Address;
             user.AvatarUrl = userProfile.AvatarUrl;
+            user.CitizenId = userProfile.CitizenId;
             if (!string.IsNullOrEmpty(userProfile.FullName))
             {
                 user.FullName = userProfile.FullName;
@@ -711,6 +712,7 @@ public class IdentityService : IIdentityService
             Gender = user.Gender,
             Address = user.Address,
             AvatarUrl = user.AvatarUrl,
+            CitizenId = user.CitizenId,
             EmailConfirmed = user.EmailConfirmed,
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt,
@@ -724,6 +726,7 @@ public class IdentityService : IIdentityService
         DateTime? dateOfBirth,
         int? gender,
         string? address,
+        string? citizenId,
         CancellationToken cancellationToken = default)
     {
         var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -735,6 +738,7 @@ public class IdentityService : IIdentityService
         user.DateOfBirth = dateOfBirth;
         user.Gender = gender.HasValue ? (Domain.Enums.Gender)gender.Value : null;
         user.Address = address;
+        user.CitizenId = citizenId;
         user.UpdatedAt = DateTime.UtcNow;
 
         var result = await _userManager.UpdateAsync(user);

@@ -21,7 +21,7 @@ public class ApplicationUser : IdentityUser<Guid>
     public Gender? Gender { get; set; }
     public DateTime? DateOfBirth { get; set; }
     public string? AvatarUrl { get; set; }
-
+    public string? CitizenId { get; set; }
     // Account Status (separate concerns)
     /// <summary>
     /// Indicates if the account is active. Inactive accounts cannot login.
