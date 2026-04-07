@@ -1,6 +1,7 @@
 using Application.Common.Constants;
 using Application.Common.Models;
 using Application.SystemAdmin.Dashboard.Queries.GetDashboardMetrics;
+using Application.SystemAdmin.Dashboard.Queries.GetPartTimeSlotQuotaUsage;
 using Application.SystemAdmin.Dashboard.Queries.GetPopulationRiskAnalysis;
 using Application.SystemAdmin.Dashboard.Queries.GetRecentScreenings;
 using Application.SystemAdmin.Dashboard.Queries.GetScreeningVolumeTrends;
@@ -117,6 +118,27 @@ public class DashboardController : BaseApiController
             PageNumber = pageNumber,
             PageSize = pageSize
         };
+        var result = await _mediator.Send(query);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Get part-time slot quota usage by day.
+    /// </summary>
+    [HttpGet("part-time-slot-usage")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<PartTimeSlotQuotaUsageDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetPartTimeSlotUsage(
+        [FromQuery] DateOnly? fromDate = null,
+        [FromQuery] DateOnly? toDate = null)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var query = new GetPartTimeSlotQuotaUsageQuery
+        {
+            FromDate = fromDate ?? today,
+            ToDate = toDate ?? today.AddDays(7)
+        };
+
         var result = await _mediator.Send(query);
         return HandleResult(result);
     }

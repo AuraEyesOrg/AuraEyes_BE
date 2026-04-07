@@ -324,6 +324,12 @@ if (string.IsNullOrWhiteSpace(slotMaintenanceCron))
     slotMaintenanceCron = "*/5 * * * *";
 }
 
+var fullTimeSlotGenerationCron = Environment.GetEnvironmentVariable("HANGFIRE_FULLTIME_SLOT_GENERATION_CRON");
+if (string.IsNullOrWhiteSpace(fullTimeSlotGenerationCron))
+{
+    fullTimeSlotGenerationCron = "0 1 * * *";
+}
+
 if (enableHangfireServer)
 {
     // Register recurring jobs
@@ -338,6 +344,12 @@ if (enableHangfireServer)
         "slot-maintenance-expire-unused",
         job => job.ExpireUnusedSlotsAsync(CancellationToken.None),
         slotMaintenanceCron,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+    recurringJobManager.AddOrUpdate<FullTimeSlotGenerationJob>(
+        "fulltime-slot-rolling-window",
+        job => job.ExecuteAsync(CancellationToken.None),
+        fullTimeSlotGenerationCron,
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 }
 else
