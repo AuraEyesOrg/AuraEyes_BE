@@ -6,6 +6,10 @@ public sealed record OrganisationRecentPatientReadModel
     public string Name { get; init; } = string.Empty;
     public int Age { get; init; }
     public string Gender { get; init; } = string.Empty;
+    public DateTime? DateOfBirth { get; init; }
+    public string? CitizenId { get; init; }
+    public string? Address { get; init; }
+    public string Email { get; init; } = string.Empty;
     public string PhoneNumber { get; init; } = string.Empty;
     public DateTime LastScreening { get; init; }
     public string AiPrediction { get; init; } = string.Empty;
