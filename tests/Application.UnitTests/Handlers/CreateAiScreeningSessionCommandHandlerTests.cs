@@ -74,7 +74,7 @@ public class CreateAiScreeningSessionCommandHandlerTests
             .Returns(call => call.Arg<AiScreening>());
 
         var result = await _handler.Handle(
-            new CreateAiScreeningSessionCommand { ModelVersion = "CFP_v1", RetinalImages = new List<RetinalImageData>() },
+            new CreateAiScreeningSessionCommand { ModelVersion = "AURA_v1.0", RetinalImages = new List<RetinalImageData>() },
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();

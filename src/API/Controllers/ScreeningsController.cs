@@ -85,7 +85,7 @@ public class ScreeningsController : BaseApiController
 
         var command = new CreateAiScreeningSessionCommand
         {
-            ModelVersion = request.ModelVersion ?? "CFP_v1",
+            ModelVersion = request.ModelVersion ?? "AURA_v1.0",
             RetinalImages = request.RetinalImages ?? new List<RetinalImageData>()
         };
 
