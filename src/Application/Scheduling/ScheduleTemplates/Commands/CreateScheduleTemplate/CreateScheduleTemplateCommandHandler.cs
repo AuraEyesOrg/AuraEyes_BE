@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Scheduling;
+using Domain.Enums;
 using Domain.Repositories;
 
 namespace Application.Scheduling.ScheduleTemplates.Commands.CreateScheduleTemplate;
@@ -9,18 +10,36 @@ namespace Application.Scheduling.ScheduleTemplates.Commands.CreateScheduleTempla
 public class CreateScheduleTemplateCommandHandler : ICommandHandler<CreateScheduleTemplateCommand, Guid>
 {
     private readonly IScheduleTemplateRepository _repository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public CreateScheduleTemplateCommandHandler(
         IScheduleTemplateRepository repository,
+        IOphthalmologistRepository ophthalmologistRepository,
         IUnitOfWork unitOfWork)
     {
         _repository = repository;
+        _ophthalmologistRepository = ophthalmologistRepository;
         _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<Guid>> Handle(CreateScheduleTemplateCommand request, CancellationToken cancellationToken)
     {
+        var source = ScheduleTemplateSource.Doctor;
+
+        if (request.OphthalId.HasValue)
+        {
+            var ophthal = await _ophthalmologistRepository.GetByIdAsync(request.OphthalId.Value, cancellationToken);
+            if (ophthal is null)
+            {
+                return Result<Guid>.NotFound($"Ophthalmologist '{request.OphthalId.Value}' not found.");
+            }
+
+            source = ophthal.EmploymentType == OphthalmologistEmploymentType.FullTime
+                ? ScheduleTemplateSource.SystemGenerated
+                : ScheduleTemplateSource.Doctor;
+        }
+
         // Check for overlapping templates
         var hasOverlap = await _repository.HasOverlappingTemplateAsync(
             request.OphthalId,
@@ -43,7 +62,8 @@ public class CreateScheduleTemplateCommandHandler : ICommandHandler<CreateSchedu
             request.MaxCapacity,
             request.OrgId,
             request.OphthalId,
-            request.Cost);
+            request.Cost,
+            source);
 
         await _repository.AddAsync(template, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

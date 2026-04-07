@@ -171,6 +171,7 @@ public static class DependencyInjection
         services.AddScoped<IDepositRequestRepository, DepositRequestRepository>();
         services.AddScoped<IScheduleTemplateRepository, ScheduleTemplateRepository>();
         services.AddScoped<IAppointmentSlotRepository, AppointmentSlotRepository>();
+        services.AddScoped<IDailySlotQuotaRepository, DailySlotQuotaRepository>();
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
         services.AddScoped<IConsultationSessionRepository, ConsultationSessionRepository>();
         services.AddScoped<IOrganisationFeedbackRepository, OrganisationFeedbackRepository>();
@@ -210,6 +211,7 @@ public static class DependencyInjection
         // Register Hangfire daily job
         services.AddScoped<DailyQuotaResetJob>();
         services.AddScoped<SlotMaintenanceJob>();
+        services.AddScoped<FullTimeSlotGenerationJob>();
 
         // Configure PayOS Settings
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));
