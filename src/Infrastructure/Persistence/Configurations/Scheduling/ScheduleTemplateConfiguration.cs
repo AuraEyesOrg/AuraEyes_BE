@@ -26,6 +26,11 @@ public class ScheduleTemplateConfiguration : IEntityTypeConfiguration<ScheduleTe
             .HasPrecision(18, 2)
             .IsRequired(false);
 
+        builder.Property(e => e.Source)
+            .HasConversion<string>()
+            .HasMaxLength(30)
+            .HasDefaultValue(Domain.Enums.ScheduleTemplateSource.Doctor);
+
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
