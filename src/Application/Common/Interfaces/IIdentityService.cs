@@ -163,6 +163,14 @@ public interface IIdentityService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Update user's email and username together.
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> UpdateUserEmailAsync(
+        Guid userId,
+        string email,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Update user avatar URL.
     /// </summary>
     Task<(bool Succeeded, string[] Errors)> UpdateAvatarUrlAsync(

@@ -759,6 +759,32 @@ public class IdentityService : IIdentityService
         return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
     }
 
+    public async Task<(bool Succeeded, string[] Errors)> UpdateUserEmailAsync(
+        Guid userId,
+        string email,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null || user.IsDeleted)
+            return (false, new[] { "User not found" });
+            
+        if(!user.OrganizationId.HasValue)
+            return (false, new[] { "Only organization users can have their email updated" });
+
+        if (string.IsNullOrWhiteSpace(email))
+            return (false, new[] { "Email is required" });
+
+        var normalizedEmail = email.Trim();
+
+        user.Email = normalizedEmail;
+        user.UserName = normalizedEmail;
+        user.EmailConfirmed = false;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var result = await _userManager.UpdateAsync(user);
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
     public async Task<(bool Succeeded, string[] Errors)> UpdateAvatarUrlAsync(
         Guid userId,
         string avatarUrl,
