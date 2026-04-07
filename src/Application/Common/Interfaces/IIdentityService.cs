@@ -40,6 +40,11 @@ public interface IIdentityService
         string phoneNumber,
         CancellationToken cancellationToken = default);
 
+    Task<bool> IsCitizenIdInUseByOrganizationAsync(
+        Guid organizationId,
+        string citizenId,
+        CancellationToken cancellationToken = default);
+
     Task<bool> IsEmailConfirmedAsync(Guid userId);
 
     Task<bool> IsUserActiveAsync(Guid userId);
@@ -154,6 +159,15 @@ public interface IIdentityService
         DateTime? dateOfBirth,
         int? gender,
         string? address,
+        string? citizenId = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update user's email and username together.
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> UpdateUserEmailAsync(
+        Guid userId,
+        string email,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -239,6 +253,7 @@ public record UserDetailsDto
     public Domain.Enums.Gender? Gender { get; init; }
     public string? Address { get; init; }
     public string? AvatarUrl { get; init; }
+    public string? CitizenId { get; init; }
     public bool EmailConfirmed { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
@@ -253,5 +268,6 @@ public record UserProfileWalkInDto(
     DateTime? DateOfBirth,
     int? Gender,
     string? Address,
-    string? AvatarUrl
+    string? AvatarUrl,
+    string? CitizenId = null
 );

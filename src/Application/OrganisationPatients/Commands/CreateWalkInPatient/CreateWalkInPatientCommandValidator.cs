@@ -21,6 +21,10 @@ public class CreateWalkInPatientCommandValidator : AbstractValidator<CreateWalkI
             .NotEmpty().WithMessage("Date of Birth is required")
             .LessThan(DateTime.UtcNow.Date).WithMessage("Date of Birth cannot be in the future")
             .Must(BeAtLeastMinimumAge).WithMessage($"Patient must be at least {MinimumAgeYears} years old");
+
+        RuleFor(x => x.Address)
+            .MaximumLength(500).When(x => !string.IsNullOrWhiteSpace(x.Address))
+            .WithMessage("Address must not exceed 500 characters");
             
         RuleFor(x => x.Email)
             .EmailAddress().When(x => !string.IsNullOrEmpty(x.Email))
