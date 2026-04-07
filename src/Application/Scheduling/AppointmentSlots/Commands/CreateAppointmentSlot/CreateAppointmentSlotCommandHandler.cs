@@ -12,6 +12,8 @@ namespace Application.Scheduling.AppointmentSlots.Commands.CreateAppointmentSlot
 
 public class CreateAppointmentSlotCommandHandler : ICommandHandler<CreateAppointmentSlotCommand, Guid>
 {
+    private const int MaxRetryAttempts = 3;
+
     private readonly IAppointmentSlotRepository _repository;
     private readonly IDailySlotQuotaRepository _dailySlotQuotaRepository;
     private readonly IScheduleTemplateRepository _templateRepository;
@@ -62,89 +64,105 @@ public class CreateAppointmentSlotCommandHandler : ICommandHandler<CreateAppoint
             }
         }
 
-        await _unitOfWork.BeginTransactionAsync(cancellationToken);
-        try
+        for (var attempt = 1; attempt <= MaxRetryAttempts; attempt++)
         {
-            var hasOverlap = await _repository.HasOverlappingSlotAsync(
-                request.Date,
-                request.StartTime,
-                request.EndTime,
-                cancellationToken: cancellationToken);
-
-            if (hasOverlap)
+            await _unitOfWork.BeginTransactionAsync(cancellationToken);
+            try
             {
-                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                return Result<Guid>.Conflict("An overlapping appointment slot already exists for this date and time.");
-            }
-
-            if (ophthalmologist?.EmploymentType == OphthalmologistEmploymentType.PartTime)
-            {
-                var quota = await GetPartTimeDailyQuotaAsync(cancellationToken);
-                var reserveResult = await _dailySlotQuotaRepository.TryReserveAsync(
+                var hasOverlap = await _repository.HasOverlappingSlotAsync(
                     request.Date,
-                    1,
-                    quota,
-                    cancellationToken);
+                    request.StartTime,
+                    request.EndTime,
+                    cancellationToken: cancellationToken);
 
-                if (!reserveResult.Success)
+                if (hasOverlap)
                 {
                     await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                    _logger.LogWarning(
-                        "Part-time slot quota exceeded on {Date}. Quota={Quota}, CurrentCount={CurrentCount}, Requested={Requested}",
-                        request.Date,
-                        reserveResult.Quota.QuotaSnapshot,
-                        reserveResult.Quota.PartTimeSlotCount,
-                        1);
-
-                    return Result<Guid>.Conflict("Daily slot quota for part-time doctors has been reached");
+                    return Result<Guid>.Conflict("An overlapping appointment slot already exists for this date and time.");
                 }
 
-                var nearLimitThreshold = Math.Max(1, (int)Math.Ceiling(reserveResult.Quota.QuotaSnapshot * 0.1));
-                if (reserveResult.Quota.Remaining <= nearLimitThreshold)
+                if (ophthalmologist?.EmploymentType == OphthalmologistEmploymentType.PartTime)
                 {
-                    _logger.LogWarning(
-                        "Part-time quota near limit on {Date}. Quota={Quota}, Used={Used}, Remaining={Remaining}",
+                    var quota = await GetPartTimeDailyQuotaAsync(cancellationToken);
+                    var reserveResult = await _dailySlotQuotaRepository.TryReserveAsync(
                         request.Date,
-                        reserveResult.Quota.QuotaSnapshot,
-                        reserveResult.Quota.PartTimeSlotCount,
-                        reserveResult.Quota.Remaining);
+                        1,
+                        quota,
+                        cancellationToken);
+
+                    if (!reserveResult.Success)
+                    {
+                        await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                        _logger.LogWarning(
+                            "Part-time slot quota exceeded on {Date}. Quota={Quota}, CurrentCount={CurrentCount}, Requested={Requested}",
+                            request.Date,
+                            reserveResult.Quota.QuotaSnapshot,
+                            reserveResult.Quota.PartTimeSlotCount,
+                            1);
+
+                        return Result<Guid>.Conflict("Daily slot quota for part-time doctors has been reached");
+                    }
+
+                    var nearLimitThreshold = Math.Max(1, (int)Math.Ceiling(reserveResult.Quota.QuotaSnapshot * 0.1));
+                    if (reserveResult.Quota.Remaining <= nearLimitThreshold)
+                    {
+                        _logger.LogWarning(
+                            "Part-time quota near limit on {Date}. Quota={Quota}, Used={Used}, Remaining={Remaining}",
+                            request.Date,
+                            reserveResult.Quota.QuotaSnapshot,
+                            reserveResult.Quota.PartTimeSlotCount,
+                            reserveResult.Quota.Remaining);
+                    }
+                    else
+                    {
+                        _logger.LogInformation(
+                            "Reserved part-time quota on {Date}. Quota={Quota}, Used={Used}, Remaining={Remaining}",
+                            request.Date,
+                            reserveResult.Quota.QuotaSnapshot,
+                            reserveResult.Quota.PartTimeSlotCount,
+                            reserveResult.Quota.Remaining);
+                    }
                 }
-                else
-                {
-                    _logger.LogInformation(
-                        "Reserved part-time quota on {Date}. Quota={Quota}, Used={Used}, Remaining={Remaining}",
-                        request.Date,
-                        reserveResult.Quota.QuotaSnapshot,
-                        reserveResult.Quota.PartTimeSlotCount,
-                        reserveResult.Quota.Remaining);
-                }
+
+                var slot = new AppointmentSlot(
+                    request.ScheduleTemplateId,
+                    request.Date,
+                    request.StartTime,
+                    request.EndTime,
+                    template.MaxCapacity,
+                    request.Cost,
+                    SlotSource.Doctor);
+
+                await _repository.AddAsync(slot, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+                return Result<Guid>.Success(slot.Id);
             }
+            catch (ConcurrencyException ex)
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                if (attempt == MaxRetryAttempts)
+                {
+                    return Result<Guid>.Conflict("Slot creation conflicted with another request. Please retry.");
+                }
 
-            var slot = new AppointmentSlot(
-                request.ScheduleTemplateId,
-                request.Date,
-                request.StartTime,
-                request.EndTime,
-                template.MaxCapacity,
-                request.Cost,
-                SlotSource.Doctor);
+                _logger.LogWarning(
+                    ex,
+                    "Retrying slot creation due to concurrency conflict. Attempt {Attempt}/{MaxAttempts}",
+                    attempt,
+                    MaxRetryAttempts);
 
-            await _repository.AddAsync(slot, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            await _unitOfWork.CommitTransactionAsync(cancellationToken);
+                await Task.Delay(TimeSpan.FromMilliseconds(100 * attempt), cancellationToken);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                throw;
+            }
+        }
 
-            return Result<Guid>.Success(slot.Id);
-        }
-        catch (ConcurrencyException)
-        {
-            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-            return Result<Guid>.Conflict("Slot creation conflicted with another request. Please retry.");
-        }
-        catch
-        {
-            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-            throw;
-        }
+        return Result<Guid>.Conflict("Slot creation conflicted with another request. Please retry.");
     }
 
     private async Task<int> GetPartTimeDailyQuotaAsync(CancellationToken cancellationToken)

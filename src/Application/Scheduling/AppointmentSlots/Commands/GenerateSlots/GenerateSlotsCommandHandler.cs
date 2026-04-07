@@ -16,6 +16,8 @@ namespace Application.Scheduling.AppointmentSlots.Commands.GenerateSlots;
 /// </summary>
 public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand, int>
 {
+    private const int MaxRetryAttempts = 3;
+
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IDailySlotQuotaRepository _dailySlotQuotaRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
@@ -122,95 +124,114 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
             currentDate = currentDate.AddDays(1);
         }
 
-        var slotsCreated = 0;
-        await _unitOfWork.BeginTransactionAsync(cancellationToken);
-        try
+        for (var attempt = 1; attempt <= MaxRetryAttempts; attempt++)
         {
-            if (ophthalmologist?.EmploymentType == OphthalmologistEmploymentType.PartTime)
+            var slotsCreated = 0;
+            await _unitOfWork.BeginTransactionAsync(cancellationToken);
+            try
             {
-                var quota = await GetPartTimeDailyQuotaAsync(cancellationToken);
+                if (ophthalmologist?.EmploymentType == OphthalmologistEmploymentType.PartTime)
+                {
+                    var quota = await GetPartTimeDailyQuotaAsync(cancellationToken);
+
+                    foreach (var kvp in slotsByDate.OrderBy(x => x.Key))
+                    {
+                        var reserveResult = await _dailySlotQuotaRepository.TryReserveAsync(
+                            kvp.Key,
+                            kvp.Value.Count,
+                            quota,
+                            cancellationToken);
+
+                        if (!reserveResult.Success)
+                        {
+                            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                            _logger.LogWarning(
+                                "Part-time quota exceeded while generating slots. Date={Date}, Quota={Quota}, CurrentCount={CurrentCount}, Requested={Requested}",
+                                kvp.Key,
+                                reserveResult.Quota.QuotaSnapshot,
+                                reserveResult.Quota.PartTimeSlotCount,
+                                kvp.Value.Count);
+
+                            return Result<int>.Conflict("Daily slot quota for part-time doctors has been reached");
+                        }
+
+                        var nearLimitThreshold = Math.Max(1, (int)Math.Ceiling(reserveResult.Quota.QuotaSnapshot * 0.1));
+                        if (reserveResult.Quota.Remaining <= nearLimitThreshold)
+                        {
+                            _logger.LogWarning(
+                                "Part-time quota near limit after bulk reserve. Date={Date}, Quota={Quota}, Used={Used}, Remaining={Remaining}",
+                                kvp.Key,
+                                reserveResult.Quota.QuotaSnapshot,
+                                reserveResult.Quota.PartTimeSlotCount,
+                                reserveResult.Quota.Remaining);
+                        }
+                        else
+                        {
+                            _logger.LogInformation(
+                                "Reserved part-time quota for bulk generation. Date={Date}, Requested={Requested}, Quota={Quota}, Used={Used}, Remaining={Remaining}",
+                                kvp.Key,
+                                kvp.Value.Count,
+                                reserveResult.Quota.QuotaSnapshot,
+                                reserveResult.Quota.PartTimeSlotCount,
+                                reserveResult.Quota.Remaining);
+                        }
+                    }
+                }
 
                 foreach (var kvp in slotsByDate.OrderBy(x => x.Key))
                 {
-                    var reserveResult = await _dailySlotQuotaRepository.TryReserveAsync(
-                        kvp.Key,
-                        kvp.Value.Count,
-                        quota,
-                        cancellationToken);
-
-                    if (!reserveResult.Success)
+                    foreach (var timeWindow in kvp.Value)
                     {
-                        await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                        _logger.LogWarning(
-                            "Part-time quota exceeded while generating slots. Date={Date}, Quota={Quota}, CurrentCount={CurrentCount}, Requested={Requested}",
+                        var slot = new AppointmentSlot(
+                            template.Id,
                             kvp.Key,
-                            reserveResult.Quota.QuotaSnapshot,
-                            reserveResult.Quota.PartTimeSlotCount,
-                            kvp.Value.Count);
+                            timeWindow.Start,
+                            timeWindow.End,
+                            template.MaxCapacity,
+                            template.Cost,
+                            SlotSource.Doctor);
 
-                        return Result<int>.Conflict("Daily slot quota for part-time doctors has been reached");
-                    }
-
-                    var nearLimitThreshold = Math.Max(1, (int)Math.Ceiling(reserveResult.Quota.QuotaSnapshot * 0.1));
-                    if (reserveResult.Quota.Remaining <= nearLimitThreshold)
-                    {
-                        _logger.LogWarning(
-                            "Part-time quota near limit after bulk reserve. Date={Date}, Quota={Quota}, Used={Used}, Remaining={Remaining}",
-                            kvp.Key,
-                            reserveResult.Quota.QuotaSnapshot,
-                            reserveResult.Quota.PartTimeSlotCount,
-                            reserveResult.Quota.Remaining);
-                    }
-                    else
-                    {
-                        _logger.LogInformation(
-                            "Reserved part-time quota for bulk generation. Date={Date}, Requested={Requested}, Quota={Quota}, Used={Used}, Remaining={Remaining}",
-                            kvp.Key,
-                            kvp.Value.Count,
-                            reserveResult.Quota.QuotaSnapshot,
-                            reserveResult.Quota.PartTimeSlotCount,
-                            reserveResult.Quota.Remaining);
+                        await _appointmentSlotRepository.AddAsync(slot, cancellationToken);
+                        slotsCreated++;
                     }
                 }
-            }
 
-            foreach (var kvp in slotsByDate.OrderBy(x => x.Key))
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+                _logger.LogInformation(
+                    "Generated {SlotsCreated} slots for template {TemplateId} from {FromDate} to {ToDate}",
+                    slotsCreated,
+                    request.ScheduleTemplateId,
+                    request.FromDate,
+                    request.ToDate);
+
+                return Result<int>.Success(slotsCreated);
+            }
+            catch (ConcurrencyException ex)
             {
-                foreach (var timeWindow in kvp.Value)
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                if (attempt == MaxRetryAttempts)
                 {
-                    var slot = new AppointmentSlot(
-                        template.Id,
-                        kvp.Key,
-                        timeWindow.Start,
-                        timeWindow.End,
-                        template.MaxCapacity,
-                        template.Cost,
-                        SlotSource.Doctor);
-
-                    await _appointmentSlotRepository.AddAsync(slot, cancellationToken);
-                    slotsCreated++;
+                    return Result<int>.Conflict("Slot generation conflicted with another request. Please retry.");
                 }
+
+                _logger.LogWarning(
+                    ex,
+                    "Retrying slot generation due to concurrency conflict. Attempt {Attempt}/{MaxAttempts}",
+                    attempt,
+                    MaxRetryAttempts);
+
+                await Task.Delay(TimeSpan.FromMilliseconds(100 * attempt), cancellationToken);
             }
-
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            await _unitOfWork.CommitTransactionAsync(cancellationToken);
-        }
-        catch (ConcurrencyException)
-        {
-            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-            return Result<int>.Conflict("Slot generation conflicted with another request. Please retry.");
-        }
-        catch
-        {
-            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-            throw;
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                throw;
+            }
         }
 
-        _logger.LogInformation(
-            "Generated {SlotsCreated} slots for template {TemplateId} from {FromDate} to {ToDate}",
-            slotsCreated, request.ScheduleTemplateId, request.FromDate, request.ToDate);
-
-        return Result<int>.Success(slotsCreated);
+        return Result<int>.Conflict("Slot generation conflicted with another request. Please retry.");
     }
 
     private async Task<int> GetPartTimeDailyQuotaAsync(CancellationToken cancellationToken)
