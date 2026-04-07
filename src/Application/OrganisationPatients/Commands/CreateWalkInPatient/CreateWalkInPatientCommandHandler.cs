@@ -69,6 +69,10 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
             ? null
             : request.CitizenId.Trim();
 
+        var address = string.IsNullOrWhiteSpace(request.Address)
+            ? null
+            : request.Address.Trim();
+
         if (citizenId is not null)
         {
             var isCitizenIdInUse = await _identityService.IsCitizenIdInUseByOrganizationAsync(
@@ -98,9 +102,9 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
             PhoneNumber: phoneNumber,
             DateOfBirth: request.DateOfBirth,
             Gender: genderId,
-            Address: null,
+            Address: address,
             AvatarUrl: null,
-            CitizenId: request.CitizenId
+            CitizenId: citizenId
         );
 
         var createResult = await _identityService.CreateUserWalkInPatientAsync(
