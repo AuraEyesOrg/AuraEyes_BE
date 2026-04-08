@@ -19,7 +19,6 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
     private const int MaxRetryAttempts = 3;
 
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
-    private readonly IDailySlotQuotaRepository _dailySlotQuotaRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IScheduleTemplateRepository _scheduleTemplateRepository;
     private readonly ISystemSettingService _settingService;
@@ -28,7 +27,6 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
 
     public GenerateSlotsCommandHandler(
         IAppointmentSlotRepository appointmentSlotRepository,
-        IDailySlotQuotaRepository dailySlotQuotaRepository,
         IOphthalmologistRepository ophthalmologistRepository,
         IScheduleTemplateRepository scheduleTemplateRepository,
         ISystemSettingService settingService,
@@ -36,7 +34,6 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
         ILogger<GenerateSlotsCommandHandler> logger)
     {
         _appointmentSlotRepository = appointmentSlotRepository;
-        _dailySlotQuotaRepository = dailySlotQuotaRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _scheduleTemplateRepository = scheduleTemplateRepository;
         _settingService = settingService;
@@ -136,7 +133,7 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
 
                     foreach (var kvp in slotsByDate.OrderBy(x => x.Key))
                     {
-                        var reserveResult = await _dailySlotQuotaRepository.TryReserveAsync(
+                        var reserveResult = await _settingService.TryReservePartTimeSlotsAsync(
                             kvp.Key,
                             kvp.Value.Count,
                             quota,
@@ -148,22 +145,22 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
                             _logger.LogWarning(
                                 "Part-time quota exceeded while generating slots. Date={Date}, Quota={Quota}, CurrentCount={CurrentCount}, Requested={Requested}",
                                 kvp.Key,
-                                reserveResult.Quota.QuotaSnapshot,
-                                reserveResult.Quota.PartTimeSlotCount,
+                                reserveResult.Quota,
+                                reserveResult.UsedSlots,
                                 kvp.Value.Count);
 
                             return Result<int>.Conflict("Daily slot quota for part-time doctors has been reached");
                         }
 
-                        var nearLimitThreshold = Math.Max(1, (int)Math.Ceiling(reserveResult.Quota.QuotaSnapshot * 0.1));
-                        if (reserveResult.Quota.Remaining <= nearLimitThreshold)
+                        var nearLimitThreshold = Math.Max(1, (int)Math.Ceiling(reserveResult.Quota * 0.1));
+                        if (reserveResult.RemainingSlots <= nearLimitThreshold)
                         {
                             _logger.LogWarning(
                                 "Part-time quota near limit after bulk reserve. Date={Date}, Quota={Quota}, Used={Used}, Remaining={Remaining}",
                                 kvp.Key,
-                                reserveResult.Quota.QuotaSnapshot,
-                                reserveResult.Quota.PartTimeSlotCount,
-                                reserveResult.Quota.Remaining);
+                                reserveResult.Quota,
+                                reserveResult.UsedSlots,
+                                reserveResult.RemainingSlots);
                         }
                         else
                         {
@@ -171,9 +168,9 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
                                 "Reserved part-time quota for bulk generation. Date={Date}, Requested={Requested}, Quota={Quota}, Used={Used}, Remaining={Remaining}",
                                 kvp.Key,
                                 kvp.Value.Count,
-                                reserveResult.Quota.QuotaSnapshot,
-                                reserveResult.Quota.PartTimeSlotCount,
-                                reserveResult.Quota.Remaining);
+                                reserveResult.Quota,
+                                reserveResult.UsedSlots,
+                                reserveResult.RemainingSlots);
                         }
                     }
                 }

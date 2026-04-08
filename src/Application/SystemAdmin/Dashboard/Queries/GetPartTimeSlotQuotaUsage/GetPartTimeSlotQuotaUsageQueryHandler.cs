@@ -2,21 +2,17 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.SystemSettings.Interfaces;
-using Domain.Repositories;
 
 namespace Application.SystemAdmin.Dashboard.Queries.GetPartTimeSlotQuotaUsage;
 
 public class GetPartTimeSlotQuotaUsageQueryHandler
     : IQueryHandler<GetPartTimeSlotQuotaUsageQuery, IReadOnlyList<PartTimeSlotQuotaUsageDto>>
 {
-    private readonly IDailySlotQuotaRepository _dailySlotQuotaRepository;
     private readonly ISystemSettingService _settingService;
 
     public GetPartTimeSlotQuotaUsageQueryHandler(
-        IDailySlotQuotaRepository dailySlotQuotaRepository,
         ISystemSettingService settingService)
     {
-        _dailySlotQuotaRepository = dailySlotQuotaRepository;
         _settingService = settingService;
     }
 
@@ -31,12 +27,10 @@ public class GetPartTimeSlotQuotaUsageQueryHandler
         }
 
         var configuredQuota = await GetPartTimeDailyQuotaAsync(cancellationToken);
-        var rows = await _dailySlotQuotaRepository.GetByDateRangeAsync(
+        var byDate = await _settingService.GetPartTimeReservedSlotsByDateRangeAsync(
             request.FromDate,
             request.ToDate,
             cancellationToken);
-
-        var byDate = rows.ToDictionary(r => r.Date);
         var result = new List<PartTimeSlotQuotaUsageDto>();
 
         var current = request.FromDate;
@@ -47,9 +41,9 @@ public class GetPartTimeSlotQuotaUsageQueryHandler
                 result.Add(new PartTimeSlotQuotaUsageDto
                 {
                     Date = current,
-                    UsedSlots = row.PartTimeSlotCount,
-                    Quota = row.QuotaSnapshot,
-                    RemainingSlots = row.Remaining
+                    UsedSlots = row,
+                    Quota = configuredQuota,
+                    RemainingSlots = Math.Max(0, configuredQuota - row)
                 });
             }
             else

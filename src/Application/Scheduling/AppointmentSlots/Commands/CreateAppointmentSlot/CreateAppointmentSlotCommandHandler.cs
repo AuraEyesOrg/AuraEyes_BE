@@ -15,7 +15,6 @@ public class CreateAppointmentSlotCommandHandler : ICommandHandler<CreateAppoint
     private const int MaxRetryAttempts = 3;
 
     private readonly IAppointmentSlotRepository _repository;
-    private readonly IDailySlotQuotaRepository _dailySlotQuotaRepository;
     private readonly IScheduleTemplateRepository _templateRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly ISystemSettingService _settingService;
@@ -24,7 +23,6 @@ public class CreateAppointmentSlotCommandHandler : ICommandHandler<CreateAppoint
 
     public CreateAppointmentSlotCommandHandler(
         IAppointmentSlotRepository repository,
-        IDailySlotQuotaRepository dailySlotQuotaRepository,
         IScheduleTemplateRepository templateRepository,
         IOphthalmologistRepository ophthalmologistRepository,
         ISystemSettingService settingService,
@@ -32,7 +30,6 @@ public class CreateAppointmentSlotCommandHandler : ICommandHandler<CreateAppoint
         ILogger<CreateAppointmentSlotCommandHandler> logger)
     {
         _repository = repository;
-        _dailySlotQuotaRepository = dailySlotQuotaRepository;
         _templateRepository = templateRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _settingService = settingService;
@@ -84,7 +81,7 @@ public class CreateAppointmentSlotCommandHandler : ICommandHandler<CreateAppoint
                 if (ophthalmologist?.EmploymentType == OphthalmologistEmploymentType.PartTime)
                 {
                     var quota = await GetPartTimeDailyQuotaAsync(cancellationToken);
-                    var reserveResult = await _dailySlotQuotaRepository.TryReserveAsync(
+                    var reserveResult = await _settingService.TryReservePartTimeSlotsAsync(
                         request.Date,
                         1,
                         quota,
@@ -96,31 +93,31 @@ public class CreateAppointmentSlotCommandHandler : ICommandHandler<CreateAppoint
                         _logger.LogWarning(
                             "Part-time slot quota exceeded on {Date}. Quota={Quota}, CurrentCount={CurrentCount}, Requested={Requested}",
                             request.Date,
-                            reserveResult.Quota.QuotaSnapshot,
-                            reserveResult.Quota.PartTimeSlotCount,
+                            reserveResult.Quota,
+                            reserveResult.UsedSlots,
                             1);
 
                         return Result<Guid>.Conflict("Daily slot quota for part-time doctors has been reached");
                     }
 
-                    var nearLimitThreshold = Math.Max(1, (int)Math.Ceiling(reserveResult.Quota.QuotaSnapshot * 0.1));
-                    if (reserveResult.Quota.Remaining <= nearLimitThreshold)
+                    var nearLimitThreshold = Math.Max(1, (int)Math.Ceiling(reserveResult.Quota * 0.1));
+                    if (reserveResult.RemainingSlots <= nearLimitThreshold)
                     {
                         _logger.LogWarning(
                             "Part-time quota near limit on {Date}. Quota={Quota}, Used={Used}, Remaining={Remaining}",
                             request.Date,
-                            reserveResult.Quota.QuotaSnapshot,
-                            reserveResult.Quota.PartTimeSlotCount,
-                            reserveResult.Quota.Remaining);
+                            reserveResult.Quota,
+                            reserveResult.UsedSlots,
+                            reserveResult.RemainingSlots);
                     }
                     else
                     {
                         _logger.LogInformation(
                             "Reserved part-time quota on {Date}. Quota={Quota}, Used={Used}, Remaining={Remaining}",
                             request.Date,
-                            reserveResult.Quota.QuotaSnapshot,
-                            reserveResult.Quota.PartTimeSlotCount,
-                            reserveResult.Quota.Remaining);
+                            reserveResult.Quota,
+                            reserveResult.UsedSlots,
+                            reserveResult.RemainingSlots);
                     }
                 }
 
