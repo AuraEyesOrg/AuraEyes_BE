@@ -22,8 +22,13 @@ public sealed record OrgBillingSummaryDto
     public int TotalScreeningsThisMonth { get; init; }
     public int TotalScreeningsAllTime { get; init; }
     public int RemainingQuota { get; init; }
+    public int MonthlyQuotaLimit { get; init; }
+    public int MonthlyQuotaUsed { get; init; }
+    public int MonthlyQuotaRemaining { get; init; }
     public int UsedQuotaToday { get; init; }
     public int PurchasedQuota { get; init; }
+    public decimal PatientUnitPrice { get; init; }
+    public decimal OrganisationUnitPrice { get; init; }
 }
 
 /// <summary>Individual quota transaction record.</summary>
