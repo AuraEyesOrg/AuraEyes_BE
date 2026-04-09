@@ -17,7 +17,7 @@ public record CreateOrgScreeningSessionCommand : ICommand<CreateOrgScreeningSess
     /// <summary>
     /// AI model version to use for screening.
     /// </summary>
-    public string ModelVersion { get; init; } = "CFP_v1";
+    public string ModelVersion { get; init; } = "AURA_v1.0";
 
     /// <summary>
     /// Retinal images uploaded for this screening.

@@ -1,0 +1,280 @@
+using Application.Common.Interfaces;
+using Application.Common.Models;
+using Application.OrganisationScreenings.Interfaces;
+using Application.OrganisationScreenings.Queries.GetOrgScreeningSessionDetail;
+using Domain.Repositories;
+using MediatR;
+using System.Globalization;
+using System.Text.Json;
+
+namespace Application.OrganisationScreenings.Queries.ExportOrgScreeningReportPdf;
+
+public sealed class ExportOrgScreeningReportPdfQueryHandler
+    : IQueryHandler<ExportOrgScreeningReportPdfQuery, OrgScreeningReportPdfFileDto>
+{
+    private readonly IMediator _mediator;
+    private readonly IOrganisationPatientsRepository _organisationPatientsRepository;
+    private readonly IOrganisationScreeningPdfService _organisationScreeningPdfService;
+
+    public ExportOrgScreeningReportPdfQueryHandler(
+        IMediator mediator,
+        IOrganisationPatientsRepository organisationPatientsRepository,
+        IOrganisationScreeningPdfService organisationScreeningPdfService)
+    {
+        _mediator = mediator;
+        _organisationPatientsRepository = organisationPatientsRepository;
+        _organisationScreeningPdfService = organisationScreeningPdfService;
+    }
+
+    public async Task<Result<OrgScreeningReportPdfFileDto>> Handle(
+        ExportOrgScreeningReportPdfQuery request,
+        CancellationToken cancellationToken)
+    {
+        var detailResult = await _mediator.Send(
+            new GetOrgScreeningSessionDetailQuery(request.OrgAdminUserId, request.ScreeningId),
+            cancellationToken);
+
+        if (!detailResult.IsSuccess || detailResult.Data is null)
+            return MapFailure(detailResult);
+
+        var detail = detailResult.Data;
+
+        var patientName = detail.PatientName;
+        if (string.IsNullOrWhiteSpace(patientName))
+        {
+            patientName = await _organisationPatientsRepository.GetPatientDisplayNameForOrganisationAdminAsync(
+                request.OrgAdminUserId,
+                detail.PatientId,
+                cancellationToken);
+        }
+
+        var organisationName = await _organisationPatientsRepository.GetOrganisationNameForOrganisationAdminAsync(
+            request.OrgAdminUserId,
+            cancellationToken);
+
+        var aiFindingDetails = ParseAiFindingDetails(detail.RawJsonOutput);
+
+        var pdfModel = new OrgScreeningReportPdfModel
+        {
+            ScreeningId = detail.ScreeningId,
+            PatientId = detail.PatientId,
+            OrganisationName = string.IsNullOrWhiteSpace(organisationName)
+                ? "AuraEyes Partner Organisation"
+                : organisationName.Trim(),
+            PatientName = string.IsNullOrWhiteSpace(patientName) ? "Patient" : patientName,
+            CreatedAt = detail.CreatedAt,
+            ModelVersion = detail.ModelVersion,
+            ImagesCount = detail.Images.Count,
+            RiskLevel = detail.LatestResult?.RiskLevel,
+            ConfidenceScore = detail.LatestResult?.ConfidenceScore,
+            Summary = detail.LatestResult?.Summary,
+            Findings = detail.LatestResult?.Findings,
+            AssessedAt = detail.LatestResult?.AssessedAt,
+            AiFindingDetails = aiFindingDetails,
+        };
+
+        var pdfBytes = _organisationScreeningPdfService.GenerateScreeningReportPdf(pdfModel);
+
+        return Result<OrgScreeningReportPdfFileDto>.Success(new OrgScreeningReportPdfFileDto
+        {
+            Content = pdfBytes,
+            ContentType = "application/pdf",
+            FileName = BuildFileName(pdfModel.PatientName, pdfModel.ScreeningId, pdfModel.CreatedAt),
+        });
+    }
+
+    private static Result<OrgScreeningReportPdfFileDto> MapFailure<T>(Result<T> source)
+    {
+        if (source.IsUnauthorized)
+            return Result<OrgScreeningReportPdfFileDto>.Unauthorized(source.ErrorMessage);
+
+        if (source.IsForbidden)
+            return Result<OrgScreeningReportPdfFileDto>.Forbidden(source.ErrorMessage);
+
+        if (source.IsNotFound)
+            return Result<OrgScreeningReportPdfFileDto>.NotFound(source.ErrorMessage);
+
+        if (source.IsConflict)
+            return Result<OrgScreeningReportPdfFileDto>.Conflict(source.ErrorMessage);
+
+        if (source.IsPaymentRequired)
+            return Result<OrgScreeningReportPdfFileDto>.PaymentRequired(source.ErrorMessage);
+
+        return Result<OrgScreeningReportPdfFileDto>.Failure(source.Errors);
+    }
+
+    private static string BuildFileName(string patientName, Guid screeningId, DateTime createdAt)
+    {
+        var safeName = SanitizeFileToken(patientName);
+        var screeningShortId = screeningId.ToString("N")[..8];
+        return $"screening-report-{safeName}-{createdAt:yyyyMMdd}-{screeningShortId}.pdf";
+    }
+
+    private static string SanitizeFileToken(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "patient";
+
+        var cleanedChars = value.Trim().ToLowerInvariant().Select(ch =>
+            char.IsLetterOrDigit(ch) ? ch : '-');
+
+        var cleaned = new string(cleanedChars.ToArray());
+
+        while (cleaned.Contains("--", StringComparison.Ordinal))
+        {
+            cleaned = cleaned.Replace("--", "-", StringComparison.Ordinal);
+        }
+
+        cleaned = cleaned.Trim('-');
+        return string.IsNullOrWhiteSpace(cleaned) ? "patient" : cleaned;
+    }
+
+    private static List<AiFindingDetail> ParseAiFindingDetails(string? rawJsonOutput)
+    {
+        if (string.IsNullOrWhiteSpace(rawJsonOutput))
+            return [];
+
+        try
+        {
+            using var document = JsonDocument.Parse(rawJsonOutput);
+            var root = document.RootElement;
+
+            var findings = ParseTopK(root);
+            if (findings.Count > 0)
+                return findings;
+
+            return ParseAnomalies(root);
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static List<AiFindingDetail> ParseTopK(JsonElement root)
+    {
+        if (!root.TryGetProperty("prediction", out var prediction) ||
+            !prediction.TryGetProperty("top_k", out var topK) ||
+            topK.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var findings = new List<AiFindingDetail>();
+        var index = 0;
+
+        foreach (var item in topK.EnumerateArray())
+        {
+            index++;
+
+            var diseaseName = TryReadString(item, "class_name");
+            if (string.IsNullOrWhiteSpace(diseaseName))
+                continue;
+
+            var confidenceValue = TryReadDecimal(item, "confidence") ?? 0m;
+            var rank = TryReadInt(item, "rank") ?? index;
+
+            findings.Add(new AiFindingDetail
+            {
+                Rank = rank,
+                DiseaseName = diseaseName.Trim(),
+                ConfidencePercentage = NormalizeConfidencePercentage(confidenceValue),
+                Status = TryReadString(item, "status")
+            });
+        }
+
+        return findings
+            .OrderBy(x => x.Rank)
+            .ThenByDescending(x => x.ConfidencePercentage)
+            .ToList();
+    }
+
+    private static List<AiFindingDetail> ParseAnomalies(JsonElement root)
+    {
+        if (!root.TryGetProperty("anomalies", out var anomalies) ||
+            anomalies.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var findings = new List<AiFindingDetail>();
+        var index = 0;
+
+        foreach (var item in anomalies.EnumerateArray())
+        {
+            index++;
+
+            var diseaseName = TryReadString(item, "name");
+            if (string.IsNullOrWhiteSpace(diseaseName))
+                continue;
+
+            var confidenceValue = TryReadDecimal(item, "confidence") ?? 0m;
+
+            findings.Add(new AiFindingDetail
+            {
+                Rank = index,
+                DiseaseName = diseaseName.Trim(),
+                ConfidencePercentage = NormalizeConfidencePercentage(confidenceValue),
+                Status = TryReadString(item, "status")
+            });
+        }
+
+        return findings
+            .OrderBy(x => x.Rank)
+            .ThenByDescending(x => x.ConfidencePercentage)
+            .ToList();
+    }
+
+    private static decimal NormalizeConfidencePercentage(decimal value)
+    {
+        var normalized = value <= 1m ? value * 100m : value;
+        return Math.Clamp(normalized, 0m, 100m);
+    }
+
+    private static string? TryReadString(JsonElement item, string propertyName)
+    {
+        if (!item.TryGetProperty(propertyName, out var property))
+            return null;
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.String => property.GetString(),
+            JsonValueKind.Number => property.ToString(),
+            _ => null
+        };
+    }
+
+    private static decimal? TryReadDecimal(JsonElement item, string propertyName)
+    {
+        if (!item.TryGetProperty(propertyName, out var property))
+            return null;
+
+        if (property.ValueKind == JsonValueKind.Number && property.TryGetDecimal(out var numberValue))
+            return numberValue;
+
+        if (property.ValueKind == JsonValueKind.String &&
+            decimal.TryParse(property.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
+        {
+            return parsed;
+        }
+
+        return null;
+    }
+
+    private static int? TryReadInt(JsonElement item, string propertyName)
+    {
+        if (!item.TryGetProperty(propertyName, out var property))
+            return null;
+
+        if (property.ValueKind == JsonValueKind.Number && property.TryGetInt32(out var intValue))
+            return intValue;
+
+        if (property.ValueKind == JsonValueKind.String &&
+            int.TryParse(property.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
+        {
+            return parsed;
+        }
+
+        return null;
+    }
+}

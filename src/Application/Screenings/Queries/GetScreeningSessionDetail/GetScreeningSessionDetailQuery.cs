@@ -8,6 +8,7 @@ public record ScreeningSessionDetailDto
 {
     public Guid ScreeningId { get; init; }
     public Guid PatientId { get; init; }
+    public string? PatientName { get; init; }
     public string ModelVersion { get; init; } = string.Empty;
     public DateTime CreatedAt { get; init; }
     public DateTime? ProcessedAt { get; init; }
