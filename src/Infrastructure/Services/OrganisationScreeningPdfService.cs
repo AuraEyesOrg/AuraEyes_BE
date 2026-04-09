@@ -442,14 +442,22 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
 
         try
         {
-            var response = ImageHttpClient.GetAsync(uri).GetAwaiter().GetResult();
+            using var response = ImageHttpClient
+                .GetAsync(uri, HttpCompletionOption.ResponseHeadersRead)
+                .GetAwaiter()
+                .GetResult();
+
             if (!response.IsSuccessStatusCode) return null;
 
             var mediaType = response.Content.Headers.ContentType?.MediaType;
             if (string.IsNullOrWhiteSpace(mediaType) || !mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
                 return null;
 
-            var data = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+            using var contentStream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+            using var buffer = new MemoryStream();
+            contentStream.CopyTo(buffer);
+
+            var data = buffer.ToArray();
             return data.Length == 0 ? null : data;
         }
         catch
