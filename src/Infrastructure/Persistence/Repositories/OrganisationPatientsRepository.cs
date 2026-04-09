@@ -137,6 +137,10 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
                 Name = string.IsNullOrWhiteSpace(u.FullName) ? (u.Email ?? "Patient") : u.FullName,
                 Age = ComputeAge(u.DateOfBirth),
                 Gender = MapGender(u.Gender),
+                DateOfBirth = u.DateOfBirth,
+                CitizenId = u.CitizenId,
+                Address = u.Address,
+                Email = u.Email ?? string.Empty,
                 PhoneNumber = u.PhoneNumber ?? string.Empty,
                 LastScreening = scr?.CreatedAt ?? u.CreatedAt,
                 AiPrediction = scr != null ? (TryGetPrimaryClassName(scr.RawJsonOutput) ?? "AI prediction") : "No screening yet",
@@ -388,6 +392,52 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
                   && u.OrganizationId == organisationId.Value
             select p.Id
         ).AnyAsync(cancellationToken);
+    }
+
+    public async Task<string?> GetPatientDisplayNameForOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        Guid patientId,
+        CancellationToken cancellationToken = default)
+    {
+        var organisationId = await _context.Set<ApplicationUser>()
+            .AsNoTracking()
+            .Where(u => u.Id == orgAdminUserId && !u.IsDeleted)
+            .Select(u => u.OrganizationId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!organisationId.HasValue)
+            return null;
+
+        return await (
+            from p in _context.Set<Patient>().AsNoTracking()
+            join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
+            where p.Id == patientId
+                  && !u.IsDeleted
+                  && u.OrganizationId == organisationId.Value
+            select string.IsNullOrWhiteSpace(u.FullName)
+                ? (u.Email ?? "Patient")
+                : u.FullName
+        ).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<string?> GetOrganisationNameForOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var organisationId = await _context.Set<ApplicationUser>()
+            .AsNoTracking()
+            .Where(u => u.Id == orgAdminUserId && !u.IsDeleted)
+            .Select(u => u.OrganizationId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!organisationId.HasValue)
+            return null;
+
+        return await _context.Set<Organisation>()
+            .AsNoTracking()
+            .Where(o => o.Id == organisationId.Value && !o.IsDeleted)
+            .Select(o => o.Name)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private static int ComputeAge(DateTime? dob)

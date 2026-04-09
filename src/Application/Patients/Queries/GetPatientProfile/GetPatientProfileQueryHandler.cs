@@ -51,6 +51,7 @@ public class GetPatientProfileQueryHandler : IQueryHandler<GetPatientProfileQuer
             DateOfBirth = userDetails?.DateOfBirth,
             Gender = userDetails?.Gender?.ToString().ToLower(),
             Address = userDetails?.Address,
+            CitizenId = userDetails?.CitizenId,
             AvatarUrl = userDetails?.AvatarUrl,
             CreatedAt = patient.CreatedAt,
             UpdatedAt = patient.UpdatedAt,

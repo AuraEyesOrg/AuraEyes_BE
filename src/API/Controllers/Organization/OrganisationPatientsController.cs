@@ -2,6 +2,7 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.OrganisationPatients;
+using Application.OrganisationPatients.Commands.UpdateOrganisationPatientContact;
 using Application.OrganisationPatients.Queries.GetOrganisationRecentPatients;
 using Application.OrganisationPatients.Commands.CreateWalkInPatient;
 using MediatR;
@@ -55,5 +56,38 @@ public class OrganisationPatientsController : BaseApiController
         var result = await _mediator.Send(command, cancellationToken);
         return HandleResult(result, "Walk-in patient created successfully");
     }
+
+    [HttpPut("{patientId:guid}/contact")]
+    [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdatePatientContact(
+        Guid patientId,
+        [FromBody] UpdateOrganisationPatientContactRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUser.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Unable to resolve current user."));
+
+        var command = new UpdateOrganisationPatientContactCommand
+        {
+            OrgAdminUserId = _currentUser.UserId.Value,
+            PatientId = patientId,
+            Address = request.Address,
+            PhoneNumber = request.PhoneNumber,
+            Email = request.Email,
+        };
+
+        var result = await _mediator.Send(command, cancellationToken);
+        return HandleResult(result, "Patient contact updated successfully");
+    }
+}
+
+public sealed record UpdateOrganisationPatientContactRequest
+{
+    public string? Address { get; init; }
+    public string? PhoneNumber { get; init; }
+    public string? Email { get; init; }
 }
 

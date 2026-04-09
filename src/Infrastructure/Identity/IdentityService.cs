@@ -110,6 +110,7 @@ public class IdentityService : IIdentityService
             }
             user.Address = userProfile.Address;
             user.AvatarUrl = userProfile.AvatarUrl;
+            user.CitizenId = userProfile.CitizenId;
             if (!string.IsNullOrEmpty(userProfile.FullName))
             {
                 user.FullName = userProfile.FullName;
@@ -196,6 +197,20 @@ public class IdentityService : IIdentityService
         return existingPhoneNumbers
             .Select(NormalizePhone)
             .Any(p => p == normalizedPhoneNumber);
+    }
+
+    public async Task<bool> IsCitizenIdInUseByOrganizationAsync(
+        Guid organizationId,
+        string citizenId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(citizenId))
+        {
+            return false;
+        }
+
+        return await _userManager.Users
+            .AnyAsync(u => u.OrganizationId == organizationId && u.CitizenId == citizenId && !u.IsDeleted, cancellationToken);
     }
 
     public async Task<bool> IsEmailConfirmedAsync(Guid userId)
@@ -711,6 +726,7 @@ public class IdentityService : IIdentityService
             Gender = user.Gender,
             Address = user.Address,
             AvatarUrl = user.AvatarUrl,
+            CitizenId = user.CitizenId,
             EmailConfirmed = user.EmailConfirmed,
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt,
@@ -724,6 +740,7 @@ public class IdentityService : IIdentityService
         DateTime? dateOfBirth,
         int? gender,
         string? address,
+        string? citizenId,
         CancellationToken cancellationToken = default)
     {
         var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -735,6 +752,33 @@ public class IdentityService : IIdentityService
         user.DateOfBirth = dateOfBirth;
         user.Gender = gender.HasValue ? (Domain.Enums.Gender)gender.Value : null;
         user.Address = address;
+        user.CitizenId = citizenId;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var result = await _userManager.UpdateAsync(user);
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<(bool Succeeded, string[] Errors)> UpdateUserEmailAsync(
+        Guid userId,
+        string email,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null || user.IsDeleted)
+            return (false, new[] { "User not found" });
+            
+        if(!user.OrganizationId.HasValue)
+            return (false, new[] { "Only organization users can have their email updated" });
+
+        if (string.IsNullOrWhiteSpace(email))
+            return (false, new[] { "Email is required" });
+
+        var normalizedEmail = email.Trim();
+
+        user.Email = normalizedEmail;
+        user.UserName = normalizedEmail;
+        user.EmailConfirmed = false;
         user.UpdatedAt = DateTime.UtcNow;
 
         var result = await _userManager.UpdateAsync(user);

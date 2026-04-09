@@ -3,6 +3,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.OrganisationScreenings;
 using Application.OrganisationScreenings.Commands.CreateOrgScreeningSession;
+using Application.OrganisationScreenings.Queries.ExportOrgScreeningReportPdf;
 using Application.OrganisationScreenings.Queries.GetOrgScreeningSessionDetail;
 using Application.OrganisationScreenings.Queries.GetOrgScreeningHistory;
 using Application.Screenings.Queries.GetScreeningSessionDetail;
@@ -49,7 +50,7 @@ public class OrganisationScreeningsController : BaseApiController
         var command = new CreateOrgScreeningSessionCommand
         {
             PatientId = request.PatientId,
-            ModelVersion = request.ModelVersion ?? "CFP_v1",
+            ModelVersion = request.ModelVersion ?? "AURA_v1.0",
             RetinalImages = request.RetinalImages ?? new List<RetinalImageData>()
         };
 
@@ -76,6 +77,36 @@ public class OrganisationScreeningsController : BaseApiController
             cancellationToken);
 
         return HandleResult(result, "Screening session loaded");
+    }
+
+    /// <summary>
+    /// Download screening report as PDF for this organisation.
+    /// </summary>
+    [HttpGet("{screeningId:guid}/report-pdf")]
+    [Produces("application/pdf")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadScreeningReportPdf(
+        [FromRoute] Guid screeningId,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUser.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
+
+        var result = await _mediator.Send(
+            new ExportOrgScreeningReportPdfQuery(_currentUser.UserId.Value, screeningId),
+            cancellationToken);
+
+        if (!result.IsSuccess || result.Data is null)
+            return HandleResult(result, "Screening report generated");
+
+        Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
+
+        return File(
+            result.Data.Content,
+            result.Data.ContentType,
+            result.Data.FileName);
     }
 
     /// <summary>

@@ -18,4 +18,5 @@ public record UpdatePatientProfileCommand : ICommand<PatientProfileDto>
     public string? DateOfBirth { get; init; }
     public string? Gender { get; init; }
     public string? Address { get; init; }
+    public string? CitizenId { get; init; }
 }

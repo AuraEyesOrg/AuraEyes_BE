@@ -42,6 +42,7 @@
     <!-- Configuration -->
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+    <PackageReference Include="QuestPDF" Version="2026.2.4" />
     
     <!-- Email (MailKit + MimeKit) -->
     <PackageReference Include="MailKit" Version="4.15.1" />

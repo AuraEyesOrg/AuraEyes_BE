@@ -2,6 +2,7 @@ using System.Text;
 using Application.AiQuota.Interfaces;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
+using Application.OrganisationScreenings.Interfaces;
 using Application.SystemAdmin.Interfaces;
 using Application.SystemSettings.Interfaces;
 using Domain.Common;
@@ -205,6 +206,7 @@ public static class DependencyInjection
         services.AddScoped<IAiQuotaService, AiQuotaService>();
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
         services.AddScoped<ISystemSettingService, SystemSettingService>();
+        services.AddScoped<IOrganisationScreeningPdfService, OrganisationScreeningPdfService>();
         services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();
 
         // Background workers

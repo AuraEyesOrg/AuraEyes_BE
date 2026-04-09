@@ -65,6 +65,27 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
             }
         }
 
+        var citizenId = string.IsNullOrWhiteSpace(request.CitizenId)
+            ? null
+            : request.CitizenId.Trim();
+
+        var address = string.IsNullOrWhiteSpace(request.Address)
+            ? null
+            : request.Address.Trim();
+
+        if (citizenId is not null)
+        {
+            var isCitizenIdInUse = await _identityService.IsCitizenIdInUseByOrganizationAsync(
+                org.Id,
+                citizenId,
+                cancellationToken);
+
+            if (isCitizenIdInUse)
+            {
+                return Result<Guid>.Conflict("Citizen ID already exists in this organisation");
+            }
+        }
+
         var uniqueSuffix = Guid.NewGuid().ToString("N").Substring(0, 8);
         var email = string.IsNullOrWhiteSpace(request.Email)
             ? $"walkin_{uniqueSuffix}@auraeyes.local"
@@ -81,8 +102,9 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
             PhoneNumber: phoneNumber,
             DateOfBirth: request.DateOfBirth,
             Gender: genderId,
-            Address: null,
-            AvatarUrl: null
+            Address: address,
+            AvatarUrl: null,
+            CitizenId: citizenId
         );
 
         var createResult = await _identityService.CreateUserWalkInPatientAsync(
@@ -100,7 +122,7 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
                 message: createResult.Errors[0]
             );
         }
-    
+
         try
         {
             var userId = createResult.UserId!.Value;
