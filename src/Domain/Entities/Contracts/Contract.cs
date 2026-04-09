@@ -21,13 +21,19 @@ public class Contract : BaseEntity, IAggregateRoot
     /// <summary>Number of AI screening credits granted under this contract.</summary>
     public int AiQuotaLimit { get; private set; }
 
+    /// <summary>Number of AI screening credits granted per month for organisation contracts.</summary>
+    public int MonthlyQuotaLimit { get; private set; }
+
     /// <summary>Platform revenue share, e.g. 0.20 = 20%.</summary>
     public decimal PlatformCommissionRate { get; private set; }
 
     private Contract() { } // EF Core
 
     public Contract(Guid userId, Guid templateId, string contractNumber,
-        int aiQuotaLimit = 0, decimal platformCommissionRate = 0m, string? signedContent = null)
+        int aiQuotaLimit = 0,
+        decimal platformCommissionRate = 0m,
+        string? signedContent = null,
+        int monthlyQuotaLimit = 0)
     {
         if (string.IsNullOrWhiteSpace(contractNumber))
             throw new ArgumentException("Contract number cannot be empty", nameof(contractNumber));
@@ -36,6 +42,7 @@ public class Contract : BaseEntity, IAggregateRoot
         TemplateId = templateId;
         ContractNumber = contractNumber;
         AiQuotaLimit = aiQuotaLimit;
+        MonthlyQuotaLimit = monthlyQuotaLimit;
         PlatformCommissionRate = platformCommissionRate;
         SignedContent = signedContent;
         Status = ContractStatus.Draft;
@@ -102,7 +109,7 @@ public class Contract : BaseEntity, IAggregateRoot
     }
 
     /// <summary>Update commercial terms — only allowed while the contract is still in Draft.</summary>
-    public void Update(Guid templateId, int aiQuotaLimit, decimal platformCommissionRate)
+    public void Update(Guid templateId, int aiQuotaLimit, decimal platformCommissionRate, int monthlyQuotaLimit = 0)
     {
         if (Status != ContractStatus.Draft)
             throw new InvalidOperationException("Only draft contracts can be updated.");
@@ -110,6 +117,16 @@ public class Contract : BaseEntity, IAggregateRoot
         TemplateId = templateId;
         AiQuotaLimit = aiQuotaLimit;
         PlatformCommissionRate = platformCommissionRate;
+        MonthlyQuotaLimit = monthlyQuotaLimit;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateMonthlyQuotaLimit(int monthlyQuotaLimit)
+    {
+        if (monthlyQuotaLimit < 0)
+            throw new ArgumentOutOfRangeException(nameof(monthlyQuotaLimit));
+
+        MonthlyQuotaLimit = monthlyQuotaLimit;
         UpdatedAt = DateTime.UtcNow;
     }
 }

@@ -324,6 +324,16 @@ if (string.IsNullOrWhiteSpace(slotMaintenanceCron))
     slotMaintenanceCron = "*/5 * * * *";
 }
 
+var defaultMonthlyQuotaResetCron = app.Environment.IsDevelopment()
+    ? "*/5 * * * *"
+    : "0 0 1 * *";
+
+var monthlyQuotaResetCron = Environment.GetEnvironmentVariable("HANGFIRE_MONTHLY_QUOTA_RESET_CRON");
+if (string.IsNullOrWhiteSpace(monthlyQuotaResetCron))
+{
+    monthlyQuotaResetCron = defaultMonthlyQuotaResetCron;
+}
+
 if (enableHangfireServer)
 {
     // Register recurring jobs
@@ -332,6 +342,12 @@ if (enableHangfireServer)
         "daily-quota-reset",
         job => job.ExecuteAsync(),
         quotaResetCron,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+    recurringJobManager.AddOrUpdate<MonthlyQuotaResetJob>(
+        "monthly-quota-reset",
+        job => job.ExecuteAsync(),
+        monthlyQuotaResetCron,
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
     recurringJobManager.AddOrUpdate<SlotMaintenanceJob>(

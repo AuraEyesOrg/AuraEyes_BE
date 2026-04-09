@@ -28,7 +28,9 @@ public class OrganisationTests
         org.RatingAverage.Should().Be(0m);
         org.RatingCount.Should().Be(0);
         org.PurchasedAiQuota.Should().Be(0);
-        org.UsedAiQuota.Should().Be(0);
+        org.MonthlyQuotaLimit.Should().Be(0);
+        org.MonthlyQuotaUsed.Should().Be(0);
+        org.MonthlyQuotaLastResetAt.Should().BeNull();
     }
 
     [Fact]
@@ -179,51 +181,56 @@ public class OrganisationTests
     }
 
     [Fact]
-    public void HasAvailableQuota_WithinFreeQuota_ShouldReturnTrue()
+    public void HasAvailableQuota_WithinMonthlyQuota_ShouldReturnTrue()
     {
         var org = CreateValidOrganisation();
+        org.ConfigureMonthlyQuota(5, DateTime.UtcNow);
 
-        org.HasAvailableQuota(freeQuota: 5).Should().BeTrue();
+        org.HasAvailableQuota().Should().BeTrue();
     }
 
     [Fact]
-    public void HasAvailableQuota_FreeQuotaExhausted_WithPurchased_ShouldReturnTrue()
+    public void HasAvailableQuota_MonthlyExhausted_WithPurchased_ShouldReturnTrue()
     {
         var org = CreateValidOrganisation();
+        org.ConfigureMonthlyQuota(3, DateTime.UtcNow);
         org.AddPurchasedQuota(10);
-        for (var i = 0; i < 5; i++) org.ConsumeQuota(5);
+        for (var i = 0; i < 3; i++) org.ConsumeQuota();
 
-        org.HasAvailableQuota(freeQuota: 5).Should().BeTrue();
+        org.HasAvailableQuota().Should().BeTrue();
     }
 
     [Fact]
     public void HasAvailableQuota_AllExhausted_ShouldReturnFalse()
     {
         var org = CreateValidOrganisation();
-        for (var i = 0; i < 3; i++) org.ConsumeQuota(3);
+        org.ConfigureMonthlyQuota(3, DateTime.UtcNow);
+        for (var i = 0; i < 3; i++) org.ConsumeQuota();
 
-        org.HasAvailableQuota(freeQuota: 3).Should().BeFalse();
+        org.HasAvailableQuota().Should().BeFalse();
     }
 
     [Fact]
-    public void ConsumeQuota_WithinFreeQuota_ShouldIncrementUsed()
+    public void ConsumeQuota_WithinMonthlyQuota_ShouldIncrementMonthlyUsed()
     {
         var org = CreateValidOrganisation();
+        org.ConfigureMonthlyQuota(5, DateTime.UtcNow);
 
-        org.ConsumeQuota(freeQuota: 5);
+        org.ConsumeQuota();
 
-        org.UsedAiQuota.Should().Be(1);
+        org.MonthlyQuotaUsed.Should().Be(1);
         org.PurchasedAiQuota.Should().Be(0);
     }
 
     [Fact]
-    public void ConsumeQuota_FreeQuotaExhausted_ShouldDecrementPurchased()
+    public void ConsumeQuota_MonthlyQuotaExhausted_ShouldDecrementPurchased()
     {
         var org = CreateValidOrganisation();
+        org.ConfigureMonthlyQuota(3, DateTime.UtcNow);
         org.AddPurchasedQuota(10);
-        for (var i = 0; i < 3; i++) org.ConsumeQuota(3);
+        for (var i = 0; i < 3; i++) org.ConsumeQuota();
 
-        org.ConsumeQuota(freeQuota: 3);
+        org.ConsumeQuota();
 
         org.PurchasedAiQuota.Should().Be(9);
     }
@@ -232,33 +239,54 @@ public class OrganisationTests
     public void ConsumeQuota_NoneAvailable_ShouldThrow()
     {
         var org = CreateValidOrganisation();
-        for (var i = 0; i < 2; i++) org.ConsumeQuota(2);
+        org.ConfigureMonthlyQuota(2, DateTime.UtcNow);
+        for (var i = 0; i < 2; i++) org.ConsumeQuota();
 
-        var act = () => org.ConsumeQuota(freeQuota: 2);
+        var act = () => org.ConsumeQuota();
 
         act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
-    public void ConsumeQuota_NegativeFreeQuota_ShouldThrow()
+    public void ConfigureMonthlyQuota_NegativeLimit_ShouldThrow()
     {
         var org = CreateValidOrganisation();
 
-        var act = () => org.ConsumeQuota(freeQuota: -1);
+        var act = () => org.ConfigureMonthlyQuota(-1, DateTime.UtcNow);
 
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
 
     [Fact]
-    public void ResetDailyQuota_ShouldResetUsedToZero()
+    public void ResetMonthlyQuota_ShouldResetMonthlyUsedToZero()
     {
         var org = CreateValidOrganisation();
-        org.ConsumeQuota(freeQuota: 5);
-        org.ConsumeQuota(freeQuota: 5);
+        var configuredAt = DateTime.UtcNow.AddDays(-5);
+        org.ConfigureMonthlyQuota(5, configuredAt);
+        org.ConsumeQuota();
+        org.ConsumeQuota();
 
-        org.ResetDailyQuota();
+        var resetAt = DateTime.UtcNow;
+        org.ResetMonthlyQuota(resetAt);
 
-        org.UsedAiQuota.Should().Be(0);
+        org.MonthlyQuotaUsed.Should().Be(0);
+        org.MonthlyQuotaLastResetAt.Should().Be(resetAt);
+        org.UpdatedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void ConfigureMonthlyQuota_ShouldSetLimitAndResetUsage()
+    {
+        var org = CreateValidOrganisation();
+        org.ConfigureMonthlyQuota(10, DateTime.UtcNow.AddDays(-2));
+        org.ConsumeQuota();
+
+        var resetAt = DateTime.UtcNow;
+        org.ConfigureMonthlyQuota(20, resetAt);
+
+        org.MonthlyQuotaLimit.Should().Be(20);
+        org.MonthlyQuotaUsed.Should().Be(0);
+        org.MonthlyQuotaLastResetAt.Should().Be(resetAt);
         org.UpdatedAt.Should().NotBeNull();
     }
 

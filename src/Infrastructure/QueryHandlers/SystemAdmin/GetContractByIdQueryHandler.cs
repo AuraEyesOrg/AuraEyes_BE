@@ -50,6 +50,7 @@ public class GetContractByIdQueryHandler : IQueryHandler<GetContractByIdQuery, C
             UserFullName = user?.FullName ?? string.Empty,
             UserEmail = user?.Email ?? string.Empty,
             AiQuotaLimit = contract.AiQuotaLimit,
+            MonthlyQuotaLimit = contract.MonthlyQuotaLimit,
             PlatformCommissionRate = contract.PlatformCommissionRate,
             CommissionRate = ophthalmologist?.CommissionRate,
             ActualMonthlySalary = ophthalmologist?.ActualMonthlySalary,

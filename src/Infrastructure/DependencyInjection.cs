@@ -210,6 +210,7 @@ public static class DependencyInjection
 
         // Register Hangfire daily job
         services.AddScoped<DailyQuotaResetJob>();
+        services.AddScoped<MonthlyQuotaResetJob>();
         services.AddScoped<SlotMaintenanceJob>();
 
         // Configure PayOS Settings

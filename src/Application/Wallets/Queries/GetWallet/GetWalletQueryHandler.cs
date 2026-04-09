@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.Common.Constants;
 using Application.Wallets.Common;
 using Domain.Entities.Financial;
 using Domain.Repositories;
@@ -34,11 +35,11 @@ public class GetWalletQueryHandler : IQueryHandler<GetWalletQuery, WalletDto>
         if (wallet is null)
         {
             var roles = await _identityService.GetUserRolesAsync(request.UserId);
-            var ownerType = roles.Contains("Ophthalmologist")
+            var ownerType = roles.Contains(Roles.Ophthalmologist)
                 ? "Ophthalmologist"
-                : roles.Contains("OrgAdmin") || roles.Contains("Organization")
+                : roles.Contains(Roles.OrgAdmin)
                     ? "Organisation"
-                    : "Patient";
+                    : Roles.Patient;
 
             wallet = new Wallet(request.UserId, ownerType, 0);
             await _walletRepository.AddAsync(wallet, cancellationToken);
