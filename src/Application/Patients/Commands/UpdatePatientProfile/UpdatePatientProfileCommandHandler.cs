@@ -62,6 +62,7 @@ public class UpdatePatientProfileCommandHandler : ICommandHandler<UpdatePatientP
             dateOfBirth,
             genderValue,
             request.Address,
+            request.CitizenId,
             cancellationToken);
 
         if (!succeeded)
@@ -82,6 +83,7 @@ public class UpdatePatientProfileCommandHandler : ICommandHandler<UpdatePatientP
             DateOfBirth = userDetails.DateOfBirth,
             Gender = userDetails.Gender?.ToString().ToLower(),
             Address = userDetails.Address,
+            CitizenId = userDetails.CitizenId,
             AvatarUrl = userDetails.AvatarUrl,
             CreatedAt = patient.CreatedAt,
             UpdatedAt = patient.UpdatedAt,

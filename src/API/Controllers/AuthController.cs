@@ -21,12 +21,38 @@ public class AuthController : BaseApiController
         IAuthService authService,
         ICurrentUserService currentUserService,
         ILogger<AuthController> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment hostEnvironment)
     {
         _authService = authService;
         _currentUserService = currentUserService;
         _logger = logger;
-        _frontendUrl = (configuration["FrontendUrl"] ?? "http://localhost:3000").TrimEnd('/');
+        _frontendUrl = ResolveFrontendUrl(configuration, hostEnvironment).TrimEnd('/');
+    }
+
+    private string ResolveFrontendUrl(IConfiguration configuration, IHostEnvironment hostEnvironment)
+    {
+        var configuredUrl = configuration["FrontendUrl"]
+            ?? configuration["BaseUrl"];
+
+        if (string.IsNullOrWhiteSpace(configuredUrl))
+        {
+            const string fallbackUrl = "http://localhost:3000";
+            _logger.LogWarning(
+                "Frontend URL is not configured. Falling back to {FallbackUrl}. Set FrontendUrl, Frontend:BaseUrl, or BaseUrl.",
+                fallbackUrl);
+            return fallbackUrl;
+        }
+
+        if (hostEnvironment.IsProduction()
+            && configuredUrl.Contains("localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "Frontend URL points to localhost in Production: {FrontendUrl}. Check BaseUrl/FrontendUrl environment configuration.",
+                configuredUrl);
+        }
+
+        return configuredUrl;
     }
 
     /// <summary>

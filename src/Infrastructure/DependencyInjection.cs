@@ -2,6 +2,7 @@ using System.Text;
 using Application.AiQuota.Interfaces;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
+using Application.OrganisationScreenings.Interfaces;
 using Application.SystemAdmin.Interfaces;
 using Application.SystemSettings.Interfaces;
 using Domain.Common;
@@ -69,6 +70,9 @@ public static class DependencyInjection
 
         // Google Auth Settings (for Google Login)
         services.Configure<GoogleAuthSettings>(configuration.GetSection(GoogleAuthSettings.SectionName));
+
+        // BetterStack settings
+        services.Configure<BetterStackSettings>(configuration.GetSection(BetterStackSettings.SectionName));
 
         // ASP.NET Core Identity configuration
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
@@ -202,6 +206,8 @@ public static class DependencyInjection
         services.AddScoped<IAiQuotaService, AiQuotaService>();
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
         services.AddScoped<ISystemSettingService, SystemSettingService>();
+        services.AddScoped<IOrganisationScreeningPdfService, OrganisationScreeningPdfService>();
+        services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();

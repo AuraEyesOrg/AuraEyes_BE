@@ -90,7 +90,32 @@ jobs:
           SerpApi__ApiKey=${{ secrets.SERPAPI_KEY }}
           SerpApi__BaseUrl=https://serpapi.com/search.json
 
+          GoogleAiStudio__ApiKey=${{ secrets.GOOGLE_AI_STUDIO_API_KEY }}
+
+          BetterStack__Dashboard__EmbedUrl=https://status.auraeyes.site
+
+          BetterStack__Heartbeats__DailyQuotaReset__PingUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_DAILY_QUOTA_RESET_KEY_URL }}
+          BetterStack__Heartbeats__DailyQuotaReset__StartUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_DAILY_QUOTA_RESET_KEY_URL }}/start
+          BetterStack__Heartbeats__DailyQuotaReset__FailUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_DAILY_QUOTA_RESET_KEY_URL }}/fail
+
+          BetterStack__Heartbeats__SlotMaintenance__PingUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_SLOT_MAINTENANCE_KEY_URL }}
+          BetterStack__Heartbeats__SlotMaintenance__StartUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_SLOT_MAINTENANCE_KEY_URL }}/start
+          BetterStack__Heartbeats__SlotMaintenance__FailUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_SLOT_MAINTENANCE_KEY_URL }}/fail
+
+          BetterStack__Heartbeats__SessionReminderWorker__PingUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_SESSION_REMINDER_WORKER_KEY_URL }}
+          BetterStack__Heartbeats__SessionReminderWorker__StartUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_SESSION_REMINDER_WORKER_KEY_URL }}/start
+          BetterStack__Heartbeats__SessionReminderWorker__FailUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_SESSION_REMINDER_WORKER_KEY_URL }}/fail
+
+          BetterStack__Heartbeats__ReservationExpirationWorker__PingUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_RESERVATION_EXPIRATION_WORKER_KEY_URL }}
+          BetterStack__Heartbeats__ReservationExpirationWorker__StartUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_RESERVATION_EXPIRATION_WORKER_KEY_URL }}/start
+          BetterStack__Heartbeats__ReservationExpirationWorker__FailUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_RESERVATION_EXPIRATION_WORKER_KEY_URL }}/fail
+
+          BetterStack__Heartbeats__ConsultationStateWorker__PingUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_CONSULTATION_STATE_WORKER_KEY_URL }}
+          BetterStack__Heartbeats__ConsultationStateWorker__StartUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_CONSULTATION_STATE_WORKER_KEY_URL }}/start
+          BetterStack__Heartbeats__ConsultationStateWorker__FailUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_CONSULTATION_STATE_WORKER_KEY_URL }}/fail
+
           Hangfire__ServerEnabled=true
+          Hangfire__WorkerCount=1
 
           API_PORT=${API_PORT}
           BaseUrl=${{ secrets.FRONTEND_URL }}

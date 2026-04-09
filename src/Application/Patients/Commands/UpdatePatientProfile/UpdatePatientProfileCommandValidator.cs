@@ -30,6 +30,10 @@ public class UpdatePatientProfileCommandValidator : AbstractValidator<UpdatePati
         RuleFor(x => x.Address)
             .MaximumLength(500).WithMessage("Address must not exceed 500 characters.")
             .When(x => x.Address is not null);
+
+        RuleFor(x => x.CitizenId)
+            .Matches("^[0-9]{12}$").WithMessage("Citizen ID must be 12 digits.")
+            .When(x => x.CitizenId is not null);
     }
 
     private static bool BeAValidDate(string? dateString)

@@ -21,11 +21,16 @@ public class DashboardMetricsService : IDashboardMetricsService
 {
     private readonly ApplicationDbContext _context;
     private readonly IAiQuotaService _aiQuotaService;
+    private readonly IBetterStackHeartbeatService _betterStackHeartbeatService;
 
-    public DashboardMetricsService(ApplicationDbContext context, IAiQuotaService aiQuotaService)
+    public DashboardMetricsService(
+        ApplicationDbContext context,
+        IAiQuotaService aiQuotaService,
+        IBetterStackHeartbeatService betterStackHeartbeatService)
     {
         _context = context;
         _aiQuotaService = aiQuotaService;
+        _betterStackHeartbeatService = betterStackHeartbeatService;
     }
 
     public async Task<DashboardMetricsDto> GetSystemAdminMetricsAsync(CancellationToken cancellationToken = default)
@@ -303,6 +308,8 @@ public class DashboardMetricsService : IDashboardMetricsService
             })
             .ToListAsync(cancellationToken);
 
+        var monitorDescriptors = _betterStackHeartbeatService.GetMonitorDescriptors();
+
         return new DashboardMetricsDto
         {
             Doctors = new UserGrowthMetricDto
@@ -347,6 +354,20 @@ public class DashboardMetricsService : IDashboardMetricsService
                 LiveConsultationSessions = liveConsultations,
                 ApiHealthy = true,
                 DatabaseHealthy = databaseHealthy
+            },
+            BetterStack = new DashboardBetterStackDto
+            {
+                Enabled = monitorDescriptors.Any(item => item.Configured),
+                EmbedUrl = _betterStackHeartbeatService.GetEmbedUrl(),
+                Monitors = monitorDescriptors
+                    .Select(item => new DashboardBackgroundMonitorDto
+                    {
+                        Key = item.Key,
+                        Name = item.DisplayName,
+                        Category = item.Category,
+                        Configured = item.Configured
+                    })
+                    .ToList()
             },
             TopDoctorsByConsultationRevenue = topDoctorRows,
             TopOrganisationsByRating = topOrgRows
