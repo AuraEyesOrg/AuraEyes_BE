@@ -2,6 +2,13 @@ using Application.OrganisationScreenings.Interfaces;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Drawing.Processing;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using ImgSharpColor = SixLabors.ImageSharp.Color;
+using ImgSharpImage = SixLabors.ImageSharp.Image;
 
 namespace Infrastructure.Services;
 
@@ -13,6 +20,10 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
     private const string Border = "#D0D5DD";
     private const string TextStrong = "#101828";
     private const string TextMuted = "#475467";
+    private static readonly HttpClient ImageHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(8)
+    };
 
     static OrganisationScreeningPdfService()
     {
@@ -21,6 +32,12 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
 
     public byte[] GenerateScreeningReportPdf(OrgScreeningReportPdfModel model)
     {
+        var originalImageUrl = model.OriginalImageUrls.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+        var originalImageData = TryDownloadImageData(originalImageUrl);
+        var annotatedImageData = TryDownloadImageData(model.AnnotatedImageUrl)
+            ?? TryBuildBoxedImage(originalImageData, model.LocalizationBoxes);
+        var heatmapImageData = TryDownloadImageData(model.HeatmapImageUrl);
+
         return Document.Create(container =>
         {
             container.Page(page =>
@@ -44,6 +61,14 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                     });
 
                     column.Item().Element(c => ComposeClinicalSummary(c, model));
+                    column.Item().Element(c => ComposeRetinalImagesSection(
+                        c,
+                        originalImageData,
+                        annotatedImageData,
+                        heatmapImageData,
+                        originalImageUrl,
+                        model.AnnotatedImageUrl,
+                        model.HeatmapImageUrl));
                     column.Item().Element(c => ComposeAiFindingsTable(c, model));
                     column.Item().Element(c => ComposeTextSection(c, "AI Summary", model.Summary ?? "No summary available."));
                     column.Item().Element(c => ComposeTextSection(c, "Clinical Findings & Notes", model.Findings ?? "No findings available."));
@@ -213,6 +238,98 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
         });
     }
 
+    private void ComposeRetinalImagesSection(
+        IContainer container,
+        byte[]? originalImageData,
+        byte[]? annotatedImageData,
+        byte[]? heatmapImageData,
+        string? originalImageUrl,
+        string? annotatedImageUrl,
+        string? heatmapImageUrl)
+    {
+        container.Border(1).BorderColor(Border).Padding(10).Column(column =>
+        {
+            column.Spacing(8);
+            column.Item().Text("Retinal Images")
+                .SemiBold()
+                .FontSize(12)
+                .FontColor(BrandBlue);
+
+            column.Item().Row(row =>
+            {
+                row.RelativeItem().Element(c => ComposeImageCard(
+                    c,
+                    "Original Retinal Image",
+                    originalImageData,
+                    originalImageUrl));
+
+                row.ConstantItem(8);
+
+                row.RelativeItem().Element(c => ComposeImageCard(
+                    c,
+                    "Boxed Retinal Image",
+                    annotatedImageData,
+                    annotatedImageData is null ? annotatedImageUrl : "generated-localization"));
+
+                row.ConstantItem(8);
+
+                row.RelativeItem().Element(c => ComposeImageCard(
+                    c,
+                    "Heatmap",
+                    heatmapImageData,
+                    heatmapImageUrl));
+            });
+        });
+    }
+
+    private void ComposeImageCard(
+        IContainer container,
+        string title,
+        byte[]? imageData,
+        string? sourceUrl)
+    {
+        container.Border(1).BorderColor(Border).Background(Surface).Padding(8).Column(column =>
+        {
+            column.Spacing(5);
+            column.Item().Text(title)
+                .SemiBold()
+                .FontSize(10)
+                .FontColor(TextStrong);
+
+            if (imageData is { Length: > 0 })
+            {
+                column.Item()
+                    .Height(155)
+                    .Border(1)
+                    .BorderColor(Border)
+                    .Padding(4)
+                    .AlignCenter()
+                    .AlignMiddle()
+                    .Image(imageData)
+                    .FitArea();
+            }
+            else
+            {
+                column.Item()
+                    .Height(155)
+                    .Border(1)
+                    .BorderColor(Border)
+                    .AlignCenter()
+                    .AlignMiddle()
+                    .Text("Image unavailable")
+                    .FontSize(9)
+                    .FontColor(TextMuted);
+            }
+
+            if (!string.IsNullOrWhiteSpace(sourceUrl))
+            {
+                column.Item().Text("Source attached")
+                    .FontSize(8)
+                    .FontColor(TextMuted);
+            }
+        });
+    }
+
     private void ComposeTextSection(IContainer container, string title, string content)
     {
         container.Border(1).BorderColor(Border).Padding(12).Column(column =>
@@ -304,5 +421,107 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
 
         value = Math.Clamp(value, 0m, 100m);
         return $"{value:0.##}%";
+    }
+
+    private static byte[]? TryDownloadImageData(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return null;
+
+        if (url.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
+            return TryDecodeDataImage(url);
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return null;
+
+        if (uri.Scheme is not ("http" or "https"))
+            return null;
+
+        try
+        {
+            var response = ImageHttpClient.GetAsync(uri).GetAwaiter().GetResult();
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var mediaType = response.Content.Headers.ContentType?.MediaType;
+            if (string.IsNullOrWhiteSpace(mediaType) ||
+                !mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            var data = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+            return data.Length == 0 ? null : data;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static byte[]? TryDecodeDataImage(string dataUrl)
+    {
+        var commaIndex = dataUrl.IndexOf(',');
+        if (commaIndex <= 0 || commaIndex >= dataUrl.Length - 1)
+            return null;
+
+        var metadata = dataUrl[..commaIndex];
+        var payload = dataUrl[(commaIndex + 1)..];
+
+        if (!metadata.Contains(";base64", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        try
+        {
+            return Convert.FromBase64String(payload);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static byte[]? TryBuildBoxedImage(
+        byte[]? originalImageData,
+        IReadOnlyCollection<AiLocalizationBox> boxes)
+    {
+        if (originalImageData is not { Length: > 0 } || boxes.Count == 0)
+            return null;
+
+        try
+        {
+            using var image = ImgSharpImage.Load<Rgba32>(originalImageData);
+
+            var lineThickness = Math.Max(2f, Math.Min(image.Width, image.Height) / 250f);
+
+            var strokeColor = ImgSharpColor.FromRgba(59, 130, 246, 255);
+            var fillColor = ImgSharpColor.FromRgba(59, 130, 246, 45);
+            image.Mutate(ctx =>
+            {
+                foreach (var box in boxes)
+                {
+                    var x = Math.Clamp(box.X, 0, image.Width - 1);
+                    var y = Math.Clamp(box.Y, 0, image.Height - 1);
+
+                    var maxWidth = image.Width - x;
+                    var maxHeight = image.Height - y;
+
+                    var width = Math.Clamp(box.Width, 1, maxWidth);
+                    var height = Math.Clamp(box.Height, 1, maxHeight);
+
+                    var rectangle = new RectangleF(x, y, width, height);
+                    ctx.Fill(fillColor, rectangle);
+                    ctx.Draw(strokeColor, lineThickness, rectangle);
+                }
+            });
+
+            using var output = new MemoryStream();
+            image.Save(output, PngFormat.Instance);
+            return output.ToArray();
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
