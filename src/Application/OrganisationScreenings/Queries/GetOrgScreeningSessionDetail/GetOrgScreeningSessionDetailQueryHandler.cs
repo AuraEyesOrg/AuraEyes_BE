@@ -76,6 +76,16 @@ public sealed class GetOrgScreeningSessionDetailQueryHandler
         if (!hasAccess)
             return Result<ScreeningSessionDetailDto>.NotFound("Screening session not found");
 
+        var patientName = await _organisationPatientsRepository.GetPatientDisplayNameForOrganisationAdminAsync(
+            request.OrgAdminUserId,
+            session.PatientId,
+            cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(patientName))
+        {
+            session = session with { PatientName = patientName };
+        }
+
         return Result<ScreeningSessionDetailDto>.Success(session);
     }
 }
