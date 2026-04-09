@@ -1,3 +1,4 @@
+using Application.Common.Helpers;
 using Application.OrganisationScreenings.Interfaces;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -20,6 +21,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
     private const string Border = "#D0D5DD";
     private const string TextStrong = "#101828";
     private const string TextMuted = "#475467";
+    private static readonly TimeZoneInfo ReportTimeZone = VietnamTimeZoneResolver.TimeZone;
     private static readonly HttpClient ImageHttpClient = new()
     {
         Timeout = TimeSpan.FromSeconds(8)
@@ -111,7 +113,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                     {
                         text.DefaultTextStyle(x => x.FontSize(9).FontColor(TextMuted));
                         text.Span("Generated: ").SemiBold();
-                        text.Span(DateTime.UtcNow.ToString("dd MMM yyyy HH:mm 'UTC'"));
+                        text.Span(FormatReportDateTime(DateTime.UtcNow, "dd MMM yyyy HH:mm"));
                     });
                 });
             });
@@ -148,7 +150,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
             
             ComposeInfoRow(column, "Screening ID", model.ScreeningId.ToString());
             ComposeInfoRow(column, "Model Version", string.IsNullOrWhiteSpace(model.ModelVersion) ? "N/A" : model.ModelVersion);
-            ComposeInfoRow(column, "Session Created", model.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"));
+            ComposeInfoRow(column, "Session Created", FormatReportDateTime(model.CreatedAt));
         });
     }
 
@@ -191,7 +193,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
             {
                 text.DefaultTextStyle(x => x.FontSize(8).FontColor(TextMuted));
                 text.Span("Assessed At: ");
-                text.Span(model.AssessedAt.HasValue ? model.AssessedAt.Value.ToString("yyyy-MM-dd HH:mm:ss") : "N/A");
+                text.Span(model.AssessedAt.HasValue ? FormatReportDateTime(model.AssessedAt.Value) : "N/A");
             });
         });
     }
@@ -416,6 +418,19 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
 
         value = Math.Clamp(value, 0m, 100m);
         return $"{value:0.##}%";
+    }
+
+    private static string FormatReportDateTime(DateTime value, string format = "yyyy-MM-dd HH:mm:ss")
+    {
+        var utcValue = value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
+
+        var localValue = TimeZoneInfo.ConvertTimeFromUtc(utcValue, ReportTimeZone);
+        return localValue.ToString(format);
     }
 
     private static byte[]? TryDownloadImageData(string? url)
