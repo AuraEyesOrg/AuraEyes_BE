@@ -83,4 +83,13 @@ public interface IOrganisationPatientsRepository
         Guid orgAdminUserId,
         Guid patientId,
         CancellationToken cancellationToken = default);
+
+    Task<string?> GetPatientDisplayNameForOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        Guid patientId,
+        CancellationToken cancellationToken = default);
+
+    Task<string?> GetOrganisationNameForOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        CancellationToken cancellationToken = default);
 }
