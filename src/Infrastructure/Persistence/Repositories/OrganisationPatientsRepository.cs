@@ -34,7 +34,7 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
 
         var managedPatientIds = _context.Set<OrganisationPatientLink>()
             .AsNoTracking()
-            .Where(link => link.OrganisationId == organisationId)
+            .Where(link => link.OrganisationId == organisationId && !link.IsDeleted)
             .Select(link => link.PatientId)
             .Distinct();
 
@@ -44,10 +44,14 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
             .Select(cs => cs.AiScreeningId!.Value)
             .Distinct();
 
+        // LEFT JOIN: walk-in patients have UserId=null, so u will be null for them
         var topPatients = await (
-            from u in _context.Set<ApplicationUser>().AsNoTracking()
-            join p in _context.Set<Patient>().AsNoTracking() on u.Id equals p.UserId
-            where managedPatientIds.Contains(p.Id) && !u.IsDeleted
+            from p in _context.Set<Patient>().AsNoTracking()
+            join u in _context.Set<ApplicationUser>().AsNoTracking()
+                on p.UserId equals u.Id into userGroup
+            from u in userGroup.DefaultIfEmpty()
+            where managedPatientIds.Contains(p.Id) && !p.IsDeleted
+                  && (u == null || !u.IsDeleted)
             let latestScreeningId = (
                 from scr in _context.Set<AiScreening>().AsNoTracking()
                 join screeningId in organisationScreeningIds on scr.Id equals screeningId
@@ -62,7 +66,7 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
                 orderby scr.CreatedAt descending
                 select (DateTime?)scr.CreatedAt
             ).FirstOrDefault()
-            orderby latestScreeningCreatedAt ?? u.CreatedAt descending
+            orderby latestScreeningCreatedAt ?? p.CreatedAt descending
             select new
             {
                 PatientUser = u,
@@ -117,7 +121,7 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         foreach (var row in topPatients)
         {
             var p = row.Patient;
-            var u = row.PatientUser;
+            var u = row.PatientUser; // null for walk-in patients
             AiScreening? scr = null;
 
             if (row.LatestScreeningId is Guid screeningId)
@@ -137,18 +141,54 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
             var status = scr == null ? "pending-review" : MapStatus(diag);
             var priority = scr == null ? "low" : MapPriority(latest?.RiskLevel, diag);
 
+            // Resolve display fields: walk-in → Patient entity, registered → ApplicationUser
+            string name;
+            int age;
+            string gender;
+            DateTime? dateOfBirth;
+            string? citizenId;
+            string? address;
+            string email;
+            string phoneNumber;
+            DateTime fallbackDate;
+
+            if (p.IsWalkIn)
+            {
+                name = !string.IsNullOrWhiteSpace(p.FullName) ? p.FullName : "Patient";
+                age = ComputeAge(p.DateOfBirth);
+                gender = MapGenderFromId(p.GenderId);
+                dateOfBirth = p.DateOfBirth;
+                citizenId = p.CitizenId;
+                address = p.Address;
+                email = string.Empty;
+                phoneNumber = p.PhoneNumber ?? string.Empty;
+                fallbackDate = p.CreatedAt;
+            }
+            else
+            {
+                name = !string.IsNullOrWhiteSpace(u?.FullName) ? u.FullName : (u?.Email ?? "Patient");
+                age = ComputeAge(u?.DateOfBirth);
+                gender = MapGender(u?.Gender);
+                dateOfBirth = u?.DateOfBirth;
+                citizenId = u?.CitizenId;
+                address = u?.Address;
+                email = u?.Email ?? string.Empty;
+                phoneNumber = u?.PhoneNumber ?? string.Empty;
+                fallbackDate = u?.CreatedAt ?? p.CreatedAt;
+            }
+
             list.Add(new OrganisationRecentPatientReadModel
             {
                 Id = p.Id.ToString(),
-                Name = string.IsNullOrWhiteSpace(u.FullName) ? (u.Email ?? "Patient") : u.FullName,
-                Age = ComputeAge(u.DateOfBirth),
-                Gender = MapGender(u.Gender),
-                DateOfBirth = u.DateOfBirth,
-                CitizenId = u.CitizenId,
-                Address = u.Address,
-                Email = u.Email ?? string.Empty,
-                PhoneNumber = u.PhoneNumber ?? string.Empty,
-                LastScreening = scr?.CreatedAt ?? u.CreatedAt,
+                Name = name,
+                Age = age,
+                Gender = gender,
+                DateOfBirth = dateOfBirth,
+                CitizenId = citizenId,
+                Address = address,
+                Email = email,
+                PhoneNumber = phoneNumber,
+                LastScreening = scr?.CreatedAt ?? fallbackDate,
                 AiPrediction = scr != null ? (TryGetPrimaryClassName(scr.RawJsonOutput) ?? "AI prediction") : "No screening yet",
                 Confidence = latest?.ConfidenceScore ?? 0,
                 Status = status,
@@ -176,23 +216,29 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
 
         var managedPatientIds = _context.Set<OrganisationPatientLink>()
             .AsNoTracking()
-            .Where(link => link.OrganisationId == organisationId)
+            .Where(link => link.OrganisationId == organisationId && !link.IsDeleted)
             .Select(link => link.PatientId)
             .Distinct();
 
+        // LEFT JOIN on ApplicationUser to include walk-in patients
         var screenings = await (
             from scr in _context.Set<AiScreening>().AsNoTracking()
             join p in _context.Set<Patient>().AsNoTracking() on scr.PatientId equals p.Id
-            join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
-            where managedPatientIds.Contains(p.Id) && !u.IsDeleted && !scr.IsDeleted
+            join u in _context.Set<ApplicationUser>().AsNoTracking()
+                on p.UserId equals u.Id into userGroup
+            from u in userGroup.DefaultIfEmpty()
+            where managedPatientIds.Contains(p.Id) && !scr.IsDeleted && !p.IsDeleted
+                  && (u == null || !u.IsDeleted)
             orderby scr.CreatedAt descending
             select new
             {
                 scr.Id,
                 scr.PatientId,
-                PatientName = string.IsNullOrWhiteSpace(u.FullName)
-                    ? (u.Email ?? "Patient")
-                    : u.FullName,
+                PatientName = p.UserId == null
+                    ? (p.FullName ?? "Patient")
+                    : (string.IsNullOrWhiteSpace(u!.FullName)
+                        ? (u.Email ?? "Patient")
+                        : u.FullName),
                 scr.CreatedAt,
                 scr.ProcessedAt,
                 ImagesCount = scr.RetinalImages.Count,
@@ -294,15 +340,15 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
 
         var managedPatientIds = _context.Set<OrganisationPatientLink>()
             .AsNoTracking()
-            .Where(link => link.OrganisationId == organisationId)
+            .Where(link => link.OrganisationId == organisationId && !link.IsDeleted)
             .Select(link => link.PatientId)
             .Distinct();
 
+        // No need to join ApplicationUser here — we only need screening stats, not patient names
         var screeningEvents =
             from scr in _context.Set<AiScreening>().AsNoTracking()
             join p in _context.Set<Patient>().AsNoTracking() on scr.PatientId equals p.Id
-            join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
-            where managedPatientIds.Contains(p.Id) && !u.IsDeleted && !scr.IsDeleted
+            where managedPatientIds.Contains(p.Id) && !p.IsDeleted && !scr.IsDeleted
             select new
             {
                 scr.CreatedAt,
@@ -405,7 +451,9 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         return await _context.Set<OrganisationPatientLink>()
             .AsNoTracking()
             .AnyAsync(
-                link => link.OrganisationId == organisationId.Value && link.PatientId == patientId,
+                link => link.OrganisationId == organisationId.Value
+                        && link.PatientId == patientId
+                        && !link.IsDeleted,
                 cancellationToken);
     }
 
@@ -423,18 +471,47 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         if (!organisationId.HasValue)
             return null;
 
-        return await (
-            from link in _context.Set<OrganisationPatientLink>().AsNoTracking()
-            from p in _context.Set<Patient>().AsNoTracking()
-            join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
-            where link.OrganisationId == organisationId.Value
-                  && link.PatientId == patientId
-                  && p.Id == link.PatientId
-                  && !u.IsDeleted
-            select string.IsNullOrWhiteSpace(u.FullName)
-                ? (u.Email ?? "Patient")
-                : u.FullName
-        ).FirstOrDefaultAsync(cancellationToken);
+        // First try: check if the patient is linked to this organisation
+        var isLinked = await _context.Set<OrganisationPatientLink>()
+            .AsNoTracking()
+            .AnyAsync(
+                link => link.OrganisationId == organisationId.Value
+                        && link.PatientId == patientId
+                        && !link.IsDeleted,
+                cancellationToken);
+
+        if (!isLinked)
+            return null;
+
+        var patient = await _context.Set<Patient>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == patientId && !p.IsDeleted, cancellationToken);
+
+        if (patient is null)
+            return null;
+
+        // Walk-in → use Patient.FullName
+        if (patient.IsWalkIn)
+        {
+            return !string.IsNullOrWhiteSpace(patient.FullName)
+                ? patient.FullName
+                : "Patient";
+        }
+
+        // Registered → lookup from ApplicationUser
+        if (!patient.UserId.HasValue)
+            return "Patient";
+
+        var user = await _context.Set<ApplicationUser>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == patient.UserId.Value && !u.IsDeleted, cancellationToken);
+
+        if (user is null)
+            return "Patient";
+
+        return !string.IsNullOrWhiteSpace(user.FullName)
+            ? user.FullName
+            : (user.Email ?? "Patient");
     }
 
     public async Task<string?> GetOrganisationNameForOrganisationAdminAsync(
@@ -473,6 +550,16 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         {
             Domain.Enums.Gender.Male => "M",
             Domain.Enums.Gender.Female => "F",
+            _ => string.Empty
+        };
+    }
+
+    private static string MapGenderFromId(int? genderId)
+    {
+        return genderId switch
+        {
+            1 => "M",
+            2 => "F",
             _ => string.Empty
         };
     }
