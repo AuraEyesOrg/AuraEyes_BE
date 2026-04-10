@@ -100,15 +100,22 @@ public class ProcessPayoutViaPayOSCommandHandler
             transactionId: firstTxn?.Id,
             fee: null);
 
-        // Nếu PayOS xử lý ngay và thành công, trừ ví
-        if (payoutResult.ApprovalState.Equals("SUCCEEDED", StringComparison.OrdinalIgnoreCase))
+        // PayOS trả approvalState ở cấp batch: "COMPLETED" | "PROCESSING" | "FAILED"
+        // Từng transaction bên trong có state: "SUCCEEDED" | "PROCESSING" | "FAILED"
+        // Coi cả "COMPLETED" (batch done) lẫn "SUCCEEDED" (compat) là hoàn thành ngay
+        var isCompletedImmediately =
+            payoutResult.ApprovalState.Equals("COMPLETED", StringComparison.OrdinalIgnoreCase)
+            || payoutResult.ApprovalState.Equals("SUCCEEDED", StringComparison.OrdinalIgnoreCase)
+            || (firstTxn?.State.Equals("SUCCEEDED", StringComparison.OrdinalIgnoreCase) ?? false);
+
+        if (isCompletedImmediately)
         {
             var wallet = await _walletRepository.GetByIdAsync(withdrawalRequest.WalletId, cancellationToken);
             if (wallet != null)
             {
                 wallet.Withdraw(withdrawalRequest.Amount, $"Payout via PayOS: {referenceId}");
             }
-            withdrawalRequest.UpdatePayOSApprovalState("SUCCEEDED", firstTxn?.Id);
+            withdrawalRequest.UpdatePayOSApprovalState("COMPLETED", firstTxn?.Id);
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);

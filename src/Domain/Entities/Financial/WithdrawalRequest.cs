@@ -158,7 +158,9 @@ public class WithdrawalRequest : BaseEntity, IAggregateRoot
 
     /// <summary>
     /// Cập nhật trạng thái phê duyệt PayOS sau khi poll / webhook.
-    /// SUCCEEDED  → Completed + ghi nhận thời gian.
+    /// COMPLETED / SUCCEEDED → Completed + ghi nhận thời gian.
+    ///   - "COMPLETED" = batch-level approvalState trả về từ PayOS khi xử lý ngay.
+    ///   - "SUCCEEDED" = transaction-level state (compat cho flow cũ / webhook).
     /// FAILED     → Failed.
     /// Các giá trị khác (PROCESSING) → giữ nguyên Processing.
     /// </summary>
@@ -169,7 +171,7 @@ public class WithdrawalRequest : BaseEntity, IAggregateRoot
         if (transactionId is not null)
             PayOSTransactionId = transactionId;
 
-        if (PayOSApprovalState == "SUCCEEDED")
+        if (PayOSApprovalState == "COMPLETED" || PayOSApprovalState == "SUCCEEDED")
         {
             Status = PaymentStatus.Completed;
             ProcessedAt = DateTime.UtcNow;
