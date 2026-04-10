@@ -58,14 +58,15 @@ public class GetOrganisationAppointmentsQueryHandler
                 request.Status,
                 cancellationToken);
 
-        var patientUserIds = appointments
-            .Where(a => a.Patient is not null)
-            .Select(a => a.Patient!.UserId)
+        // Build identity lookup for registered patients only (those with UserId)
+        var registeredPatientUserIds = appointments
+            .Where(a => a.Patient is not null && a.Patient.UserId.HasValue)
+            .Select(a => a.Patient!.UserId!.Value)
             .Distinct()
             .ToList();
 
         var patientLookup = new Dictionary<Guid, UserDto>();
-        foreach (var userId in patientUserIds)
+        foreach (var userId in registeredPatientUserIds)
         {
             var user = await _identityService.GetUserByIdAsync(userId, cancellationToken);
             if (user is not null)
@@ -78,20 +79,38 @@ public class GetOrganisationAppointmentsQueryHandler
             .Where(a => a.AppointmentSlot is not null)
             .Select(a =>
             {
-                var patientUser = a.Patient is not null && patientLookup.TryGetValue(a.Patient.UserId, out var user)
-                    ? user
-                    : null;
+                // Resolve patient display name: walk-in → entity fields, registered → Identity
+                string patientName;
+                string? patientAvatarUrl = null;
+
+                if (a.Patient is not null && a.Patient.IsWalkIn)
+                {
+                    patientName = !string.IsNullOrWhiteSpace(a.Patient.FullName)
+                        ? a.Patient.FullName
+                        : $"Patient {a.PatientId.ToString()[..8]}";
+                }
+                else if (a.Patient is not null
+                         && a.Patient.UserId.HasValue
+                         && patientLookup.TryGetValue(a.Patient.UserId.Value, out var user))
+                {
+                    patientName = !string.IsNullOrWhiteSpace(user.FullName)
+                        ? user.FullName
+                        : !string.IsNullOrWhiteSpace(user.Email)
+                            ? user.Email
+                            : $"Patient {a.PatientId.ToString()[..8]}";
+                    patientAvatarUrl = user.AvatarUrl;
+                }
+                else
+                {
+                    patientName = $"Patient {a.PatientId.ToString()[..8]}";
+                }
 
                 return new ClinicAppointmentDto
                 {
                     Id = a.Id,
                     PatientId = a.PatientId,
-                    PatientName = !string.IsNullOrWhiteSpace(patientUser?.FullName)
-                        ? patientUser!.FullName
-                        : !string.IsNullOrWhiteSpace(patientUser?.Email)
-                            ? patientUser.Email
-                            : $"Patient {a.PatientId.ToString()[..8]}",
-                    PatientAvatarUrl = patientUser?.AvatarUrl,
+                    PatientName = patientName,
+                    PatientAvatarUrl = patientAvatarUrl,
                     OrganisationId = a.OrganisationId ?? Guid.Empty,
                     OrganisationName = a.Organisation?.Name,
                     SlotId = a.AppointmentSlotId,

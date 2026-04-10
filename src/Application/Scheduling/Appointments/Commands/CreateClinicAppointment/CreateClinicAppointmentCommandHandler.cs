@@ -155,10 +155,20 @@ public class CreateClinicAppointmentCommandHandler
             var patient = await _patientRepository.GetByIdAsync(patientId, cancellationToken);
             if (patient is not null)
             {
-                var patientUser = await _identityService.GetUserByIdAsync(patient.UserId, cancellationToken);
-                if (!string.IsNullOrWhiteSpace(patientUser?.FullName))
+                if (patient.IsWalkIn)
                 {
-                    patientName = patientUser.FullName;
+                    if (!string.IsNullOrWhiteSpace(patient.FullName))
+                    {
+                        patientName = patient.FullName;
+                    }
+                }
+                else
+                {
+                    var patientUser = await _identityService.GetUserByIdAsync(patient.UserId!.Value, cancellationToken);
+                    if (!string.IsNullOrWhiteSpace(patientUser?.FullName))
+                    {
+                        patientName = patientUser.FullName;
+                    }
                 }
             }
 
