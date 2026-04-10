@@ -11,7 +11,6 @@ namespace Application.OrganisationPatients.Commands.UpdateOrganisationPatientCon
 public class UpdateOrganisationPatientContactCommandHandler
     : ICommandHandler<UpdateOrganisationPatientContactCommand, Guid>
 {
-    private readonly IIdentityService _identityService;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IRepository<Organisation> _organisationRepository;
     private readonly IRepository<OrganisationPatientLink> _organisationPatientLinkRepository;
@@ -20,7 +19,6 @@ public class UpdateOrganisationPatientContactCommandHandler
     private readonly ILogger<UpdateOrganisationPatientContactCommandHandler> _logger;
 
     public UpdateOrganisationPatientContactCommandHandler(
-        IIdentityService identityService,
         IRepository<Patient> patientRepository,
         IRepository<Organisation> organisationRepository,
         IRepository<OrganisationPatientLink> organisationPatientLinkRepository,
@@ -28,7 +26,6 @@ public class UpdateOrganisationPatientContactCommandHandler
         IUnitOfWork unitOfWork,
         ILogger<UpdateOrganisationPatientContactCommandHandler> logger)
     {
-        _identityService = identityService;
         _patientRepository = patientRepository;
         _organisationRepository = organisationRepository;
         _organisationPatientLinkRepository = organisationPatientLinkRepository;
@@ -57,178 +54,163 @@ public class UpdateOrganisationPatientContactCommandHandler
             return Result<Guid>.NotFound("Patient profile not found");
         }
 
-        // ── Walk-in patient: update profile fields on Patient entity directly ──
+        // ── Walk-in patient: org owns full profile ──
         if (patient.IsWalkIn)
         {
             return await HandleWalkInUpdateAsync(patient, request, cancellationToken);
         }
 
-        // ── Registered patient: update via Identity service ──
+        // ── Registered patient: org can only update medical fields ──
         return await HandleRegisteredUpdateAsync(patient, request, cancellationToken);
     }
 
+    /// <summary>
+    /// Walk-in: update ALL fields (admin + medical) on Patient entity.
+    /// </summary>
     private async Task<Result<Guid>> HandleWalkInUpdateAsync(
         Patient patient,
         UpdateOrganisationPatientContactCommand request,
         CancellationToken cancellationToken)
     {
+        // Resolve final values (use request if provided, else keep current)
+        var fullName = request.FullName is not null
+            ? request.FullName.Trim()
+            : patient.FullName ?? "Unknown";
+
         var phoneNumber = request.PhoneNumber is not null
             ? TrimToNull(request.PhoneNumber)
             : patient.PhoneNumber;
+
+        var citizenId = request.CitizenId is not null
+            ? TrimToNull(request.CitizenId)
+            : patient.CitizenId;
+
+        var dateOfBirth = request.DateOfBirth ?? patient.DateOfBirth;
+
+        int? genderId = request.Gender is not null
+            ? ParseGenderId(request.Gender)
+            : patient.GenderId;
 
         var address = request.Address is not null
             ? TrimToNull(request.Address)
             : patient.Address;
 
+        var bmi = request.Bmi ?? patient.BMI;
+        var diseaseHistory = request.DiseaseHistory is not null
+            ? TrimToNull(request.DiseaseHistory)
+            : patient.DiseaseHistory;
+
         // Duplicate phone check scoped to organisation
         if (phoneNumber is not null && !AreEquivalentPhoneNumber(phoneNumber, patient.PhoneNumber))
         {
-            var organisation = (await _organisationRepository.FindAsync(
-                    o => o.OwnerId == request.OrgAdminUserId,
-                    cancellationToken))
-                .FirstOrDefault();
+            var isDuplicate = await IsPhoneDuplicateInOrgAsync(
+                request.OrgAdminUserId, patient.Id, phoneNumber, cancellationToken);
 
-            if (organisation is null)
-            {
-                return Result<Guid>.NotFound("Organisation not found");
-            }
-
-            var phoneInUse = await _organisationPatientLinkRepository.Query()
-                .Where(link => link.OrganisationId == organisation.Id && !link.IsDeleted)
-                .Join(
-                    _patientRepository.Query()
-                        .Where(p => p.Id != patient.Id && p.PhoneNumber == phoneNumber && !p.IsDeleted),
-                    link => link.PatientId,
-                    p => p.Id,
-                    (link, p) => p)
-                .AnyAsync(cancellationToken);
-
-            if (phoneInUse)
+            if (isDuplicate)
             {
                 return Result<Guid>.Conflict("Phone number already exists in this organisation");
             }
         }
 
-        patient.UpdateWalkInProfile(
-            fullName: patient.FullName ?? "Unknown",
-            phoneNumber: phoneNumber,
-            citizenId: patient.CitizenId,
-            dateOfBirth: patient.DateOfBirth,
-            genderId: patient.GenderId,
-            address: address);
+        // Duplicate citizenId check scoped to organisation
+        if (citizenId is not null && citizenId != patient.CitizenId)
+        {
+            var isDuplicate = await IsCitizenIdDuplicateInOrgAsync(
+                request.OrgAdminUserId, patient.Id, citizenId, cancellationToken);
+
+            if (isDuplicate)
+            {
+                return Result<Guid>.Conflict("Citizen ID already exists in this organisation");
+            }
+        }
+
+        patient.UpdateWalkInProfile(fullName, phoneNumber, citizenId, dateOfBirth, genderId, address);
+        patient.UpdateProfile(bmi, diseaseHistory);
 
         await _patientRepository.UpdateAsync(patient, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
-            "OrgAdmin {OrgAdminId} updated contact for walk-in patient {PatientId}",
-            request.OrgAdminUserId,
-            request.PatientId);
+            "OrgAdmin {OrgAdminId} updated walk-in patient {PatientId}",
+            request.OrgAdminUserId, request.PatientId);
 
         return Result<Guid>.Success(request.PatientId);
     }
 
+    /// <summary>
+    /// Registered: ONLY update medical fields (BMI, DiseaseHistory).
+    /// Admin fields belong to the patient via Identity — org CANNOT modify them.
+    /// </summary>
     private async Task<Result<Guid>> HandleRegisteredUpdateAsync(
         Patient patient,
         UpdateOrganisationPatientContactCommand request,
         CancellationToken cancellationToken)
     {
-        var userDetails = await _identityService.GetUserDetailsAsync(patient.UserId!.Value, cancellationToken);
-        if (userDetails is null)
-        {
-            return Result<Guid>.NotFound("Patient user not found");
-        }
+        var bmi = request.Bmi ?? patient.BMI;
+        var diseaseHistory = request.DiseaseHistory is not null
+            ? TrimToNull(request.DiseaseHistory)
+            : patient.DiseaseHistory;
 
-        var requestedPhoneUpdate = request.PhoneNumber is not null;
-        var requestedEmailUpdate = request.Email is not null;
-        var requestedAddressUpdate = request.Address is not null;
+        patient.UpdateProfile(bmi, diseaseHistory);
 
-        var phoneNumber = requestedPhoneUpdate
-            ? TrimToNull(request.PhoneNumber)
-            : userDetails.PhoneNumber;
-
-        var email = requestedEmailUpdate
-            ? TrimToNull(request.Email)
-            : userDetails.Email;
-
-        var address = requestedAddressUpdate
-            ? TrimToNull(request.Address)
-            : userDetails.Address;
-
-        if (requestedEmailUpdate && email is null)
-        {
-            return Result<Guid>.Failure("Email cannot be empty");
-        }
-
-        if (phoneNumber is not null && !AreEquivalentPhoneNumber(phoneNumber, userDetails.PhoneNumber))
-        {
-            var organisation = (await _organisationRepository.FindAsync(
-                    o => o.OwnerId == request.OrgAdminUserId,
-                    cancellationToken))
-                .FirstOrDefault();
-
-            if (organisation is null)
-            {
-                return Result<Guid>.NotFound("Organisation not found");
-            }
-
-            var isPhoneInUse = await _identityService.IsPhoneNumberInUseByOrganizationAsync(
-                organisation.Id,
-                phoneNumber,
-                cancellationToken);
-
-            if (isPhoneInUse)
-            {
-                return Result<Guid>.Conflict("Phone number already exists in this organisation");
-            }
-        }
-
-        if (requestedEmailUpdate
-            && email is not null
-            && !string.Equals(email, userDetails.Email, StringComparison.OrdinalIgnoreCase))
-        {
-            var existingUser = await _identityService.GetUserByEmailAsync(email, cancellationToken);
-            if (existingUser is not null && existingUser.Id != patient.UserId!.Value)
-            {
-                return Result<Guid>.Conflict("Email already exists");
-            }
-
-            var (emailUpdated, emailErrors) = await _identityService.UpdateUserEmailAsync(
-                patient.UserId!.Value,
-                email,
-                cancellationToken);
-
-            if (!emailUpdated)
-            {
-                return Result<Guid>.Failure(emailErrors);
-            }
-        }
-
-        int? currentGender = userDetails.Gender.HasValue
-            ? (int)userDetails.Gender.Value
-            : null;
-
-        var (profileUpdated, profileErrors) = await _identityService.UpdateUserProfileAsync(
-            patient.UserId!.Value,
-            userDetails.FullName,
-            phoneNumber,
-            userDetails.DateOfBirth,
-            currentGender,
-            address,
-            userDetails.CitizenId,
-            cancellationToken);
-
-        if (!profileUpdated)
-        {
-            return Result<Guid>.Failure(profileErrors);
-        }
+        await _patientRepository.UpdateAsync(patient, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
-            "OrgAdmin {OrgAdminId} updated contact for patient {PatientId}",
-            request.OrgAdminUserId,
-            request.PatientId);
+            "OrgAdmin {OrgAdminId} updated medical info for registered patient {PatientId}",
+            request.OrgAdminUserId, request.PatientId);
 
         return Result<Guid>.Success(request.PatientId);
+    }
+
+    // ── Helpers ──
+
+    private async Task<bool> IsPhoneDuplicateInOrgAsync(
+        Guid orgAdminUserId, Guid excludePatientId, string phoneNumber, CancellationToken ct)
+    {
+        var organisation = (await _organisationRepository.FindAsync(
+                o => o.OwnerId == orgAdminUserId, ct))
+            .FirstOrDefault();
+
+        if (organisation is null) return false;
+
+        return await _organisationPatientLinkRepository.Query()
+            .Where(link => link.OrganisationId == organisation.Id && !link.IsDeleted)
+            .Join(
+                _patientRepository.Query()
+                    .Where(p => p.Id != excludePatientId && p.PhoneNumber == phoneNumber && !p.IsDeleted),
+                link => link.PatientId,
+                p => p.Id,
+                (link, p) => p)
+            .AnyAsync(ct);
+    }
+
+    private async Task<bool> IsCitizenIdDuplicateInOrgAsync(
+        Guid orgAdminUserId, Guid excludePatientId, string citizenId, CancellationToken ct)
+    {
+        var organisation = (await _organisationRepository.FindAsync(
+                o => o.OwnerId == orgAdminUserId, ct))
+            .FirstOrDefault();
+
+        if (organisation is null) return false;
+
+        return await _organisationPatientLinkRepository.Query()
+            .Where(link => link.OrganisationId == organisation.Id && !link.IsDeleted)
+            .Join(
+                _patientRepository.Query()
+                    .Where(p => p.Id != excludePatientId && p.CitizenId == citizenId && !p.IsDeleted),
+                link => link.PatientId,
+                p => p.Id,
+                (link, p) => p)
+            .AnyAsync(ct);
+    }
+
+    private static int? ParseGenderId(string? gender)
+    {
+        if (string.IsNullOrWhiteSpace(gender)) return null;
+        if (gender.StartsWith("M", StringComparison.OrdinalIgnoreCase)) return 1;
+        if (gender.StartsWith("F", StringComparison.OrdinalIgnoreCase)) return 2;
+        return 3;
     }
 
     private static bool AreEquivalentPhoneNumber(string incomingPhone, string? existingPhone)
@@ -238,18 +220,12 @@ public class UpdateOrganisationPatientContactCommandHandler
 
     private static string NormalizePhone(string? phoneNumber)
     {
-        if (string.IsNullOrWhiteSpace(phoneNumber))
-        {
-            return string.Empty;
-        }
-
+        if (string.IsNullOrWhiteSpace(phoneNumber)) return string.Empty;
         return new string(phoneNumber.Where(char.IsDigit).ToArray());
     }
 
     private static string? TrimToNull(string? value)
     {
-        return string.IsNullOrWhiteSpace(value)
-            ? null
-            : value.Trim();
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }

@@ -11,6 +11,9 @@ public sealed record OrganisationRecentPatientReadModel
     public string? Address { get; init; }
     public string Email { get; init; } = string.Empty;
     public string PhoneNumber { get; init; } = string.Empty;
+    public bool IsWalkIn { get; init; }
+    public decimal? Bmi { get; init; }
+    public string? DiseaseHistory { get; init; }
     public DateTime LastScreening { get; init; }
     public string AiPrediction { get; init; } = string.Empty;
     public decimal Confidence { get; init; }
