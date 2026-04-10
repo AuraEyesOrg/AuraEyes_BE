@@ -40,6 +40,7 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<OrganisationOnboardingRequest> OrganisationOnboardingRequests => Set<OrganisationOnboardingRequest>();
     public DbSet<Ophthalmologist> Ophthalmologists => Set<Ophthalmologist>();
     public DbSet<Patient> Patients => Set<Patient>();
+    public DbSet<OrganisationPatientLink> OrganisationPatientLinks => Set<OrganisationPatientLink>();
     public DbSet<Certificate> Certificates => Set<Certificate>();
     public DbSet<Consent> Consents => Set<Consent>();
 
