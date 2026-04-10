@@ -3,6 +3,7 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Common.Models.Auth;
+using Application.Scheduling.ScheduleTemplates.Interfaces;
 using Domain.Common;
 using Domain.Entities.Users;
 using Domain.Enums;
@@ -34,6 +35,7 @@ public class AuthService : IAuthService
     private readonly IRepository<Patient> _patientRepository;
     private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
     private readonly IContractRepository _contractRepository;
+    private readonly IFullTimeTemplateProvisioningService _fullTimeTemplateProvisioningService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly GoogleAuthSettings _googleAuthSettings;
@@ -50,6 +52,7 @@ public class AuthService : IAuthService
         IRepository<Patient> patientRepository,
         IRepository<Ophthalmologist> ophthalmologistRepository,
         IContractRepository contractRepository,
+        IFullTimeTemplateProvisioningService fullTimeTemplateProvisioningService,
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager,
         IOptions<GoogleAuthSettings> googleAuthSettings,
@@ -65,6 +68,7 @@ public class AuthService : IAuthService
         _patientRepository = patientRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _contractRepository = contractRepository;
+        _fullTimeTemplateProvisioningService = fullTimeTemplateProvisioningService;
         _unitOfWork = unitOfWork;
         _userManager = userManager;
         _googleAuthSettings = googleAuthSettings.Value;
@@ -275,6 +279,17 @@ public class AuthService : IAuthService
 
             await _ophthalmologistRepository.AddAsync(ophthalmologist, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            if (ophthalmologist.EmploymentType == OphthalmologistEmploymentType.FullTime)
+            {
+                var createdTemplates = await _fullTimeTemplateProvisioningService
+                    .EnsureSystemGeneratedTemplatesAsync(ophthalmologist, cancellationToken);
+
+                _logger.LogInformation(
+                    "Provisioned {CreatedTemplates} system templates for newly registered full-time ophthalmologist {OphthalmologistId}",
+                    createdTemplates,
+                    ophthalmologist.Id);
+            }
 
             // All DB operations succeeded — commit transaction
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
@@ -629,6 +644,7 @@ public class AuthService : IAuthService
         bool? isVerified = null;
         string? verificationStatus = null;
         string? contractStatus = null;
+        string? employmentType = null;
 
         if (roles.Contains(Roles.Patient))
         {
@@ -646,6 +662,7 @@ public class AuthService : IAuthService
                 roleId = doctors[0].Id;
                 isVerified = doctors[0].IsVerified;
                 verificationStatus = doctors[0].VerificationStatus.ToString();
+                employmentType = doctors[0].EmploymentType.ToString();
             }
 
             var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
@@ -674,7 +691,8 @@ public class AuthService : IAuthService
                 TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
-                ContractStatus = contractStatus
+                ContractStatus = contractStatus,
+                EmploymentType = employmentType
             }
         };
     }
@@ -751,6 +769,7 @@ public class AuthService : IAuthService
             bool? isVerified = null;
             string? verificationStatus = null;
             string? contractStatus = null;
+            string? employmentType = null;
 
             if (roles.Contains(Roles.Patient))
             {
@@ -768,6 +787,7 @@ public class AuthService : IAuthService
                     roleId = doctors[0].Id;
                     isVerified = doctors[0].IsVerified;
                     verificationStatus = doctors[0].VerificationStatus.ToString();
+                    employmentType = doctors[0].EmploymentType.ToString();
                 }
 
                 var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
@@ -795,7 +815,8 @@ public class AuthService : IAuthService
                     TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
                     IsVerified = isVerified,
                     VerificationStatus = verificationStatus,
-                    ContractStatus = contractStatus
+                    ContractStatus = contractStatus,
+                    EmploymentType = employmentType
                 }
             });
         }
@@ -983,6 +1004,7 @@ public class AuthService : IAuthService
             bool? isVerified = null;
             string? verificationStatus = null;
             string? contractStatus = null;
+            string? employmentType = null;
 
             if (roles.Contains(Roles.Patient))
             {
@@ -1000,6 +1022,7 @@ public class AuthService : IAuthService
                     roleId = doctors[0].Id;
                     isVerified = doctors[0].IsVerified;
                     verificationStatus = doctors[0].VerificationStatus.ToString();
+                    employmentType = doctors[0].EmploymentType.ToString();
                 }
 
                 var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
@@ -1022,7 +1045,8 @@ public class AuthService : IAuthService
                 TwoFactorEnabled = twoFactorEnabled,
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
-                ContractStatus = contractStatus
+                ContractStatus = contractStatus,
+                EmploymentType = employmentType
             });
         }
         catch (Exception ex)

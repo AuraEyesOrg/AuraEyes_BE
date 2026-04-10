@@ -56,6 +56,7 @@ public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQu
             UserPhoneNumber = userDetails?.PhoneNumber,
             UserAddress = userDetails?.Address,
             Bio = ophthalmologist.Bio,
+            EmploymentType = ophthalmologist.EmploymentType.ToString(),
             YearsOfExperience = ophthalmologist.YearsOfExperience,
             IsVerified = ophthalmologist.IsVerified,
             CreatedAt = ophthalmologist.CreatedAt,
