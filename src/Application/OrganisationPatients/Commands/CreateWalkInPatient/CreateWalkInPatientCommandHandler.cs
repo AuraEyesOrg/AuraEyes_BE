@@ -11,6 +11,7 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
 {
     private readonly IIdentityService _identityService;
     private readonly IRepository<Patient> _patientRepository;
+    private readonly IRepository<OrganisationPatientLink> _organisationPatientLinkRepository;
     private readonly IRepository<Organisation> _orgRepository;
     private readonly ICurrentUserService _currentUserService;
     private readonly IUnitOfWork _unitOfWork;
@@ -19,6 +20,7 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
     public CreateWalkInPatientCommandHandler(
         IIdentityService identityService,
         IRepository<Patient> patientRepository,
+        IRepository<OrganisationPatientLink> organisationPatientLinkRepository,
         IRepository<Organisation> orgRepository,
         ICurrentUserService currentUserService,
         IUnitOfWork unitOfWork,
@@ -26,6 +28,7 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
     {
         _identityService = identityService;
         _patientRepository = patientRepository;
+        _organisationPatientLinkRepository = organisationPatientLinkRepository;
         _orgRepository = orgRepository;
         _currentUserService = currentUserService;
         _unitOfWork = unitOfWork;
@@ -131,6 +134,9 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
             patient.UpdateProfile(null, null);
 
             await _patientRepository.AddAsync(patient, cancellationToken);
+            await _organisationPatientLinkRepository.AddAsync(
+                new OrganisationPatientLink(org.Id, patient.Id, "walk-in"),
+                cancellationToken);
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
