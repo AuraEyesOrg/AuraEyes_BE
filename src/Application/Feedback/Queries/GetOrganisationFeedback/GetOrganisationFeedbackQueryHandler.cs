@@ -34,15 +34,22 @@ public class GetOrganisationFeedbackQueryHandler : IQueryHandler<GetOrganisation
             return Result<OrganisationFeedbackDto>.NotFound($"Organisation feedback '{request.FeedbackId}' not found.");
 
         var patientEntity = await _patientRepository.GetByIdAsync(feedback.PatientId, cancellationToken);
-        var patientUser = patientEntity != null
-            ? await _identityService.GetUserByIdAsync(patientEntity.UserId, cancellationToken)
-            : null;
+        string? patientFullName = null;
+        if (patientEntity is not null && patientEntity.IsWalkIn)
+        {
+            patientFullName = patientEntity.FullName;
+        }
+        else if (patientEntity is not null && patientEntity.UserId.HasValue)
+        {
+            var patientUser = await _identityService.GetUserByIdAsync(patientEntity.UserId.Value, cancellationToken);
+            patientFullName = patientUser?.FullName;
+        }
 
         var dto = new OrganisationFeedbackDto
         {
             Id = feedback.Id,
             PatientId = feedback.PatientId,
-            PatientFullName = patientUser?.FullName,
+            PatientFullName = patientFullName,
             OrganisationId = feedback.OrganisationId,
             AppointmentId = feedback.AppointmentId,
             Rating = feedback.Rating,
