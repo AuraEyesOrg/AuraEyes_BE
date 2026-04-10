@@ -1,4 +1,3 @@
-using Application.Common.Constants;
 using Application.SystemSettings.Interfaces;
 using Domain.Entities.Platform;
 using Infrastructure.Persistence;
@@ -10,6 +9,8 @@ namespace Infrastructure.Services;
 
 public class SystemSettingService : ISystemSettingService
 {
+    private const string PartTimeReservedSlotsPrefix = "PART_TIME_RESERVED_SLOTS_";
+
     private readonly ApplicationDbContext _context;
     private readonly ILogger<SystemSettingService> _logger;
 
@@ -106,7 +107,7 @@ public class SystemSettingService : ISystemSettingService
         DateOnly toDate,
         CancellationToken cancellationToken = default)
     {
-        var prefix = SystemSettingKeys.PartTimeReservedSlotsPrefix;
+        var prefix = PartTimeReservedSlotsPrefix;
 
         var rows = await _context.SystemSettings
             .AsNoTracking()
@@ -130,11 +131,11 @@ public class SystemSettingService : ISystemSettingService
     }
 
     private static string BuildPartTimeReservedSlotsKey(DateOnly date)
-        => $"{SystemSettingKeys.PartTimeReservedSlotsPrefix}{date:yyyyMMdd}";
+        => $"{PartTimeReservedSlotsPrefix}{date:yyyyMMdd}";
 
     private static bool TryParseDateFromPartTimeReservedSlotsKey(string key, out DateOnly date)
     {
-        var prefix = SystemSettingKeys.PartTimeReservedSlotsPrefix;
+        var prefix = PartTimeReservedSlotsPrefix;
         date = default;
 
         if (!key.StartsWith(prefix, StringComparison.Ordinal))

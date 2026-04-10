@@ -35,9 +35,12 @@ public class CreateScheduleTemplateCommandHandler : ICommandHandler<CreateSchedu
                 return Result<Guid>.NotFound($"Ophthalmologist '{request.OphthalId.Value}' not found.");
             }
 
-            source = ophthal.EmploymentType == OphthalmologistEmploymentType.FullTime
-                ? ScheduleTemplateSource.SystemGenerated
-                : ScheduleTemplateSource.Doctor;
+            if (ophthal.EmploymentType == OphthalmologistEmploymentType.FullTime)
+            {
+                return Result<Guid>.Forbidden("Full-time ophthalmologists cannot manually create schedule templates.");
+            }
+
+            source = ScheduleTemplateSource.Doctor;
         }
 
         // Check for overlapping templates

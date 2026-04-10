@@ -1,4 +1,3 @@
-using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.SystemSettings.Interfaces;
@@ -65,7 +64,7 @@ public class GetPartTimeSlotQuotaUsageQueryHandler
 
     private async Task<int> GetPartTimeDailyQuotaAsync(CancellationToken cancellationToken)
     {
-        var configured = await _settingService.GetSettingAsync(SystemSettingKeys.PartTimeMaxSlotsPerDay, cancellationToken);
+        var configured = await _settingService.GetSettingAsync("PART_TIME_MAX_SLOTS_PER_DAY", cancellationToken);
         return int.TryParse(configured, out var value) && value > 0 ? value : 100;
     }
 }
