@@ -6,9 +6,11 @@ using Application.SystemAdmin.Dashboard.Queries.GetPopulationRiskAnalysis;
 using Application.SystemAdmin.Dashboard.Queries.GetRecentScreenings;
 using Application.SystemAdmin.Dashboard.Queries.GetScreeningVolumeTrends;
 using Application.SystemAdmin.Dashboard.Queries.GetSystemHealth;
+using Infrastructure.Services;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace API.Controllers.SystemAdmin;
 
@@ -22,10 +24,17 @@ namespace API.Controllers.SystemAdmin;
 public class DashboardController : BaseApiController
 {
     private readonly IMediator _mediator;
+    private readonly FullTimeSlotGenerationJob _fullTimeSlotGenerationJob;
+    private readonly ILogger<DashboardController> _logger;
 
-    public DashboardController(IMediator mediator)
+    public DashboardController(
+        IMediator mediator,
+        FullTimeSlotGenerationJob fullTimeSlotGenerationJob,
+        ILogger<DashboardController> logger)
     {
         _mediator = mediator;
+        _fullTimeSlotGenerationJob = fullTimeSlotGenerationJob;
+        _logger = logger;
     }
 
     /// <summary>
@@ -141,5 +150,32 @@ public class DashboardController : BaseApiController
 
         var result = await _mediator.Send(query);
         return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Manually executes the full-time rolling-window slot generation job once.
+    /// This endpoint runs the same job logic as Hangfire recurring execution.
+    /// </summary>
+    [HttpPost("jobs/fulltime-slot-rolling-window/trigger-once")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> TriggerFullTimeRollingWindowJobOnce(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _fullTimeSlotGenerationJob.ExecuteAsync(cancellationToken);
+
+            return Ok(ApiResponseFactory.Success(new
+            {
+                JobId = "fulltime-slot-rolling-window",
+                TriggeredAtUtc = DateTime.UtcNow
+            }, "Triggered full-time rolling-window job successfully."));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to trigger full-time rolling-window job manually.");
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                ApiResponseFactory.InternalServerError("Failed to trigger full-time rolling-window job."));
+        }
     }
 }
