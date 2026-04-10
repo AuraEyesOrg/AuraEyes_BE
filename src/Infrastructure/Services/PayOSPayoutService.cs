@@ -51,9 +51,15 @@ public class PayOSPayoutService : IPayOSPayoutService
             ? s.ApiKey
             : s.PayoutApiKey;
 
+        // IMPORTANT: PayOS Payout API uses the SAME ChecksumKey as Payment API for x-signature.
+        // PayoutChecksumKey field is kept in settings for future compatibility but currently
+        // PayOS verifies x-signature with the shared ChecksumKey (b42806d4...).
+        // Fallback chain: PayoutChecksumKey (if set & different) → shared ChecksumKey
         _payoutChecksumKey = string.IsNullOrWhiteSpace(s.PayoutChecksumKey)
             ? s.ChecksumKey
             : s.PayoutChecksumKey;
+        // Force use shared ChecksumKey — empirically confirmed correct for PayOS Payout API
+        _payoutChecksumKey = s.ChecksumKey;
 
         // Only set BaseAddress — do NOT set x-client-id/x-api-key on DefaultRequestHeaders
         // because typed HttpClient constructors may run multiple times causing duplicate headers.
@@ -108,7 +114,8 @@ public class PayOSPayoutService : IPayOSPayoutService
         _logger.LogInformation(
             "Creating PayOS payout: ReferenceId={ReferenceId}, Amount={Amount}, ToBin={ToBin}, Account={Account}",
             referenceId, amountVnd, toBin, MaskAccountNumber(toAccountNumber));
-        _logger.LogDebug("PayOS payout signature data: {SigData} → {Sig}", signatureData, signature);
+        _logger.LogInformation("PayOS payout SigData: [{SigData}] Sig: [{Sig}]", signatureData, signature);
+        _logger.LogInformation("PayOS payout JSON body: {Body}", jsonBody);
 
         using var request = CreateRequest(HttpMethod.Post, "/v1/payouts");
         request.Headers.Add("x-idempotency-key", idempotencyKey);
