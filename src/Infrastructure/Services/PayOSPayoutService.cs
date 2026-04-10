@@ -18,9 +18,12 @@ namespace Infrastructure.Services;
 public class PayOSPayoutService : IPayOSPayoutService
 {
     private readonly HttpClient _httpClient;
-    private readonly PayOSSettings _settings;
     private readonly ILogger<PayOSPayoutService> _logger;
     private readonly string _payoutChecksumKey;
+    private readonly string _payoutClientId;
+    private readonly string _payoutApiKey;
+
+    private static readonly Uri BaseAddress = new("https://api-merchant.payos.vn");
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -34,29 +37,28 @@ public class PayOSPayoutService : IPayOSPayoutService
         ILogger<PayOSPayoutService> logger)
     {
         _httpClient = httpClient;
-        _settings = settings.Value;
         _logger = logger;
 
-        // Set base address and common headers.
-        // NOTE: Payout API (api-merchant.payos.vn) uses DIFFERENT credentials vs Payment API.
-        // Use Payout-specific keys if configured; fall back to shared Payment keys.
-        var payoutClientId = string.IsNullOrWhiteSpace(_settings.PayoutClientId)
-            ? _settings.ClientId
-            : _settings.PayoutClientId;
-        var payoutApiKey = string.IsNullOrWhiteSpace(_settings.PayoutApiKey)
-            ? _settings.ApiKey
-            : _settings.PayoutApiKey;
+        var s = settings.Value;
 
-        // PayoutChecksumKey is used for HMAC-SHA256 signature; fall back to shared ChecksumKey.
-        _payoutChecksumKey = string.IsNullOrWhiteSpace(_settings.PayoutChecksumKey)
-            ? _settings.ChecksumKey
-            : _settings.PayoutChecksumKey;
+        // NOTE: Payout API uses DIFFERENT credentials from Payment API.
+        // Fall back to Payment keys if Payout-specific ones are not configured.
+        _payoutClientId = string.IsNullOrWhiteSpace(s.PayoutClientId)
+            ? s.ClientId
+            : s.PayoutClientId;
 
-        _httpClient.BaseAddress = new Uri("https://api-merchant.payos.vn");
-        _httpClient.DefaultRequestHeaders.Accept.Clear();
-        _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        _httpClient.DefaultRequestHeaders.Add("x-client-id", payoutClientId);
-        _httpClient.DefaultRequestHeaders.Add("x-api-key", payoutApiKey);
+        _payoutApiKey = string.IsNullOrWhiteSpace(s.PayoutApiKey)
+            ? s.ApiKey
+            : s.PayoutApiKey;
+
+        _payoutChecksumKey = string.IsNullOrWhiteSpace(s.PayoutChecksumKey)
+            ? s.ChecksumKey
+            : s.PayoutChecksumKey;
+
+        // Only set BaseAddress — do NOT set x-client-id/x-api-key on DefaultRequestHeaders
+        // because typed HttpClient constructors may run multiple times causing duplicate headers.
+        // These are set per-request instead (see CreateRequest helper).
+        _httpClient.BaseAddress = BaseAddress;
     }
 
     /// <inheritdoc/>
@@ -108,7 +110,7 @@ public class PayOSPayoutService : IPayOSPayoutService
             referenceId, amountVnd, toBin, MaskAccountNumber(toAccountNumber));
         _logger.LogDebug("PayOS payout signature data: {SigData} → {Sig}", signatureData, signature);
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/payouts");
+        using var request = CreateRequest(HttpMethod.Post, "/v1/payouts");
         request.Headers.Add("x-idempotency-key", idempotencyKey);
         request.Headers.Add("x-signature", signature);
         request.Content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
@@ -138,7 +140,8 @@ public class PayOSPayoutService : IPayOSPayoutService
     {
         _logger.LogInformation("Getting PayOS payout detail: PayoutId={PayoutId}", payoutId);
 
-        var response = await _httpClient.GetAsync($"/v1/payouts/{payoutId}", cancellationToken);
+        using var request = CreateRequest(HttpMethod.Get, $"/v1/payouts/{payoutId}");
+        var response = await _httpClient.SendAsync(request, cancellationToken);
         var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
 
         response.EnsureSuccessStatusCode();
@@ -162,7 +165,8 @@ public class PayOSPayoutService : IPayOSPayoutService
 
         _logger.LogInformation("Getting PayOS payouts list: Url={Url}", url);
 
-        var response = await _httpClient.GetAsync(url, cancellationToken);
+        using var listReq = CreateRequest(HttpMethod.Get, url);
+        var response = await _httpClient.SendAsync(listReq, cancellationToken);
         var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
 
         response.EnsureSuccessStatusCode();
@@ -229,7 +233,7 @@ public class PayOSPayoutService : IPayOSPayoutService
 
         _logger.LogInformation("Estimating PayOS payout credit: ReferenceId={ReferenceId}", referenceId);
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/payouts/estimate-credit");
+        using var request = CreateRequest(HttpMethod.Post, "/v1/payouts/estimate-credit");
         request.Headers.Add("x-signature", signature);
         request.Content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
 
@@ -253,7 +257,8 @@ public class PayOSPayoutService : IPayOSPayoutService
     {
         _logger.LogInformation("Getting PayOS payout account balance");
 
-        var response = await _httpClient.GetAsync("/v1/payouts-account/balance", cancellationToken);
+        using var balReq = CreateRequest(HttpMethod.Get, "/v1/payouts-account/balance");
+        var response = await _httpClient.SendAsync(balReq, cancellationToken);
         var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
 
         response.EnsureSuccessStatusCode();
@@ -276,6 +281,19 @@ public class PayOSPayoutService : IPayOSPayoutService
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Tạo HttpRequestMessage với x-client-id và x-api-key được đính kèm per-request.
+    /// Tránh duplicate headers khi typed HttpClient constructor chạy nhiều lần.
+    /// </summary>
+    private HttpRequestMessage CreateRequest(HttpMethod method, string relativeUrl)
+    {
+        var req = new HttpRequestMessage(method, relativeUrl);
+        req.Headers.Add("x-client-id", _payoutClientId);
+        req.Headers.Add("x-api-key", _payoutApiKey);
+        req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        return req;
+    }
 
     /// <summary>
     /// Sinh idempotency key dựa trên referenceId + timestamp để đảm bảo tính duy nhất.
