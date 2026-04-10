@@ -99,11 +99,17 @@ public class CreateVideoCallSessionCommandHandler
     {
         var emails = new List<string>();
 
-        var patientUser = await _identityService.GetUserByIdAsync(patient.UserId, cancellationToken);
+        if (!patient.UserId.HasValue)
+        {
+            _logger.LogWarning("Walk-in patient {PatientId} has no user account for video call.", patient.Id);
+            return Result<List<string>>.Failure("Walk-in patients cannot be invited to video calls (no email on file).");
+        }
+
+        var patientUser = await _identityService.GetUserByIdAsync(patient.UserId.Value, cancellationToken);
         if (patientUser is null || string.IsNullOrWhiteSpace(patientUser.Email))
         {
             _logger.LogWarning("Cannot resolve email for Patient {PatientId} (UserId: {UserId})", patient.Id,
-                patient.UserId);
+                patient.UserId.Value);
             return Result<List<string>>.Failure("Patient email is required to schedule a video call.");
         }
 
