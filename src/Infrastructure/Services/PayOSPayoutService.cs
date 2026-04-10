@@ -51,15 +51,12 @@ public class PayOSPayoutService : IPayOSPayoutService
             ? s.ApiKey
             : s.PayoutApiKey;
 
-        // IMPORTANT: PayOS Payout API uses the SAME ChecksumKey as Payment API for x-signature.
-        // PayoutChecksumKey field is kept in settings for future compatibility but currently
-        // PayOS verifies x-signature with the shared ChecksumKey (b42806d4...).
-        // Fallback chain: PayoutChecksumKey (if set & different) → shared ChecksumKey
+        // PayOS Payout API uses the Payout channel's own ChecksumKey (CHECKSUM_KEY in .env),
+        // which is separate from the Payment API ChecksumKey.
+        // Fall back to shared Payment ChecksumKey only if PayoutChecksumKey is not configured.
         _payoutChecksumKey = string.IsNullOrWhiteSpace(s.PayoutChecksumKey)
             ? s.ChecksumKey
             : s.PayoutChecksumKey;
-        // Force use shared ChecksumKey — empirically confirmed correct for PayOS Payout API
-        _payoutChecksumKey = s.ChecksumKey;
 
         // Only set BaseAddress — do NOT set x-client-id/x-api-key on DefaultRequestHeaders
         // because typed HttpClient constructors may run multiple times causing duplicate headers.
@@ -80,11 +77,17 @@ public class PayOSPayoutService : IPayOSPayoutService
         var categoryList = categories?.ToList() ?? new List<string> { "salary" };
         var amount = (long)amountVnd;
 
+        // PayOS Payout API: description max 25 characters
+        const int MaxDescriptionLength = 25;
+        var truncatedDescription = description.Length > MaxDescriptionLength
+            ? description[..MaxDescriptionLength]
+            : description;
+
         var payload = new
         {
             referenceId,
             amount,
-            description,
+            description = truncatedDescription,
             toBin,
             toAccountNumber,
             category = categoryList
@@ -93,22 +96,24 @@ public class PayOSPayoutService : IPayOSPayoutService
         var jsonBody = JsonSerializer.Serialize(payload, JsonOptions);
         var idempotencyKey = GenerateIdempotencyKey(referenceId);
 
-        // PayOS Payout API signature format (empirically verified):
-        // HMAC-SHA256 of sorted key=value pairs (alphabetical by key).
-        // - Scalar fields: use raw value (no quotes)
-        // - Array fields (category): use the FIRST element as a plain string (e.g. "salary")
-        // - Nested objects (payouts array): excluded from signature
-        // Final string: amount=X&category=salary&description=Y&referenceId=Z&toAccountNumber=A&toBin=B
-        var firstCategory = categoryList.FirstOrDefault() ?? "salary";
-        var signatureData = BuildSignatureData(new SortedDictionary<string, string>
+        // PayOS Payout API signature format (from official payOSHQ/payos-payout-demo-nodejs):
+        //   1. Sort all top-level keys alphabetically
+        //   2. For each key: encodeURIComponent(key)=encodeURIComponent(value)
+        //      - Arrays  → JSON.stringify(array) e.g. ["salary","hoa"] → %5B%22salary%22%2C%22hoa%22%5D
+        //      - Scalars → String(value)
+        //   3. Join with &
+        //   4. HMAC-SHA256 with the Payout channel's CHECKSUM_KEY
+        // IMPORTANT: signature must use the same truncated description that is sent in the body
+        var signatureFields = new SortedDictionary<string, object>(StringComparer.Ordinal)
         {
-            ["amount"] = amount.ToString(),
-            ["category"] = firstCategory,
-            ["description"] = description,
-            ["referenceId"] = referenceId,
-            ["toAccountNumber"] = toAccountNumber,
-            ["toBin"] = toBin,
-        });
+            ["amount"] = (object)amount,
+            ["category"] = (object)categoryList,
+            ["description"] = (object)truncatedDescription,
+            ["referenceId"] = (object)referenceId,
+            ["toAccountNumber"] = (object)toAccountNumber,
+            ["toBin"] = (object)toBin,
+        };
+        var signatureData = BuildPayOSSignatureData(signatureFields);
         var signature = GenerateSignature(signatureData);
 
         _logger.LogInformation(
@@ -228,14 +233,14 @@ public class PayOSPayoutService : IPayOSPayoutService
 
         var jsonBody = JsonSerializer.Serialize(payload, JsonOptions);
 
-        // Signature for estimate-credit: same pattern as create payout.
-        // category = first element as plain string (no brackets), referenceId = raw value.
-        var firstCat = categoryList.FirstOrDefault() ?? "salary";
-        var signatureData = BuildSignatureData(new SortedDictionary<string, string>
+        // Signature for estimate-credit: same encodeURIComponent format as CreatePayoutAsync.
+        // Only include top-level scalar/array fields; nested "payouts" array is excluded.
+        var estimateSigFields = new SortedDictionary<string, object>(StringComparer.Ordinal)
         {
-            ["category"] = firstCat,
-            ["referenceId"] = referenceId,
-        });
+            ["category"] = (object)categoryList,
+            ["referenceId"] = (object)referenceId,
+        };
+        var signatureData = BuildPayOSSignatureData(estimateSigFields);
         var signature = GenerateSignature(signatureData);
 
         _logger.LogInformation("Estimating PayOS payout credit: ReferenceId={ReferenceId}", referenceId);
@@ -320,11 +325,37 @@ public class PayOSPayoutService : IPayOSPayoutService
     }
 
     /// <summary>
-    /// Xây dựng chuỗi signature data theo format PayOS Payout:
-    /// key1=value1&amp;key2=value2 (sắp xếp theo thứ tự chữ cái của key).
+    /// Xây dựng chuỗi signature data theo format chính thức của PayOS Payout API.
+    /// Tham chiếu: payOSHQ/payos-payout-demo-nodejs / lib/signature.js → createSignature()
+    ///
+    /// Quy tắc:
+    ///   1. Sắp xếp các key theo thứ tự bảng chữ cái (Ordinal)
+    ///   2. Mỗi cặp: Uri.EscapeDataString(key)=Uri.EscapeDataString(value)
+    ///      - Array (List&lt;string&gt;): serialize thành JSON string, e.g. ["salary"] → %5B%22salary%22%5D
+    ///      - Scalar:                  Convert.ToString(value) thông thường
+    ///   3. Nối với &amp;
     /// </summary>
-    private static string BuildSignatureData(SortedDictionary<string, string> fields)
-        => string.Join("&", fields.Select(kv => $"{kv.Key}={kv.Value}"));
+    private static string BuildPayOSSignatureData(SortedDictionary<string, object> fields)
+    {
+        var parts = new List<string>(fields.Count);
+        foreach (var (key, value) in fields)
+        {
+            string strValue;
+            if (value is System.Collections.IEnumerable enumerable and not string)
+            {
+                // Arrays → JSON.stringify equivalent: ["salary"] or ["salary","hoa"]
+                var items = enumerable.Cast<object>().Select(item => $"\"{item}\"");
+                strValue = $"[{string.Join(",", items)}]";
+            }
+            else
+            {
+                strValue = Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? "";
+            }
+
+            parts.Add($"{Uri.EscapeDataString(key)}={Uri.EscapeDataString(strValue)}");
+        }
+        return string.Join("&", parts);
+    }
 
     private static string BuildQueryString(PayOSPayoutFilter filter)
     {
