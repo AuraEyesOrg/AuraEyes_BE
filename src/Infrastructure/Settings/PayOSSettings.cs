@@ -41,4 +41,11 @@ public sealed class PayOSSettings
     /// PayOS Payout API Key — lấy từ trang merchant PayOS mục "Chi tiền".
     /// </summary>
     public string PayoutApiKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// PayOS Payout Checksum Key — dùng để sign request HMAC-SHA256 cho Payout API.
+    /// Khác với ChecksumKey của Payment API.
+    /// Nếu không cấu hình, fallback về ChecksumKey chung.
+    /// </summary>
+    public string PayoutChecksumKey { get; set; } = string.Empty;
 }

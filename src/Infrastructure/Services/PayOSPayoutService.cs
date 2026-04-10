@@ -20,6 +20,7 @@ public class PayOSPayoutService : IPayOSPayoutService
     private readonly HttpClient _httpClient;
     private readonly PayOSSettings _settings;
     private readonly ILogger<PayOSPayoutService> _logger;
+    private readonly string _payoutChecksumKey;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -36,15 +37,20 @@ public class PayOSPayoutService : IPayOSPayoutService
         _settings = settings.Value;
         _logger = logger;
 
-        // Set base address and common headers
-        // NOTE: Payout API uses different credentials than Payment API.
-        // Use PayoutClientId/PayoutApiKey if configured; fall back to ClientId/ApiKey.
+        // Set base address and common headers.
+        // NOTE: Payout API (api-merchant.payos.vn) uses DIFFERENT credentials vs Payment API.
+        // Use Payout-specific keys if configured; fall back to shared Payment keys.
         var payoutClientId = string.IsNullOrWhiteSpace(_settings.PayoutClientId)
             ? _settings.ClientId
             : _settings.PayoutClientId;
         var payoutApiKey = string.IsNullOrWhiteSpace(_settings.PayoutApiKey)
             ? _settings.ApiKey
             : _settings.PayoutApiKey;
+
+        // PayoutChecksumKey is used for HMAC-SHA256 signature; fall back to shared ChecksumKey.
+        _payoutChecksumKey = string.IsNullOrWhiteSpace(_settings.PayoutChecksumKey)
+            ? _settings.ChecksumKey
+            : _settings.PayoutChecksumKey;
 
         _httpClient.BaseAddress = new Uri("https://api-merchant.payos.vn");
         _httpClient.DefaultRequestHeaders.Accept.Clear();
@@ -247,11 +253,11 @@ public class PayOSPayoutService : IPayOSPayoutService
         => $"{referenceId}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
 
     /// <summary>
-    /// Sinh chữ ký HMAC-SHA256 từ body request và ChecksumKey.
+    /// Sinh chữ ký HMAC-SHA256 từ body request và PayoutChecksumKey.
     /// </summary>
     private string GenerateSignature(string jsonBody)
     {
-        var keyBytes = Encoding.UTF8.GetBytes(_settings.ChecksumKey);
+        var keyBytes = Encoding.UTF8.GetBytes(_payoutChecksumKey);
         var bodyBytes = Encoding.UTF8.GetBytes(jsonBody);
         var hash = HMACSHA256.HashData(keyBytes, bodyBytes);
         return Convert.ToHexString(hash).ToLowerInvariant();
