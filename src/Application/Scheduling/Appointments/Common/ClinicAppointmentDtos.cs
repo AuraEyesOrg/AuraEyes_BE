@@ -6,6 +6,8 @@ public class ClinicAppointmentDto
 {
     public Guid Id { get; init; }
     public Guid PatientId { get; init; }
+    public string? PatientName { get; init; }
+    public string? PatientAvatarUrl { get; init; }
     public Guid OrganisationId { get; init; }
     public string? OrganisationName { get; init; }
     public Guid SlotId { get; init; }

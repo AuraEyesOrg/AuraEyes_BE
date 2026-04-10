@@ -149,11 +149,11 @@ public class SubmitVerificationReportCommandHandler
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
             var patient = await _patientRepository.GetByIdAsync(session.PatientId, cancellationToken);
-            if (patient is not null)
+            if (patient is not null && patient.UserId.HasValue)
             {
                 // Send real-time notification to Patient [FR-46]
                 await _notificationService.SendAsync(
-                    patient.UserId,
+                    patient.UserId.Value,
                     "Kết quả tư vấn đã sẵn sàng",
                     "Bác sĩ đã hoàn tất báo cáo xác minh kết quả sàng lọc của bạn. Bạn có thể xem chi tiết và trao đổi trực tiếp với bác sĩ.",
                     NotificationType.ConsultationResultProvided,

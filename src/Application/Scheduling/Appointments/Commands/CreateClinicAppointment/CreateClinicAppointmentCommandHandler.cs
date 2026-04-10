@@ -18,6 +18,7 @@ public class CreateClinicAppointmentCommandHandler
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IRepository<Organisation> _organisationRepository;
     private readonly IRepository<Patient> _patientRepository;
+    private readonly IRepository<OrganisationPatientLink> _organisationPatientLinkRepository;
     private readonly ICurrentUserService _currentUser;
     private readonly IIdentityService _identityService;
     private readonly INotificationService _notificationService;
@@ -29,6 +30,7 @@ public class CreateClinicAppointmentCommandHandler
         IAppointmentRepository appointmentRepository,
         IRepository<Organisation> organisationRepository,
         IRepository<Patient> patientRepository,
+        IRepository<OrganisationPatientLink> organisationPatientLinkRepository,
         ICurrentUserService currentUser,
         IIdentityService identityService,
         INotificationService notificationService,
@@ -39,6 +41,7 @@ public class CreateClinicAppointmentCommandHandler
         _appointmentRepository = appointmentRepository;
         _organisationRepository = organisationRepository;
         _patientRepository = patientRepository;
+        _organisationPatientLinkRepository = organisationPatientLinkRepository;
         _currentUser = currentUser;
         _identityService = identityService;
         _notificationService = notificationService;
@@ -117,6 +120,22 @@ public class CreateClinicAppointmentCommandHandler
                 request.OrganisationId,
                 request.VisitReason);
 
+            var existingLink = (await _organisationPatientLinkRepository.FindAsync(
+                link => link.OrganisationId == request.OrganisationId && link.PatientId == patientId,
+                cancellationToken)).FirstOrDefault();
+
+            if (existingLink is null)
+            {
+                await _organisationPatientLinkRepository.AddAsync(
+                    new OrganisationPatientLink(request.OrganisationId, patientId, "clinic-booking"),
+                    cancellationToken);
+            }
+            else
+            {
+                existingLink.Touch("clinic-booking");
+                await _organisationPatientLinkRepository.UpdateAsync(existingLink, cancellationToken);
+            }
+
             await _appointmentRepository.AddAsync(appointment, cancellationToken);
             await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -136,10 +155,20 @@ public class CreateClinicAppointmentCommandHandler
             var patient = await _patientRepository.GetByIdAsync(patientId, cancellationToken);
             if (patient is not null)
             {
-                var patientUser = await _identityService.GetUserByIdAsync(patient.UserId, cancellationToken);
-                if (!string.IsNullOrWhiteSpace(patientUser?.FullName))
+                if (patient.IsWalkIn)
                 {
-                    patientName = patientUser.FullName;
+                    if (!string.IsNullOrWhiteSpace(patient.FullName))
+                    {
+                        patientName = patient.FullName;
+                    }
+                }
+                else
+                {
+                    var patientUser = await _identityService.GetUserByIdAsync(patient.UserId!.Value, cancellationToken);
+                    if (!string.IsNullOrWhiteSpace(patientUser?.FullName))
+                    {
+                        patientName = patientUser.FullName;
+                    }
                 }
             }
 
