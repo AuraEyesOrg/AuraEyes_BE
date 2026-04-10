@@ -74,6 +74,7 @@ public class CreateWithdrawalRequestCommandHandler : ICommandHandler<CreateWithd
             request.BankName,
             request.BankAccountNumber,
             request.AccountHolderName,
+            request.BankBin,
             contractNumber,
             request.Note);
 

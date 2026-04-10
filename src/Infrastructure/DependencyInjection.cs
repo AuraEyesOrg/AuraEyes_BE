@@ -223,6 +223,9 @@ public static class DependencyInjection
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));
         services.AddScoped<IPayOSService, PayOSService>();
 
+        // Register PayOS Payout Service (sử dụng HttpClient riêng với base URL PayOS Payout API)
+        services.AddHttpClient<IPayOSPayoutService, PayOSPayoutService>();
+
         return services;
     }
 }
