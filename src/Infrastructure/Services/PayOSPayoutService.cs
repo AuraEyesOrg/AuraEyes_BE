@@ -70,11 +70,12 @@ public class PayOSPayoutService : IPayOSPayoutService
         CancellationToken cancellationToken = default)
     {
         var categoryList = categories?.ToList() ?? new List<string> { "salary" };
+        var amount = (long)amountVnd;
 
         var payload = new
         {
             referenceId,
-            amount = (long)amountVnd,
+            amount,
             description,
             toBin,
             toAccountNumber,
@@ -83,11 +84,25 @@ public class PayOSPayoutService : IPayOSPayoutService
 
         var jsonBody = JsonSerializer.Serialize(payload, JsonOptions);
         var idempotencyKey = GenerateIdempotencyKey(referenceId);
-        var signature = GenerateSignature(jsonBody);
+
+        // PayOS Payout signature: HMAC-SHA256 over sorted key=value pairs (alphabetical)
+        // Fields: amount, category (JSON array string), description, referenceId, toBin, toAccountNumber
+        var categoryJson = JsonSerializer.Serialize(categoryList, JsonOptions);
+        var signatureData = BuildSignatureData(new SortedDictionary<string, string>
+        {
+            ["amount"] = amount.ToString(),
+            ["category"] = categoryJson,
+            ["description"] = description,
+            ["referenceId"] = referenceId,
+            ["toBin"] = toBin,
+            ["toAccountNumber"] = toAccountNumber,
+        });
+        var signature = GenerateSignature(signatureData);
 
         _logger.LogInformation(
             "Creating PayOS payout: ReferenceId={ReferenceId}, Amount={Amount}, ToBin={ToBin}, Account={Account}",
             referenceId, amountVnd, toBin, MaskAccountNumber(toAccountNumber));
+        _logger.LogDebug("PayOS payout signature data: {SignatureData}", signatureData);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/payouts");
         request.Headers.Add("x-idempotency-key", idempotencyKey);
@@ -178,12 +193,15 @@ public class PayOSPayoutService : IPayOSPayoutService
         IEnumerable<PayOSPayoutItem> payouts,
         CancellationToken cancellationToken = default)
     {
+        var categoryList = categories.ToList();
+        var payoutList = payouts.ToList();
+
         var payload = new
         {
             referenceId,
-            category = categories.ToList(),
+            category = categoryList,
             validateDestination = true,
-            payouts = payouts.Select(p => new
+            payouts = payoutList.Select(p => new
             {
                 referenceId = p.ReferenceId,
                 amount = p.Amount,
@@ -194,7 +212,15 @@ public class PayOSPayoutService : IPayOSPayoutService
         };
 
         var jsonBody = JsonSerializer.Serialize(payload, JsonOptions);
-        var signature = GenerateSignature(jsonBody);
+
+        // Signature for estimate-credit uses sorted key=value format (same pattern as create payout)
+        var categoryJson = JsonSerializer.Serialize(categoryList, JsonOptions);
+        var signatureData = BuildSignatureData(new SortedDictionary<string, string>
+        {
+            ["category"] = categoryJson,
+            ["referenceId"] = referenceId,
+        });
+        var signature = GenerateSignature(signatureData);
 
         _logger.LogInformation("Estimating PayOS payout credit: ReferenceId={ReferenceId}", referenceId);
 
@@ -253,15 +279,22 @@ public class PayOSPayoutService : IPayOSPayoutService
         => $"{referenceId}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
 
     /// <summary>
-    /// Sinh chữ ký HMAC-SHA256 từ body request và PayoutChecksumKey.
+    /// Sinh chữ ký HMAC-SHA256 từ chuỗi data và PayoutChecksumKey.
     /// </summary>
-    private string GenerateSignature(string jsonBody)
+    private string GenerateSignature(string data)
     {
         var keyBytes = Encoding.UTF8.GetBytes(_payoutChecksumKey);
-        var bodyBytes = Encoding.UTF8.GetBytes(jsonBody);
-        var hash = HMACSHA256.HashData(keyBytes, bodyBytes);
+        var dataBytes = Encoding.UTF8.GetBytes(data);
+        var hash = HMACSHA256.HashData(keyBytes, dataBytes);
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
+
+    /// <summary>
+    /// Xây dựng chuỗi signature data theo format PayOS Payout:
+    /// key1=value1&amp;key2=value2 (sắp xếp theo thứ tự chữ cái của key).
+    /// </summary>
+    private static string BuildSignatureData(SortedDictionary<string, string> fields)
+        => string.Join("&", fields.Select(kv => $"{kv.Key}={kv.Value}"));
 
     private static string BuildQueryString(PayOSPayoutFilter filter)
     {
