@@ -85,24 +85,28 @@ public class PayOSPayoutService : IPayOSPayoutService
         var jsonBody = JsonSerializer.Serialize(payload, JsonOptions);
         var idempotencyKey = GenerateIdempotencyKey(referenceId);
 
-        // PayOS Payout signature: HMAC-SHA256 over sorted key=value pairs (alphabetical)
-        // Fields: amount, category (JSON array string), description, referenceId, toBin, toAccountNumber
-        var categoryJson = JsonSerializer.Serialize(categoryList, JsonOptions);
+        // PayOS Payout API signature format (empirically verified):
+        // HMAC-SHA256 of sorted key=value pairs (alphabetical by key).
+        // - Scalar fields: use raw value (no quotes)
+        // - Array fields (category): use the FIRST element as a plain string (e.g. "salary")
+        // - Nested objects (payouts array): excluded from signature
+        // Final string: amount=X&category=salary&description=Y&referenceId=Z&toAccountNumber=A&toBin=B
+        var firstCategory = categoryList.FirstOrDefault() ?? "salary";
         var signatureData = BuildSignatureData(new SortedDictionary<string, string>
         {
             ["amount"] = amount.ToString(),
-            ["category"] = categoryJson,
+            ["category"] = firstCategory,
             ["description"] = description,
             ["referenceId"] = referenceId,
-            ["toBin"] = toBin,
             ["toAccountNumber"] = toAccountNumber,
+            ["toBin"] = toBin,
         });
         var signature = GenerateSignature(signatureData);
 
         _logger.LogInformation(
             "Creating PayOS payout: ReferenceId={ReferenceId}, Amount={Amount}, ToBin={ToBin}, Account={Account}",
             referenceId, amountVnd, toBin, MaskAccountNumber(toAccountNumber));
-        _logger.LogDebug("PayOS payout signature data: {SignatureData}", signatureData);
+        _logger.LogDebug("PayOS payout signature data: {SigData} → {Sig}", signatureData, signature);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/payouts");
         request.Headers.Add("x-idempotency-key", idempotencyKey);
@@ -213,11 +217,12 @@ public class PayOSPayoutService : IPayOSPayoutService
 
         var jsonBody = JsonSerializer.Serialize(payload, JsonOptions);
 
-        // Signature for estimate-credit uses sorted key=value format (same pattern as create payout)
-        var categoryJson = JsonSerializer.Serialize(categoryList, JsonOptions);
+        // Signature for estimate-credit: same pattern as create payout.
+        // category = first element as plain string (no brackets), referenceId = raw value.
+        var firstCat = categoryList.FirstOrDefault() ?? "salary";
         var signatureData = BuildSignatureData(new SortedDictionary<string, string>
         {
-            ["category"] = categoryJson,
+            ["category"] = firstCat,
             ["referenceId"] = referenceId,
         });
         var signature = GenerateSignature(signatureData);
