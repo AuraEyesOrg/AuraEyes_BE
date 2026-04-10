@@ -78,12 +78,31 @@ public class ShareConsultationToNetworkCommandHandler : ICommandHandler<ShareCon
             .FirstOrDefault();
 
         var patient = await _patientRepository.GetByIdAsync(session.PatientId, cancellationToken);
-        var userDetails = patient is null
-            ? null
-            : await _identityService.GetUserDetailsAsync(patient.UserId, cancellationToken);
 
-        var patientAge = CalculateAge(userDetails?.DateOfBirth);
-        var patientGender = userDetails?.Gender?.ToString();
+        int? patientAge;
+        string? patientGender;
+
+        if (patient is not null && patient.IsWalkIn)
+        {
+            patientAge = CalculateAge(patient.DateOfBirth);
+            patientGender = patient.GenderId switch
+            {
+                1 => "Male",
+                2 => "Female",
+                _ => "Other"
+            };
+        }
+        else if (patient is not null && patient.UserId.HasValue)
+        {
+            var userDetails = await _identityService.GetUserDetailsAsync(patient.UserId.Value, cancellationToken);
+            patientAge = CalculateAge(userDetails?.DateOfBirth);
+            patientGender = userDetails?.Gender?.ToString();
+        }
+        else
+        {
+            patientAge = null;
+            patientGender = null;
+        }
 
         var post = new ProfessionalPost(
             request.CurrentUserId,

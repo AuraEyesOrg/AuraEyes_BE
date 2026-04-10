@@ -222,8 +222,8 @@ public class ConsultationStateWorker : BackgroundService
         var userIds = new List<Guid>(2);
 
         var patient = await patientRepo.GetByIdAsync(patientId, cancellationToken);
-        if (patient is not null)
-            userIds.Add(patient.UserId);
+        if (patient is not null && patient.UserId.HasValue)
+            userIds.Add(patient.UserId.Value);
 
         if (ophthalmologistId.HasValue)
         {

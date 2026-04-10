@@ -8,6 +8,26 @@ public class PatientConfiguration : IEntityTypeConfiguration<Patient>
 {
     public void Configure(EntityTypeBuilder<Patient> builder)
     {
+        // UserId is nullable (walk-in patients have no Identity user)
+        builder.Property(e => e.UserId)
+            .IsRequired(false);
+
+        // ── Walk-in profile fields ──
+
+        builder.Property(e => e.FullName)
+            .HasMaxLength(200);
+
+        builder.Property(e => e.PhoneNumber)
+            .HasMaxLength(20);
+
+        builder.Property(e => e.CitizenId)
+            .HasMaxLength(20);
+
+        builder.Property(e => e.Address)
+            .HasMaxLength(500);
+
+        // ── EMR fields ──
+
         builder.Property(e => e.BMI)
             .HasPrecision(5, 2);
 
@@ -23,8 +43,10 @@ public class PatientConfiguration : IEntityTypeConfiguration<Patient>
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
+        // UserId unique index — only for registered patients (non-null UserId)
         builder.HasIndex(e => e.UserId)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("\"UserId\" IS NOT NULL");
 
         // Relationships
         builder.HasMany(e => e.RetinalImages)
@@ -36,5 +58,8 @@ public class PatientConfiguration : IEntityTypeConfiguration<Patient>
             .WithOne()
             .HasForeignKey(s => s.PatientId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Computed column — not mapped, EF ignores it
+        builder.Ignore(e => e.IsWalkIn);
     }
 }

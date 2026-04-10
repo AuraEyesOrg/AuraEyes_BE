@@ -1,4 +1,5 @@
 using Application.Common.Behaviors;
+using Application.Common.Services;
 using Application.ConsultationSessions.Common;
 using AutoMapper;
 using FluentValidation;
@@ -20,6 +21,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
         services.AddAutoMapper(Assembly.GetExecutingAssembly());
         services.AddScoped<IConsultationParticipantEnrichmentService, ConsultationParticipantEnrichmentService>();
+        services.AddScoped<IPatientDisplayNameResolver, PatientDisplayNameResolver>();
 
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));

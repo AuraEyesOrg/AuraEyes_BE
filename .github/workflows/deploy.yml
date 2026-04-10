@@ -117,6 +117,8 @@ jobs:
           Hangfire__ServerEnabled=true
           Hangfire__WorkerCount=1
 
+          AiAsset__BaseUrl=${{ secrets.AI_BASE_URL }}
+
           API_PORT=${API_PORT}
           BaseUrl=${{ secrets.FRONTEND_URL }}
 

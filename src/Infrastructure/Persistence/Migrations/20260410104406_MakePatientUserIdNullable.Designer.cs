@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260410104406_MakePatientUserIdNullable")]
+    partial class MakePatientUserIdNullable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -595,11 +598,6 @@ namespace Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
-
-                    b.Property<int>("MonthlyQuotaLimit")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
 
                     b.Property<decimal>("PlatformCommissionRate")
                         .ValueGeneratedOnAdd()
@@ -1581,6 +1579,12 @@ namespace Infrastructure.Persistence.Migrations
                         },
                         new
                         {
+                            Key = "DEFAULT_PLATFORM_COMMISSION",
+                            Description = "Default platform commission rate (20%)",
+                            Value = "0.20"
+                        },
+                        new
+                        {
                             Key = "MIN_ADVANCE_BOOKING_HOURS",
                             Description = "Minimum time notice to book a slot (hours)",
                             Value = "0.5"
@@ -1863,9 +1867,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<Guid?>("OrganisationId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid");
 
@@ -1882,8 +1883,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("OrganisationId");
 
                     b.HasIndex("PatientId");
 
@@ -2418,19 +2417,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<string>("LicenseNumber")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime?>("MonthlyQuotaLastResetAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("MonthlyQuotaLimit")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<int>("MonthlyQuotaUsed")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -3314,11 +3300,6 @@ namespace Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Domain.Entities.Screening.AiScreening", b =>
                 {
-                    b.HasOne("Domain.Entities.Users.Organisation", null)
-                        .WithMany()
-                        .HasForeignKey("OrganisationId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("Domain.Entities.Users.Patient", null)
                         .WithMany("AiScreenings")
                         .HasForeignKey("PatientId")

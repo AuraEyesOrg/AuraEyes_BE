@@ -44,10 +44,8 @@ public class ConsultationParticipantEnrichmentService : IConsultationParticipant
         ConsultationSession session,
         CancellationToken cancellationToken)
     {
-        var patientDisplayLookup = await LoadParticipantDisplayDataAsync(
+        var patientDisplayLookup = await LoadPatientDisplayDataAsync(
             [session.PatientId],
-            (profileId, ct) => _patientRepository.GetByIdAsync(profileId, ct),
-            profile => profile.UserId,
             cancellationToken);
 
         var doctorDisplayLookup = await LoadParticipantDisplayDataAsync(
@@ -79,10 +77,8 @@ public class ConsultationParticipantEnrichmentService : IConsultationParticipant
         IReadOnlyList<ConsultationSession> sessions,
         CancellationToken cancellationToken)
     {
-        var patientDisplayLookup = await LoadParticipantDisplayDataAsync(
+        var patientDisplayLookup = await LoadPatientDisplayDataAsync(
             sessions.Select(session => session.PatientId),
-            (profileId, ct) => _patientRepository.GetByIdAsync(profileId, ct),
-            profile => profile.UserId,
             cancellationToken);
 
         var doctorDisplayLookup = await LoadParticipantDisplayDataAsync(
@@ -112,6 +108,50 @@ public class ConsultationParticipantEnrichmentService : IConsultationParticipant
                 OphthalmologistAvatarUrl = doctorDisplay?.AvatarUrl
             };
         }).ToList();
+    }
+
+    /// <summary>
+    /// Patient-specific loader that handles both walk-in (UserId=null, name on entity)
+    /// and registered (UserId != null, name from Identity) patients.
+    /// </summary>
+    private async Task<Dictionary<Guid, ConsultationParticipantDisplayData>> LoadPatientDisplayDataAsync(
+        IEnumerable<Guid> patientProfileIds,
+        CancellationToken cancellationToken)
+    {
+        var distinctIds = patientProfileIds.Distinct().ToList();
+        if (distinctIds.Count == 0)
+        {
+            return [];
+        }
+
+        var displayLookup = new Dictionary<Guid, ConsultationParticipantDisplayData>();
+        foreach (var profileId in distinctIds)
+        {
+            var patient = await _patientRepository.GetByIdAsync(profileId, cancellationToken);
+            if (patient is null)
+            {
+                continue;
+            }
+
+            if (patient.IsWalkIn)
+            {
+                displayLookup[profileId] = new ConsultationParticipantDisplayData(
+                    patient.FullName,
+                    null);
+            }
+            else if (patient.UserId.HasValue)
+            {
+                var user = await _identityService.GetUserByIdAsync(
+                    patient.UserId.Value,
+                    cancellationToken);
+
+                displayLookup[profileId] = new ConsultationParticipantDisplayData(
+                    user?.FullName,
+                    user?.AvatarUrl);
+            }
+        }
+
+        return displayLookup;
     }
 
     private async Task<Dictionary<Guid, ConsultationParticipantDisplayData>> LoadParticipantDisplayDataAsync<TProfile>(
