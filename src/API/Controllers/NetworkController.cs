@@ -132,6 +132,7 @@ public class NetworkController : BaseApiController
         var command = new CreatePostCommand
         {
             AuthorId = _currentUserService.UserId!.Value,
+            CurrentProfileId = _currentUserService.ProfileId,
             AuthorType = request.AuthorType,
             Content = request.Content,
             Category = request.Category,
@@ -141,6 +142,7 @@ public class NetworkController : BaseApiController
             IsAnonymizationConfirmed = request.IsAnonymizationConfirmed,
             IsInternalCase = request.IsInternalCase,
             ConsultationSessionId = request.ConsultationSessionId,
+            AiScreeningId = request.AiScreeningId,
             PatientAge = request.PatientAge,
             PatientGender = request.PatientGender
         };
@@ -515,6 +517,7 @@ public class CreatePostRequest
     public bool IsAnonymizationConfirmed { get; set; }
     public bool IsInternalCase { get; set; }
     public Guid? ConsultationSessionId { get; set; }
+    public Guid? AiScreeningId { get; set; }
     public int? PatientAge { get; set; }
     public string? PatientGender { get; set; }
 }

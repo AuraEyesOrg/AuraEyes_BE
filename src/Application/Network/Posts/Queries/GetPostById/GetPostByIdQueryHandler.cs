@@ -69,6 +69,11 @@ public class GetPostByIdQueryHandler : IQueryHandler<GetPostByIdQuery, PostDetai
             RepostCount = post.RepostCount,
             ViewCount = post.ViewCount,
             AllowComments = post.AllowComments,
+            IsInternalCase = post.IsInternalCase,
+            ConsultationSessionId = post.ConsultationSessionId,
+            AiScreeningId = post.AiScreeningId,
+            PatientAge = post.PatientAge,
+            PatientGender = post.PatientGender,
             Attachments = post.Attachments.Select(a => new AttachmentDto
             {
                 Id = a.Id,

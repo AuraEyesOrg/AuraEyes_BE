@@ -992,12 +992,14 @@ public class AuthService : IAuthService
                         "Bác sĩ đã xác thực email",
                         $"Bác sĩ {user.FullName} đã xác thực email. Vui lòng kiểm tra hợp đồng.",
                         NotificationType.SystemAlert,
-                        new
+                        payload: new
                         {
+                            action = "ophthalmologist_email_confirmed",
                             ophthalmologistUserId = user.Id,
                             emailConfirmed = true
                         },
-                        cancellationToken);
+                        cancellationToken: cancellationToken,
+                        referenceId: user.Id);
                 }
             }
 

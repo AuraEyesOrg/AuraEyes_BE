@@ -1249,6 +1249,9 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
+                    b.Property<Guid?>("AiScreeningId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("AuthorId")
                         .HasColumnType("uuid");
 
@@ -1348,6 +1351,8 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("AuthorId");
 
                     b.HasIndex("Category");
+
+                    b.HasIndex("AiScreeningId");
 
                     b.HasIndex("ConsultationSessionId");
 

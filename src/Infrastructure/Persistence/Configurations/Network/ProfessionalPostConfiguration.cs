@@ -94,6 +94,7 @@ public class ProfessionalPostConfiguration : IEntityTypeConfiguration<Profession
         builder.HasIndex(e => e.CreatedAt);
         builder.HasIndex(e => new { e.AuthorId, e.AuthorType });
         builder.HasIndex(e => e.ConsultationSessionId);
+        builder.HasIndex(e => e.AiScreeningId);
         builder.HasIndex(e => e.IsInternalCase);
         builder.HasIndex(e => e.IsHidden);
     }

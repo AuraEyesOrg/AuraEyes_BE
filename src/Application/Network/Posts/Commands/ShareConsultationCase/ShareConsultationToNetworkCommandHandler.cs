@@ -115,6 +115,7 @@ public class ShareConsultationToNetworkCommandHandler : ICommandHandler<ShareCon
         post.SetClinicalCaseMetadata(
             isInternalCase: true,
             consultationSessionId: session.Id,
+            aiScreeningId: session.AiScreeningId,
             patientAge: patientAge,
             patientGender: patientGender);
 

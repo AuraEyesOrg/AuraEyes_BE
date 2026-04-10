@@ -65,6 +65,11 @@ public class GetSavedPostsQueryHandler : IQueryHandler<GetSavedPostsQuery, Paged
                 RepostCount = s.Post.RepostCount,
                 ViewCount = s.Post.ViewCount,
                 AllowComments = s.Post.AllowComments,
+                IsInternalCase = s.Post.IsInternalCase,
+                ConsultationSessionId = s.Post.ConsultationSessionId,
+                AiScreeningId = s.Post.AiScreeningId,
+                PatientAge = s.Post.PatientAge,
+                PatientGender = s.Post.PatientGender,
                 Attachments = s.Post.Attachments.Select(a => new AttachmentDto
                 {
                     Id = a.Id,
