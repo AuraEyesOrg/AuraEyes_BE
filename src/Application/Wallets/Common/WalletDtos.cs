@@ -79,7 +79,7 @@ public class VerifyPaymentResponse
 }
 
 /// <summary>
-/// DTO for Withdrawal Request information.
+/// DTO for Withdrawal Request information (includes PayOS Payout fields).
 /// </summary>
 public class WithdrawalRequestDto
 {
@@ -98,10 +98,30 @@ public class WithdrawalRequestDto
     public Guid? ProcessedByAdminId { get; set; }
     public DateTime? ProcessedAt { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    // ── PayOS Payout fields ──────────────────────────────────────────────────
+
+    /// <summary>Mã BIN ngân hàng PayOS.</summary>
+    public string BankBin { get; set; } = string.Empty;
+
+    /// <summary>ID lệnh chi trả về từ PayOS.</summary>
+    public string? ExternalPayoutId { get; set; }
+
+    /// <summary>Mã tham chiếu nội bộ gửi lên PayOS.</summary>
+    public string? PayOSReferenceId { get; set; }
+
+    /// <summary>ID giao dịch chi tiết bên trong PayOS.</summary>
+    public string? PayOSTransactionId { get; set; }
+
+    /// <summary>Trạng thái phê duyệt PayOS: PROCESSING | SUCCEEDED | FAILED.</summary>
+    public string? PayOSApprovalState { get; set; }
+
+    /// <summary>Phí giao dịch từ PayOS.</summary>
+    public decimal? Fee { get; set; }
 }
 
 /// <summary>
-/// DTO for admin withdrawal queue rows.
+/// DTO for admin withdrawal queue rows (includes doctor info + PayOS fields).
 /// </summary>
 public class AdminWithdrawalRequestDto : WithdrawalRequestDto
 {
@@ -114,28 +134,9 @@ public class AdminWithdrawalRequestDto : WithdrawalRequestDto
 // ────────────────────────────────────────────────────────────────────────────
 
 /// <summary>
-/// DTO đầy đủ của WithdrawalRequest kèm thông tin PayOS Payout.
+/// Alias kept for backward-compat — WithdrawalRequestDto now includes all PayOS fields.
 /// </summary>
-public class WithdrawalRequestDetailDto : WithdrawalRequestDto
-{
-    /// <summary>Mã BIN ngân hàng đích.</summary>
-    public string BankBin { get; set; } = string.Empty;
-
-    /// <summary>Mã tham chiếu gửi đến PayOS (referenceId).</summary>
-    public string? PayOSReferenceId { get; set; }
-
-    /// <summary>ID lệnh chi trả về từ PayOS (payout id).</summary>
-    public string? ExternalPayoutId { get; set; }
-
-    /// <summary>ID giao dịch chi tiết bên trong PayOS.</summary>
-    public string? PayOSTransactionId { get; set; }
-
-    /// <summary>Trạng thái phê duyệt PayOS: PROCESSING | SUCCEEDED | FAILED.</summary>
-    public string? PayOSApprovalState { get; set; }
-
-    /// <summary>Phí giao dịch từ PayOS.</summary>
-    public decimal? Fee { get; set; }
-}
+public class WithdrawalRequestDetailDto : WithdrawalRequestDto { }
 
 /// <summary>
 /// Response sau khi trigger lệnh chi PayOS thành công.

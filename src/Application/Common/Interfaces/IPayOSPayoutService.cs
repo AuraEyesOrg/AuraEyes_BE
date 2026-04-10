@@ -1,95 +1,35 @@
 namespace Application.Common.Interfaces;
 
-/// <summary>
-/// PayOS Payout Service - tạo và quản lý lệnh chi (disbursement) qua PayOS Payout API.
-/// Tài liệu: POST /v1/payouts, GET /v1/payouts, GET /v1/payouts/{payoutId}
-/// </summary>
-public interface IPayOSPayoutService
-{
-    /// <summary>
-    /// Tạo một lệnh chi đơn lẻ qua PayOS Payout API (POST /v1/payouts).
-    /// </summary>
-    /// <param name="referenceId">Mã tham chiếu nội bộ (unique per request).</param>
-    /// <param name="amountVnd">Số tiền thanh toán (VND).</param>
-    /// <param name="description">Mô tả thanh toán.</param>
-    /// <param name="toBin">Mã ngân hàng đích (BIN).</param>
-    /// <param name="toAccountNumber">Số tài khoản ngân hàng đích.</param>
-    /// <param name="categories">Danh mục thanh toán (e.g. ["salary"]).</param>
-    /// <returns>Thông tin lệnh chi PayOS.</returns>
-    Task<PayOSPayoutResult> CreatePayoutAsync(
-        string referenceId,
-        decimal amountVnd,
-        string description,
-        string toBin,
-        string toAccountNumber,
-        IEnumerable<string>? categories = null,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Lấy thông tin chi tiết một lệnh chi theo PayOS payout ID (GET /v1/payouts/{payoutId}).
-    /// </summary>
-    /// <param name="payoutId">ID lệnh chi PayOS.</param>
-    /// <returns>Thông tin lệnh chi.</returns>
-    Task<PayOSPayoutResult> GetPayoutAsync(
-        string payoutId,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Lấy danh sách lệnh chi với bộ lọc tùy chọn (GET /v1/payouts).
-    /// </summary>
-    /// <param name="filter">Bộ lọc danh sách lệnh chi.</param>
-    /// <returns>Danh sách lệnh chi và thông tin phân trang.</returns>
-    Task<PayOSPayoutListResult> GetPayoutsAsync(
-        PayOSPayoutFilter filter,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Ước tính phí cho một batch lệnh chi (POST /v1/payouts/estimate-credit).
-    /// </summary>
-    /// <param name="referenceId">Mã tham chiếu.</param>
-    /// <param name="categories">Danh mục thanh toán.</param>
-    /// <param name="payouts">Danh sách lệnh chi cần ước tính.</param>
-    /// <returns>Số credit ước tính.</returns>
-    Task<long> EstimateCreditAsync(
-        string referenceId,
-        IEnumerable<string> categories,
-        IEnumerable<PayOSPayoutItem> payouts,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Lấy số dư tài khoản chi PayOS (GET /v1/payouts-account/balance).
-    /// </summary>
-    /// <returns>Thông tin số dư.</returns>
-    Task<PayOSPayoutAccountBalance> GetPayoutAccountBalanceAsync(
-        CancellationToken cancellationToken = default);
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Models returned by IPayOSPayoutService
+// ─────────────────────────────────────────────────────────────────────────────
 
 /// <summary>
-/// Kết quả tạo/lấy lệnh chi từ PayOS.
+/// Kết quả lệnh chi PayOS (payout) – ánh xạ từ PayOS Payout API response.
 /// </summary>
 public class PayOSPayoutResult
 {
-    /// <summary>ID lệnh chi (PayOS id field).</summary>
+    /// <summary>PayOS payout ID.</summary>
     public string Id { get; set; } = string.Empty;
 
-    /// <summary>Mã tham chiếu nội bộ (referenceId).</summary>
+    /// <summary>Reference ID do hệ thống sinh ra, gửi lên PayOS.</summary>
     public string ReferenceId { get; set; } = string.Empty;
 
     /// <summary>Trạng thái phê duyệt: PROCESSING | SUCCEEDED | FAILED.</summary>
     public string ApprovalState { get; set; } = string.Empty;
 
-    /// <summary>Danh sách giao dịch chi tiết.</summary>
-    public List<PayOSPayoutTransaction> Transactions { get; set; } = new();
-
-    /// <summary>Danh mục thanh toán.</summary>
+    /// <summary>Danh mục thanh toán (salary, bonus, …).</summary>
     public List<string> Categories { get; set; } = new();
 
-    /// <summary>Thời điểm tạo.</summary>
+    /// <summary>Thời điểm PayOS tạo lệnh chi.</summary>
     public DateTime? CreatedAt { get; set; }
+
+    /// <summary>Danh sách giao dịch chi tiết bên trong lệnh chi.</summary>
+    public List<PayOSPayoutTransaction> Transactions { get; set; } = new();
 }
 
 /// <summary>
-/// Giao dịch chi tiết bên trong một lệnh chi PayOS.
+/// Giao dịch chi tiết trong lệnh chi PayOS.
 /// </summary>
 public class PayOSPayoutTransaction
 {
@@ -101,12 +41,12 @@ public class PayOSPayoutTransaction
     public string ToAccountNumber { get; set; } = string.Empty;
     public string ToAccountName { get; set; } = string.Empty;
 
-    /// <summary>Trạng thái giao dịch: PROCESSING | SUCCEEDED | FAILED.</summary>
+    /// <summary>Trạng thái: PROCESSING | SUCCEEDED | FAILED.</summary>
     public string State { get; set; } = string.Empty;
 }
 
 /// <summary>
-/// Kết quả lấy danh sách lệnh chi PayOS.
+/// Kết quả danh sách lệnh chi PayOS (phân trang).
 /// </summary>
 public class PayOSPayoutListResult
 {
@@ -115,7 +55,7 @@ public class PayOSPayoutListResult
 }
 
 /// <summary>
-/// Thông tin phân trang trả về từ PayOS.
+/// Thông tin phân trang từ PayOS.
 /// </summary>
 public class PayOSPayoutPagination
 {
@@ -127,11 +67,11 @@ public class PayOSPayoutPagination
 }
 
 /// <summary>
-/// Bộ lọc cho API lấy danh sách lệnh chi.
+/// Bộ lọc khi lấy danh sách lệnh chi từ PayOS.
 /// </summary>
 public class PayOSPayoutFilter
 {
-    public int Limit { get; set; } = 10;
+    public int Limit { get; set; } = 20;
     public int Offset { get; set; } = 0;
     public string? ReferenceId { get; set; }
     public string? ApprovalState { get; set; }
@@ -141,7 +81,7 @@ public class PayOSPayoutFilter
 }
 
 /// <summary>
-/// Một phần tử trong batch lệnh chi (dùng cho estimate-credit và batch payout).
+/// Một mục trong batch payout (dùng cho EstimateCredit).
 /// </summary>
 public class PayOSPayoutItem
 {
@@ -153,12 +93,73 @@ public class PayOSPayoutItem
 }
 
 /// <summary>
-/// Thông tin số dư tài khoản chi PayOS.
+/// Số dư tài khoản chi PayOS.
 /// </summary>
 public class PayOSPayoutAccountBalance
 {
     public string AccountNumber { get; set; } = string.Empty;
     public string AccountName { get; set; } = string.Empty;
-    public string Currency { get; set; } = string.Empty;
+    public string Currency { get; set; } = "VND";
     public long Balance { get; set; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Interface
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// <summary>
+/// Service giao tiếp với PayOS Payout API để thực hiện lệnh chi tự động.
+/// Base URL: https://api-merchant.payos.vn
+/// </summary>
+public interface IPayOSPayoutService
+{
+    /// <summary>
+    /// Tạo lệnh chi đơn lẻ qua PayOS Payout API.
+    /// </summary>
+    /// <param name="referenceId">Mã tham chiếu duy nhất của hệ thống (ví dụ: payout_{withdrawalRequestId}).</param>
+    /// <param name="amountVnd">Số tiền VND cần chuyển.</param>
+    /// <param name="description">Nội dung chuyển khoản (tối đa 25 ký tự, không dấu).</param>
+    /// <param name="toBin">Mã BIN ngân hàng đích (ví dụ: "970415" = Vietinbank).</param>
+    /// <param name="toAccountNumber">Số tài khoản ngân hàng đích.</param>
+    /// <param name="categories">Danh mục thanh toán (mặc định: ["salary"]).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<PayOSPayoutResult> CreatePayoutAsync(
+        string referenceId,
+        decimal amountVnd,
+        string description,
+        string toBin,
+        string toAccountNumber,
+        IEnumerable<string>? categories = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lấy chi tiết một lệnh chi từ PayOS theo ID.
+    /// </summary>
+    /// <param name="payoutId">PayOS payout ID (trả về khi tạo lệnh chi).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task<PayOSPayoutResult> GetPayoutAsync(
+        string payoutId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lấy danh sách lệnh chi từ PayOS (có phân trang và lọc).
+    /// </summary>
+    Task<PayOSPayoutListResult> GetPayoutsAsync(
+        PayOSPayoutFilter filter,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Ước tính số dư credit cần thiết cho một batch payout.
+    /// </summary>
+    Task<long> EstimateCreditAsync(
+        string referenceId,
+        IEnumerable<string> categories,
+        IEnumerable<PayOSPayoutItem> payouts,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lấy số dư tài khoản chi PayOS.
+    /// </summary>
+    Task<PayOSPayoutAccountBalance> GetPayoutAccountBalanceAsync(
+        CancellationToken cancellationToken = default);
 }
