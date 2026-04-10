@@ -36,6 +36,9 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
     /// <summary>Template source (doctor-defined or system-generated).</summary>
     public ScheduleTemplateSource Source { get; private set; }
 
+    /// <summary>Indicates whether this template is active and can be used for slot generation.</summary>
+    public bool IsActive { get; private set; }
+
     // Navigation
     private readonly List<AppointmentSlot> _appointmentSlots = new();
     public IReadOnlyCollection<AppointmentSlot> AppointmentSlots => _appointmentSlots.AsReadOnly();
@@ -75,6 +78,7 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         OrgId = orgId;
         OphthalId = ophthalId;
         Source = source;
+        IsActive = true;
     }
 
     public void Update(
@@ -100,6 +104,18 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         SlotDuration = slotDuration;
         MaxCapacity = maxCapacity;
         Cost = cost;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Activate()
+    {
+        IsActive = true;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Deactivate()
+    {
+        IsActive = false;
         UpdatedAt = DateTime.UtcNow;
     }
 }

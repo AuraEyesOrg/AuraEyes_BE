@@ -2,6 +2,7 @@ using System.Text;
 using Application.AiQuota.Interfaces;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
+using Application.Scheduling.ScheduleTemplates.Interfaces;
 using Application.SystemAdmin.Interfaces;
 using Application.SystemSettings.Interfaces;
 using Domain.Common;
@@ -201,6 +202,7 @@ public static class DependencyInjection
         services.AddScoped<IAiQuotaService, AiQuotaService>();
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
         services.AddScoped<ISystemSettingService, SystemSettingService>();
+        services.AddScoped<IFullTimeTemplateProvisioningService, FullTimeTemplateProvisioningService>();
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
@@ -209,6 +211,7 @@ public static class DependencyInjection
 
         // Register Hangfire daily job
         services.AddScoped<DailyQuotaResetJob>();
+        services.AddScoped<MonthlyQuotaResetJob>();
         services.AddScoped<SlotMaintenanceJob>();
         services.AddScoped<FullTimeSlotGenerationJob>();
 
