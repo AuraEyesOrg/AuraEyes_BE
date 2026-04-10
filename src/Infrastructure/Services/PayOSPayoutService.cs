@@ -37,11 +37,20 @@ public class PayOSPayoutService : IPayOSPayoutService
         _logger = logger;
 
         // Set base address and common headers
+        // NOTE: Payout API uses different credentials than Payment API.
+        // Use PayoutClientId/PayoutApiKey if configured; fall back to ClientId/ApiKey.
+        var payoutClientId = string.IsNullOrWhiteSpace(_settings.PayoutClientId)
+            ? _settings.ClientId
+            : _settings.PayoutClientId;
+        var payoutApiKey = string.IsNullOrWhiteSpace(_settings.PayoutApiKey)
+            ? _settings.ApiKey
+            : _settings.PayoutApiKey;
+
         _httpClient.BaseAddress = new Uri("https://api-merchant.payos.vn");
         _httpClient.DefaultRequestHeaders.Accept.Clear();
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        _httpClient.DefaultRequestHeaders.Add("x-client-id", _settings.ClientId);
-        _httpClient.DefaultRequestHeaders.Add("x-api-key", _settings.ApiKey);
+        _httpClient.DefaultRequestHeaders.Add("x-client-id", payoutClientId);
+        _httpClient.DefaultRequestHeaders.Add("x-api-key", payoutApiKey);
     }
 
     /// <inheritdoc/>
