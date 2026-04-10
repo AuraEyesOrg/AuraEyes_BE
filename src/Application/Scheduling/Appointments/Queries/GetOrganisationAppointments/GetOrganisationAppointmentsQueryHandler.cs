@@ -13,15 +13,18 @@ public class GetOrganisationAppointmentsQueryHandler
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IRepository<Organisation> _organisationRepository;
     private readonly ICurrentUserService _currentUser;
+    private readonly IIdentityService _identityService;
 
     public GetOrganisationAppointmentsQueryHandler(
         IAppointmentRepository appointmentRepository,
         IRepository<Organisation> organisationRepository,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        IIdentityService identityService)
     {
         _appointmentRepository = appointmentRepository;
         _organisationRepository = organisationRepository;
         _currentUser = currentUser;
+        _identityService = identityService;
     }
 
     public async Task<Result<IReadOnlyList<ClinicAppointmentDto>>> Handle(
@@ -55,21 +58,50 @@ public class GetOrganisationAppointmentsQueryHandler
                 request.Status,
                 cancellationToken);
 
+        var patientUserIds = appointments
+            .Where(a => a.Patient is not null)
+            .Select(a => a.Patient!.UserId)
+            .Distinct()
+            .ToList();
+
+        var patientLookup = new Dictionary<Guid, UserDto>();
+        foreach (var userId in patientUserIds)
+        {
+            var user = await _identityService.GetUserByIdAsync(userId, cancellationToken);
+            if (user is not null)
+            {
+                patientLookup[userId] = user;
+            }
+        }
+
         var data = appointments
             .Where(a => a.AppointmentSlot is not null)
-            .Select(a => new ClinicAppointmentDto
+            .Select(a =>
             {
-                Id = a.Id,
-                PatientId = a.PatientId,
-                OrganisationId = a.OrganisationId ?? Guid.Empty,
-                OrganisationName = a.Organisation?.Name,
-                SlotId = a.AppointmentSlotId,
-                Date = a.AppointmentSlot!.Date,
-                StartTime = a.AppointmentSlot.StartTime,
-                EndTime = a.AppointmentSlot.EndTime,
-                VisitReason = a.VisitReason,
-                Status = a.Status,
-                CreatedAt = a.CreatedAt
+                var patientUser = a.Patient is not null && patientLookup.TryGetValue(a.Patient.UserId, out var user)
+                    ? user
+                    : null;
+
+                return new ClinicAppointmentDto
+                {
+                    Id = a.Id,
+                    PatientId = a.PatientId,
+                    PatientName = !string.IsNullOrWhiteSpace(patientUser?.FullName)
+                        ? patientUser!.FullName
+                        : !string.IsNullOrWhiteSpace(patientUser?.Email)
+                            ? patientUser.Email
+                            : $"Patient {a.PatientId.ToString()[..8]}",
+                    PatientAvatarUrl = patientUser?.AvatarUrl,
+                    OrganisationId = a.OrganisationId ?? Guid.Empty,
+                    OrganisationName = a.Organisation?.Name,
+                    SlotId = a.AppointmentSlotId,
+                    Date = a.AppointmentSlot!.Date,
+                    StartTime = a.AppointmentSlot.StartTime,
+                    EndTime = a.AppointmentSlot.EndTime,
+                    VisitReason = a.VisitReason,
+                    Status = a.Status,
+                    CreatedAt = a.CreatedAt
+                };
             })
             .ToList();
 

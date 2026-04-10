@@ -32,6 +32,12 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         var organisationId = appUser.OrganizationId.Value;
         take = Math.Clamp(take, 1, 100);
 
+        var managedPatientIds = _context.Set<OrganisationPatientLink>()
+            .AsNoTracking()
+            .Where(link => link.OrganisationId == organisationId)
+            .Select(link => link.PatientId)
+            .Distinct();
+
         var organisationScreeningIds = _context.Set<ConsultationSession>()
             .AsNoTracking()
             .Where(cs => cs.OrganisationId == organisationId && cs.AiScreeningId != null)
@@ -40,8 +46,8 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
 
         var topPatients = await (
             from u in _context.Set<ApplicationUser>().AsNoTracking()
-            where u.OrganizationId == organisationId && !u.IsDeleted
             join p in _context.Set<Patient>().AsNoTracking() on u.Id equals p.UserId
+            where managedPatientIds.Contains(p.Id) && !u.IsDeleted
             let latestScreeningId = (
                 from scr in _context.Set<AiScreening>().AsNoTracking()
                 join screeningId in organisationScreeningIds on scr.Id equals screeningId
@@ -168,11 +174,17 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         var organisationId = appUser.OrganizationId.Value;
         take = Math.Clamp(take, 1, 100);
 
+        var managedPatientIds = _context.Set<OrganisationPatientLink>()
+            .AsNoTracking()
+            .Where(link => link.OrganisationId == organisationId)
+            .Select(link => link.PatientId)
+            .Distinct();
+
         var screenings = await (
             from scr in _context.Set<AiScreening>().AsNoTracking()
             join p in _context.Set<Patient>().AsNoTracking() on scr.PatientId equals p.Id
             join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
-            where u.OrganizationId == organisationId && !u.IsDeleted && !scr.IsDeleted
+            where managedPatientIds.Contains(p.Id) && !u.IsDeleted && !scr.IsDeleted
             orderby scr.CreatedAt descending
             select new
             {
@@ -280,11 +292,17 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
 
         var organisationId = appUser.OrganizationId.Value;
 
+        var managedPatientIds = _context.Set<OrganisationPatientLink>()
+            .AsNoTracking()
+            .Where(link => link.OrganisationId == organisationId)
+            .Select(link => link.PatientId)
+            .Distinct();
+
         var screeningEvents =
             from scr in _context.Set<AiScreening>().AsNoTracking()
             join p in _context.Set<Patient>().AsNoTracking() on scr.PatientId equals p.Id
             join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
-            where u.OrganizationId == organisationId && !u.IsDeleted && !scr.IsDeleted
+            where managedPatientIds.Contains(p.Id) && !u.IsDeleted && !scr.IsDeleted
             select new
             {
                 scr.CreatedAt,
@@ -384,14 +402,11 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         if (!organisationId.HasValue)
             return false;
 
-        return await (
-            from p in _context.Set<Patient>().AsNoTracking()
-            join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
-            where p.Id == patientId
-                  && !u.IsDeleted
-                  && u.OrganizationId == organisationId.Value
-            select p.Id
-        ).AnyAsync(cancellationToken);
+        return await _context.Set<OrganisationPatientLink>()
+            .AsNoTracking()
+            .AnyAsync(
+                link => link.OrganisationId == organisationId.Value && link.PatientId == patientId,
+                cancellationToken);
     }
 
     public async Task<string?> GetPatientDisplayNameForOrganisationAdminAsync(
@@ -409,11 +424,13 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
             return null;
 
         return await (
+            from link in _context.Set<OrganisationPatientLink>().AsNoTracking()
             from p in _context.Set<Patient>().AsNoTracking()
             join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
-            where p.Id == patientId
+            where link.OrganisationId == organisationId.Value
+                  && link.PatientId == patientId
+                  && p.Id == link.PatientId
                   && !u.IsDeleted
-                  && u.OrganizationId == organisationId.Value
             select string.IsNullOrWhiteSpace(u.FullName)
                 ? (u.Email ?? "Patient")
                 : u.FullName
