@@ -71,7 +71,9 @@ public class GetPostByIdQueryHandler : IQueryHandler<GetPostByIdQuery, PostDetai
             AllowComments = post.AllowComments,
             IsInternalCase = post.IsInternalCase,
             ConsultationSessionId = post.ConsultationSessionId,
-            AiScreeningId = post.AiScreeningId,
+            AiScreeningId = post.AuthorId == request.CurrentUserId || request.IsSystemAdmin
+                ? post.AiScreeningId
+                : null,
             PatientAge = post.PatientAge,
             PatientGender = post.PatientGender,
             Attachments = post.Attachments.Select(a => new AttachmentDto

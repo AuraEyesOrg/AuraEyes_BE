@@ -17,6 +17,7 @@ public class SignContractCommandHandler : ICommandHandler<SignContractCommand, C
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IRepository<Organisation> _organisationRepository;
     private readonly IIdentityService _identityService;
+    private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<SignContractCommandHandler> _logger;
 
@@ -26,6 +27,7 @@ public class SignContractCommandHandler : ICommandHandler<SignContractCommand, C
         IOphthalmologistRepository ophthalmologistRepository,
         IRepository<Organisation> organisationRepository,
         IIdentityService identityService,
+        INotificationService notificationService,
         IUnitOfWork unitOfWork,
         ILogger<SignContractCommandHandler> logger)
     {
@@ -34,6 +36,7 @@ public class SignContractCommandHandler : ICommandHandler<SignContractCommand, C
         _ophthalmologistRepository = ophthalmologistRepository;
         _organisationRepository = organisationRepository;
         _identityService = identityService;
+        _notificationService = notificationService;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -95,6 +98,37 @@ public class SignContractCommandHandler : ICommandHandler<SignContractCommand, C
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         var user = await _identityService.GetUserByIdAsync(contract.UserId, cancellationToken);
+
+        try
+        {
+            await _notificationService.SendAsync(
+                contract.UserId,
+                "Hợp đồng đã được kích hoạt",
+                isOrganisationContract
+                    ? "Hợp đồng tổ chức của bạn đã được System Admin xác nhận và kích hoạt."
+                    : "Hợp đồng bác sĩ của bạn đã được System Admin xác nhận và kích hoạt.",
+                NotificationType.SystemAlert,
+                payload: new
+                {
+                    action = "contract_activated",
+                    contractId = contract.Id,
+                    contractType = template.Type.ToString(),
+                    contractStatus = contract.Status.ToString(),
+                    routeHint = isOrganisationContract
+                        ? "/organisation/contract"
+                        : "/ophthalmologist/contract"
+                },
+                cancellationToken: cancellationToken,
+                referenceId: contract.Id);
+        }
+        catch (Exception notifyEx)
+        {
+            _logger.LogWarning(
+                notifyEx,
+                "Failed to send contract activation notification for contract {ContractId} to user {UserId}.",
+                contract.Id,
+                contract.UserId);
+        }
 
         _logger.LogInformation("Contract {Id} signed and activated.", contract.Id);
 

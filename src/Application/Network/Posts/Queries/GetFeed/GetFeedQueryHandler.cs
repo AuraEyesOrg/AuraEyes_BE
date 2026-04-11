@@ -112,7 +112,9 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
             AllowComments = p.AllowComments,
             IsInternalCase = p.IsInternalCase,
             ConsultationSessionId = p.ConsultationSessionId,
-            AiScreeningId = p.AiScreeningId,
+            AiScreeningId = p.AuthorId == request.CurrentUserId || request.IsSystemAdmin
+                ? p.AiScreeningId
+                : null,
             PatientAge = p.PatientAge,
             PatientGender = p.PatientGender,
             Attachments = p.Attachments.Select(a => new AttachmentDto

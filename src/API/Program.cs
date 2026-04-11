@@ -252,7 +252,8 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        Log.Error(ex, "An error occurred while seeding the database");
+        Log.Fatal(ex, "An error occurred while seeding or migrating the database. Application startup aborted.");
+        throw;
     }
 }
 

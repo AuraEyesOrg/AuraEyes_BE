@@ -738,36 +738,8 @@ public class AuthService : IAuthService
 
         _logger.LogInformation("User logged in: {Email}", user.Email);
 
-        // Resolve role-specific profile entity (PatientId / OphthalmologistId)
-        Guid? roleId = null;
-        bool? isVerified = null;
-        string? verificationStatus = null;
-        string? contractStatus = null;
-
-        if (roles.Contains(Roles.Patient))
-        {
-            var patients = await _patientRepository.FindAsync(
-                p => p.UserId == user.Id, cancellationToken);
-            if (patients.Count > 0)
-                roleId = patients[0].Id;
-        }
-        else if (roles.Contains(Roles.Ophthalmologist))
-        {
-            var doctors = await _ophthalmologistRepository.FindAsync(
-                o => o.UserId == user.Id, cancellationToken);
-            if (doctors.Count > 0)
-            {
-                roleId = doctors[0].Id;
-                isVerified = doctors[0].IsVerified;
-                verificationStatus = doctors[0].VerificationStatus.ToString();
-            }
-
-            var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
-            if (contract != null)
-            {
-                contractStatus = contract.Status.ToString();
-            }
-        }
+        var (roleId, isVerified, verificationStatus, contractStatus) =
+            await ResolveRoleContextAsync(user.Id, roles, cancellationToken);
 
         return new AuthResponse
         {
@@ -860,36 +832,8 @@ public class AuthService : IAuthService
 
             _logger.LogInformation("Token refreshed for user: {UserId}", user.Id);
 
-            // Resolve role-specific profile entity (PatientId / OphthalmologistId)
-            Guid? roleId = null;
-            bool? isVerified = null;
-            string? verificationStatus = null;
-            string? contractStatus = null;
-
-            if (roles.Contains(Roles.Patient))
-            {
-                var patients = await _patientRepository.FindAsync(
-                    p => p.UserId == user.Id, cancellationToken);
-                if (patients.Count > 0)
-                    roleId = patients[0].Id;
-            }
-            else if (roles.Contains(Roles.Ophthalmologist))
-            {
-                var doctors = await _ophthalmologistRepository.FindAsync(
-                    o => o.UserId == user.Id, cancellationToken);
-                if (doctors.Count > 0)
-                {
-                    roleId = doctors[0].Id;
-                    isVerified = doctors[0].IsVerified;
-                    verificationStatus = doctors[0].VerificationStatus.ToString();
-                }
-
-                var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
-                if (contract != null)
-                {
-                    contractStatus = contract.Status.ToString();
-                }
-            }
+            var (roleId, isVerified, verificationStatus, contractStatus) =
+                await ResolveRoleContextAsync(user.Id, roles, cancellationToken);
 
             return Result<AuthResponse>.Success(new AuthResponse
             {
@@ -1094,36 +1038,8 @@ public class AuthService : IAuthService
             var roles = await _identityService.GetUserRolesAsync(userId);
             var twoFactorEnabled = await _identityService.IsTwoFactorEnabledAsync(userId);
 
-            // Resolve role-specific profile entity (PatientId / OphthalmologistId)
-            Guid? roleId = null;
-            bool? isVerified = null;
-            string? verificationStatus = null;
-            string? contractStatus = null;
-
-            if (roles.Contains(Roles.Patient))
-            {
-                var patients = await _patientRepository.FindAsync(
-                    p => p.UserId == userId, cancellationToken);
-                if (patients.Count > 0)
-                    roleId = patients[0].Id;
-            }
-            else if (roles.Contains(Roles.Ophthalmologist))
-            {
-                var doctors = await _ophthalmologistRepository.FindAsync(
-                    o => o.UserId == userId, cancellationToken);
-                if (doctors.Count > 0)
-                {
-                    roleId = doctors[0].Id;
-                    isVerified = doctors[0].IsVerified;
-                    verificationStatus = doctors[0].VerificationStatus.ToString();
-                }
-
-                var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
-                if (contract != null)
-                {
-                    contractStatus = contract.Status.ToString();
-                }
-            }
+            var (roleId, isVerified, verificationStatus, contractStatus) =
+                await ResolveRoleContextAsync(userId, roles, cancellationToken);
 
             return Result<UserInfoResponse>.Success(new UserInfoResponse
             {
@@ -1198,5 +1114,50 @@ public class AuthService : IAuthService
         }
 
         return claims;
+    }
+
+    private async Task<(Guid? RoleId, bool? IsVerified, string? VerificationStatus, string? ContractStatus)>
+        ResolveRoleContextAsync(Guid userId, IList<string> roles, CancellationToken cancellationToken)
+    {
+        Guid? roleId = null;
+        bool? isVerified = null;
+        string? verificationStatus = null;
+        string? contractStatus = null;
+
+        if (roles.Contains(Roles.Patient))
+        {
+            var patients = await _patientRepository.FindAsync(
+                p => p.UserId == userId,
+                cancellationToken);
+
+            if (patients.Count > 0)
+            {
+                roleId = patients[0].Id;
+            }
+        }
+        else if (roles.Contains(Roles.Ophthalmologist))
+        {
+            var doctors = await _ophthalmologistRepository.FindAsync(
+                o => o.UserId == userId,
+                cancellationToken);
+
+            if (doctors.Count > 0)
+            {
+                roleId = doctors[0].Id;
+                isVerified = doctors[0].IsVerified;
+                verificationStatus = doctors[0].VerificationStatus.ToString();
+            }
+        }
+
+        if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+        {
+            var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
+            if (contract is not null)
+            {
+                contractStatus = contract.Status.ToString();
+            }
+        }
+
+        return (roleId, isVerified, verificationStatus, contractStatus);
     }
 }

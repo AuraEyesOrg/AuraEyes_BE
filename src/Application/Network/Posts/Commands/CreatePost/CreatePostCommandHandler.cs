@@ -9,7 +9,6 @@ using Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Network.Posts.Commands.CreatePost;
-
 /// <summary>
 /// Handler for CreatePostCommand
 /// </summary>
@@ -218,21 +217,14 @@ public class CreatePostCommandHandler : ICommandHandler<CreatePostCommand, Guid>
             return Result<ResolvedSourceData>.Forbidden("You are not allowed to share this consultation case.");
         }
 
-        if (!session.AiScreeningId.HasValue)
+        AiScreening? screening = null;
+        if (session.AiScreeningId.HasValue)
         {
-            return Result<ResolvedSourceData>.Failure(
-                "This consultation session has no linked AI screening to share.");
-        }
-
-        var screening = await _aiScreeningRepository
-            .Query()
-            .AsNoTracking()
-            .Include(x => x.ScreeningResults)
-            .FirstOrDefaultAsync(x => x.Id == session.AiScreeningId.Value, cancellationToken);
-
-        if (screening is null)
-        {
-            return Result<ResolvedSourceData>.NotFound("Linked AI screening was not found.");
+            screening = await _aiScreeningRepository
+                .Query()
+                .AsNoTracking()
+                .Include(x => x.ScreeningResults)
+                .FirstOrDefaultAsync(x => x.Id == session.AiScreeningId.Value, cancellationToken);
         }
 
         var diagnosis = await _medicalDiagnosisRepository
@@ -243,7 +235,7 @@ public class CreatePostCommandHandler : ICommandHandler<CreatePostCommand, Guid>
             .ThenByDescending(d => d.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var latestResult = screening.ScreeningResults
+        var latestResult = screening?.ScreeningResults
             .OrderByDescending(r => r.CreatedAt)
             .FirstOrDefault();
 
@@ -260,10 +252,10 @@ public class CreatePostCommandHandler : ICommandHandler<CreatePostCommand, Guid>
             request.OrganisationId,
             true,
             session.Id,
-            session.AiScreeningId,
+            screening?.Id,
             age,
             gender,
-            session.AiScreeningId));
+            screening?.Id));
     }
 
     private async Task<Result<ResolvedSourceData>> ResolveFromAiScreeningSourceAsync(
