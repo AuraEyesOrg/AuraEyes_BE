@@ -21,6 +21,7 @@ public sealed record OrgBillingSummaryDto
 {
     public int TotalScreeningsThisMonth { get; init; }
     public int TotalScreeningsAllTime { get; init; }
+    public decimal WalletBalance { get; init; }
     public int RemainingQuota { get; init; }
     public int MonthlyQuotaLimit { get; init; }
     public int MonthlyQuotaUsed { get; init; }

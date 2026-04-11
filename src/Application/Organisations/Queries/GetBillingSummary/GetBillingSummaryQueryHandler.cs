@@ -16,17 +16,20 @@ public sealed class GetBillingSummaryQueryHandler
 {
     private readonly IRepository<Organisation> _orgRepo;
     private readonly IOrganisationPatientsRepository _orgPatientsRepo;
+    private readonly IWalletRepository _walletRepository;
     private readonly IAiQuotaService _aiQuotaService;
     private readonly ISystemSettingService _settingService;
 
     public GetBillingSummaryQueryHandler(
         IRepository<Organisation> orgRepo,
         IOrganisationPatientsRepository orgPatientsRepo,
+        IWalletRepository walletRepository,
         IAiQuotaService aiQuotaService,
         ISystemSettingService settingService)
     {
         _orgRepo = orgRepo;
         _orgPatientsRepo = orgPatientsRepo;
+        _walletRepository = walletRepository;
         _aiQuotaService = aiQuotaService;
         _settingService = settingService;
     }
@@ -63,11 +66,13 @@ public sealed class GetBillingSummaryQueryHandler
 
         var organisationUnitPrice = quota.UnitPrice
             ?? Math.Round(patientUnitPrice * 0.60m, 0, MidpointRounding.AwayFromZero);
+        var wallet = await _walletRepository.GetByUserIdAsync(request.OrgAdminUserId, cancellationToken);
 
         return Result<OrgBillingSummaryDto>.Success(new OrgBillingSummaryDto
         {
             TotalScreeningsThisMonth = screeningCounts.TotalScreeningsFromDate,
             TotalScreeningsAllTime = screeningCounts.TotalScreeningsAllTime,
+            WalletBalance = wallet?.Balance ?? 0m,
             RemainingQuota = quota.RemainingQuota,
             MonthlyQuotaLimit = quota.MonthlyQuotaLimit ?? 0,
             MonthlyQuotaUsed = quota.MonthlyQuotaUsed ?? 0,
