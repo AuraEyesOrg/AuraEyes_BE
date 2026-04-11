@@ -70,7 +70,7 @@ public class EmailService : IEmailService
         ArgumentException.ThrowIfNullOrWhiteSpace(subject, nameof(subject));
         ArgumentException.ThrowIfNullOrWhiteSpace(body, nameof(body));
 
-        var message = CreateMessage(to, subject, body, isHtml);
+        var message = CreateMessage(to, subject, body, isHtml, []);
 
         try
         {
@@ -93,9 +93,51 @@ public class EmailService : IEmailService
         }
     }
 
+    /// <inheritdoc />
+    public async Task SendWithAttachmentsAsync(
+        string to,
+        string subject,
+        string body,
+        IReadOnlyCollection<EmailAttachment> attachments,
+        bool isHtml = true,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(to, nameof(to));
+        ArgumentException.ThrowIfNullOrWhiteSpace(subject, nameof(subject));
+        ArgumentException.ThrowIfNullOrWhiteSpace(body, nameof(body));
+
+        var message = CreateMessage(to, subject, body, isHtml, attachments);
+
+        try
+        {
+            await SendMessageAsync(message, cancellationToken);
+
+            _logger.LogDebug(
+                "Email with attachments sent successfully - To: {To}, Subject: {Subject}, AttachmentCount: {AttachmentCount}",
+                MaskEmail(to),
+                subject,
+                attachments.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to send email with attachments - To: {To}, Subject: {Subject}, Error: {Error}",
+                MaskEmail(to),
+                subject,
+                ex.Message);
+            throw;
+        }
+    }
+
     #region Private Methods
 
-    private MimeMessage CreateMessage(string to, string subject, string body, bool isHtml)
+    private MimeMessage CreateMessage(
+        string to,
+        string subject,
+        string body,
+        bool isHtml,
+        IReadOnlyCollection<EmailAttachment> attachments)
     {
         var message = new MimeMessage();
 
@@ -118,6 +160,20 @@ public class EmailService : IEmailService
         {
             bodyBuilder.TextBody = body;
         }
+
+        foreach (var attachment in attachments)
+        {
+            if (attachment.Content.Length == 0 || string.IsNullOrWhiteSpace(attachment.FileName))
+            {
+                continue;
+            }
+
+            bodyBuilder.Attachments.Add(
+                attachment.FileName,
+                attachment.Content,
+                ContentType.Parse(attachment.ContentType));
+        }
+
         message.Body = bodyBuilder.ToMessageBody();
 
         return message;

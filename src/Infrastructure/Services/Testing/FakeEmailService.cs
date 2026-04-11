@@ -38,4 +38,20 @@ public sealed class FakeEmailService : IEmailService
         _logger.LogInformation("[FAKE EMAIL] Generic email captured. To={To}, Subject={Subject}", to, subject);
         return Task.CompletedTask;
     }
+
+    public Task SendWithAttachmentsAsync(
+        string to,
+        string subject,
+        string body,
+        IReadOnlyCollection<EmailAttachment> attachments,
+        bool isHtml = true,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "[FAKE EMAIL] Email with attachments captured. To={To}, Subject={Subject}, Attachments={AttachmentCount}",
+            to,
+            subject,
+            attachments.Count);
+        return Task.CompletedTask;
+    }
 }
