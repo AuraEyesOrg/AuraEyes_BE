@@ -3,6 +3,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.OrganisationScreenings;
 using Application.OrganisationScreenings.Commands.CreateOrgScreeningSession;
+using Application.OrganisationScreenings.Commands.ShareOrgScreeningResult;
 using Application.OrganisationScreenings.Queries.ExportOrgScreeningReportPdf;
 using Application.OrganisationScreenings.Queries.GetOrgScreeningSessionDetail;
 using Application.OrganisationScreenings.Queries.GetOrgScreeningHistory;
@@ -131,6 +132,36 @@ public class OrganisationScreeningsController : BaseApiController
 
         return HandleResult(result, "Screening history loaded");
     }
+
+    /// <summary>
+    /// Share screening result via email.
+    /// Walk-in patient requires recipient email; Aura patient can use prefilled account email.
+    /// </summary>
+    [HttpPost("{screeningId:guid}/share")]
+    [ProducesResponseType(typeof(ApiResponse<ShareOrgScreeningResultResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ShareScreeningResult(
+        [FromRoute] Guid screeningId,
+        [FromBody] ShareOrgScreeningResultRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUser.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
+
+        var command = new ShareOrgScreeningResultCommand
+        {
+            OrgAdminUserId = _currentUser.UserId.Value,
+            ScreeningId = screeningId,
+            RecipientEmail = request.RecipientEmail,
+            IncludePdf = request.IncludePdf,
+            IncludeRetinalImages = request.IncludeRetinalImages
+        };
+
+        var result = await _mediator.Send(command, cancellationToken);
+        return HandleResult(result, "Screening result shared successfully");
+    }
 }
 
 public record CreateOrgScreeningRequest
@@ -143,4 +174,11 @@ public record CreateOrgScreeningRequest
 
     /// <summary>Retinal images with URLs already uploaded.</summary>
     public List<RetinalImageData>? RetinalImages { get; init; }
+}
+
+public record ShareOrgScreeningResultRequest
+{
+    public string? RecipientEmail { get; init; }
+    public bool IncludePdf { get; init; } = true;
+    public bool IncludeRetinalImages { get; init; }
 }

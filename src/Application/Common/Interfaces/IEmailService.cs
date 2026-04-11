@@ -12,4 +12,14 @@ public interface IEmailService
     Task SendWelcomeEmailAsync(string email, string fullName, CancellationToken cancellationToken = default);
 
     Task SendAsync(string to, string subject, string body, bool isHtml = true, CancellationToken cancellationToken = default);
+
+    Task SendWithAttachmentsAsync(
+        string to,
+        string subject,
+        string body,
+        IReadOnlyCollection<EmailAttachment> attachments,
+        bool isHtml = true,
+        CancellationToken cancellationToken = default);
 }
+
+public sealed record EmailAttachment(string FileName, byte[] Content, string ContentType = "application/octet-stream");
