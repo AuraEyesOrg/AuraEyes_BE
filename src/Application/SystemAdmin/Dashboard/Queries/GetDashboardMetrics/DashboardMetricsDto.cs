@@ -1,10 +1,25 @@
 namespace Application.SystemAdmin.Dashboard.Queries.GetDashboardMetrics;
 
 /// <summary>
-/// DTO for system admin growth KPIs and chart datasets.
+/// DTO contract for System Admin dashboard metrics.
+/// Keep this shape synchronized with AuraEyes_FE system-admin dashboard API mapping.
 /// </summary>
 public class DashboardMetricsDto
 {
+    public DashboardUserGrowthMetricDto Doctors { get; set; } = new();
+    public DashboardUserGrowthMetricDto Organisations { get; set; } = new();
+    public DashboardUserGrowthMetricDto Patients { get; set; } = new();
+
+    public List<DashboardPaymentMethodRevenueDto> PaymentMethodBreakdown { get; set; } = new();
+    public List<DashboardRevenuePointDto> MonthlyRevenue { get; set; } = new();
+    public List<DashboardRevenuePointDto> DailyRevenue { get; set; } = new();
+    public decimal TotalDepositRevenueYear { get; set; }
+
+    public decimal TotalPlatformCommissionYear { get; set; }
+    public List<DashboardRevenuePointDto> MonthlyPlatformCommission { get; set; } = new();
+    public List<DashboardRevenuePointDto> DailyPlatformCommission { get; set; } = new();
+
+    public List<int> MonthlyNewDoctorCounts { get; set; } = new();
     public UserGrowthMetricDto Doctors { get; set; } = new();
     public UserGrowthMetricDto Organisations { get; set; } = new();
     public UserGrowthMetricDto Patients { get; set; } = new();
@@ -29,6 +44,31 @@ public class DashboardMetricsDto
 
     public DashboardPendingActionsDto PendingActions { get; set; } = new();
     public DashboardSystemStatusDto SystemStatus { get; set; } = new();
+    public List<DashboardTopDoctorDto> TopDoctorsByConsultationRevenue { get; set; } = new();
+    public List<DashboardTopOrganisationDto> TopOrganisationsByRating { get; set; } = new();
+}
+
+public class DashboardUserGrowthMetricDto
+{
+    public int Total { get; set; }
+    public int CurrentMonth { get; set; }
+    public int PreviousMonth { get; set; }
+    public decimal GrowthPercentage { get; set; }
+}
+
+public class DashboardPaymentMethodRevenueDto
+{
+    public string PaymentMethod { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public decimal Percentage { get; set; }
+}
+
+public class DashboardRevenuePointDto
+{
+    public int? Month { get; set; }
+    public string? Date { get; set; }
+    public string Label { get; set; } = string.Empty;
+    public decimal Revenue { get; set; }
     public DashboardBetterStackDto BetterStack { get; set; } = new();
     public List<TopPerformerDoctorDto> TopDoctorsByConsultationRevenue { get; set; } = new();
     public List<TopPerformerOrganisationDto> TopOrganisationsByRating { get; set; } = new();
@@ -42,6 +82,13 @@ public class DashboardPendingActionsDto
 }
 
 public class DashboardSystemStatusDto
+{
+    public int LiveConsultationSessions { get; set; }
+    public bool ApiHealthy { get; set; }
+    public bool DatabaseHealthy { get; set; }
+}
+
+public class DashboardTopDoctorDto
 {
     /// <summary>Sessions with open chat (active consultation window).</summary>
     public int LiveConsultationSessions { get; set; }
@@ -70,7 +117,12 @@ public class TopPerformerDoctorDto
     public Guid OphthalmologistId { get; set; }
     public string Name { get; set; } = string.Empty;
     public decimal Revenue { get; set; }
+    public decimal RatingAverage { get; set; }
+    public int RatingCount { get; set; }
+}
 
+public class DashboardTopOrganisationDto
+{
     /// <summary>Aggregate rating from patient feedback (1–5).</summary>
     public decimal RatingAverage { get; set; }
 

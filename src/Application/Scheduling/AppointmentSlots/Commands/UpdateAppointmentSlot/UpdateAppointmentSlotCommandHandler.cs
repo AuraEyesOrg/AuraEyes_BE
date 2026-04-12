@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.Scheduling.Pricing.Interfaces;
 using Domain.Common;
 using Domain.Enums;
 using Domain.Repositories;
@@ -12,19 +13,25 @@ namespace Application.Scheduling.AppointmentSlots.Commands.UpdateAppointmentSlot
 public class UpdateAppointmentSlotCommandHandler : ICommandHandler<UpdateAppointmentSlotCommand>
 {
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IExperiencePricingService _experiencePricingService;
     private readonly IUnitOfWork _unitOfWork;
 
     public UpdateAppointmentSlotCommandHandler(
         IAppointmentSlotRepository appointmentSlotRepository,
+        IOphthalmologistRepository ophthalmologistRepository,
+        IExperiencePricingService experiencePricingService,
         IUnitOfWork unitOfWork)
     {
         _appointmentSlotRepository = appointmentSlotRepository;
+        _ophthalmologistRepository = ophthalmologistRepository;
+        _experiencePricingService = experiencePricingService;
         _unitOfWork = unitOfWork;
     }
 
     public async Task<Result> Handle(UpdateAppointmentSlotCommand request, CancellationToken cancellationToken)
     {
-        var slot = await _appointmentSlotRepository.GetByIdAsync(request.AppointmentSlotId, cancellationToken);
+        var slot = await _appointmentSlotRepository.GetByIdWithTemplateAsync(request.AppointmentSlotId, cancellationToken);
 
         if (slot is null)
         {
@@ -48,6 +55,38 @@ public class UpdateAppointmentSlotCommandHandler : ICommandHandler<UpdateAppoint
         if (hasOverlap)
         {
             return Result.Conflict("An overlapping appointment slot already exists for this date and time.");
+        }
+
+        var ophthalmologistId = slot.ScheduleTemplate?.OphthalId;
+        if (ophthalmologistId.HasValue)
+        {
+            var ophthalmologist = await _ophthalmologistRepository.GetByIdAsync(ophthalmologistId.Value, cancellationToken);
+            if (ophthalmologist is null)
+            {
+                return Result.NotFound($"Ophthalmologist '{ophthalmologistId.Value}' not found.");
+            }
+
+            if (ophthalmologist.EmploymentType == OphthalmologistEmploymentType.FullTime)
+            {
+                return Result.Forbidden("Full-time ophthalmologists cannot manually update slot costs.");
+            }
+
+            if (ophthalmologist.EmploymentType == OphthalmologistEmploymentType.PartTime)
+            {
+                var pricingValidation = await _experiencePricingService.ValidatePartTimeCostAsync(
+                    ophthalmologist.Id,
+                    request.Cost,
+                    cancellationToken);
+
+                if (!pricingValidation.IsSuccess)
+                {
+                    return pricingValidation.IsNotFound
+                        ? Result.NotFound(pricingValidation.ErrorMessage)
+                        : pricingValidation.IsForbidden
+                            ? Result.Forbidden(pricingValidation.ErrorMessage)
+                            : Result.Failure(pricingValidation.ErrorMessage);
+                }
+            }
         }
 
         // Create new slot with updated values (since entity has private setters)

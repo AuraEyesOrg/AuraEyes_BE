@@ -17,6 +17,7 @@ using Application.Scheduling.AppointmentSlots.Common;
 using Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlot;
 using Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlots;
 using Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlotStats;
+using Application.Scheduling.AppointmentSlots.Queries.GetAllowedPriceRange;
 using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -83,6 +84,20 @@ public class AppointmentSlotsController : BaseApiController
     public async Task<IActionResult> GetAppointmentSlot(Guid slotId)
     {
         var result = await _mediator.Send(new GetAppointmentSlotQuery(slotId));
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Get allowed cost range for an ophthalmologist based on years of experience.
+    /// </summary>
+    [HttpGet("ophthalmologists/{ophthalmologistId:guid}/pricing-range")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponse<AllowedPriceRangeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAllowedPriceRange(Guid ophthalmologistId)
+    {
+        var result = await _mediator.Send(new GetAllowedPriceRangeQuery(ophthalmologistId));
         return HandleResult(result);
     }
 

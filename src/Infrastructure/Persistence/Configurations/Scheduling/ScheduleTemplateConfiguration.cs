@@ -26,8 +26,16 @@ public class ScheduleTemplateConfiguration : IEntityTypeConfiguration<ScheduleTe
             .HasPrecision(18, 2)
             .IsRequired(false);
 
+        builder.Property(e => e.Source)
+            .HasConversion<string>()
+            .HasMaxLength(30)
+            .HasDefaultValue(Domain.Enums.ScheduleTemplateSource.Doctor);
+
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
+
+        builder.Property(e => e.IsActive)
+            .HasDefaultValue(true);
 
         builder.Property(e => e.OrgId)
             .IsRequired(false);
@@ -44,5 +52,9 @@ public class ScheduleTemplateConfiguration : IEntityTypeConfiguration<ScheduleTe
         builder.HasIndex(e => e.OrgId);
         builder.HasIndex(e => e.OphthalId);
         builder.HasIndex(e => e.DayOfWeek);
+        builder.HasIndex(e => new { e.OphthalId, e.DayOfWeek })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false AND \"IsActive\" = true AND \"Source\" = 'SystemGenerated' AND \"OphthalId\" IS NOT NULL")
+            .HasDatabaseName("UX_ScheduleTemplates_FullTime_SystemGenerated_Day");
     }
 }

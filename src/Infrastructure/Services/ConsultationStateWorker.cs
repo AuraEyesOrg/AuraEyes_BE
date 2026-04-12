@@ -54,13 +54,24 @@ public class ConsultationStateWorker : BackgroundService
                 await ProcessStateTransitionsAsync(stoppingToken);
                 await _betterStackHeartbeat.NotifySucceededAsync(BetterStackMonitor.ConsultationStateWorker, stoppingToken);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+            {
+                _logger.LogWarning("ConsultationStateWorker cycle was canceled by infrastructure timeout and will retry.");
+            }
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
                 await _betterStackHeartbeat.NotifyFailedAsync(BetterStackMonitor.ConsultationStateWorker, stoppingToken);
                 _logger.LogError(ex, "Error in ConsultationStateWorker cycle");
             }
 
-            await Task.Delay(CheckInterval, stoppingToken);
+            try
+            {
+                await Task.Delay(CheckInterval, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
         }
 
         _logger.LogInformation("ConsultationStateWorker stopped");
