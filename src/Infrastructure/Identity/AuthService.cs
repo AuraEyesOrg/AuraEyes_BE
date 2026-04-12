@@ -3,6 +3,7 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Common.Models.Auth;
+using Application.Scheduling.ScheduleTemplates.Interfaces;
 using Domain.Common;
 using Domain.Entities.Users;
 using Domain.Enums;
@@ -34,6 +35,7 @@ public class AuthService : IAuthService
     private readonly IRepository<Patient> _patientRepository;
     private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
     private readonly IContractRepository _contractRepository;
+    private readonly IFullTimeTemplateProvisioningService _fullTimeTemplateProvisioningService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
@@ -51,6 +53,7 @@ public class AuthService : IAuthService
         IRepository<Patient> patientRepository,
         IRepository<Ophthalmologist> ophthalmologistRepository,
         IContractRepository contractRepository,
+        IFullTimeTemplateProvisioningService fullTimeTemplateProvisioningService,
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
@@ -67,6 +70,7 @@ public class AuthService : IAuthService
         _patientRepository = patientRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _contractRepository = contractRepository;
+        _fullTimeTemplateProvisioningService = fullTimeTemplateProvisioningService;
         _unitOfWork = unitOfWork;
         _userManager = userManager;
         _signInManager = signInManager;
@@ -306,6 +310,17 @@ public class AuthService : IAuthService
 
             await _ophthalmologistRepository.AddAsync(ophthalmologist, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            if (ophthalmologist.EmploymentType == OphthalmologistEmploymentType.FullTime)
+            {
+                var createdTemplates = await _fullTimeTemplateProvisioningService
+                    .EnsureSystemGeneratedTemplatesAsync(ophthalmologist, cancellationToken);
+
+                _logger.LogInformation(
+                    "Provisioned {CreatedTemplates} system templates for newly registered full-time ophthalmologist {OphthalmologistId}",
+                    createdTemplates,
+                    ophthalmologist.Id);
+            }
 
             // All DB operations succeeded — commit transaction
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
@@ -738,8 +753,38 @@ public class AuthService : IAuthService
 
         _logger.LogInformation("User logged in: {Email}", user.Email);
 
-        var (roleId, isVerified, verificationStatus, contractStatus) =
-            await ResolveRoleContextAsync(user.Id, roles, cancellationToken);
+        // Resolve role-specific profile entity (PatientId / OphthalmologistId)
+        Guid? roleId = null;
+        bool? isVerified = null;
+        string? verificationStatus = null;
+        string? contractStatus = null;
+        string? employmentType = null;
+
+        if (roles.Contains(Roles.Patient))
+        {
+            var patients = await _patientRepository.FindAsync(
+                p => p.UserId == user.Id, cancellationToken);
+            if (patients.Count > 0)
+                roleId = patients[0].Id;
+        }
+        else if (roles.Contains(Roles.Ophthalmologist))
+        {
+            var doctors = await _ophthalmologistRepository.FindAsync(
+                o => o.UserId == user.Id, cancellationToken);
+            if (doctors.Count > 0)
+            {
+                roleId = doctors[0].Id;
+                isVerified = doctors[0].IsVerified;
+                verificationStatus = doctors[0].VerificationStatus.ToString();
+                employmentType = doctors[0].EmploymentType.ToString();
+            }
+
+            var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
+            if (contract != null)
+            {
+                contractStatus = contract.Status.ToString();
+            }
+        }
 
         return new AuthResponse
         {
@@ -760,7 +805,8 @@ public class AuthService : IAuthService
                 TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
-                ContractStatus = contractStatus
+                ContractStatus = contractStatus,
+                EmploymentType = employmentType
             }
         };
     }
@@ -832,8 +878,38 @@ public class AuthService : IAuthService
 
             _logger.LogInformation("Token refreshed for user: {UserId}", user.Id);
 
-            var (roleId, isVerified, verificationStatus, contractStatus) =
-                await ResolveRoleContextAsync(user.Id, roles, cancellationToken);
+            // Resolve role-specific profile entity (PatientId / OphthalmologistId)
+            Guid? roleId = null;
+            bool? isVerified = null;
+            string? verificationStatus = null;
+            string? contractStatus = null;
+            string? employmentType = null;
+
+            if (roles.Contains(Roles.Patient))
+            {
+                var patients = await _patientRepository.FindAsync(
+                    p => p.UserId == user.Id, cancellationToken);
+                if (patients.Count > 0)
+                    roleId = patients[0].Id;
+            }
+            else if (roles.Contains(Roles.Ophthalmologist))
+            {
+                var doctors = await _ophthalmologistRepository.FindAsync(
+                    o => o.UserId == user.Id, cancellationToken);
+                if (doctors.Count > 0)
+                {
+                    roleId = doctors[0].Id;
+                    isVerified = doctors[0].IsVerified;
+                    verificationStatus = doctors[0].VerificationStatus.ToString();
+                    employmentType = doctors[0].EmploymentType.ToString();
+                }
+
+                var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
+                if (contract != null)
+                {
+                    contractStatus = contract.Status.ToString();
+                }
+            }
 
             return Result<AuthResponse>.Success(new AuthResponse
             {
@@ -853,7 +929,8 @@ public class AuthService : IAuthService
                     TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
                     IsVerified = isVerified,
                     VerificationStatus = verificationStatus,
-                    ContractStatus = contractStatus
+                    ContractStatus = contractStatus,
+                    EmploymentType = employmentType
                 }
             });
         }
@@ -936,14 +1013,12 @@ public class AuthService : IAuthService
                         "Bác sĩ đã xác thực email",
                         $"Bác sĩ {user.FullName} đã xác thực email. Vui lòng kiểm tra hợp đồng.",
                         NotificationType.SystemAlert,
-                        payload: new
+                        new
                         {
-                            action = "ophthalmologist_email_confirmed",
                             ophthalmologistUserId = user.Id,
                             emailConfirmed = true
                         },
-                        cancellationToken: cancellationToken,
-                        referenceId: user.Id);
+                        cancellationToken);
                 }
             }
 
@@ -1038,8 +1113,38 @@ public class AuthService : IAuthService
             var roles = await _identityService.GetUserRolesAsync(userId);
             var twoFactorEnabled = await _identityService.IsTwoFactorEnabledAsync(userId);
 
-            var (roleId, isVerified, verificationStatus, contractStatus) =
-                await ResolveRoleContextAsync(userId, roles, cancellationToken);
+            // Resolve role-specific profile entity (PatientId / OphthalmologistId)
+            Guid? roleId = null;
+            bool? isVerified = null;
+            string? verificationStatus = null;
+            string? contractStatus = null;
+            string? employmentType = null;
+
+            if (roles.Contains(Roles.Patient))
+            {
+                var patients = await _patientRepository.FindAsync(
+                    p => p.UserId == userId, cancellationToken);
+                if (patients.Count > 0)
+                    roleId = patients[0].Id;
+            }
+            else if (roles.Contains(Roles.Ophthalmologist))
+            {
+                var doctors = await _ophthalmologistRepository.FindAsync(
+                    o => o.UserId == userId, cancellationToken);
+                if (doctors.Count > 0)
+                {
+                    roleId = doctors[0].Id;
+                    isVerified = doctors[0].IsVerified;
+                    verificationStatus = doctors[0].VerificationStatus.ToString();
+                    employmentType = doctors[0].EmploymentType.ToString();
+                }
+
+                var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
+                if (contract != null)
+                {
+                    contractStatus = contract.Status.ToString();
+                }
+            }
 
             return Result<UserInfoResponse>.Success(new UserInfoResponse
             {
@@ -1054,7 +1159,8 @@ public class AuthService : IAuthService
                 TwoFactorEnabled = twoFactorEnabled,
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
-                ContractStatus = contractStatus
+                ContractStatus = contractStatus,
+                EmploymentType = employmentType
             });
         }
         catch (Exception ex)
@@ -1114,50 +1220,5 @@ public class AuthService : IAuthService
         }
 
         return claims;
-    }
-
-    private async Task<(Guid? RoleId, bool? IsVerified, string? VerificationStatus, string? ContractStatus)>
-        ResolveRoleContextAsync(Guid userId, IList<string> roles, CancellationToken cancellationToken)
-    {
-        Guid? roleId = null;
-        bool? isVerified = null;
-        string? verificationStatus = null;
-        string? contractStatus = null;
-
-        if (roles.Contains(Roles.Patient))
-        {
-            var patients = await _patientRepository.FindAsync(
-                p => p.UserId == userId,
-                cancellationToken);
-
-            if (patients.Count > 0)
-            {
-                roleId = patients[0].Id;
-            }
-        }
-        else if (roles.Contains(Roles.Ophthalmologist))
-        {
-            var doctors = await _ophthalmologistRepository.FindAsync(
-                o => o.UserId == userId,
-                cancellationToken);
-
-            if (doctors.Count > 0)
-            {
-                roleId = doctors[0].Id;
-                isVerified = doctors[0].IsVerified;
-                verificationStatus = doctors[0].VerificationStatus.ToString();
-            }
-        }
-
-        if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
-        {
-            var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
-            if (contract is not null)
-            {
-                contractStatus = contract.Status.ToString();
-            }
-        }
-
-        return (roleId, isVerified, verificationStatus, contractStatus);
     }
 }

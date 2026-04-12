@@ -50,6 +50,14 @@ public class GetWithdrawalRequestsQueryHandler : IQueryHandler<GetWithdrawalRequ
                 ProcessedByAdminId = item.ProcessedByAdminId,
                 ProcessedAt = item.ProcessedAt,
                 CreatedAt = item.CreatedAt,
+                // PayOS Payout fields
+                BankBin = item.BankBin,
+                ExternalPayoutId = item.ExternalPayoutId,
+                PayOSReferenceId = item.PayOSReferenceId,
+                PayOSTransactionId = item.PayOSTransactionId,
+                PayOSApprovalState = item.PayOSApprovalState,
+                Fee = item.Fee,
+                // Doctor info from Identity
                 DoctorFullName = user?.FullName ?? "Unknown",
                 DoctorEmail = user?.Email ?? string.Empty
             });

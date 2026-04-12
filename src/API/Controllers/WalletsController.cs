@@ -2,10 +2,13 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Wallets.Commands.CreateDeposit;
 using Application.Wallets.Commands.CreateWithdrawalRequest;
+using Application.Wallets.Commands.ProcessPayoutViaPayOS;
+using Application.Wallets.Commands.SyncPayoutStatus;
 using Application.Wallets.Commands.VerifyPayment;
 using Application.Wallets.Common;
 using Application.Wallets.Queries.GetDepositHistory;
 using Application.Wallets.Queries.GetDepositRequest;
+using Application.Wallets.Queries.GetPayoutStatus;
 using Application.Wallets.Queries.GetWithdrawalHistory;
 using Application.Wallets.Queries.GetWallet;
 using Application.Wallets.Queries.GetWalletTransactions;
@@ -216,6 +219,7 @@ public class WalletsController : BaseApiController
 
     /// <summary>
     /// Create withdrawal request for ophthalmologist wallet payout.
+    /// BankBin là mã ngân hàng PayOS (ví dụ: 970415 = Vietinbank), cần thiết để chi tự động.
     /// </summary>
     [HttpPost("withdraw-requests")]
     [Authorize(Policy = Policies.OphthalmologistOnly)]
@@ -237,6 +241,7 @@ public class WalletsController : BaseApiController
             BankName = request.BankName,
             BankAccountNumber = request.BankAccountNumber,
             AccountHolderName = request.AccountHolderName,
+            BankBin = request.BankBin,
             ContractNumber = request.ContractNumber,
             Note = request.Note
         };
@@ -267,6 +272,29 @@ public class WalletsController : BaseApiController
             UserId = userId.Value,
             PageNumber = pageNumber,
             PageSize = pageSize
+        });
+
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// [Ophthalmologist] Lấy trạng thái lệnh chi PayOS của một withdrawal request.
+    /// </summary>
+    [HttpGet("withdraw-requests/{id:guid}/payout-status")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponse<PayoutStatusResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetWithdrawalPayoutStatus(Guid id)
+    {
+        var userId = _currentUserService.UserId;
+        if (!userId.HasValue)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated."));
+
+        var result = await _mediator.Send(new GetPayoutStatusQuery
+        {
+            WithdrawalRequestId = id,
+            RequestedByUserId = userId.Value
         });
 
         return HandleResult(result);
@@ -388,12 +416,23 @@ public class VerifyPaymentRequest
     public string OrderCode { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Request DTO for creating a withdrawal request.
+/// </summary>
 public class CreateWithdrawalRequest
 {
     public decimal AmountVnd { get; set; }
     public string BankName { get; set; } = string.Empty;
     public string BankAccountNumber { get; set; } = string.Empty;
     public string AccountHolderName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Mã BIN ngân hàng PayOS (ví dụ: "970415" = Vietinbank, "970436" = Vietcombank).
+    /// Bắt buộc nếu muốn chi tự động qua PayOS Payout API.
+    /// Xem danh sách: https://api-merchant.payos.vn/v1/payouts
+    /// </summary>
+    public string BankBin { get; set; } = string.Empty;
+
     public string? ContractNumber { get; set; }
     public string? Note { get; set; }
 }
