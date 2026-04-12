@@ -19,8 +19,14 @@ public class Organisation : BaseEntity, IAggregateRoot
     /// <summary>Current purchased AI screening credits balance.</summary>
     public int PurchasedAiQuota { get; private set; }
 
-    /// <summary>AI screening credits used today (reset to 0 daily by Hangfire job).</summary>
-    public int UsedAiQuota { get; private set; }
+    /// <summary>Monthly AI quota allocated from contract.</summary>
+    public int MonthlyQuotaLimit { get; private set; }
+
+    /// <summary>Monthly AI quota already consumed in the current month.</summary>
+    public int MonthlyQuotaUsed { get; private set; }
+
+    /// <summary>UTC timestamp of the most recent monthly quota reset/allocation.</summary>
+    public DateTime? MonthlyQuotaLastResetAt { get; private set; }
 
     private Organisation() { } // EF Core
 
@@ -75,19 +81,16 @@ public class Organisation : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public bool HasAvailableQuota(int freeQuota)
+    public bool HasAvailableQuota()
     {
-        return UsedAiQuota < freeQuota || PurchasedAiQuota > 0;
+        return MonthlyQuotaUsed < MonthlyQuotaLimit || PurchasedAiQuota > 0;
     }
 
-    public void ConsumeQuota(int freeQuota)
+    public void ConsumeQuota()
     {
-        if (freeQuota < 0)
-            throw new ArgumentOutOfRangeException(nameof(freeQuota));
-
-        if (UsedAiQuota < freeQuota)
+        if (MonthlyQuotaUsed < MonthlyQuotaLimit)
         {
-            UsedAiQuota++;
+            MonthlyQuotaUsed++;
             UpdatedAt = DateTime.UtcNow;
             return;
         }
@@ -99,9 +102,21 @@ public class Organisation : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void ResetDailyQuota()
+    public void ConfigureMonthlyQuota(int monthlyQuotaLimit, DateTime resetAtUtc)
     {
-        UsedAiQuota = 0;
+        if (monthlyQuotaLimit < 0)
+            throw new ArgumentOutOfRangeException(nameof(monthlyQuotaLimit));
+
+        MonthlyQuotaLimit = monthlyQuotaLimit;
+        MonthlyQuotaUsed = 0;
+        MonthlyQuotaLastResetAt = resetAtUtc;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void ResetMonthlyQuota(DateTime resetAtUtc)
+    {
+        MonthlyQuotaUsed = 0;
+        MonthlyQuotaLastResetAt = resetAtUtc;
         UpdatedAt = DateTime.UtcNow;
     }
 }

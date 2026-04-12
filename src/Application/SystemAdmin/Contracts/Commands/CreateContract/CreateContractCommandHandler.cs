@@ -84,6 +84,7 @@ public class CreateContractCommandHandler : ICommandHandler<CreateContractComman
             UserFullName = userFullName,
             UserEmail = userEmail,
             AiQuotaLimit = c.AiQuotaLimit,
+            MonthlyQuotaLimit = c.MonthlyQuotaLimit,
             PlatformCommissionRate = c.PlatformCommissionRate,
             CommissionRate = commissionRate,
             ActualMonthlySalary = actualMonthlySalary,

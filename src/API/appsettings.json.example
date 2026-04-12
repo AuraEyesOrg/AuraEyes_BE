@@ -23,6 +23,9 @@
     "ValidateLifetime": true,
     "ClockSkewSeconds": 0
   },
+  "AiAsset": {
+    "BaseUrl": "https://ai"
+  },
   "Smtp": {
     "Host": "smtp.gmail.com",
     "Port": 587,

@@ -4,7 +4,9 @@ using Domain.Enums;
 namespace Domain.Entities.Financial;
 
 /// <summary>
-/// Withdrawal request entity for manual bank transfer payouts handled by system admin.
+/// Withdrawal request entity for doctor payouts.
+/// Supports both manual bank-transfer flow (admin confirms) and
+/// automated PayOS Payout API flow (admin triggers, PayOS executes).
 /// </summary>
 public class WithdrawalRequest : BaseEntity, IAggregateRoot
 {
@@ -20,6 +22,25 @@ public class WithdrawalRequest : BaseEntity, IAggregateRoot
     public string? AdminNote { get; private set; }
     public string? TransferReference { get; private set; }
     public Guid? ProcessedByAdminId { get; private set; }
+
+    /// <summary>Mã BIN ngân hàng PayOS (ví dụ: 970415 = Vietinbank).</summary>
+    public string BankBin { get; private set; } = string.Empty;
+
+    /// <summary>ID lệnh chi trả về từ PayOS Payout API.</summary>
+    public string? ExternalPayoutId { get; private set; }
+
+    /// <summary>Mã tham chiếu nội bộ gửi lên PayOS (payout_{id:N}).</summary>
+    public string? PayOSReferenceId { get; private set; }
+
+    /// <summary>ID giao dịch chi tiết trong lệnh chi PayOS.</summary>
+    public string? PayOSTransactionId { get; private set; }
+
+    /// <summary>Trạng thái phê duyệt từ PayOS: PROCESSING | SUCCEEDED | FAILED.</summary>
+    public string? PayOSApprovalState { get; private set; }
+
+    /// <summary>Phí giao dịch từ PayOS.</summary>
+    public decimal? Fee { get; private set; }
+
     public DateTime? ProcessedAt { get; private set; }
 
     // Navigation property
@@ -34,6 +55,7 @@ public class WithdrawalRequest : BaseEntity, IAggregateRoot
         string bankName,
         string bankAccountNumber,
         string accountHolderName,
+        string bankBin,
         string? contractNumber = null,
         string? note = null)
     {
@@ -53,9 +75,12 @@ public class WithdrawalRequest : BaseEntity, IAggregateRoot
         BankName = bankName.Trim();
         BankAccountNumber = bankAccountNumber.Trim();
         AccountHolderName = accountHolderName.Trim();
+        BankBin = bankBin?.Trim() ?? string.Empty;
         ContractNumber = string.IsNullOrWhiteSpace(contractNumber) ? null : contractNumber.Trim();
         Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
     }
+
+    // ─── Manual flow ─────────────────────────────────────────────────────────
 
     public void MarkCompleted(Guid adminUserId, string? transferReference = null, string? adminNote = null)
     {
@@ -99,6 +124,64 @@ public class WithdrawalRequest : BaseEntity, IAggregateRoot
         Status = PaymentStatus.Cancelled;
         AdminNote = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         ProcessedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    // ─── PayOS Payout flow ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Lưu thông tin sau khi tạo lệnh chi PayOS thành công.
+    /// Chuyển trạng thái sang Processing (chờ PayOS xử lý).
+    /// Nếu PayOS trả SUCCEEDED ngay lập tức, gọi UpdatePayOSApprovalState("SUCCEEDED") tiếp theo.
+    /// </summary>
+    public void SetPayOSPayout(
+        string payOSReferenceId,
+        string externalPayoutId,
+        string approvalState,
+        string? transactionId = null,
+        decimal? fee = null)
+    {
+        if (Status != PaymentStatus.Pending)
+            throw new InvalidOperationException(
+                $"Can only set PayOS payout for Pending requests (current: {Status}).");
+
+        PayOSReferenceId = payOSReferenceId;
+        ExternalPayoutId = externalPayoutId;
+        PayOSApprovalState = approvalState?.ToUpperInvariant();
+        PayOSTransactionId = transactionId;
+        Fee = fee;
+
+        // Chuyển sang Processing; nếu đã SUCCEEDED thì UpdatePayOSApprovalState sẽ hoàn tất
+        Status = PaymentStatus.Processing;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Cập nhật trạng thái phê duyệt PayOS sau khi poll / webhook.
+    /// COMPLETED / SUCCEEDED → Completed + ghi nhận thời gian.
+    ///   - "COMPLETED" = batch-level approvalState trả về từ PayOS khi xử lý ngay.
+    ///   - "SUCCEEDED" = transaction-level state (compat cho flow cũ / webhook).
+    /// FAILED     → Failed.
+    /// Các giá trị khác (PROCESSING) → giữ nguyên Processing.
+    /// </summary>
+    public void UpdatePayOSApprovalState(string newApprovalState, string? transactionId = null)
+    {
+        PayOSApprovalState = newApprovalState?.ToUpperInvariant();
+
+        if (transactionId is not null)
+            PayOSTransactionId = transactionId;
+
+        if (PayOSApprovalState == "COMPLETED" || PayOSApprovalState == "SUCCEEDED")
+        {
+            Status = PaymentStatus.Completed;
+            ProcessedAt = DateTime.UtcNow;
+        }
+        else if (PayOSApprovalState == "FAILED")
+        {
+            Status = PaymentStatus.Failed;
+            ProcessedAt = DateTime.UtcNow;
+        }
+
         UpdatedAt = DateTime.UtcNow;
     }
 }

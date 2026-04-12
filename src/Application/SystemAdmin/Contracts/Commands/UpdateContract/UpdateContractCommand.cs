@@ -9,5 +9,6 @@ public record UpdateContractCommand : ICommand<ContractDto>
     public Guid Id { get; init; }
     public Guid TemplateId { get; init; }
     public int AiQuotaLimit { get; init; }
+    public int MonthlyQuotaLimit { get; init; }
     public decimal PlatformCommissionRate { get; init; }
 }

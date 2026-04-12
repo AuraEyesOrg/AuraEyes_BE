@@ -57,33 +57,46 @@ public class ShareConsultationToNetworkCommandHandler : ICommandHandler<ShareCon
             return Result<Guid>.Forbidden("You are not allowed to share this consultation case.");
         }
 
-        if (!session.AiScreeningId.HasValue)
+        AiScreening? screening = null;
+        if (session.AiScreeningId.HasValue)
         {
-            return Result<Guid>.Failure("This consultation session has no linked AI screening to share.");
+            screening = await _aiScreeningRepository
+                .Query()
+                .Include(x => x.RetinalImages)
+                .Include(x => x.ScreeningResults)
+                .FirstOrDefaultAsync(x => x.Id == session.AiScreeningId.Value, cancellationToken);
         }
 
-        var screening = await _aiScreeningRepository
-            .Query()
-            .Include(x => x.RetinalImages)
-            .Include(x => x.ScreeningResults)
-            .FirstOrDefaultAsync(x => x.Id == session.AiScreeningId.Value, cancellationToken);
-
-        if (screening is null)
-        {
-            return Result<Guid>.NotFound("Linked AI screening was not found.");
-        }
-
-        var latestResult = screening.ScreeningResults
+        var latestResult = screening?.ScreeningResults
             .OrderByDescending(x => x.CreatedAt)
             .FirstOrDefault();
 
         var patient = await _patientRepository.GetByIdAsync(session.PatientId, cancellationToken);
-        var userDetails = patient is null
-            ? null
-            : await _identityService.GetUserDetailsAsync(patient.UserId, cancellationToken);
 
-        var patientAge = CalculateAge(userDetails?.DateOfBirth);
-        var patientGender = userDetails?.Gender?.ToString();
+        int? patientAge;
+        string? patientGender;
+
+        if (patient is not null && patient.IsWalkIn)
+        {
+            patientAge = CalculateAge(patient.DateOfBirth);
+            patientGender = patient.GenderId switch
+            {
+                1 => "Male",
+                2 => "Female",
+                _ => "Other"
+            };
+        }
+        else if (patient is not null && patient.UserId.HasValue)
+        {
+            var userDetails = await _identityService.GetUserDetailsAsync(patient.UserId.Value, cancellationToken);
+            patientAge = CalculateAge(userDetails?.DateOfBirth);
+            patientGender = userDetails?.Gender?.ToString();
+        }
+        else
+        {
+            patientAge = null;
+            patientGender = null;
+        }
 
         var post = new ProfessionalPost(
             request.CurrentUserId,
@@ -96,10 +109,14 @@ public class ShareConsultationToNetworkCommandHandler : ICommandHandler<ShareCon
         post.SetClinicalCaseMetadata(
             isInternalCase: true,
             consultationSessionId: session.Id,
+            aiScreeningId: session.AiScreeningId,
             patientAge: patientAge,
             patientGender: patientGender);
 
-        AddRetinalImageAttachments(post, screening.RetinalImages);
+        if (screening is not null)
+        {
+            AddRetinalImageAttachments(post, screening.RetinalImages);
+        }
 
         await _postRepository.AddAsync(post, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

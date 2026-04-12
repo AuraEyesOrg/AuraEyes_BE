@@ -1,4 +1,5 @@
 using Domain.Entities.Screening;
+using Domain.Entities.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -23,6 +24,11 @@ public class AiScreeningConfiguration : IEntityTypeConfiguration<AiScreening>
             .HasDefaultValue(false);
 
         // PatientId FK — configured from Patient side (PatientConfiguration)
+        builder.HasOne<Organisation>()
+            .WithMany()
+            .HasForeignKey(e => e.OrganisationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // 1:1 Consent configured from ConsentConfiguration
         builder.HasMany(e => e.RetinalImages)
             .WithOne()
@@ -35,5 +41,6 @@ public class AiScreeningConfiguration : IEntityTypeConfiguration<AiScreening>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => e.PatientId);
+        builder.HasIndex(e => e.OrganisationId);
     }
 }

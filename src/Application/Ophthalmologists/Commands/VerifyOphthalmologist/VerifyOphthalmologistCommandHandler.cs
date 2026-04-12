@@ -55,8 +55,14 @@ public class VerifyOphthalmologistCommandHandler : ICommandHandler<VerifyOphthal
                 "Tài khoản bác sĩ đã được phê duyệt",
                 "Chúc mừng, hồ sơ bác sĩ của bạn đã được System Admin phê duyệt. Bạn có thể tiếp tục sử dụng đầy đủ chức năng chuyên môn trên hệ thống.",
                 NotificationType.SystemAlert,
-                new { OphthalmologistId = ophthalmologist.Id, Action = "Approved" },
-                cancellationToken);
+                payload: new
+                {
+                    action = "ophthalmologist_verification_approved",
+                    verificationFlowType = "OnboardingVerification",
+                    ophthalmologistId = ophthalmologist.Id
+                },
+                cancellationToken: cancellationToken,
+                referenceId: ophthalmologist.Id);
         }
         catch (Exception ex)
         {

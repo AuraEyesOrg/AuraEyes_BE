@@ -207,6 +207,7 @@ public static class DependencyInjection
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
         services.AddScoped<ISystemSettingService, SystemSettingService>();
         services.AddScoped<IOrganisationScreeningPdfService, OrganisationScreeningPdfService>();
+        services.AddSingleton<IAiAssetBaseUrlProvider, AiAssetBaseUrlProvider>();
         services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();
 
         // Background workers
@@ -221,6 +222,31 @@ public static class DependencyInjection
         // Configure PayOS Settings
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));
         services.AddScoped<IPayOSService, PayOSService>();
+
+        // Register PayOS Payout Service with IPv4-only SocketsHttpHandler
+        // to ensure requests go through the whitelisted IPv4 address (not IPv6).
+        services.AddHttpClient<IPayOSPayoutService, PayOSPayoutService>()
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                ConnectCallback = async (context, cancellationToken) =>
+                {
+                    // Force IPv4 by resolving DNS and picking only IPv4 addresses
+                    var addresses = await System.Net.Dns.GetHostAddressesAsync(
+                        context.DnsEndPoint.Host,
+                        System.Net.Sockets.AddressFamily.InterNetwork,
+                        cancellationToken);
+                    var ipv4 = addresses.FirstOrDefault()
+                        ?? throw new InvalidOperationException(
+                            $"No IPv4 address found for {context.DnsEndPoint.Host}");
+                    var socket = new System.Net.Sockets.Socket(
+                        System.Net.Sockets.AddressFamily.InterNetwork,
+                        System.Net.Sockets.SocketType.Stream,
+                        System.Net.Sockets.ProtocolType.Tcp);
+                    socket.NoDelay = true;
+                    await socket.ConnectAsync(ipv4, context.DnsEndPoint.Port, cancellationToken);
+                    return new System.Net.Sockets.NetworkStream(socket, ownsSocket: true);
+                }
+            });
 
         return services;
     }

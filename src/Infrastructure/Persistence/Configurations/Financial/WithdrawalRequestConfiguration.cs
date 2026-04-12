@@ -43,6 +43,26 @@ public class WithdrawalRequestConfiguration : IEntityTypeConfiguration<Withdrawa
         builder.Property(x => x.TransferReference)
             .HasMaxLength(200);
 
+        builder.Property(x => x.BankBin)
+            .HasMaxLength(20)
+            .IsRequired()
+            .HasDefaultValue(string.Empty);
+
+        builder.Property(x => x.PayOSReferenceId)
+            .HasMaxLength(100);
+
+        builder.Property(x => x.ExternalPayoutId)
+            .HasMaxLength(100);
+
+        builder.Property(x => x.PayOSTransactionId)
+            .HasMaxLength(100);
+
+        builder.Property(x => x.PayOSApprovalState)
+            .HasMaxLength(30);
+
+        builder.Property(x => x.Fee)
+            .HasPrecision(18, 2);
+
         builder.HasIndex(x => x.UserId);
         builder.HasIndex(x => x.Status);
         builder.HasIndex(x => x.CreatedAt);

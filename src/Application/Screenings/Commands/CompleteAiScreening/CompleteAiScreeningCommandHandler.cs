@@ -76,10 +76,10 @@ public class CompleteAiScreeningCommandHandler : ICommandHandler<CompleteAiScree
                 screening.PatientId,
                 screening.Id);
         }
-        else
+        else if (patient.UserId.HasValue)
         {
             await _notificationService.SendAsync(
-                patient.UserId,
+                patient.UserId.Value,
                 notificationTitle,
                 notificationMessage,
                 NotificationType.AiScreeningCompleted,
@@ -88,8 +88,14 @@ public class CompleteAiScreeningCommandHandler : ICommandHandler<CompleteAiScree
 
             _logger.LogInformation(
                 "Real-time notification sent to User {UserId} for screening {ScreeningId}",
-                patient.UserId,
+                patient.UserId.Value,
                 screening.Id);
+        }
+        else
+        {
+            _logger.LogInformation(
+                "Skipping notification for walk-in patient {PatientId} (no user account)",
+                screening.PatientId);
         }
 
         return Result<CompleteAiScreeningResponse>.Success(new CompleteAiScreeningResponse
