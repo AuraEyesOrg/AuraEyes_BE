@@ -83,6 +83,7 @@ public class GetContractsQueryHandler : IQueryHandler<GetContractsQuery, PagedRe
                 UserFullName = user?.FullName ?? string.Empty,
                 UserEmail = user?.Email ?? string.Empty,
                 AiQuotaLimit = c.AiQuotaLimit,
+                MonthlyQuotaLimit = c.MonthlyQuotaLimit,
                 PlatformCommissionRate = c.PlatformCommissionRate,
                 CommissionRate = ophthalmologist?.CommissionRate,
                 ActualMonthlySalary = ophthalmologist?.ActualMonthlySalary,

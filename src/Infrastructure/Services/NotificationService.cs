@@ -15,6 +15,22 @@ namespace Infrastructure.Services;
 /// </summary>
 public class NotificationService : INotificationService
 {
+    private static readonly string[] GenericReferenceKeys =
+    {
+        "consultationSessionId",
+        "consultationId",
+        "sessionId",
+        "appointmentId",
+        "appointmentSlotId",
+        "slotId",
+        "screeningId",
+        "aiScreeningId",
+        "transactionId",
+        "messageId",
+        "ophthalmologistId",
+        "ophthalmologistUserId"
+    };
+
     private readonly IRepository<Notification> _notificationRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationHubService _hubService;
@@ -55,7 +71,15 @@ public class NotificationService : INotificationService
                 });
             }
 
-            referenceId ??= ExtractReferenceId(payloadJson);
+            referenceId ??= ExtractReferenceId(type, payloadJson);
+
+            if (referenceId is null && RequiresReferenceId(type))
+            {
+                _logger.LogWarning(
+                    "ReferenceId was not resolved for notification Type={Type}, UserId={UserId}",
+                    type,
+                    userId);
+            }
 
             // Step B: Create and persist notification entity
             var notification = new Notification(
@@ -123,7 +147,7 @@ public class NotificationService : INotificationService
             null);
     }
 
-    private static Guid? ExtractReferenceId(string? payloadJson)
+    private static Guid? ExtractReferenceId(NotificationType type, string? payloadJson)
     {
         if (string.IsNullOrWhiteSpace(payloadJson))
             return null;
@@ -136,24 +160,21 @@ public class NotificationService : INotificationService
             if (root.ValueKind != JsonValueKind.Object)
                 return null;
 
-            var keys = new[]
+            var prioritizedKeys = GetReferenceKeysByType(type);
+            foreach (var key in prioritizedKeys)
             {
-                "consultationId",
-                "sessionId",
-                "appointmentId",
-                "screeningId",
-                "aiScreeningId",
-                "transactionId",
-                "messageId"
-            };
+                if (TryReadGuid(root, key, out var parsed))
+                {
+                    return parsed;
+                }
+            }
 
-            foreach (var key in keys)
+            foreach (var key in GenericReferenceKeys)
             {
-                if (!root.TryGetProperty(key, out var value))
+                if (prioritizedKeys.Contains(key, StringComparer.Ordinal))
                     continue;
 
-                if (value.ValueKind == JsonValueKind.String
-                    && Guid.TryParse(value.GetString(), out var parsed))
+                if (TryReadGuid(root, key, out var parsed))
                 {
                     return parsed;
                 }
@@ -165,5 +186,58 @@ public class NotificationService : INotificationService
         }
 
         return null;
+    }
+
+    private static IReadOnlyCollection<string> GetReferenceKeysByType(NotificationType type)
+    {
+        return type switch
+        {
+            NotificationType.AiScreeningCompleted =>
+                new[] { "aiScreeningId", "screeningId" },
+
+            NotificationType.ConsultationAccepted or
+            NotificationType.ConsultationResultProvided or
+            NotificationType.NewConsultationRequest or
+            NotificationType.NewPatientMessage =>
+                new[] { "consultationSessionId", "consultationId", "sessionId" },
+
+            NotificationType.NewAppointmentBooked or
+            NotificationType.ScheduleChanged =>
+                new[]
+                {
+                    "appointmentId",
+                    "appointmentSlotId",
+                    "slotId",
+                    "consultationSessionId",
+                    "sessionId"
+                },
+
+            NotificationType.WalletDepositSuccess or
+            NotificationType.WalletPaymentProcessed =>
+                new[] { "transactionId" },
+
+            NotificationType.SystemAlert =>
+                new[] { "ophthalmologistId", "ophthalmologistUserId" },
+
+            _ => Array.Empty<string>()
+        };
+    }
+
+    private static bool TryReadGuid(JsonElement root, string key, out Guid value)
+    {
+        value = Guid.Empty;
+
+        if (!root.TryGetProperty(key, out var element))
+            return false;
+
+        if (element.ValueKind != JsonValueKind.String)
+            return false;
+
+        return Guid.TryParse(element.GetString(), out value);
+    }
+
+    private static bool RequiresReferenceId(NotificationType type)
+    {
+        return type != NotificationType.SystemAlert;
     }
 }

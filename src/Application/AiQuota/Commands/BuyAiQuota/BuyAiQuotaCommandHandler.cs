@@ -1,4 +1,5 @@
 using Application.AiQuota.Interfaces;
+using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.SystemSettings.Interfaces;
@@ -13,6 +14,7 @@ namespace Application.AiQuota.Commands.BuyAiQuota;
 public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAiQuotaResponse>
 {
     private const decimal DefaultUnitPrice = 10000m;
+    private const decimal OrganisationUnitPriceRatio = 0.60m;
 
     private readonly IWalletRepository _walletRepository;
     private readonly IAiQuotaService _quotaService;
@@ -50,10 +52,14 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
             return Result<BuyAiQuotaResponse>.Unauthorized("User is not authenticated.");
 
         var userId = _currentUser.UserId.Value;
-        var role = _currentUser.Roles.FirstOrDefault() ?? "Patient";
+        var role = _currentUser.Roles.FirstOrDefault() ?? Roles.Patient;
 
         var configuredUnitPrice = await _settingService.GetSettingAsync("AI_QUOTA_UNIT_PRICE", cancellationToken);
         var unitPrice = ResolveUnitPrice(configuredUnitPrice);
+        if (IsOrganisationBillingRole(role))
+        {
+            unitPrice = Math.Round(unitPrice * OrganisationUnitPriceRatio, 0, MidpointRounding.AwayFromZero);
+        }
         var totalCredits = request.QuotaAmount;
         var totalCost = Math.Round(unitPrice * totalCredits, 0, MidpointRounding.AwayFromZero);
 
@@ -155,5 +161,10 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
         }
 
         return DefaultUnitPrice;
+    }
+
+    private static bool IsOrganisationBillingRole(string role)
+    {
+        return string.Equals(role, Roles.OrgAdmin, StringComparison.OrdinalIgnoreCase);
     }
 }

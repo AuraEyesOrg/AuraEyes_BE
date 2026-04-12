@@ -303,7 +303,9 @@ internal static class EmailTemplates
         string? contactPhone,
         string? address,
         string? licenseNumber,
-        string? notes)
+        string? notes,
+        string? businessCode = null,
+        string? taxCode = null)
     {
         var content = $@"
             <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 22px; font-weight: 600;"">
@@ -320,6 +322,8 @@ internal static class EmailTemplates
                 <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Số điện thoại</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{contactPhone ?? "—"}</td></tr>
                 <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Địa chỉ</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{address ?? "—"}</td></tr>
                 <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã giấy phép</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{licenseNumber ?? "—"}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã số doanh nghiệp</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{businessCode ?? "—"}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã số thuế</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{taxCode ?? "—"}</td></tr>
                 <tr><td style=""padding: 12px 16px; font-weight: 600;"">Ghi chú</td><td style=""padding: 12px 16px;"">{notes ?? "—"}</td></tr>
             </table>
             <div style=""border-left: 3px solid {BorderWarning}; padding-left: 16px; color: {AlertWarningText};"">
