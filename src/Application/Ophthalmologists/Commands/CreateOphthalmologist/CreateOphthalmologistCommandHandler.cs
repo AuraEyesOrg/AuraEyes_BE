@@ -1,9 +1,7 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
-using Application.Scheduling.ScheduleTemplates.Interfaces;
 using Domain.Common;
 using Domain.Entities.Users;
-using Domain.Enums;
 using Domain.Repositories;
 
 namespace Application.Ophthalmologists.Commands.CreateOphthalmologist;
@@ -15,18 +13,15 @@ public class CreateOphthalmologistCommandHandler : ICommandHandler<CreateOphthal
 {
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IIdentityService _identityService;
-    private readonly IFullTimeTemplateProvisioningService _fullTimeTemplateProvisioningService;
     private readonly IUnitOfWork _unitOfWork;
 
     public CreateOphthalmologistCommandHandler(
         IOphthalmologistRepository ophthalmologistRepository,
         IIdentityService identityService,
-        IFullTimeTemplateProvisioningService fullTimeTemplateProvisioningService,
         IUnitOfWork unitOfWork)
     {
         _ophthalmologistRepository = ophthalmologistRepository;
         _identityService = identityService;
-        _fullTimeTemplateProvisioningService = fullTimeTemplateProvisioningService;
         _unitOfWork = unitOfWork;
     }
 
@@ -46,36 +41,15 @@ public class CreateOphthalmologistCommandHandler : ICommandHandler<CreateOphthal
             return Result<Guid>.Conflict($"An ophthalmologist profile already exists for user '{request.UserId}'.");
         }
 
-        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        // Create the ophthalmologist entity
+        var ophthalmologist = new Ophthalmologist(
+            request.UserId,
+            request.Bio,
+            request.YearsOfExperience);
 
-        try
-        {
-            var ophthalmologist = new Ophthalmologist(
-                request.UserId,
-                request.Bio,
-                request.YearsOfExperience,
-                employmentType: request.EmploymentType,
-                workingHoursPerWeek: request.WorkingHoursPerWeek,
-                expectedMonthlySalary: request.ExpectedMonthlySalary);
+        await _ophthalmologistRepository.AddAsync(ophthalmologist, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            await _ophthalmologistRepository.AddAsync(ophthalmologist, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-            if (ophthalmologist.EmploymentType == OphthalmologistEmploymentType.FullTime)
-            {
-                await _fullTimeTemplateProvisioningService.EnsureSystemGeneratedTemplatesAsync(
-                    ophthalmologist,
-                    cancellationToken);
-            }
-
-            await _unitOfWork.CommitTransactionAsync(cancellationToken);
-
-            return Result<Guid>.Success(ophthalmologist.Id);
-        }
-        catch
-        {
-            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-            throw;
-        }
+        return Result<Guid>.Success(ophthalmologist.Id);
     }
 }

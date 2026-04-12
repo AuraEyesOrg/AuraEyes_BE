@@ -2,7 +2,6 @@ using System.Text;
 using Application.AiQuota.Interfaces;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
-using Application.Scheduling.ScheduleTemplates.Interfaces;
 using Application.OrganisationScreenings.Interfaces;
 using Application.SystemAdmin.Interfaces;
 using Application.SystemSettings.Interfaces;
@@ -177,7 +176,6 @@ public static class DependencyInjection
         services.AddScoped<IWithdrawalRequestRepository, WithdrawalRequestRepository>();
         services.AddScoped<IScheduleTemplateRepository, ScheduleTemplateRepository>();
         services.AddScoped<IAppointmentSlotRepository, AppointmentSlotRepository>();
-        services.AddScoped<IExperiencePricingRuleRepository, ExperiencePricingRuleRepository>();
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
         services.AddScoped<IConsultationSessionRepository, ConsultationSessionRepository>();
         services.AddScoped<IOrganisationFeedbackRepository, OrganisationFeedbackRepository>();
@@ -208,7 +206,6 @@ public static class DependencyInjection
         services.AddScoped<IAiQuotaService, AiQuotaService>();
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
         services.AddScoped<ISystemSettingService, SystemSettingService>();
-        services.AddScoped<IFullTimeTemplateProvisioningService, FullTimeTemplateProvisioningService>();
         services.AddScoped<IOrganisationScreeningPdfService, OrganisationScreeningPdfService>();
         services.AddSingleton<IAiAssetBaseUrlProvider, AiAssetBaseUrlProvider>();
         services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();
@@ -220,9 +217,7 @@ public static class DependencyInjection
 
         // Register Hangfire daily job
         services.AddScoped<DailyQuotaResetJob>();
-        services.AddScoped<MonthlyQuotaResetJob>();
         services.AddScoped<SlotMaintenanceJob>();
-        services.AddScoped<FullTimeSlotGenerationJob>();
 
         // Configure PayOS Settings
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));

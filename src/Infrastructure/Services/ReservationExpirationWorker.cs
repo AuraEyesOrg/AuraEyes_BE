@@ -41,24 +41,13 @@ public class ReservationExpirationWorker : BackgroundService
                 await ReleaseExpiredReservationsAsync(stoppingToken);
                 await _betterStackHeartbeat.NotifySucceededAsync(BetterStackMonitor.ReservationExpirationWorker, stoppingToken);
             }
-            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
-            {
-                _logger.LogWarning("ReservationExpirationWorker cycle was canceled by infrastructure timeout and will retry.");
-            }
-            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 await _betterStackHeartbeat.NotifyFailedAsync(BetterStackMonitor.ReservationExpirationWorker, stoppingToken);
                 _logger.LogError(ex, "Error in ReservationExpirationWorker cycle");
             }
 
-            try
-            {
-                await Task.Delay(CheckInterval, stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
+            await Task.Delay(CheckInterval, stoppingToken);
         }
 
         _logger.LogInformation("ReservationExpirationWorker stopped");

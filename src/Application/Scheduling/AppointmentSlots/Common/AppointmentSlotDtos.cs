@@ -46,11 +46,3 @@ public record AppointmentSlotStatsDto
     public int CancelledCount { get; init; }
     public int NoShowCount { get; init; }
 }
-
-public record AllowedPriceRangeDto
-{
-    public Guid OphthalmologistId { get; init; }
-    public int YearsOfExperience { get; init; }
-    public decimal MinPrice { get; init; }
-    public decimal MaxPrice { get; init; }
-}

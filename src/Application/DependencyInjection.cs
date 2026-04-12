@@ -1,8 +1,6 @@
 using Application.Common.Behaviors;
 using Application.Common.Services;
 using Application.ConsultationSessions.Common;
-using Application.Scheduling.Pricing.Interfaces;
-using Application.Scheduling.Pricing.Services;
 using AutoMapper;
 using FluentValidation;
 using MediatR;
@@ -23,7 +21,6 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
         services.AddAutoMapper(Assembly.GetExecutingAssembly());
         services.AddScoped<IConsultationParticipantEnrichmentService, ConsultationParticipantEnrichmentService>();
-        services.AddScoped<IExperiencePricingService, ExperiencePricingService>();
         services.AddScoped<IPatientDisplayNameResolver, PatientDisplayNameResolver>();
 
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));

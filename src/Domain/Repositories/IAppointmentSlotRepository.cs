@@ -137,13 +137,4 @@ public interface IAppointmentSlotRepository : IRepository<AppointmentSlot>
         DateOnly? fromDate = null,
         DateOnly? toDate = null,
         CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Get total created slot count per day for all part-time ophthalmologists.
-    /// Used for admin reporting/observability.
-    /// </summary>
-    Task<IReadOnlyDictionary<DateOnly, int>> GetPartTimeSlotCountsByDateRangeAsync(
-        DateOnly fromDate,
-        DateOnly toDate,
-        CancellationToken cancellationToken = default);
 }

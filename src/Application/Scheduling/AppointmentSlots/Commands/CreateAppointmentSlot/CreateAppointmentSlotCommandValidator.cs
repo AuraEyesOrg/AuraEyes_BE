@@ -25,12 +25,8 @@ public class CreateAppointmentSlotCommandValidator : AbstractValidator<CreateApp
             .WithMessage("End time must be after start time.");
 
         RuleFor(x => x.Cost)
-            .GreaterThan(0)
+            .GreaterThanOrEqualTo(0)
             .When(x => x.Cost.HasValue)
-            .WithMessage("Cost must be a positive value.");
-
-        RuleFor(x => x.Cost)
-            .Must(cost => !cost.HasValue || decimal.Truncate(cost.Value) == cost.Value)
-            .WithMessage("Cost must be an integer value.");
+            .WithMessage("Cost cannot be negative.");
     }
 }

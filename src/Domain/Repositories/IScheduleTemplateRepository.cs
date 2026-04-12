@@ -61,19 +61,4 @@ public interface IScheduleTemplateRepository : IRepository<ScheduleTemplate>
     Task<ScheduleTemplate?> GetByIdWithSlotsAsync(
         Guid id,
         CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Get active system-generated templates for a specific ophthalmologist.
-    /// </summary>
-    Task<IReadOnlyList<ScheduleTemplate>> GetActiveSystemGeneratedByOphthalmologistIdAsync(
-        Guid ophthalId,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Check if an active system-generated template exists for ophthalmologist/day.
-    /// </summary>
-    Task<bool> ExistsActiveSystemGeneratedTemplateAsync(
-        Guid ophthalId,
-        DayOfWeek dayOfWeek,
-        CancellationToken cancellationToken = default);
 }

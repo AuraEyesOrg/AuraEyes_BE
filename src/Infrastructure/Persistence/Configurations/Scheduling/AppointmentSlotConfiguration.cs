@@ -12,11 +12,6 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
             .HasConversion<string>()
             .HasMaxLength(20);
 
-        builder.Property(e => e.Source)
-            .HasConversion<string>()
-            .HasMaxLength(20)
-            .HasDefaultValue(Domain.Enums.SlotSource.Doctor);
-
         builder.Property(e => e.Cost)
             .HasPrecision(18, 2);
 
@@ -51,10 +46,6 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
         builder.HasIndex(e => e.ScheduleTemplateId);
         builder.HasIndex(e => e.Date);
         builder.HasIndex(e => e.Status);
-        builder.HasIndex(e => new { e.ScheduleTemplateId, e.Date, e.StartTime, e.EndTime })
-            .IsUnique()
-            .HasFilter("\"IsDeleted\" = false")
-            .HasDatabaseName("UX_AppointmentSlots_TemplateDateTime");
         builder.HasIndex(e => new { e.Status, e.ReservationExpireAt })
             .HasFilter("\"Status\" = 'Reserved'");
         builder.HasIndex(e => new { e.Status, e.BookedCount, e.MaxCapacity })

@@ -28,9 +28,6 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     /// <summary>Status of this slot.</summary>
     public ScheduleStatus Status { get; private set; }
 
-    /// <summary>Slot creation source (doctor or system).</summary>
-    public SlotSource Source { get; private set; }
-
     /// <summary>Cost of the appointment (optional).</summary>
     public decimal? Cost { get; private set; }
 
@@ -61,8 +58,7 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
         TimeOnly startTime,
         TimeOnly endTime,
         int maxCapacity = 1,
-        decimal? cost = null,
-        SlotSource source = SlotSource.Doctor)
+        decimal? cost = null)
     {
         if (endTime <= startTime)
             throw new ArgumentException("End time must be after start time");
@@ -75,7 +71,6 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
         EndTime = endTime;
         MaxCapacity = maxCapacity;
         Cost = cost;
-        Source = source;
         Status = ScheduleStatus.Available;
         BookedCount = 0;
     }

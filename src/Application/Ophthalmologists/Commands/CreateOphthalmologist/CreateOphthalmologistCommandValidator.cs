@@ -22,19 +22,5 @@ public class CreateOphthalmologistCommandValidator : AbstractValidator<CreateOph
         RuleFor(x => x.Bio)
             .MaximumLength(2000)
             .WithMessage("Bio cannot exceed 2000 characters.");
-
-        RuleFor(x => x.EmploymentType)
-            .IsInEnum()
-            .WithMessage("Employment type is invalid.");
-
-        RuleFor(x => x.WorkingHoursPerWeek)
-            .InclusiveBetween(1, 112)
-            .When(x => x.WorkingHoursPerWeek.HasValue)
-            .WithMessage("Working hours per week must be between 1 and 112.");
-
-        RuleFor(x => x.ExpectedMonthlySalary)
-            .GreaterThanOrEqualTo(0)
-            .When(x => x.ExpectedMonthlySalary.HasValue)
-            .WithMessage("Expected monthly salary cannot be negative.");
     }
 }

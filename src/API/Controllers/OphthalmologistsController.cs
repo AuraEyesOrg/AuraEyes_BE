@@ -190,13 +190,6 @@ public class OphthalmologistsController : BaseApiController
         if (_currentUserService.ProfileId is null)
             return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found in token"));
 
-        var existingProfileResult = await _mediator.Send(
-            new GetOphthalmologistQuery(_currentUserService.ProfileId.Value),
-            cancellationToken);
-
-        if (!existingProfileResult.IsSuccess || existingProfileResult.Data is null)
-            return HandleResult(existingProfileResult, "Unable to resolve current profile.");
-
         var command = new UpdateOphthalmologistCommand
         {
             Id = _currentUserService.ProfileId.Value,
@@ -205,7 +198,7 @@ public class OphthalmologistsController : BaseApiController
             Phone = request.Phone,
             Address = request.Address,
             Bio = request.Bio,
-            YearsOfExperience = existingProfileResult.Data.YearsOfExperience,
+            YearsOfExperience = request.YearsOfExperience,
         };
 
         var result = await _mediator.Send(command, cancellationToken);

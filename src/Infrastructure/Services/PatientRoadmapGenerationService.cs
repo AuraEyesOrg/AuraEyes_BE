@@ -51,10 +51,6 @@ public class PatientRoadmapGenerationService : IPatientRoadmapGenerationService
         if (string.IsNullOrWhiteSpace(_settings.ApiKey))
             return Result<GeneratedPatientRoadmap>.Failure("Google AI Studio API key is not configured.");
 
-        if (string.IsNullOrWhiteSpace(_settings.Model) || _settings.Model.Any(char.IsWhiteSpace))
-            return Result<GeneratedPatientRoadmap>.Failure(
-                "Google AI Studio model is invalid. Use API model id format, for example: gemini-2.5-flash.");
-
         var prompt = BuildPrompt(input);
         var maxAttempts = Math.Max(1, _settings.MaxRetries + 1);
         var delayMs = Math.Max(200, _settings.InitialBackoffMs);
@@ -100,7 +96,8 @@ public class PatientRoadmapGenerationService : IPatientRoadmapGenerationService
 
                 if (attempt == maxAttempts)
                 {
-                    return Result<GeneratedPatientRoadmap>.Failure(MapInfrastructureFailureMessage(ex));
+                    return Result<GeneratedPatientRoadmap>.Failure(
+                        "Unable to generate patient roadmap from AI at this time.");
                 }
             }
 
@@ -344,52 +341,6 @@ public class PatientRoadmapGenerationService : IPatientRoadmapGenerationService
             return value;
 
         return value[..maxLength];
-    }
-
-    private static string MapInfrastructureFailureMessage(Exception exception)
-    {
-        if (exception is TaskCanceledException)
-        {
-            return "Patient roadmap generation timed out when calling AI provider.";
-        }
-
-        var message = exception.Message;
-
-        if (message.Contains("status 429", StringComparison.OrdinalIgnoreCase) ||
-            message.Contains("RESOURCE_EXHAUSTED", StringComparison.OrdinalIgnoreCase) ||
-            message.Contains("quota", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Patient roadmap AI quota is exceeded. Please check Google AI Studio quota or billing configuration and retry.";
-        }
-
-        if (message.Contains("status 401", StringComparison.OrdinalIgnoreCase) ||
-            message.Contains("status 403", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Google AI Studio credentials are invalid or unauthorized.";
-        }
-
-        if (message.Contains("status 400", StringComparison.OrdinalIgnoreCase) ||
-            message.Contains("INVALID_ARGUMENT", StringComparison.OrdinalIgnoreCase))
-        {
-            if (message.Contains("model", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Google AI Studio model is invalid. Use API model id format, for example: gemini-2.5-flash.";
-            }
-
-            return "Google AI Studio rejected the roadmap request due to invalid arguments.";
-        }
-
-        if (message.Contains("status 404", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Google AI Studio model endpoint was not found. Please verify GoogleAiStudio:BaseUrl and GoogleAiStudio:Model settings.";
-        }
-
-        if (message.Contains("empty roadmap payload", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Google AI Studio returned an empty roadmap payload.";
-        }
-
-        return "Unable to generate patient roadmap from AI at this time.";
     }
 
     private sealed class GeminiGenerateRequest
