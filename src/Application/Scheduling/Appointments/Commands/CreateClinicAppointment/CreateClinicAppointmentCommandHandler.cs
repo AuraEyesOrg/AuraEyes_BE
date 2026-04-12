@@ -121,7 +121,9 @@ public class CreateClinicAppointmentCommandHandler
                 request.VisitReason);
 
             var existingLink = (await _organisationPatientLinkRepository.FindAsync(
-                link => link.OrganisationId == request.OrganisationId && link.PatientId == patientId,
+                link => link.OrganisationId == request.OrganisationId
+                        && link.PatientId == patientId
+                        && !link.IsDeleted,
                 cancellationToken)).FirstOrDefault();
 
             if (existingLink is null)
@@ -162,9 +164,9 @@ public class CreateClinicAppointmentCommandHandler
                         patientName = patient.FullName;
                     }
                 }
-                else
+                else if (patient.UserId.HasValue)
                 {
-                    var patientUser = await _identityService.GetUserByIdAsync(patient.UserId!.Value, cancellationToken);
+                    var patientUser = await _identityService.GetUserByIdAsync(patient.UserId.Value, cancellationToken);
                     if (!string.IsNullOrWhiteSpace(patientUser?.FullName))
                     {
                         patientName = patientUser.FullName;

@@ -65,6 +65,9 @@ public class GetOrganisationAppointmentsQueryHandler
             .Distinct()
             .ToList();
 
+        // Sequential fetch — must NOT use Task.WhenAll here because all tasks share
+        // the same scoped DbContext and concurrent operations throw:
+        // "A second operation was started on this context instance before a previous operation completed."
         var patientLookup = new Dictionary<Guid, UserDto>();
         foreach (var userId in registeredPatientUserIds)
         {
