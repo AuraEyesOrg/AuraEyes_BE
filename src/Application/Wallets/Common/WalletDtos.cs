@@ -79,7 +79,7 @@ public class VerifyPaymentResponse
 }
 
 /// <summary>
-/// DTO for Withdrawal Request information.
+/// DTO for Withdrawal Request information (includes PayOS Payout fields).
 /// </summary>
 public class WithdrawalRequestDto
 {
@@ -98,13 +98,105 @@ public class WithdrawalRequestDto
     public Guid? ProcessedByAdminId { get; set; }
     public DateTime? ProcessedAt { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    // ── PayOS Payout fields ──────────────────────────────────────────────────
+
+    /// <summary>Mã BIN ngân hàng PayOS.</summary>
+    public string BankBin { get; set; } = string.Empty;
+
+    /// <summary>ID lệnh chi trả về từ PayOS.</summary>
+    public string? ExternalPayoutId { get; set; }
+
+    /// <summary>Mã tham chiếu nội bộ gửi lên PayOS.</summary>
+    public string? PayOSReferenceId { get; set; }
+
+    /// <summary>ID giao dịch chi tiết bên trong PayOS.</summary>
+    public string? PayOSTransactionId { get; set; }
+
+    /// <summary>Trạng thái phê duyệt PayOS: PROCESSING | SUCCEEDED | FAILED.</summary>
+    public string? PayOSApprovalState { get; set; }
+
+    /// <summary>Phí giao dịch từ PayOS.</summary>
+    public decimal? Fee { get; set; }
 }
 
 /// <summary>
-/// DTO for admin withdrawal queue rows.
+/// DTO for admin withdrawal queue rows (includes doctor info + PayOS fields).
 /// </summary>
 public class AdminWithdrawalRequestDto : WithdrawalRequestDto
 {
     public string DoctorFullName { get; set; } = string.Empty;
     public string DoctorEmail { get; set; } = string.Empty;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// PayOS Payout DTOs
+// ────────────────────────────────────────────────────────────────────────────
+
+/// <summary>
+/// Alias kept for backward-compat — WithdrawalRequestDto now includes all PayOS fields.
+/// </summary>
+public class WithdrawalRequestDetailDto : WithdrawalRequestDto { }
+
+/// <summary>
+/// Response sau khi trigger lệnh chi PayOS thành công.
+/// </summary>
+public class PayoutViaPayOSResponse
+{
+    public Guid WithdrawalRequestId { get; set; }
+
+    /// <summary>ID lệnh chi PayOS.</summary>
+    public string ExternalPayoutId { get; set; } = string.Empty;
+
+    /// <summary>Mã tham chiếu nội bộ gửi đến PayOS.</summary>
+    public string PayOSReferenceId { get; set; } = string.Empty;
+
+    /// <summary>Trạng thái phê duyệt: PROCESSING | SUCCEEDED | FAILED.</summary>
+    public string ApprovalState { get; set; } = string.Empty;
+
+    /// <summary>Trạng thái hiện tại của WithdrawalRequest trong hệ thống.</summary>
+    public string WithdrawalStatus { get; set; } = string.Empty;
+
+    /// <summary>Danh sách giao dịch chi tiết từ PayOS.</summary>
+    public List<PayOSPayoutTransactionDto> Transactions { get; set; } = new();
+}
+
+/// <summary>
+/// Response khi lấy trạng thái lệnh chi từ PayOS.
+/// </summary>
+public class PayoutStatusResponse
+{
+    public Guid WithdrawalRequestId { get; set; }
+    public string ExternalPayoutId { get; set; } = string.Empty;
+    public string PayOSReferenceId { get; set; } = string.Empty;
+    public string ApprovalState { get; set; } = string.Empty;
+    public string WithdrawalStatus { get; set; } = string.Empty;
+    public List<PayOSPayoutTransactionDto> Transactions { get; set; } = new();
+}
+
+/// <summary>
+/// DTO giao dịch chi tiết từ PayOS Payout.
+/// </summary>
+public class PayOSPayoutTransactionDto
+{
+    public string Id { get; set; } = string.Empty;
+    public long Amount { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public string ToBin { get; set; } = string.Empty;
+    public string ToAccountNumber { get; set; } = string.Empty;
+    public string ToAccountName { get; set; } = string.Empty;
+
+    /// <summary>Trạng thái: PROCESSING | SUCCEEDED | FAILED.</summary>
+    public string State { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Response thông tin số dư tài khoản chi PayOS.
+/// </summary>
+public class PayoutAccountBalanceResponse
+{
+    public string AccountNumber { get; set; } = string.Empty;
+    public string AccountName { get; set; } = string.Empty;
+    public string Currency { get; set; } = string.Empty;
+    public long Balance { get; set; }
 }
