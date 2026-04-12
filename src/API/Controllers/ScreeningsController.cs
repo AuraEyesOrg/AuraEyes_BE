@@ -3,14 +3,11 @@ using Application.Common.Models;
 using Application.Screenings.Commands.CreateAiScreeningSession;
 using Application.Screenings.Commands.SaveAiScreeningResults;
 using Application.Screenings.Queries.GetRecentScreeningSessions;
-using Domain.Common;
-using Domain.Entities.Screening;
-using Domain.Entities.Users;
+using Application.Screenings.Queries.GetScreeningSessionDetail;
 using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace API.Controllers;
 
@@ -22,8 +19,6 @@ namespace API.Controllers;
 [Authorize]
 public class ScreeningsController : BaseApiController
 {
-    private const string UserNotAuthenticatedMessage = "User not authenticated";
-
     private readonly IMediator _mediator;
     private readonly ICurrentUserService _currentUserService;
     private readonly IRepository<AiScreening> _screeningRepository;
@@ -69,22 +64,17 @@ public class ScreeningsController : BaseApiController
     }
 
     [HttpGet("{screeningId:guid}")]
-    [ProducesResponseType(typeof(ApiResponse<ScreeningSessionDetailResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<ScreeningSessionDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSessionById(
         [FromRoute] Guid screeningId,
         CancellationToken cancellationToken = default)
     {
-        if (_currentUserService.UserId is null)
-            return Unauthorized(ApiResponseFactory.Unauthorized(UserNotAuthenticatedMessage));
-
-        var patient = await _patientRepository
-            .Query()
-            .FirstOrDefaultAsync(
-                p => p.UserId == _currentUserService.UserId && !p.IsDeleted,
-                cancellationToken);
-
+        var result = await _mediator.Send(
+            new GetScreeningSessionDetailQuery(screeningId),
+            cancellationToken);
+        var patient = patients.FirstOrDefault();
         if (patient is null)
             return NotFound(ApiResponseFactory.NotFound("Patient profile not found"));
 
@@ -174,7 +164,7 @@ public class ScreeningsController : BaseApiController
         CancellationToken cancellationToken)
     {
         if (_currentUserService.UserId is null)
-            return Unauthorized(ApiResponseFactory.Unauthorized(UserNotAuthenticatedMessage));
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
 
         var command = new CreateAiScreeningSessionCommand
         {
@@ -205,7 +195,7 @@ public class ScreeningsController : BaseApiController
         CancellationToken cancellationToken)
     {
         if (_currentUserService.UserId is null)
-            return Unauthorized(ApiResponseFactory.Unauthorized(UserNotAuthenticatedMessage));
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
 
         // Validate request
         if (string.IsNullOrWhiteSpace(request.RawJsonOutput))
@@ -249,7 +239,7 @@ public class ScreeningsController : BaseApiController
         CancellationToken cancellationToken = default)
     {
         if (_currentUserService.UserId is null)
-            return Unauthorized(ApiResponseFactory.Unauthorized(UserNotAuthenticatedMessage));
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
 
         if (images is null || images.Count == 0)
             return BadRequest(ApiResponseFactory.Error("No images provided"));
