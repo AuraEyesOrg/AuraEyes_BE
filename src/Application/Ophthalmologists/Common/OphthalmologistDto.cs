@@ -12,7 +12,6 @@ public class OphthalmologistDto
     public string? UserPhoneNumber { get; set; }
     public string? UserAddress { get; set; }
     public string? Bio { get; set; }
-    public string? EmploymentType { get; set; }
     public int YearsOfExperience { get; set; }
     public bool IsVerified { get; set; }
     public DateTime CreatedAt { get; set; }

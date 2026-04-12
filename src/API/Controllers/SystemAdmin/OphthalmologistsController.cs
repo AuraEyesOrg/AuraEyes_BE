@@ -1,10 +1,6 @@
 using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
-using Application.SystemAdmin.Ophthalmologists.Commands.BackfillFullTimeSchedule;
-using Application.SystemAdmin.Ophthalmologists.Commands.DeleteFutureOphthalmologistSlots;
-using Application.SystemAdmin.Ophthalmologists.Commands.NormalizeAllFullTimeSchedules;
-using Application.SystemAdmin.Ophthalmologists.Commands.NormalizeFullTimeSchedule;
 using Application.SystemAdmin.Ophthalmologists.Commands.PaySalary;
 using Application.SystemAdmin.Ophthalmologists.Commands.ConfirmWithdrawalRequest;
 using Application.SystemAdmin.Ophthalmologists.Commands.RejectWithdrawalRequest;
@@ -85,81 +81,6 @@ public class OphthalmologistsController : BaseApiController
     }
 
     /// <summary>
-    /// Force backfill system-generated full-time templates and slots for one ophthalmologist.
-    /// Useful for recovery/testing when old scheduler failures caused missing data.
-    /// </summary>
-    /// <param name="id">Ophthalmologist ID</param>
-    /// <param name="windowDays">Optional rolling window size in days (default from settings/environment)</param>
-    [HttpPost("{id:guid}/backfill-fulltime-schedule")]
-    [ProducesResponseType(typeof(ApiResponse<BackfillFullTimeScheduleResultDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> BackfillFullTimeSchedule(Guid id, [FromQuery] int? windowDays = null)
-    {
-        var result = await _mediator.Send(new BackfillFullTimeScheduleCommand
-        {
-            OphthalmologistId = id,
-            WindowDays = windowDays
-        });
-
-        return HandleResult(result, "Backfill full-time schedule completed successfully.");
-    }
-
-    /// <summary>
-    /// Delete all future slots of one ophthalmologist.
-    /// Past slots are preserved.
-    /// </summary>
-    /// <param name="id">Ophthalmologist ID</param>
-    [HttpDelete("{id:guid}/future-slots")]
-    [ProducesResponseType(typeof(ApiResponse<DeleteFutureOphthalmologistSlotsResultDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteFutureSlots(Guid id)
-    {
-        var result = await _mediator.Send(new DeleteFutureOphthalmologistSlotsCommand
-        {
-            OphthalmologistId = id
-        });
-
-        return HandleResult(result, "Delete future slots completed successfully.");
-    }
-
-    /// <summary>
-    /// Normalize one full-time ophthalmologist schedule to canonical system-generated weekday templates.
-    /// Deactivates non-canonical templates, cleans future mismatched slots, and creates missing canonical slots.
-    /// </summary>
-    /// <param name="id">Ophthalmologist ID</param>
-    /// <param name="windowDays">Optional reconciliation window in days (default from settings/environment)</param>
-    [HttpPost("{id:guid}/normalize-fulltime-schedule")]
-    [ProducesResponseType(typeof(ApiResponse<NormalizeFullTimeScheduleResultDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> NormalizeFullTimeSchedule(Guid id, [FromQuery] int? windowDays = null)
-    {
-        var result = await _mediator.Send(new NormalizeFullTimeScheduleCommand
-        {
-            OphthalmologistId = id,
-            WindowDays = windowDays
-        });
-
-        return HandleResult(result, "Normalize full-time schedule completed successfully.");
-    }
-
-    /// <summary>
-    /// Bulk normalize all full-time ophthalmologist schedules to canonical weekday templates.
-    /// Default reconciliation window is 7 days when not provided.
-    /// </summary>
-    /// <param name="windowDays">Optional reconciliation window in days (default: 7)</param>
-    [HttpPost("normalize-fulltime-schedules/bulk")]
-    [ProducesResponseType(typeof(ApiResponse<NormalizeAllFullTimeSchedulesResultDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> NormalizeAllFullTimeSchedules([FromQuery] int? windowDays = null)
-    {
-        var result = await _mediator.Send(new NormalizeAllFullTimeSchedulesCommand
-        {
-            WindowDays = windowDays
-        });
-
-        return HandleResult(result, "Bulk normalize full-time schedules completed successfully.");
-    }
     /// Pay monthly salary (or custom amount) into ophthalmologist wallet.
     /// </summary>
     [HttpPost("{id:guid}/salary-payout")]

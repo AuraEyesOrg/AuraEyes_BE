@@ -45,24 +45,13 @@ public class SessionReminderWorker : BackgroundService
                 await CheckAndNotifyStaleSessionsAsync(stoppingToken);
                 await _betterStackHeartbeat.NotifySucceededAsync(BetterStackMonitor.SessionReminderWorker, stoppingToken);
             }
-            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
-            {
-                _logger.LogWarning("SessionReminderWorker cycle was canceled by infrastructure timeout and will retry.");
-            }
-            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 await _betterStackHeartbeat.NotifyFailedAsync(BetterStackMonitor.SessionReminderWorker, stoppingToken);
                 _logger.LogError(ex, "Error in SessionReminderWorker cycle");
             }
 
-            try
-            {
-                await Task.Delay(CheckInterval, stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
+            await Task.Delay(CheckInterval, stoppingToken);
         }
 
         _logger.LogInformation("SessionReminderWorker stopped");

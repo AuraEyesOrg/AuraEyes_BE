@@ -1,5 +1,4 @@
 using Application.Common.Interfaces;
-using Domain.Enums;
 
 namespace Application.Ophthalmologists.Commands.UpdateOphthalmologist;
 
@@ -43,19 +42,4 @@ public record UpdateOphthalmologistCommand : ICommand
     /// Updated years of experience.
     /// </summary>
     public int YearsOfExperience { get; init; }
-
-    /// <summary>
-    /// Optional employment type update.
-    /// </summary>
-    public OphthalmologistEmploymentType? EmploymentType { get; init; }
-
-    /// <summary>
-    /// Optional working hours per week update.
-    /// </summary>
-    public int? WorkingHoursPerWeek { get; init; }
-
-    /// <summary>
-    /// Optional expected monthly salary update.
-    /// </summary>
-    public decimal? ExpectedMonthlySalary { get; init; }
 }
