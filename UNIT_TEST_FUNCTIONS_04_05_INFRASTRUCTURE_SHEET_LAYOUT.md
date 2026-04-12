@@ -1,26 +1,45 @@
 ﻿# Infrastructure Unit Test - Sheet Layout Ready
 
-Ngay cap nhat: 07/04/2026
-Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
+Last updated: 13/04/2026
+Source: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
-## F005 - AuthService.RegisterPatientAsync
+## How to copy into Sheet / Excel
+
+- Each block `## F001` … `## F096` is **one function**; copy the whole block into one sheet or one table range.
+- In the Header table **Value** column, fill in **Created By**, **Executed By**, **Lines of Code**, **Passed / Failed / Untested**, **Count type N / A / B** after you run tests.
+- **Result Matrix**: enter **P**/**F** (or Passed/Failed), **Executed Date**, **Defect ID** per UTCID.
+- (Optional) Before **Result Matrix**, you may insert a **Confirm** table: Expected Return / Exception / Log message per UTCID (add columns yourself if needed).
+- Empty cells are **placeholders**; to convert markdown tables to Sheet, paste into a table converter (e.g. tableconvert) if needed.
+
+---
+
+## F001 - AuthService.RegisterPatientAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F005 |
+| Function Code | F001 |
 | Function Name | AuthService.RegisterPatientAsync |
 | Total Test Cases | 10 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Email da ton tai -> Failure conflict message. | Valid dependencies and data setup for this scenario | UTCID01-UTCID02 |
-| `_userManager.CreateAsync` fail -> rollback transaction + tra identity errors. | Valid dependencies and data setup for this scenario | UTCID03-UTCID04 |
-| Tao user + add role + tao patient + commit -> Success co UserId/Email. | Valid dependencies and data setup for this scenario | UTCID05-UTCID06 |
-| Gui email confirm fail -> van Success, co warning log. | Valid dependencies and data setup for this scenario | UTCID07-UTCID08 |
-| Exception trong transaction -> rollback + Failure generic. | Valid dependencies and data setup for this scenario | UTCID09-UTCID10 |
+| Email already exists -> Failure conflict message. | Valid dependencies and data setup for this scenario | UTCID01-UTCID02 |
+| `_userManager.CreateAsync` fails -> rollback transaction + return identity errors. | Valid dependencies and data setup for this scenario | UTCID03-UTCID04 |
+| Create user + add role + create patient + commit -> Success with UserId/Email. | Valid dependencies and data setup for this scenario | UTCID05-UTCID06 |
+| Confirmation email send fails -> still Success, warning log. | Valid dependencies and data setup for this scenario | UTCID07-UTCID08 |
+| Exception during transaction -> rollback + generic Failure. | Valid dependencies and data setup for this scenario | UTCID09-UTCID10 |
 
 ### Result Matrix
 
@@ -39,27 +58,36 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F006 - AuthService.RegisterOphthalmologistAsync
+## F002 - AuthService.RegisterOphthalmologistAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F006 |
+| Function Code | F002 |
 | Function Name | AuthService.RegisterOphthalmologistAsync |
 | Total Test Cases | 60 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Khong co credential nao -> Failure. | Valid dependencies and data setup for this scenario | UTCID01-UTCID08 |
-| Co credentials nhung khong co Degree -> Failure. | Valid dependencies and data setup for this scenario | UTCID09-UTCID16 |
-| Co Degree nhung khong co License -> Failure. | Valid dependencies and data setup for this scenario | UTCID17-UTCID24 |
-| Degree level/file/expiry validation fail -> Failure validation. | Valid dependencies and data setup for this scenario | UTCID25-UTCID40 |
-| License expiry validation fail (`<= issued`) -> Failure validation. | Valid dependencies and data setup for this scenario | UTCID41-UTCID50 |
-| Upload credentials + tao profile + commit -> Success. | Valid dependencies and data setup for this scenario | UTCID51-UTCID54 |
-| Loi sau khi upload file -> rollback va cleanup file da upload. | Valid dependencies and data setup for this scenario | UTCID55-UTCID58 |
-| Loi gui email confirm/admin -> van Success, ghi warning. | Valid dependencies and data setup for this scenario | UTCID59-UTCID60 |
+| No credentials -> Failure. | Valid dependencies and data setup for this scenario | UTCID01-UTCID08 |
+| Has credentials but no Degree -> Failure. | Valid dependencies and data setup for this scenario | UTCID09-UTCID16 |
+| Has Degree but no License -> Failure. | Valid dependencies and data setup for this scenario | UTCID17-UTCID24 |
+| Degree level/file/expiry validation fails -> Failure validation. | Valid dependencies and data setup for this scenario | UTCID25-UTCID40 |
+| License expiry validation fails (`<= issued`) -> Failure validation. | Valid dependencies and data setup for this scenario | UTCID41-UTCID50 |
+| Upload credentials + create profile + commit -> Success. | Valid dependencies and data setup for this scenario | UTCID51-UTCID54 |
+| Error after file upload -> rollback and cleanup uploaded files. | Valid dependencies and data setup for this scenario | UTCID55-UTCID58 |
+| Confirm/admin email error -> still Success, log warning. | Valid dependencies and data setup for this scenario | UTCID59-UTCID60 |
 
 ### Result Matrix
 
@@ -128,21 +156,30 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F007 - AuthService.RegisterOrganisationAsync
+## F003 - AuthService.RegisterOrganisationAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F007 |
+| Function Code | F003 |
 | Function Name | AuthService.RegisterOrganisationAsync |
 | Total Test Cases | 20 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Onboarding service tra Success -> AuthService tra Success payload dung. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
-| Onboarding service tra Conflict -> AuthService giu nguyen conflict. | Valid dependencies and data setup for this scenario | UTCID11-UTCID20 |
+| Onboarding service returns Success -> AuthService returns correct Success payload. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
+| Onboarding service returns Conflict -> AuthService preserves conflict. | Valid dependencies and data setup for this scenario | UTCID11-UTCID20 |
 
 ### Result Matrix
 
@@ -171,13 +208,22 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F008 - AuthService.GoogleLoginAsync
+## F004 - AuthService.GoogleLoginAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F008 |
+| Function Code | F004 |
 | Function Name | AuthService.GoogleLoginAsync |
 | Total Test Cases | 10 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
@@ -203,13 +249,22 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F009 - AuthService.LoginAsync
+## F005 - AuthService.LoginAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F009 |
+| Function Code | F005 |
 | Function Name | AuthService.LoginAsync |
 | Total Test Cases | 10 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
@@ -235,13 +290,22 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F010 - AuthService.VerifyTwoFactorLoginAsync
+## F006 - AuthService.VerifyTwoFactorLoginAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F010 |
+| Function Code | F006 |
 | Function Name | AuthService.VerifyTwoFactorLoginAsync |
 | Total Test Cases | 10 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
@@ -267,13 +331,22 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F011 - AuthService.RefreshTokenAsync
+## F007 - AuthService.RefreshTokenAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F011 |
+| Function Code | F007 |
 | Function Name | AuthService.RefreshTokenAsync |
 | Total Test Cases | 10 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
@@ -299,21 +372,226 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F012 - AuthService.LogoutAsync
+## F008 - AuthService.LogoutAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F008 |
+| Function Name | AuthService.LogoutAsync |
+| Total Test Cases | 20 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| Token not found -> still Success (idempotent). | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
+| Exception when revoking -> Failure. | Valid dependencies and data setup for this scenario | UTCID11-UTCID20 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | A |  |  |  |
+| UTCID02 | A |  |  |  |
+| UTCID03 | A |  |  |  |
+| UTCID04 | A |  |  |  |
+| UTCID05 | A |  |  |  |
+| UTCID06 | A |  |  |  |
+| UTCID07 | A |  |  |  |
+| UTCID08 | A |  |  |  |
+| UTCID09 | A |  |  |  |
+| UTCID10 | A |  |  |  |
+| UTCID11 | A |  |  |  |
+| UTCID12 | A |  |  |  |
+| UTCID13 | A |  |  |  |
+| UTCID14 | A |  |  |  |
+| UTCID15 | A |  |  |  |
+| UTCID16 | A |  |  |  |
+| UTCID17 | A |  |  |  |
+| UTCID18 | A |  |  |  |
+| UTCID19 | A |  |  |  |
+| UTCID20 | A |  |  |  |
+
+---
+
+## F009 - AuthService.LogoutAllAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F009 |
+| Function Name | AuthService.LogoutAllAsync |
+| Total Test Cases | 20 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| Revoke all tokens succeeds -> Success. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
+| Revoke all tokens throws -> Failure. | Valid dependencies and data setup for this scenario | UTCID11-UTCID20 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | A |  |  |  |
+| UTCID02 | A |  |  |  |
+| UTCID03 | A |  |  |  |
+| UTCID04 | A |  |  |  |
+| UTCID05 | A |  |  |  |
+| UTCID06 | A |  |  |  |
+| UTCID07 | A |  |  |  |
+| UTCID08 | A |  |  |  |
+| UTCID09 | A |  |  |  |
+| UTCID10 | A |  |  |  |
+| UTCID11 | A |  |  |  |
+| UTCID12 | A |  |  |  |
+| UTCID13 | A |  |  |  |
+| UTCID14 | A |  |  |  |
+| UTCID15 | A |  |  |  |
+| UTCID16 | A |  |  |  |
+| UTCID17 | A |  |  |  |
+| UTCID18 | A |  |  |  |
+| UTCID19 | A |  |  |  |
+| UTCID20 | A |  |  |  |
+
+---
+
+## F010 - AuthService.ConfirmEmailAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F010 |
+| Function Name | AuthService.ConfirmEmailAsync |
+| Total Test Cases | 10 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| `userId` cannot parse Guid -> Failure invalid id. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | A |  |  |  |
+| UTCID02 | A |  |  |  |
+| UTCID03 | A |  |  |  |
+| UTCID04 | A |  |  |  |
+| UTCID05 | A |  |  |  |
+| UTCID06 | A |  |  |  |
+| UTCID07 | A |  |  |  |
+| UTCID08 | A |  |  |  |
+| UTCID09 | A |  |  |  |
+| UTCID10 | A |  |  |  |
+
+---
+
+## F011 - AuthService.ForgotPasswordAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F011 |
+| Function Name | AuthService.ForgotPasswordAsync |
+| Total Test Cases | 20 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| Email does not exist -> no email sent, still Success (anti-enumeration). | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
+| Exception sending mail/token -> Failure. | Valid dependencies and data setup for this scenario | UTCID11-UTCID20 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | A |  |  |  |
+| UTCID02 | A |  |  |  |
+| UTCID03 | A |  |  |  |
+| UTCID04 | A |  |  |  |
+| UTCID05 | A |  |  |  |
+| UTCID06 | A |  |  |  |
+| UTCID07 | A |  |  |  |
+| UTCID08 | A |  |  |  |
+| UTCID09 | A |  |  |  |
+| UTCID10 | A |  |  |  |
+| UTCID11 | A |  |  |  |
+| UTCID12 | A |  |  |  |
+| UTCID13 | A |  |  |  |
+| UTCID14 | A |  |  |  |
+| UTCID15 | A |  |  |  |
+| UTCID16 | A |  |  |  |
+| UTCID17 | A |  |  |  |
+| UTCID18 | A |  |  |  |
+| UTCID19 | A |  |  |  |
+| UTCID20 | A |  |  |  |
+
+---
+
+## F012 - AuthService.ResetPasswordAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F012 |
-| Function Name | AuthService.LogoutAsync |
-| Total Test Cases | 20 |
+| Function Name | AuthService.ResetPasswordAsync |
+| Total Test Cases | 10 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Token khong ton tai -> van Success (idempotent). | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
-| Exception khi revoke -> Failure. | Valid dependencies and data setup for this scenario | UTCID11-UTCID20 |
+| UserId invalid format -> Failure invalid id. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
 
 ### Result Matrix
 
@@ -329,34 +607,32 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 | UTCID08 | A |  |  |  |
 | UTCID09 | A |  |  |  |
 | UTCID10 | A |  |  |  |
-| UTCID11 | A |  |  |  |
-| UTCID12 | A |  |  |  |
-| UTCID13 | A |  |  |  |
-| UTCID14 | A |  |  |  |
-| UTCID15 | A |  |  |  |
-| UTCID16 | A |  |  |  |
-| UTCID17 | A |  |  |  |
-| UTCID18 | A |  |  |  |
-| UTCID19 | A |  |  |  |
-| UTCID20 | A |  |  |  |
 
 ---
 
-## F013 - AuthService.LogoutAllAsync
+## F013 - AuthService.GetCurrentUserAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F013 |
-| Function Name | AuthService.LogoutAllAsync |
-| Total Test Cases | 20 |
+| Function Name | AuthService.GetCurrentUserAsync |
+| Total Test Cases | 10 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Revoke all token thanh cong -> Success. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
-| Revoke all token throw -> Failure. | Valid dependencies and data setup for this scenario | UTCID11-UTCID20 |
+| User not found -> Unauthorized. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
 
 ### Result Matrix
 
@@ -372,33 +648,33 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 | UTCID08 | A |  |  |  |
 | UTCID09 | A |  |  |  |
 | UTCID10 | A |  |  |  |
-| UTCID11 | A |  |  |  |
-| UTCID12 | A |  |  |  |
-| UTCID13 | A |  |  |  |
-| UTCID14 | A |  |  |  |
-| UTCID15 | A |  |  |  |
-| UTCID16 | A |  |  |  |
-| UTCID17 | A |  |  |  |
-| UTCID18 | A |  |  |  |
-| UTCID19 | A |  |  |  |
-| UTCID20 | A |  |  |  |
 
 ---
 
-## F014 - AuthService.ConfirmEmailAsync
+## F014 - AuthService.ResendConfirmationAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F014 |
-| Function Name | AuthService.ConfirmEmailAsync |
-| Total Test Cases | 10 |
+| Function Name | AuthService.ResendConfirmationAsync |
+| Total Test Cases | 20 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| `userId` khong parse duoc Guid -> Failure invalid id. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
+| User missing / already confirmed -> still Success. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
+| Exception sending email -> Failure. | Valid dependencies and data setup for this scenario | UTCID11-UTCID20 |
 
 ### Result Matrix
 
@@ -414,175 +690,44 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 | UTCID08 | A |  |  |  |
 | UTCID09 | A |  |  |  |
 | UTCID10 | A |  |  |  |
+| UTCID11 | A |  |  |  |
+| UTCID12 | A |  |  |  |
+| UTCID13 | A |  |  |  |
+| UTCID14 | A |  |  |  |
+| UTCID15 | A |  |  |  |
+| UTCID16 | A |  |  |  |
+| UTCID17 | A |  |  |  |
+| UTCID18 | A |  |  |  |
+| UTCID19 | A |  |  |  |
+| UTCID20 | A |  |  |  |
 
 ---
 
-## F015 - AuthService.ForgotPasswordAsync
+## F015 - IdentityService.CheckPasswordAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F015 |
-| Function Name | AuthService.ForgotPasswordAsync |
-| Total Test Cases | 20 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| Email khong ton tai -> khong gui, van Success (anti enumeration). | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
-| Exception send mail/token -> Failure. | Valid dependencies and data setup for this scenario | UTCID11-UTCID20 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | A |  |  |  |
-| UTCID02 | A |  |  |  |
-| UTCID03 | A |  |  |  |
-| UTCID04 | A |  |  |  |
-| UTCID05 | A |  |  |  |
-| UTCID06 | A |  |  |  |
-| UTCID07 | A |  |  |  |
-| UTCID08 | A |  |  |  |
-| UTCID09 | A |  |  |  |
-| UTCID10 | A |  |  |  |
-| UTCID11 | A |  |  |  |
-| UTCID12 | A |  |  |  |
-| UTCID13 | A |  |  |  |
-| UTCID14 | A |  |  |  |
-| UTCID15 | A |  |  |  |
-| UTCID16 | A |  |  |  |
-| UTCID17 | A |  |  |  |
-| UTCID18 | A |  |  |  |
-| UTCID19 | A |  |  |  |
-| UTCID20 | A |  |  |  |
-
----
-
-## F016 - AuthService.ResetPasswordAsync
-
-| Header | Value |
-|---|---|
-| Function Code | F016 |
-| Function Name | AuthService.ResetPasswordAsync |
-| Total Test Cases | 10 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| UserId sai format -> Failure invalid id. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | A |  |  |  |
-| UTCID02 | A |  |  |  |
-| UTCID03 | A |  |  |  |
-| UTCID04 | A |  |  |  |
-| UTCID05 | A |  |  |  |
-| UTCID06 | A |  |  |  |
-| UTCID07 | A |  |  |  |
-| UTCID08 | A |  |  |  |
-| UTCID09 | A |  |  |  |
-| UTCID10 | A |  |  |  |
-
----
-
-## F017 - AuthService.GetCurrentUserAsync
-
-| Header | Value |
-|---|---|
-| Function Code | F017 |
-| Function Name | AuthService.GetCurrentUserAsync |
-| Total Test Cases | 10 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| User khong ton tai -> Unauthorized. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | A |  |  |  |
-| UTCID02 | A |  |  |  |
-| UTCID03 | A |  |  |  |
-| UTCID04 | A |  |  |  |
-| UTCID05 | A |  |  |  |
-| UTCID06 | A |  |  |  |
-| UTCID07 | A |  |  |  |
-| UTCID08 | A |  |  |  |
-| UTCID09 | A |  |  |  |
-| UTCID10 | A |  |  |  |
-
----
-
-## F018 - AuthService.ResendConfirmationAsync
-
-| Header | Value |
-|---|---|
-| Function Code | F018 |
-| Function Name | AuthService.ResendConfirmationAsync |
-| Total Test Cases | 20 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| User khong ton tai/da confirm -> van Success. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
-| Exception gui email -> Failure. | Valid dependencies and data setup for this scenario | UTCID11-UTCID20 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | A |  |  |  |
-| UTCID02 | A |  |  |  |
-| UTCID03 | A |  |  |  |
-| UTCID04 | A |  |  |  |
-| UTCID05 | A |  |  |  |
-| UTCID06 | A |  |  |  |
-| UTCID07 | A |  |  |  |
-| UTCID08 | A |  |  |  |
-| UTCID09 | A |  |  |  |
-| UTCID10 | A |  |  |  |
-| UTCID11 | A |  |  |  |
-| UTCID12 | A |  |  |  |
-| UTCID13 | A |  |  |  |
-| UTCID14 | A |  |  |  |
-| UTCID15 | A |  |  |  |
-| UTCID16 | A |  |  |  |
-| UTCID17 | A |  |  |  |
-| UTCID18 | A |  |  |  |
-| UTCID19 | A |  |  |  |
-| UTCID20 | A |  |  |  |
-
----
-
-## F019 - IdentityService.CheckPasswordAsync
-
-| Header | Value |
-|---|---|
-| Function Code | F019 |
 | Function Name | IdentityService.CheckPasswordAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| UserId khong ton tai -> false. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Password sai -> false. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Password dung -> true. | Valid dependencies and data setup for this scenario | UTCID03 |
+| UserId not found -> false. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Wrong password -> false. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Correct password -> true. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -594,22 +739,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F020 - IdentityService.GetUserByEmailAsync
+## F016 - IdentityService.GetUserByEmailAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F020 |
+| Function Code | F016 |
 | Function Name | IdentityService.GetUserByEmailAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User ton tai va !IsDeleted -> tra `UserDto`. | Valid dependencies and data setup for this scenario | UTCID01 |
-| User bi IsDeleted -> null. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Khong tim thay email -> null. | Valid dependencies and data setup for this scenario | UTCID03 |
+| User exists and !IsDeleted -> returns `UserDto`. | Valid dependencies and data setup for this scenario | UTCID01 |
+| User is IsDeleted -> null. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Email not found -> null. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -621,22 +775,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F021 - IdentityService.GetUserByIdAsync
+## F017 - IdentityService.GetUserByIdAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F021 |
+| Function Code | F017 |
 | Function Name | IdentityService.GetUserByIdAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User ton tai va !IsDeleted -> dto day du. | Valid dependencies and data setup for this scenario | UTCID01 |
+| User exists and !IsDeleted -> full DTO. | Valid dependencies and data setup for this scenario | UTCID01 |
 | User deleted -> null. | Valid dependencies and data setup for this scenario | UTCID02 |
-| UserId khong ton tai -> null. | Valid dependencies and data setup for this scenario | UTCID03 |
+| UserId not found -> null. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -648,23 +811,32 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F022 - IdentityService.IsPhoneNumberInUseByOrganizationAsync
+## F018 - IdentityService.IsPhoneNumberInUseByOrganizationAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F022 |
+| Function Code | F018 |
 | Function Name | IdentityService.IsPhoneNumberInUseByOrganizationAsync |
 | Total Test Cases | 4 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Phone input rong/chi ky tu trang -> false. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Cung so nhung khac format (`+84`, khoang trang, dau gach) -> true. | Valid dependencies and data setup for this scenario | UTCID02 |
-| So ton tai nhung khac organisation -> false. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Cung org nhung user deleted -> false. | Valid dependencies and data setup for this scenario | UTCID04 |
+| Empty phone / whitespace-only -> false. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Same number, different format (`+84`, spaces, dashes) -> true. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Number exists but different organisation -> false. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Same org but user deleted -> false. | Valid dependencies and data setup for this scenario | UTCID04 |
 
 ### Result Matrix
 
@@ -677,22 +849,171 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F023 - IdentityService.IsEmailConfirmedAsync
+## F019 - IdentityService.IsEmailConfirmedAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F019 |
+| Function Name | IdentityService.IsEmailConfirmedAsync |
+| Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| User not found -> false. | Valid dependencies and data setup for this scenario | UTCID01 |
+| User exists, EmailConfirmed=false -> false. | Valid dependencies and data setup for this scenario | UTCID02 |
+| User exists, EmailConfirmed=true -> true. | Valid dependencies and data setup for this scenario | UTCID03 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | A |  |  |  |
+| UTCID02 | N |  |  |  |
+| UTCID03 | N |  |  |  |
+
+---
+
+## F020 - IdentityService.IsUserActiveAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F020 |
+| Function Name | IdentityService.IsUserActiveAsync |
+| Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| User not found -> false. | Valid dependencies and data setup for this scenario | UTCID01 |
+| User inactive or deleted -> false. | Valid dependencies and data setup for this scenario | UTCID02 |
+| User active and !deleted -> true. | Valid dependencies and data setup for this scenario | UTCID03 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | A |  |  |  |
+| UTCID02 | A |  |  |  |
+| UTCID03 | N |  |  |  |
+
+---
+
+## F021 - IdentityService.GenerateEmailConfirmationTokenAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F021 |
+| Function Name | IdentityService.GenerateEmailConfirmationTokenAsync |
+| Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| User not found -> throw `InvalidOperationException`. | Valid dependencies and data setup for this scenario | UTCID01 |
+| User exists -> token non-empty. | Valid dependencies and data setup for this scenario | UTCID02 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | A |  |  |  |
+| UTCID02 | N |  |  |  |
+
+---
+
+## F022 - IdentityService.GeneratePasswordResetTokenAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F022 |
+| Function Name | IdentityService.GeneratePasswordResetTokenAsync |
+| Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| User not found -> throw. | Valid dependencies and data setup for this scenario | UTCID01 |
+| User exists -> token non-empty. | Valid dependencies and data setup for this scenario | UTCID02 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | A |  |  |  |
+| UTCID02 | N |  |  |  |
+
+---
+
+## F023 - IdentityService.GetUserRolesAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F023 |
-| Function Name | IdentityService.IsEmailConfirmedAsync |
+| Function Name | IdentityService.GetUserRolesAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User khong ton tai -> false. | Valid dependencies and data setup for this scenario | UTCID01 |
-| User ton tai, EmailConfirmed=false -> false. | Valid dependencies and data setup for this scenario | UTCID02 |
-| User ton tai, EmailConfirmed=true -> true. | Valid dependencies and data setup for this scenario | UTCID03 |
+| User not found -> empty list. | Valid dependencies and data setup for this scenario | UTCID01 |
+| User has one role -> that role returned. | Valid dependencies and data setup for this scenario | UTCID02 |
+| User has multiple roles -> all roles returned. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -704,73 +1025,102 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F024 - IdentityService.IsUserActiveAsync
+## F024 - IdentityService.IsInRoleAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F024 |
-| Function Name | IdentityService.IsUserActiveAsync |
+| Function Name | IdentityService.IsInRoleAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User khong ton tai -> false. | Valid dependencies and data setup for this scenario | UTCID01 |
-| User inactive hoac deleted -> false. | Valid dependencies and data setup for this scenario | UTCID02 |
-| User active va !deleted -> true. | Valid dependencies and data setup for this scenario | UTCID03 |
+| User not found -> false. | Valid dependencies and data setup for this scenario | UTCID01 |
+| User has role -> true. | Valid dependencies and data setup for this scenario | UTCID02 |
+| User has no role -> false. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|
 | UTCID01 | A |  |  |  |
-| UTCID02 | A |  |  |  |
+| UTCID02 | N |  |  |  |
 | UTCID03 | N |  |  |  |
 
 ---
 
-## F025 - IdentityService.GenerateEmailConfirmationTokenAsync
+## F025 - IdentityService.GetUserIdsByRoleAndOrganizationAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F025 |
-| Function Name | IdentityService.GenerateEmailConfirmationTokenAsync |
-| Total Test Cases | 2 |
+| Function Name | IdentityService.GetUserIdsByRoleAndOrganizationAsync |
+| Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User khong ton tai -> throw `InvalidOperationException`. | Valid dependencies and data setup for this scenario | UTCID01 |
-| User ton tai -> token khong rong. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Filter users correctly by role + org. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Deleted/inactive despite same role -> excluded. | Valid dependencies and data setup for this scenario | UTCID02 |
+| No valid users -> empty list. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|
-| UTCID01 | A |  |  |  |
-| UTCID02 | N |  |  |  |
+| UTCID01 | N |  |  |  |
+| UTCID02 | A |  |  |  |
+| UTCID03 | B |  |  |  |
 
 ---
 
-## F026 - IdentityService.GeneratePasswordResetTokenAsync
+## F026 - IdentityService.UpdateLastLoginAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F026 |
-| Function Name | IdentityService.GeneratePasswordResetTokenAsync |
+| Function Name | IdentityService.UpdateLastLoginAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User khong ton tai -> throw. | Valid dependencies and data setup for this scenario | UTCID01 |
-| User ton tai -> token khong rong. | Valid dependencies and data setup for this scenario | UTCID02 |
+| User not found -> no-op. | Valid dependencies and data setup for this scenario | UTCID01 |
+| User exists -> LastLoginAt updated + `UpdateAsync` called. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -781,22 +1131,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F027 - IdentityService.GetUserRolesAsync
+## F027 - IdentityService.IsTwoFactorEnabledAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F027 |
-| Function Name | IdentityService.GetUserRolesAsync |
+| Function Name | IdentityService.IsTwoFactorEnabledAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User khong ton tai -> empty list. | Valid dependencies and data setup for this scenario | UTCID01 |
-| User 1 role -> dung role do. | Valid dependencies and data setup for this scenario | UTCID02 |
-| User nhieu role -> tra du role. | Valid dependencies and data setup for this scenario | UTCID03 |
+| User not found -> false. | Valid dependencies and data setup for this scenario | UTCID01 |
+| User 2FA=false -> false. | Valid dependencies and data setup for this scenario | UTCID02 |
+| User 2FA=true -> true. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -808,22 +1167,30 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F028 - IdentityService.IsInRoleAsync
+## F028 - IdentityService.GetAuthenticatorKeyAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F028 |
-| Function Name | IdentityService.IsInRoleAsync |
-| Total Test Cases | 3 |
+| Function Name | IdentityService.GetAuthenticatorKeyAsync |
+| Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User khong ton tai -> false. | Valid dependencies and data setup for this scenario | UTCID01 |
-| User co role -> true. | Valid dependencies and data setup for this scenario | UTCID02 |
-| User khong co role -> false. | Valid dependencies and data setup for this scenario | UTCID03 |
+| User not found -> null. | Valid dependencies and data setup for this scenario | UTCID01 |
+| User exists -> returns key. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -831,78 +1198,103 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 |---|---|---|---|---|
 | UTCID01 | A |  |  |  |
 | UTCID02 | N |  |  |  |
-| UTCID03 | N |  |  |  |
 
 ---
 
-## F029 - IdentityService.GetUserIdsByRoleAndOrganizationAsync
+## F029 - IdentityService.GetOrCreateAuthenticatorKeyAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F029 |
-| Function Name | IdentityService.GetUserIdsByRoleAndOrganizationAsync |
-| Total Test Cases | 3 |
+| Function Name | IdentityService.GetOrCreateAuthenticatorKeyAsync |
+| Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Loc dung user theo role + org. | Valid dependencies and data setup for this scenario | UTCID01 |
-| User deleted/inactive du cung role -> bi loai. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Khong co user hop le -> danh sach rong. | Valid dependencies and data setup for this scenario | UTCID03 |
+| User not found -> throw. | Valid dependencies and data setup for this scenario | UTCID01 |
+| User exists -> reset key and obtain new key successfully. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|
-| UTCID01 | N |  |  |  |
-| UTCID02 | A |  |  |  |
-| UTCID03 | B |  |  |  |
+| UTCID01 | A |  |  |  |
+| UTCID02 | N |  |  |  |
 
 ---
 
-## F030 - IdentityService.UpdateLastLoginAsync
+## F030 - IdentityService.VerifyTwoFactorCodeAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F030 |
-| Function Name | IdentityService.UpdateLastLoginAsync |
-| Total Test Cases | 2 |
+| Function Name | IdentityService.VerifyTwoFactorCodeAsync |
+| Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User khong ton tai -> no-op. | Valid dependencies and data setup for this scenario | UTCID01 |
-| User ton tai -> LastLoginAt cap nhat + `UpdateAsync` duoc goi. | Valid dependencies and data setup for this scenario | UTCID02 |
+| User not found -> false. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Wrong code -> false. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Correct code -> true. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|
 | UTCID01 | A |  |  |  |
-| UTCID02 | N |  |  |  |
+| UTCID02 | A |  |  |  |
+| UTCID03 | N |  |  |  |
 
 ---
 
-## F031 - IdentityService.IsTwoFactorEnabledAsync
+## F031 - IdentityService.GenerateNewRecoveryCodesAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F031 |
-| Function Name | IdentityService.IsTwoFactorEnabledAsync |
-| Total Test Cases | 3 |
+| Function Name | IdentityService.GenerateNewRecoveryCodesAsync |
+| Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User khong ton tai -> false. | Valid dependencies and data setup for this scenario | UTCID01 |
-| User co 2FA=false -> false. | Valid dependencies and data setup for this scenario | UTCID02 |
-| User co 2FA=true -> true. | Valid dependencies and data setup for this scenario | UTCID03 |
+| User not found -> throw. | Valid dependencies and data setup for this scenario | UTCID01 |
+| User exists -> returns recovery codes per count. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -910,25 +1302,33 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 |---|---|---|---|---|
 | UTCID01 | A |  |  |  |
 | UTCID02 | N |  |  |  |
-| UTCID03 | N |  |  |  |
 
 ---
 
-## F032 - IdentityService.GetAuthenticatorKeyAsync
+## F032 - IdentityService.GetRecoveryCodesCountAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F032 |
-| Function Name | IdentityService.GetAuthenticatorKeyAsync |
+| Function Name | IdentityService.GetRecoveryCodesCountAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User khong ton tai -> null. | Valid dependencies and data setup for this scenario | UTCID01 |
-| User ton tai -> tra key. | Valid dependencies and data setup for this scenario | UTCID02 |
+| User not found -> 0. | Valid dependencies and data setup for this scenario | UTCID01 |
+| User exists -> correct count. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -939,174 +1339,99 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F033 - IdentityService.GetOrCreateAuthenticatorKeyAsync
+## F033 - IdentityService.GenerateAuthenticatorUri
 
 | Header | Value |
 |---|---|
 | Function Code | F033 |
-| Function Name | IdentityService.GetOrCreateAuthenticatorKeyAsync |
+| Function Name | IdentityService.GenerateAuthenticatorUri |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User khong ton tai -> throw. | Valid dependencies and data setup for this scenario | UTCID01 |
-| User ton tai -> reset key va lay key moi thanh cong. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Valid email + key -> URI uses `otpauth://totp` schema. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Email with special characters -> UrlEncoded correctly. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|
-| UTCID01 | A |  |  |  |
-| UTCID02 | N |  |  |  |
+| UTCID01 | N |  |  |  |
+| UTCID02 | B |  |  |  |
 
 ---
 
-## F034 - IdentityService.VerifyTwoFactorCodeAsync
+## F034 - IdentityService.FormatAuthenticatorKey
 
 | Header | Value |
 |---|---|
 | Function Code | F034 |
-| Function Name | IdentityService.VerifyTwoFactorCodeAsync |
-| Total Test Cases | 3 |
+| Function Name | IdentityService.FormatAuthenticatorKey |
+| Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User khong ton tai -> false. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Code sai -> false. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Code dung -> true. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Long key -> 4-char blocks + uppercase. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Key shorter than 4 -> still uppercase, no error. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|
-| UTCID01 | A |  |  |  |
-| UTCID02 | A |  |  |  |
-| UTCID03 | N |  |  |  |
+| UTCID01 | N |  |  |  |
+| UTCID02 | B |  |  |  |
 
 ---
 
-## F035 - IdentityService.GenerateNewRecoveryCodesAsync
+## F035 - IdentityService.GetUserMetricsAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F035 |
-| Function Name | IdentityService.GenerateNewRecoveryCodesAsync |
-| Total Test Cases | 2 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| User khong ton tai -> throw. | Valid dependencies and data setup for this scenario | UTCID01 |
-| User ton tai -> tra mang recovery code theo count. | Valid dependencies and data setup for this scenario | UTCID02 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | A |  |  |  |
-| UTCID02 | N |  |  |  |
-
----
-
-## F036 - IdentityService.GetRecoveryCodesCountAsync
-
-| Header | Value |
-|---|---|
-| Function Code | F036 |
-| Function Name | IdentityService.GetRecoveryCodesCountAsync |
-| Total Test Cases | 2 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| User khong ton tai -> 0. | Valid dependencies and data setup for this scenario | UTCID01 |
-| User ton tai -> so luong dung. | Valid dependencies and data setup for this scenario | UTCID02 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | A |  |  |  |
-| UTCID02 | N |  |  |  |
-
----
-
-## F037 - IdentityService.GenerateAuthenticatorUri
-
-| Header | Value |
-|---|---|
-| Function Code | F037 |
-| Function Name | IdentityService.GenerateAuthenticatorUri |
-| Total Test Cases | 2 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| Email + key hop le -> URI dung schema `otpauth://totp`. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Email co ky tu dac biet -> duoc UrlEncode dung. | Valid dependencies and data setup for this scenario | UTCID02 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | N |  |  |  |
-| UTCID02 | B |  |  |  |
-
----
-
-## F038 - IdentityService.FormatAuthenticatorKey
-
-| Header | Value |
-|---|---|
-| Function Code | F038 |
-| Function Name | IdentityService.FormatAuthenticatorKey |
-| Total Test Cases | 2 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| Key dai -> chia block 4 ky tu + uppercase. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Key ngan hon 4 -> van uppercase, khong loi. | Valid dependencies and data setup for this scenario | UTCID02 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | N |  |  |  |
-| UTCID02 | B |  |  |  |
-
----
-
-## F039 - IdentityService.GetUserMetricsAsync
-
-| Header | Value |
-|---|---|
-| Function Code | F039 |
 | Function Name | IdentityService.GetUserMetricsAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Du lieu co lich su thang truoc -> tinh % change dung. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Thang truoc =0 nhung co user moi -> change =100. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Pending approvals dem dung theo dieu kien. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Data with prior month history -> percent change calculated correctly. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Prior month =0 but new users -> change =100. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Pending approvals counted correctly per rules. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -1118,22 +1443,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F040 - IdentityService.GetUsersInRoleCountAsync
+## F036 - IdentityService.GetUsersInRoleCountAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F040 |
+| Function Code | F036 |
 | Function Name | IdentityService.GetUsersInRoleCountAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| `activeOnly=true` -> chi dem active + !deleted. | Valid dependencies and data setup for this scenario | UTCID01 |
-| `activeOnly=false` -> dem toan bo !deleted. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Role khong co user -> 0. | Valid dependencies and data setup for this scenario | UTCID03 |
+| `activeOnly=true` -> count only active + !deleted. | Valid dependencies and data setup for this scenario | UTCID01 |
+| `activeOnly=false` -> count all !deleted. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Role has no users -> 0. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -1145,21 +1479,30 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F041 - IdentityService.GetPendingApprovalsCountAsync
+## F037 - IdentityService.GetPendingApprovalsCountAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F041 |
+| Function Code | F037 |
 | Function Name | IdentityService.GetPendingApprovalsCountAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Dem dung user `!EmailConfirmed // !IsActive`. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Khong co pending -> 0. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Count users matching `!EmailConfirmed || !IsActive` correctly. | Valid dependencies and data setup for this scenario | UTCID01 |
+| No pending -> 0. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -1170,22 +1513,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F042 - IdentityService.GetUserDetailsAsync
+## F038 - IdentityService.GetUserDetailsAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F042 |
+| Function Code | F038 |
 | Function Name | IdentityService.GetUserDetailsAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User khong ton tai -> null. | Valid dependencies and data setup for this scenario | UTCID01 |
+| User not found -> null. | Valid dependencies and data setup for this scenario | UTCID01 |
 | User deleted -> null. | Valid dependencies and data setup for this scenario | UTCID02 |
-| User hop le -> dto day du thong tin profile. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Valid user -> DTO with full profile. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -1197,21 +1549,30 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F046 - RefreshTokenService.CreateRefreshTokenAsync
+## F039 - RefreshTokenService.CreateRefreshTokenAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F046 |
+| Function Code | F039 |
 | Function Name | RefreshTokenService.CreateRefreshTokenAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Tao refresh token va save DB thanh cong -> return Id. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Du lieu luu dung `UserId`, `JwtId`, `TokenHash`. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Refresh token created and saved -> return Id. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Persisted data correct for `UserId`, `JwtId`, `TokenHash`. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -1222,22 +1583,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F047 - RefreshTokenService.GetByTokenHashAsync
+## F040 - RefreshTokenService.GetByTokenHashAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F047 |
+| Function Code | F040 |
 | Function Name | RefreshTokenService.GetByTokenHashAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Hash khong ton tai -> null. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Hash ton tai -> map dto dung fields. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Token revoked/used -> `IsActive=false` trong dto. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Hash not found -> null. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Hash exists -> DTO mapped with correct fields. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Token revoked/used -> `IsActive=false` in DTO. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -1249,22 +1619,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F048 - RefreshTokenService.RotateRefreshTokenAsync
+## F041 - RefreshTokenService.RotateRefreshTokenAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F048 |
+| Function Code | F041 |
 | Function Name | RefreshTokenService.RotateRefreshTokenAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Old token id khong ton tai -> throw. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Old token ton tai -> tao new token thanh cong. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Old token duoc `MarkAsUsed` va lien ket token moi. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Old token id not found -> throw. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Old token exists -> new token created successfully. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Old token `MarkAsUsed` and linked to new token. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -1276,21 +1655,30 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F049 - RefreshTokenService.RevokeTokenAsync
+## F042 - RefreshTokenService.RevokeTokenAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F049 |
+| Function Code | F042 |
 | Function Name | RefreshTokenService.RevokeTokenAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Token ton tai -> revoke va save. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Token khong ton tai -> no-op, khong throw. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Token exists -> revoke and save. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Token not found -> no-op, does not throw. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -1301,21 +1689,30 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F050 - RefreshTokenService.RevokeAllUserTokensAsync
+## F043 - RefreshTokenService.RevokeAllUserTokensAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F050 |
+| Function Code | F043 |
 | Function Name | RefreshTokenService.RevokeAllUserTokensAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Co nhieu token chua revoke -> tat ca bi revoke. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Khong co token hop le -> save van an toan. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Multiple unre revoked tokens -> all revoked. | Valid dependencies and data setup for this scenario | UTCID01 |
+| No valid tokens -> save still safe. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -1326,21 +1723,30 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F051 - RefreshTokenService.RevokeTokenFamilyAsync
+## F044 - RefreshTokenService.RevokeTokenFamilyAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F051 |
+| Function Code | F044 |
 | Function Name | RefreshTokenService.RevokeTokenFamilyAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Token goc khong ton tai -> return, khong throw. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Token ton tai -> revoke toan bo token cua user. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Root token missing -> return, does not throw. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Token exists -> revoke all user tokens. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -1351,22 +1757,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F052 - RefreshTokenService.CleanupExpiredTokensAsync
+## F045 - RefreshTokenService.CleanupExpiredTokensAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F052 |
+| Function Code | F045 |
 | Function Name | RefreshTokenService.CleanupExpiredTokensAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Token het han qua cutoff -> bi xoa. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Token revoked qua cutoff -> bi xoa. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Khong co token can xoa -> return 0. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Token expired past cutoff -> deleted. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Token revoked past cutoff -> deleted. | Valid dependencies and data setup for this scenario | UTCID02 |
+| No tokens to delete -> return 0. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -1378,23 +1793,32 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F053 - TokenService.GenerateAccessTokenAsync
+## F046 - TokenService.GenerateAccessTokenAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F053 |
+| Function Code | F046 |
 | Function Name | TokenService.GenerateAccessTokenAsync |
 | Total Test Cases | 4 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Tao token co claims bat buoc (`sub`,`uid`,`email`,`jti`,`iat`). | Valid dependencies and data setup for this scenario | UTCID01 |
-| Roles duoc dua vao `ClaimTypes.Role` va `role`. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Additional claims duoc append dung. | Valid dependencies and data setup for this scenario | UTCID03 |
-| ExpiresAt dung theo config `AccessTokenExpiryMinutes`. | Valid dependencies and data setup for this scenario | UTCID04 |
+| Token has required claims (`sub`,`uid`,`email`,`jti`,`iat`). | Valid dependencies and data setup for this scenario | UTCID01 |
+| Roles added to `ClaimTypes.Role` and `role`. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Additional claims appended correctly. | Valid dependencies and data setup for this scenario | UTCID03 |
+| ExpiresAt matches `AccessTokenExpiryMinutes` config. | Valid dependencies and data setup for this scenario | UTCID04 |
 
 ### Result Matrix
 
@@ -1407,22 +1831,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F054 - TokenService.GenerateRefreshToken
+## F047 - TokenService.GenerateRefreshToken
 
 | Header | Value |
 |---|---|
-| Function Code | F054 |
+| Function Code | F047 |
 | Function Name | TokenService.GenerateRefreshToken |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Token base64 hop le, khong rong. | Valid dependencies and data setup for this scenario | UTCID01 |
-| 2 lan sinh lien tiep khac nhau. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Do dai token du lon (>=64 byte random truoc encode). | Valid dependencies and data setup for this scenario | UTCID03 |
+| Valid non-empty base64 token. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Two consecutive generations differ. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Token length large enough (>=64 random bytes before encode). | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -1434,22 +1867,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F055 - TokenService.ValidateToken
+## F048 - TokenService.ValidateToken
 
 | Header | Value |
 |---|---|
-| Function Code | F055 |
+| Function Code | F048 |
 | Function Name | TokenService.ValidateToken |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Token hop le -> tra ClaimsPrincipal. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Token sai signature -> null. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Token alg khong phai HmacSha256 -> null. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Valid token -> returns ClaimsPrincipal. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Invalid token signature -> null. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Token alg not HmacSha256 -> null. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -1461,22 +1903,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F056 - TokenService.GetUserIdFromToken
+## F049 - TokenService.GetUserIdFromToken
 
 | Header | Value |
 |---|---|
-| Function Code | F056 |
+| Function Code | F049 |
 | Function Name | TokenService.GetUserIdFromToken |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Token hop le co `sub` -> parse Guid thanh cong. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Khong co `sub` nhung co `uid`/`nameidentifier` -> van lay duoc. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Claim user id khong parse duoc -> null. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Valid token with `sub` -> Guid parses successfully. | Valid dependencies and data setup for this scenario | UTCID01 |
+| No `sub` but has `uid`/`nameidentifier` -> still resolved. | Valid dependencies and data setup for this scenario | UTCID02 |
+| User id claim cannot be parsed -> null. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -1488,21 +1939,30 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F057 - TokenService.GetJtiFromToken
+## F050 - TokenService.GetJtiFromToken
 
 | Header | Value |
 |---|---|
-| Function Code | F057 |
+| Function Code | F050 |
 | Function Name | TokenService.GetJtiFromToken |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Token hop le -> lay `jti`. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Token invalid -> null. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Valid token -> read `jti`. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Invalid token -> null. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -1513,22 +1973,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F058 - TokenService.HashToken
+## F051 - TokenService.HashToken
 
 | Header | Value |
 |---|---|
-| Function Code | F058 |
+| Function Code | F051 |
 | Function Name | TokenService.HashToken |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Cung input -> hash giong nhau. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Khac input -> hash khac nhau. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Input rong -> van hash duoc (khong null). | Valid dependencies and data setup for this scenario | UTCID03 |
+| Same input -> same hash. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Different input -> different hash. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Empty input -> still hashable (non-null). | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -1540,24 +2009,33 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F059 - AdminQueryService.GetOphthalmologistsAsync
+## F052 - AdminQueryService.GetOphthalmologistsAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F059 |
+| Function Code | F052 |
 | Function Name | AdminQueryService.GetOphthalmologistsAsync |
 | Total Test Cases | 5 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Khong filter -> paging + sort CreatedAt desc dung. | Valid dependencies and data setup for this scenario | UTCID01 |
-| SearchTerm tim theo fullName/email/phone ILike. | Valid dependencies and data setup for this scenario | UTCID02 |
-| VerificationStatus nhieu gia tri phan cach dau phay -> loc dung. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Map licenses/degrees tu Certificates dung theo Type. | Valid dependencies and data setup for this scenario | UTCID04 |
-| VerificationStatus khong parse duoc -> bo qua filter status. | Valid dependencies and data setup for this scenario | UTCID05 |
+| No filter -> paging + CreatedAt desc sort correct. | Valid dependencies and data setup for this scenario | UTCID01 |
+| SearchTerm matches fullName/email/phone with ILike. | Valid dependencies and data setup for this scenario | UTCID02 |
+| VerificationStatus comma-separated values -> filter correct. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Map licenses/degrees from Certificates by Type correctly. | Valid dependencies and data setup for this scenario | UTCID04 |
+| VerificationStatus unparsable -> skip status filter. | Valid dependencies and data setup for this scenario | UTCID05 |
 
 ### Result Matrix
 
@@ -1571,23 +2049,32 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F060 - AdminQueryService.GetPatientsAsync
+## F053 - AdminQueryService.GetPatientsAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F060 |
+| Function Code | F053 |
 | Function Name | AdminQueryService.GetPatientsAsync |
 | Total Test Cases | 4 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| SearchTerm hoat dong theo fullName/email. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Filter status `active/pending/suspended` dung. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Paging dung totalCount/items. | Valid dependencies and data setup for this scenario | UTCID03 |
-| User deleted khong duoc hien thi. | Valid dependencies and data setup for this scenario | UTCID04 |
+| SearchTerm works on fullName/email. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Filter status `active/pending/suspended` correct. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Paging correct totalCount/items. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Deleted user not shown. | Valid dependencies and data setup for this scenario | UTCID04 |
 
 ### Result Matrix
 
@@ -1600,24 +2087,33 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F061 - AdminQueryService.GetAuditLogsAsync
+## F054 - AdminQueryService.GetAuditLogsAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F061 |
+| Function Code | F054 |
 | Function Name | AdminQueryService.GetAuditLogsAsync |
 | Total Test Cases | 5 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Loc theo search term action/entity/email dung. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Loc theo action/entityName/userId dung. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Loc theo fromDate/toDate dung. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Paging + sort `CreatedAt desc` dung. | Valid dependencies and data setup for this scenario | UTCID04 |
-| Log khong co user join -> `UserName=null` van map duoc. | Valid dependencies and data setup for this scenario | UTCID05 |
+| Filter by search term action/entity/email correct. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Filter by action/entityName/userId correct. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Filter by fromDate/toDate correct. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Paging + `CreatedAt desc` sort correct. | Valid dependencies and data setup for this scenario | UTCID04 |
+| Log without user join -> `UserName=null` still maps. | Valid dependencies and data setup for this scenario | UTCID05 |
 
 ### Result Matrix
 
@@ -1631,24 +2127,33 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F062 - AiQuotaService.GetQuotaAsync
+## F055 - AiQuotaService.GetQuotaAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F062 |
+| Function Code | F055 |
 | Function Name | AiQuotaService.GetQuotaAsync |
 | Total Test Cases | 5 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Role Patient co profile -> tinh total/used/remaining/free-purchased source dung. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Role Patient khong co profile -> fallback free quota. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Role OrgAdmin/Ophthalmologist co org -> tinh quota theo organisation. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Role organisation nhung user khong co org -> None quota. | Valid dependencies and data setup for this scenario | UTCID04 |
-| Role la -> None quota. | Valid dependencies and data setup for this scenario | UTCID05 |
+| Patient with profile -> total/used/remaining/free+purchased correct. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Patient without profile -> fallback free quota. | Valid dependencies and data setup for this scenario | UTCID02 |
+| OrgAdmin/Ophthalmologist with org -> quota by organisation. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Organisation role but user has no org -> None quota. | Valid dependencies and data setup for this scenario | UTCID04 |
+| Unknown role -> None quota. | Valid dependencies and data setup for this scenario | UTCID05 |
 
 ### Result Matrix
 
@@ -1662,13 +2167,22 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F063 - AiQuotaService.HasAvailableQuotaAsync
+## F056 - AiQuotaService.HasAvailableQuotaAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F063 |
+| Function Code | F056 |
 | Function Name | AiQuotaService.HasAvailableQuotaAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
@@ -1687,23 +2201,32 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F064 - AiQuotaService.DeductQuotaAsync
+## F057 - AiQuotaService.DeductQuotaAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F064 |
+| Function Code | F057 |
 | Function Name | AiQuotaService.DeductQuotaAsync |
 | Total Test Cases | 4 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Patient ton tai -> consume quota + save. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Org role va org ton tai -> consume quota organisation + save. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Patient khong ton tai -> throw `InvalidOperationException`. | Valid dependencies and data setup for this scenario | UTCID03 |
-| User org role khong co org -> throw. | Valid dependencies and data setup for this scenario | UTCID04 |
+| Patient exists -> consume quota + save. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Org role and org exist -> consume organisation quota + save. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Patient not found -> throw `InvalidOperationException`. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Org role user without org -> throw. | Valid dependencies and data setup for this scenario | UTCID04 |
 
 ### Result Matrix
 
@@ -1716,23 +2239,32 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F065 - AiQuotaService.AddPurchasedQuotaAsync
+## F058 - AiQuotaService.AddPurchasedQuotaAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F065 |
+| Function Code | F058 |
 | Function Name | AiQuotaService.AddPurchasedQuotaAsync |
 | Total Test Cases | 4 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Patient ton tai -> tang purchased quota. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Org role co org -> tang purchased quota org. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Patient khong ton tai -> throw. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Org khong ton tai -> throw. | Valid dependencies and data setup for this scenario | UTCID04 |
+| Patient exists -> increase purchased quota. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Org role with org -> increase org purchased quota. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Patient not found -> throw. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Organisation not found -> throw. | Valid dependencies and data setup for this scenario | UTCID04 |
 
 ### Result Matrix
 
@@ -1745,21 +2277,30 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F066 - BetterStackHeartbeatService.GetEmbedUrl
+## F059 - BetterStackHeartbeatService.GetEmbedUrl
 
 | Header | Value |
 |---|---|
-| Function Code | F066 |
+| Function Code | F059 |
 | Function Name | BetterStackHeartbeatService.GetEmbedUrl |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| EmbedUrl null/white-space -> null. | Valid dependencies and data setup for this scenario | UTCID01 |
-| EmbedUrl hop le -> tra lai dung gia tri. | Valid dependencies and data setup for this scenario | UTCID02 |
+| EmbedUrl null/whitespace -> null. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Valid EmbedUrl -> returns correct value. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -1770,21 +2311,30 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F067 - BetterStackHeartbeatService.GetMonitorDescriptors
+## F060 - BetterStackHeartbeatService.GetMonitorDescriptors
 
 | Header | Value |
 |---|---|
-| Function Code | F067 |
+| Function Code | F060 |
 | Function Name | BetterStackHeartbeatService.GetMonitorDescriptors |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Tra du descriptor cho tat ca enum monitor. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Truong `Configured` dung theo endpoint setting. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Return descriptors for all monitor enums. | Valid dependencies and data setup for this scenario | UTCID01 |
+| `Configured` field matches endpoint setting. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -1795,22 +2345,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F068 - BetterStackHeartbeatService.NotifyStartedAsync
+## F061 - BetterStackHeartbeatService.NotifyStartedAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F068 |
+| Function Code | F061 |
 | Function Name | BetterStackHeartbeatService.NotifyStartedAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Endpoint khong config -> skip, khong throw. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Endpoint config -> POST thanh cong. | Valid dependencies and data setup for this scenario | UTCID02 |
-| HTTP fail/exception -> warning log, khong throw. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Endpoint not configured -> skip, does not throw. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Endpoint configured -> POST succeeds. | Valid dependencies and data setup for this scenario | UTCID02 |
+| HTTP failure/exception -> warning log, does not throw. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -1822,20 +2381,29 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F069 - BetterStackHeartbeatService.NotifySucceededAsync
+## F062 - BetterStackHeartbeatService.NotifySucceededAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F069 |
+| Function Code | F062 |
 | Function Name | BetterStackHeartbeatService.NotifySucceededAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Ping URL hop le -> goi POST. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Valid ping URL -> POST called. | Valid dependencies and data setup for this scenario | UTCID01 |
 | Non-success status -> warning log. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
@@ -1847,21 +2415,30 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F070 - BetterStackHeartbeatService.NotifyFailedAsync
+## F063 - BetterStackHeartbeatService.NotifyFailedAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F070 |
+| Function Code | F063 |
 | Function Name | BetterStackHeartbeatService.NotifyFailedAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Co FailUrl -> POST den fail url. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Khong co FailUrl -> fallback ping url, loi cung khong throw. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Has FailUrl -> POST to fail URL. | Valid dependencies and data setup for this scenario | UTCID01 |
+| No FailUrl -> fallback ping URL, errors still do not throw. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -1872,25 +2449,34 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F072 - DashboardMetricsService.GetSystemAdminMetricsAsync
+## F064 - DashboardMetricsService.GetSystemAdminMetricsAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F072 |
+| Function Code | F064 |
 | Function Name | DashboardMetricsService.GetSystemAdminMetricsAsync |
 | Total Test Cases | 6 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Tinh tong doctor/org/patient va growth phan tram dung. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Revenue by payment method + percentage dung. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Monthly/Daily revenue map day du theo period. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Pending actions (verification/withdraw/onboarding) dung. | Valid dependencies and data setup for this scenario | UTCID04 |
-| Top doctor by consultation revenue + top org by rating dung. | Valid dependencies and data setup for this scenario | UTCID05 |
-| BetterStack monitor map vao response dung. | Valid dependencies and data setup for this scenario | UTCID06 |
+| Totals doctor/org/patient and growth % correct. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Revenue by payment method + percentage correct. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Monthly/Daily revenue mapped fully for period. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Pending actions (verification/withdraw/onboarding) correct. | Valid dependencies and data setup for this scenario | UTCID04 |
+| Top doctor by consultation revenue + top org by rating correct. | Valid dependencies and data setup for this scenario | UTCID05 |
+| BetterStack monitors mapped into response correctly. | Valid dependencies and data setup for this scenario | UTCID06 |
 
 ### Result Matrix
 
@@ -1905,23 +2491,32 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F073 - DashboardMetricsService.GetRecentScreeningsAsync
+## F065 - DashboardMetricsService.GetRecentScreeningsAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F073 |
+| Function Code | F065 |
 | Function Name | DashboardMetricsService.GetRecentScreeningsAsync |
 | Total Test Cases | 4 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Paging total/items dung. | Valid dependencies and data setup for this scenario | UTCID01 |
-| RiskLevel va `IsCritical` map dung. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Status `Completed/Analyzing` map theo `ProcessedAt`. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Screening khong co risk result -> risk null van map duoc. | Valid dependencies and data setup for this scenario | UTCID04 |
+| Paging total/items correct. | Valid dependencies and data setup for this scenario | UTCID01 |
+| RiskLevel and `IsCritical` mapped correctly. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Status `Completed/Analyzing` mapped from `ProcessedAt`. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Screening without risk result -> risk null still maps. | Valid dependencies and data setup for this scenario | UTCID04 |
 
 ### Result Matrix
 
@@ -1934,22 +2529,316 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F074 - DashboardMetricsService.GetScreeningVolumeTrendsAsync
+## F066 - DashboardMetricsService.GetScreeningVolumeTrendsAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F066 |
+| Function Name | DashboardMetricsService.GetScreeningVolumeTrendsAsync |
+| Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| `weekly` -> group by week start, label dd MMM. | Valid dependencies and data setup for this scenario | UTCID01 |
+| `monthly` -> group by month, label MMM yyyy. | Valid dependencies and data setup for this scenario | UTCID02 |
+| `timeRange` empty -> fallback monthly. | Valid dependencies and data setup for this scenario | UTCID03 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | N |  |  |  |
+| UTCID02 | N |  |  |  |
+| UTCID03 | B |  |  |  |
+
+---
+
+## F067 - DashboardMetricsService.GetPopulationRiskAnalysisAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F067 |
+| Function Name | DashboardMetricsService.GetPopulationRiskAnalysisAsync |
+| Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| Total `TotalPatients` correct. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Skip RiskLevel.None in output list. | Valid dependencies and data setup for this scenario | UTCID02 |
+| No results -> percentage=0. | Valid dependencies and data setup for this scenario | UTCID03 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | N |  |  |  |
+| UTCID02 | N |  |  |  |
+| UTCID03 | B |  |  |  |
+
+---
+
+## F068 - DashboardMetricsService.GetSystemHealthAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F068 |
+| Function Name | DashboardMetricsService.GetSystemHealthAsync |
+| Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| Payload has Database/AI/Notifications components. | Valid dependencies and data setup for this scenario | UTCID01 |
+| `AllSystemsOperational=true` and health fields complete. | Valid dependencies and data setup for this scenario | UTCID02 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | N |  |  |  |
+| UTCID02 | N |  |  |  |
+
+---
+
+## F069 - DashboardMetricsService.GetOphthalmologistMetricsAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F069 |
+| Function Name | DashboardMetricsService.GetOphthalmologistMetricsAsync |
+| Total Test Cases | 4 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| UserId maps to no doctor -> empty DTO. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Pending reviews and urgent cases counted correctly. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Completed today counted correctly. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Open slots today calculated correctly per template/org. | Valid dependencies and data setup for this scenario | UTCID04 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | A |  |  |  |
+| UTCID02 | N |  |  |  |
+| UTCID03 | N |  |  |  |
+| UTCID04 | N |  |  |  |
+
+---
+
+## F070 - DashboardMetricsService.GetOrganisationMetricsAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F070 |
+| Function Name | DashboardMetricsService.GetOrganisationMetricsAsync |
+| Total Test Cases | 4 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| User has no organisation -> empty DTO. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Total appointments + status breakdown counted correctly. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Utilization rate by booked/capacity correct. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Remaining AI quota from `AiQuotaService` correct. | Valid dependencies and data setup for this scenario | UTCID04 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | A |  |  |  |
+| UTCID02 | N |  |  |  |
+| UTCID03 | N |  |  |  |
+| UTCID04 | N |  |  |  |
+
+---
+
+## F071 - DashboardMetricsService.GetPatientMetricsAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F071 |
+| Function Name | DashboardMetricsService.GetPatientMetricsAsync |
+| Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| Patient profile not found -> empty DTO. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Completed screenings / total reports counted correctly. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Upcoming appointments + remaining quota counted correctly. | Valid dependencies and data setup for this scenario | UTCID03 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | A |  |  |  |
+| UTCID02 | N |  |  |  |
+| UTCID03 | N |  |  |  |
+
+---
+
+## F072 - DateTimeService.Now
+
+| Header | Value |
+|---|---|
+| Function Code | F072 |
+| Function Name | DateTimeService.Now |
+| Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| `Now` value close to `DateTime.Now`. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Each call may differ with real time. | Valid dependencies and data setup for this scenario | UTCID02 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | N |  |  |  |
+| UTCID02 | B |  |  |  |
+
+---
+
+## F073 - DateTimeService.UtcNow
+
+| Header | Value |
+|---|---|
+| Function Code | F073 |
+| Function Name | DateTimeService.UtcNow |
+| Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
+| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| `UtcNow` value close to `DateTime.UtcNow`. | Valid dependencies and data setup for this scenario | UTCID01 |
+| `Kind` of value is UTC. | Valid dependencies and data setup for this scenario | UTCID02 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|
+| UTCID01 | N |  |  |  |
+| UTCID02 | B |  |  |  |
+
+---
+
+## F074 - EmailService.SendEmailConfirmationAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F074 |
-| Function Name | DashboardMetricsService.GetScreeningVolumeTrendsAsync |
-| Total Test Cases | 3 |
+| Function Name | EmailService.SendEmailConfirmationAsync |
+| Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| `weekly` -> group theo dau tuan, label dd MMM. | Valid dependencies and data setup for this scenario | UTCID01 |
-| `monthly` -> group theo thang, label MMM yyyy. | Valid dependencies and data setup for this scenario | UTCID02 |
-| `timeRange` la -> fallback monthly. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Correct subject/template for confirmation email. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Calls `SendAsync` with `isHtml=true`. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -1957,26 +2846,33 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 |---|---|---|---|---|
 | UTCID01 | N |  |  |  |
 | UTCID02 | N |  |  |  |
-| UTCID03 | B |  |  |  |
 
 ---
 
-## F075 - DashboardMetricsService.GetPopulationRiskAnalysisAsync
+## F075 - EmailService.SendPasswordResetAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F075 |
-| Function Name | DashboardMetricsService.GetPopulationRiskAnalysisAsync |
-| Total Test Cases | 3 |
+| Function Name | EmailService.SendPasswordResetAsync |
+| Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Tong `TotalPatients` dung. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Bo qua RiskLevel.None trong danh sach output. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Khong co result -> percentage=0. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Correct subject/template for password reset. | Valid dependencies and data setup for this scenario | UTCID01 |
+| `SendAsync` succeeds. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -1984,25 +2880,33 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 |---|---|---|---|---|
 | UTCID01 | N |  |  |  |
 | UTCID02 | N |  |  |  |
-| UTCID03 | B |  |  |  |
 
 ---
 
-## F076 - DashboardMetricsService.GetSystemHealthAsync
+## F076 - EmailService.SendWelcomeEmailAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F076 |
-| Function Name | DashboardMetricsService.GetSystemHealthAsync |
+| Function Name | EmailService.SendWelcomeEmailAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Tra payload co 3 component Database/AI/Notifications. | Valid dependencies and data setup for this scenario | UTCID01 |
-| `AllSystemsOperational=true` va fields health day du. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Correct subject/template for welcome email. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Calls `SendAsync` and logs info. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -2013,233 +2917,32 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F077 - DashboardMetricsService.GetOphthalmologistMetricsAsync
+## F077 - EmailService.SendAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F077 |
-| Function Name | DashboardMetricsService.GetOphthalmologistMetricsAsync |
-| Total Test Cases | 4 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| UserId khong map duoc doctor -> dto rong. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Dem pending reviews va urgent cases dung. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Dem completed today dung. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Tinh open slots today dung theo template/org. | Valid dependencies and data setup for this scenario | UTCID04 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | A |  |  |  |
-| UTCID02 | N |  |  |  |
-| UTCID03 | N |  |  |  |
-| UTCID04 | N |  |  |  |
-
----
-
-## F078 - DashboardMetricsService.GetOrganisationMetricsAsync
-
-| Header | Value |
-|---|---|
-| Function Code | F078 |
-| Function Name | DashboardMetricsService.GetOrganisationMetricsAsync |
-| Total Test Cases | 4 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| User khong co organisation -> dto rong. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Dem total appointment + breakdown status dung. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Utilization rate theo booked/capacity dung. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Remaining AI quota lay tu `AiQuotaService` dung. | Valid dependencies and data setup for this scenario | UTCID04 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | A |  |  |  |
-| UTCID02 | N |  |  |  |
-| UTCID03 | N |  |  |  |
-| UTCID04 | N |  |  |  |
-
----
-
-## F079 - DashboardMetricsService.GetPatientMetricsAsync
-
-| Header | Value |
-|---|---|
-| Function Code | F079 |
-| Function Name | DashboardMetricsService.GetPatientMetricsAsync |
-| Total Test Cases | 3 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| Khong tim thay patient profile -> dto rong. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Dem completed screenings / total reports dung. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Dem upcoming appointments + remaining quota dung. | Valid dependencies and data setup for this scenario | UTCID03 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | A |  |  |  |
-| UTCID02 | N |  |  |  |
-| UTCID03 | N |  |  |  |
-
----
-
-## F080 - DateTimeService.Now
-
-| Header | Value |
-|---|---|
-| Function Code | F080 |
-| Function Name | DateTimeService.Now |
-| Total Test Cases | 2 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| Gia tri `Now` gan voi `DateTime.Now`. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Moi lan goi co the thay doi theo thoi gian thuc. | Valid dependencies and data setup for this scenario | UTCID02 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | N |  |  |  |
-| UTCID02 | B |  |  |  |
-
----
-
-## F081 - DateTimeService.UtcNow
-
-| Header | Value |
-|---|---|
-| Function Code | F081 |
-| Function Name | DateTimeService.UtcNow |
-| Total Test Cases | 2 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| Gia tri `UtcNow` gan voi `DateTime.UtcNow`. | Valid dependencies and data setup for this scenario | UTCID01 |
-| `Kind` cua gia tri la UTC. | Valid dependencies and data setup for this scenario | UTCID02 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | N |  |  |  |
-| UTCID02 | B |  |  |  |
-
----
-
-## F082 - EmailService.SendEmailConfirmationAsync
-
-| Header | Value |
-|---|---|
-| Function Code | F082 |
-| Function Name | EmailService.SendEmailConfirmationAsync |
-| Total Test Cases | 2 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| Dung subject/template confirm email. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Goi `SendAsync` voi `isHtml=true`. | Valid dependencies and data setup for this scenario | UTCID02 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | N |  |  |  |
-| UTCID02 | N |  |  |  |
-
----
-
-## F083 - EmailService.SendPasswordResetAsync
-
-| Header | Value |
-|---|---|
-| Function Code | F083 |
-| Function Name | EmailService.SendPasswordResetAsync |
-| Total Test Cases | 2 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| Dung subject/template reset password. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Goi `SendAsync` thanh cong. | Valid dependencies and data setup for this scenario | UTCID02 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | N |  |  |  |
-| UTCID02 | N |  |  |  |
-
----
-
-## F084 - EmailService.SendWelcomeEmailAsync
-
-| Header | Value |
-|---|---|
-| Function Code | F084 |
-| Function Name | EmailService.SendWelcomeEmailAsync |
-| Total Test Cases | 2 |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| Dung subject/template welcome. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Goi `SendAsync` va ghi log info. | Valid dependencies and data setup for this scenario | UTCID02 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|
-| UTCID01 | N |  |  |  |
-| UTCID02 | N |  |  |  |
-
----
-
-## F085 - EmailService.SendAsync
-
-| Header | Value |
-|---|---|
-| Function Code | F085 |
 | Function Name | EmailService.SendAsync |
 | Total Test Cases | 4 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| `to` rong -> `ArgumentException`. | Valid dependencies and data setup for this scenario | UTCID01 |
-| `subject` hoac `body` rong -> `ArgumentException`. | Valid dependencies and data setup for this scenario | UTCID02 |
-| SMTP connect/auth/send/disconnect thanh cong -> debug log. | Valid dependencies and data setup for this scenario | UTCID03 |
-| SMTP fail -> log error va rethrow. | Valid dependencies and data setup for this scenario | UTCID04 |
+| `to` empty -> `ArgumentException`. | Valid dependencies and data setup for this scenario | UTCID01 |
+| `subject` or `body` empty -> `ArgumentException`. | Valid dependencies and data setup for this scenario | UTCID02 |
+| SMTP connect/auth/send/disconnect success -> debug log. | Valid dependencies and data setup for this scenario | UTCID03 |
+| SMTP failure -> log error and rethrow. | Valid dependencies and data setup for this scenario | UTCID04 |
 
 ### Result Matrix
 
@@ -2252,24 +2955,33 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F086 - GoogleMeetService.CreateMeetingAsync
+## F078 - GoogleMeetService.CreateMeetingAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F086 |
+| Function Code | F078 |
 | Function Name | GoogleMeetService.CreateMeetingAsync |
 | Total Test Cases | 5 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Tao event co meet link ngay -> return `MeetingInfo`. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Khong co link ngay lan dau -> retry va lay duoc link. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Retry het van khong co link -> cleanup orphan event + throw. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Co attendeeEmails -> map attendees vao event. | Valid dependencies and data setup for this scenario | UTCID04 |
-| `durationMinutes` null -> dung default duration setting. | Valid dependencies and data setup for this scenario | UTCID05 |
+| Event created with meet link immediately -> return `MeetingInfo`. | Valid dependencies and data setup for this scenario | UTCID01 |
+| No link on first try -> retry and obtain link. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Retries exhausted without link -> cleanup orphan event + throw. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Has attendeeEmails -> map attendees into event. | Valid dependencies and data setup for this scenario | UTCID04 |
+| `durationMinutes` null -> use default duration setting. | Valid dependencies and data setup for this scenario | UTCID05 |
 
 ### Result Matrix
 
@@ -2283,21 +2995,30 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F087 - GoogleMeetService.DeleteMeetingAsync
+## F079 - GoogleMeetService.DeleteMeetingAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F087 |
+| Function Code | F079 |
 | Function Name | GoogleMeetService.DeleteMeetingAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Xoa event thanh cong. | Valid dependencies and data setup for this scenario | UTCID01 |
-| API tra 404 not found -> warning, khong throw. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Delete event succeeds. | Valid dependencies and data setup for this scenario | UTCID01 |
+| API returns 404 not found -> warning, does not throw. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -2308,20 +3029,29 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F088 - GoogleMeetService.Dispose
+## F080 - GoogleMeetService.Dispose
 
 | Header | Value |
 |---|---|
-| Function Code | F088 |
+| Function Code | F080 |
 | Function Name | GoogleMeetService.Dispose |
 | Total Test Cases | 1 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Goi dispose -> calendar service duoc dispose an toan. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Dispose -> calendar service disposed safely. | Valid dependencies and data setup for this scenario | UTCID01 |
 
 ### Result Matrix
 
@@ -2331,13 +3061,22 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F089 - NotificationService.SendAsync (typed)
+## F081 - NotificationService.SendAsync (typed)
 
 | Header | Value |
 |---|---|
-| Function Code | F089 |
+| Function Code | F081 |
 | Function Name | NotificationService.SendAsync (typed) |
 | Total Test Cases | 4 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
@@ -2346,8 +3085,8 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 |---|---|---|
 | Payload object -> serialize camelCase JSON. | Valid dependencies and data setup for this scenario | UTCID01 |
 | Persist notification + SaveChanges + broadcast notification DTO. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Tinh unread count va broadcast unread count dung. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Loi repository/hub -> log error va rethrow. | Valid dependencies and data setup for this scenario | UTCID04 |
+| Unread count and broadcast correct. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Repository/hub error -> log error and rethrow. | Valid dependencies and data setup for this scenario | UTCID04 |
 
 ### Result Matrix
 
@@ -2360,20 +3099,29 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F090 - NotificationService.SendAsync (legacy)
+## F082 - NotificationService.SendAsync (legacy)
 
 | Header | Value |
 |---|---|
-| Function Code | F090 |
+| Function Code | F082 |
 | Function Name | NotificationService.SendAsync (legacy) |
 | Total Test Cases | 1 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Overload legacy chuyen dung tham so sang overload typed. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Legacy overload forwards parameters to typed overload. | Valid dependencies and data setup for this scenario | UTCID01 |
 
 ### Result Matrix
 
@@ -2383,22 +3131,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F091 - OrganisationOnboardingService.SubmitRequestAsync
+## F083 - OrganisationOnboardingService.SubmitRequestAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F091 |
+| Function Code | F083 |
 | Function Name | OrganisationOnboardingService.SubmitRequestAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Da ton tai pending request cung email -> Conflict. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Tao request moi + save thanh cong. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Gui notify admin sau khi save thanh cong. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Pending request with same email already exists -> Conflict. | Valid dependencies and data setup for this scenario | UTCID01 |
+| New request created + save succeeds. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Notify admins after successful save. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -2410,21 +3167,30 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F092 - OrganisationOnboardingService.GetRequestsAsync
+## F084 - OrganisationOnboardingService.GetRequestsAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F092 |
+| Function Code | F084 |
 | Function Name | OrganisationOnboardingService.GetRequestsAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Tra danh sach sort `CreatedAt desc`. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Map dto day du (`OrgType`, `Status`, `ApprovedAt`...). | Valid dependencies and data setup for this scenario | UTCID02 |
+| Return list sorted `CreatedAt desc`. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Full DTO map (`OrgType`, `Status`, `ApprovedAt`...). | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -2435,25 +3201,34 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F093 - OrganisationOnboardingService.ApproveRequestAsync
+## F085 - OrganisationOnboardingService.ApproveRequestAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F093 |
+| Function Code | F085 |
 | Function Name | OrganisationOnboardingService.ApproveRequestAsync |
 | Total Test Cases | 6 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| RequestId khong ton tai -> NotFound. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Request khong con Pending -> Failure da xu ly. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Contact email da ton tai user -> Conflict. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Tao org admin + add role + tao organisation + approve request -> Success. | Valid dependencies and data setup for this scenario | UTCID04 |
-| Co contract template active -> tao contract va send for signature. | Valid dependencies and data setup for this scenario | UTCID05 |
-| Exception bat ky -> rollback transaction + Failure. | Valid dependencies and data setup for this scenario | UTCID06 |
+| RequestId not found -> NotFound. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Request no longer Pending -> Failure already processed. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Contact email already used by a user -> Conflict. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Create org admin + add role + create organisation + approve request -> Success. | Valid dependencies and data setup for this scenario | UTCID04 |
+| Active contract template -> create contract and send for signature. | Valid dependencies and data setup for this scenario | UTCID05 |
+| Any exception -> rollback transaction + Failure. | Valid dependencies and data setup for this scenario | UTCID06 |
 
 ### Result Matrix
 
@@ -2468,25 +3243,34 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F094 - PatientRoadmapGenerationService.GenerateFromDiagnosisAsync
+## F086 - PatientRoadmapGenerationService.GenerateFromDiagnosisAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F094 |
+| Function Code | F086 |
 | Function Name | PatientRoadmapGenerationService.GenerateFromDiagnosisAsync |
 | Total Test Cases | 6 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| `PatientId` rong -> Failure validation. | Valid dependencies and data setup for this scenario | UTCID01 |
-| `ScreeningId` rong hoac `AiScreeningRawJson` rong -> Failure validation. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Chua config ApiKey -> Failure. | Valid dependencies and data setup for this scenario | UTCID03 |
-| AI tra JSON hop le -> parse + normalize + Success. | Valid dependencies and data setup for this scenario | UTCID04 |
-| AI tra JSON sai format lien tiep -> retry het va Failure. | Valid dependencies and data setup for this scenario | UTCID05 |
-| HTTP timeout/network error qua max retry -> Failure unavailable. | Valid dependencies and data setup for this scenario | UTCID06 |
+| `PatientId` empty -> Failure validation. | Valid dependencies and data setup for this scenario | UTCID01 |
+| `ScreeningId` empty or `AiScreeningRawJson` empty -> Failure validation. | Valid dependencies and data setup for this scenario | UTCID02 |
+| ApiKey not configured -> Failure. | Valid dependencies and data setup for this scenario | UTCID03 |
+| AI returns valid JSON -> parse + normalize + Success. | Valid dependencies and data setup for this scenario | UTCID04 |
+| AI returns invalid JSON repeatedly -> exhaust retries and Failure. | Valid dependencies and data setup for this scenario | UTCID05 |
+| HTTP timeout/network past max retries -> Failure unavailable. | Valid dependencies and data setup for this scenario | UTCID06 |
 
 ### Result Matrix
 
@@ -2501,24 +3285,33 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F095 - PayOSService.CreatePaymentLinkAsync
+## F087 - PayOSService.CreatePaymentLinkAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F095 |
+| Function Code | F087 |
 | Function Name | PayOSService.CreatePaymentLinkAsync |
 | Total Test Cases | 5 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Tao payment link thanh cong, return `checkoutUrl` + `orderCode`. | Valid dependencies and data setup for this scenario | UTCID01 |
-| `returnUrl/cancelUrl` rong -> dung default URL tu settings. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Description >25 ky tu -> bi truncate dung gioi han. | Valid dependencies and data setup for this scenario | UTCID03 |
-| URL output co append query param `orderCode`. | Valid dependencies and data setup for this scenario | UTCID04 |
-| SDK tra null hoac empty url -> throw exception. | Valid dependencies and data setup for this scenario | UTCID05 |
+| Payment link created, return `checkoutUrl` + `orderCode`. | Valid dependencies and data setup for this scenario | UTCID01 |
+| `returnUrl/cancelUrl` empty -> default URLs from settings. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Description >25 chars -> truncated to limit correctly. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Output URL appends `orderCode` query param. | Valid dependencies and data setup for this scenario | UTCID04 |
+| SDK returns null or empty URL -> throw. | Valid dependencies and data setup for this scenario | UTCID05 |
 
 ### Result Matrix
 
@@ -2532,22 +3325,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F096 - PayOSService.GetPaymentStatusAsync
+## F088 - PayOSService.GetPaymentStatusAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F096 |
+| Function Code | F088 |
 | Function Name | PayOSService.GetPaymentStatusAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Query thanh cong -> map `Status/Amount/TxnRef`. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Query succeeds -> map `Status/Amount/TxnRef`. | Valid dependencies and data setup for this scenario | UTCID01 |
 | PaymentInfo null -> throw "Payment not found". | Valid dependencies and data setup for this scenario | UTCID02 |
-| SDK throw -> wrap va throw exception service. | Valid dependencies and data setup for this scenario | UTCID03 |
+| SDK throws -> wrap and throw service exception. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -2559,20 +3361,29 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F097 - PayOSService.VerifyWebhookSignatureAsync
+## F089 - PayOSService.VerifyWebhookSignatureAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F097 |
+| Function Code | F089 |
 | Function Name | PayOSService.VerifyWebhookSignatureAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Flow hien tai -> return true. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Current flow -> return true. | Valid dependencies and data setup for this scenario | UTCID01 |
 | Exception branch -> return false + log error. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
@@ -2584,22 +3395,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F098 - PayOSService.CancelPaymentAsync
+## F090 - PayOSService.CancelPaymentAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F098 |
+| Function Code | F090 |
 | Function Name | PayOSService.CancelPaymentAsync |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| SDK cancel tra object -> true. | Valid dependencies and data setup for this scenario | UTCID01 |
-| SDK tra null -> false. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Exception -> false va log error. | Valid dependencies and data setup for this scenario | UTCID03 |
+| SDK cancel returns object -> true. | Valid dependencies and data setup for this scenario | UTCID01 |
+| SDK returns null -> false. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Exception -> false and log error. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -2611,24 +3431,33 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F100 - SupabaseStorageService.SaveFileAsync
+## F091 - SupabaseStorageService.SaveFileAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F100 |
+| Function Code | F091 |
 | Function Name | SupabaseStorageService.SaveFileAsync |
 | Total Test Cases | 5 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Filename duoc sanitize + path tao dung theo subfolder. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Stream rong -> throw `InvalidOperationException`. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Upload thanh cong -> tra public URL. | Valid dependencies and data setup for this scenario | UTCID03 |
-| SDK tra URL tuong doi -> fallback thanh absolute URL. | Valid dependencies and data setup for this scenario | UTCID04 |
-| ContentType map dung theo extension file. | Valid dependencies and data setup for this scenario | UTCID05 |
+| Filename sanitized + path built correctly per subfolder. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Empty stream -> throw `InvalidOperationException`. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Upload succeeds -> returns public URL. | Valid dependencies and data setup for this scenario | UTCID03 |
+| SDK returns relative URL -> fallback to absolute URL. | Valid dependencies and data setup for this scenario | UTCID04 |
+| ContentType mapped correctly by file extension. | Valid dependencies and data setup for this scenario | UTCID05 |
 
 ### Result Matrix
 
@@ -2642,22 +3471,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F101 - SupabaseStorageService.DeleteFile
+## F092 - SupabaseStorageService.DeleteFile
 
 | Header | Value |
 |---|---|
-| Function Code | F101 |
+| Function Code | F092 |
 | Function Name | SupabaseStorageService.DeleteFile |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Input full URL -> extract path va remove thanh cong -> true. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Input relative path hop le -> remove thanh cong -> true. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Remove throw exception/path invalid -> false. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Full URL input -> extract path and remove succeeds -> true. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Valid relative path -> remove succeeds -> true. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Remove throws or invalid path -> false. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -2669,22 +3507,31 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F102 - SupabaseStorageService.FileExists
+## F093 - SupabaseStorageService.FileExists
 
 | Header | Value |
 |---|---|
-| Function Code | F102 |
+| Function Code | F093 |
 | Function Name | SupabaseStorageService.FileExists |
 | Total Test Cases | 3 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| HEAD tra success -> true. | Valid dependencies and data setup for this scenario | UTCID01 |
-| HEAD tra non-success -> false. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Input rong/exception request -> false. | Valid dependencies and data setup for this scenario | UTCID03 |
+| HEAD success -> true. | Valid dependencies and data setup for this scenario | UTCID01 |
+| HEAD non-success -> false. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Empty input/request exception -> false. | Valid dependencies and data setup for this scenario | UTCID03 |
 
 ### Result Matrix
 
@@ -2696,21 +3543,30 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F103 - SystemSettingService.GetSettingAsync
+## F094 - SystemSettingService.GetSettingAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F103 |
+| Function Code | F094 |
 | Function Name | SystemSettingService.GetSettingAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Key ton tai -> tra value dung. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Key khong ton tai -> null. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Key exists -> returns correct value. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Key not found -> null. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -2721,21 +3577,30 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F104 - SystemSettingService.GetAllSettingsAsync
+## F095 - SystemSettingService.GetAllSettingsAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F104 |
+| Function Code | F095 |
 | Function Name | SystemSettingService.GetAllSettingsAsync |
 | Total Test Cases | 2 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Co du lieu -> dictionary day du key/value. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Khong co du lieu -> dictionary rong. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Has data -> dictionary with full key/value. | Valid dependencies and data setup for this scenario | UTCID01 |
+| No data -> empty dictionary. | Valid dependencies and data setup for this scenario | UTCID02 |
 
 ### Result Matrix
 
@@ -2746,23 +3611,32 @@ Nguon: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
 ---
 
-## F105 - SystemSettingService.UpdateSettingsAsync
+## F096 - SystemSettingService.UpdateSettingsAsync
 
 | Header | Value |
 |---|---|
-| Function Code | F105 |
+| Function Code | F096 |
 | Function Name | SystemSettingService.UpdateSettingsAsync |
 | Total Test Cases | 4 |
+| Created By | |
+| Executed By | |
+| Lines of Code | |
+| Passed | |
+| Failed | |
+| Untested | |
+| Count type N | |
+| Count type A | |
+| Count type B | |
 | Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Input null/rong -> no-op. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Key da ton tai -> goi `UpdateValue`. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Key moi -> add `SystemSetting` moi. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Sau update -> `SaveChangesAsync` duoc goi + log info keys. | Valid dependencies and data setup for this scenario | UTCID04 |
+| Input null/empty -> no-op. | Valid dependencies and data setup for this scenario | UTCID01 |
+| Key exists -> call `UpdateValue`. | Valid dependencies and data setup for this scenario | UTCID02 |
+| New key -> add new `SystemSetting`. | Valid dependencies and data setup for this scenario | UTCID03 |
+| After update -> `SaveChangesAsync` called + log info keys. | Valid dependencies and data setup for this scenario | UTCID04 |
 
 ### Result Matrix
 
