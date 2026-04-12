@@ -3,8 +3,28 @@
 Ngay cap nhat: 13/04/2026
 Scope: d:/sep/AuraEyes_BE/src/Infrastructure/Identity + src/Infrastructure/Services
 
+## Huong dan: doc checklist + copy sang sheet (de hieu)
+
+**Hai file dung chung ma F001–F096 (96 function).**
+
+| File | Vai tro |
+|------|---------|
+| **CHECKLIST (file nay)** | Nguon chi tiet tung **UTCID**: dong `UTCIDxx - dieu kien -> ket qua`. Phan sau `->` la y de ghi vao cot **Expected** tren sheet. |
+| **UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_SHEET_LAYOUT.md** | Layout giong Excel: moi `## Fxxx` la 1 function; bang **Result Matrix** = **1 hang = 1 UTCID** (de dien va copy). |
+
+**Quy tac don gian**
+
+1. Tim **Function Code** (Fxxx) trong bang **Function Catalog** ben duoi.
+2. Keo xuong muc `### Fxxx - ...` trong file nay: moi bullet **UTCID01, UTCID02, ...** tuong ung **mot hang** trong Result Matrix cua cung Fxxx trong file SHEET_LAYOUT.
+3. **Condition Matrix** trong SHEET_LAYOUT chi la **tom tat** (nhieu UTCID co the gop 1 dong). Checklist + Result Matrix la **khung**; cot Expected tren sheet chi **dien co chung cu** tu assert trong test (xem quy tac o tren).
+
+**Luu y:** Unit test trong `tests/Infrastructure.UnitTests` dung `Assert`/`Verify` trong code; file MD khong tu dong dong bo — ban cap nhat tay khi doi spec.
+
+**Quy tac Expected (return / exception / log):** chi ghi noi dung khi **co assert hoac Verify tuong ung** trong test, hoac ban da doi chieu ro va ghi ten test. **Khong** dien theo suy doan / doc code ma test khong kiem tra — de trong hoac `n/a (chua assert trong test)`.
+
 ## Trang thai hien tai
 
+- **Sheet Result Matrix:** tung co lan dien hang loat bang `scripts/fill_all_sheet_expected.py` (gom ca phan suy dien tu contract cho cho chua co test). **Chuan dung:** chi giu / sua cot Expected khi **co chung cu tu test**; phan con lai de trong hoac danh dau `n/a` — xem huong dan dau file SHEET_LAYOUT.
 - Da tao lai project test: tests/Infrastructure.UnitTests.
 - Scope checklist da bo cac case fake (FakeEmailService, FakePayOSService).
 - Tat ca function da duoc nang cap bo case theo huong Condition / Return / Log message / Response convention; LoginAsync (F005) giu bo case chi tiet theo mau.
@@ -136,9 +156,11 @@ Ghi chu:
 - Doan bullet `### F001` … `### F014` ngay duoi day la **tom tat luong chinh** (it hon so dong tren sheet). Vi du F001 o day liet ke 5 y chinh; sheet/matrix va bang thong ke dung **10** case. Khong lay doan tom tat lam so lieu tong hop.
 - Moi function duoi day co nhieu case theo luong thanh cong + luong loi nghiep vu + luong exception.
 - Dinh dang: `UTCIDxx - Condition -> Expected`.
+- **Return / exception / log message:** O day expected outcome gop vao cuoi moi bullet (`-> ...`). File `UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_SHEET_LAYOUT.md` co them 3 cot trong **Result Matrix**: `Expected return`, `Expected exception`, `Expected log message` (dien tay cho tung UTCID, map voi vung **Confirm** tren Excel: Excel dung hang Return/Exception/Log x cot UTCID; markdown dung 1 hang = 1 UTCID). Trong code `tests/Infrastructure.UnitTests`, ket qua kiem tra nam trong **assert/Verify** (khong tu dong sync tu file MD).
 - Co the tach moi function thanh 1 sheet rieng giong mau `LoginAsync`.
 
 ### F001 - AuthService.RegisterPatientAsync
+- **Trace day du (10 UTCID):** `UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_SHEET_LAYOUT.md` (F001) — Expected return / exception / log da dien theo `RegisterPatientAsync_WhenDependenciesMissing_ShouldReturnFailure` (10× InlineData). Cac luong email trung / rollback / success trong checklist ben duoi la tom tat kich ban service, chua co test rieng trong `AuthServiceTests` cho tung y do.
 - UTCID01 - Email da ton tai -> Failure "A user with this email already exists".
 - UTCID02 - Tao user that bai (Identity errors) -> Rollback transaction + tra danh sach loi.
 - UTCID03 - Tao user thanh cong + add role + tao Patient profile -> Commit + Success response co UserId/Email.
@@ -146,6 +168,7 @@ Ghi chu:
 - UTCID05 - Exception khi dang transaction -> Rollback + Failure "An error occurred during registration".
 
 ### F002 - AuthService.RegisterOphthalmologistAsync
+- **Trace day du (60 UTCID):** `UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_SHEET_LAYOUT.md` (F002) — Expected return / exception / log da dien theo `tests/Infrastructure.UnitTests/Identity/AuthServiceTests.cs` (6 nhom x 10 `InlineData`: no credentials, no degree, no license, degree level missing, credential file missing, license expiry invalid). Service con luong Success / rollback S3 / warning email — chua co test tuong ung trong class nay (xem ghi chu duoi Condition Matrix trong file sheet).
 - UTCID01 - Khong co credential -> Failure "At least one credential is required".
 - UTCID02 - Thieu Degree -> Failure "At least one degree is required".
 - UTCID03 - Thieu License -> Failure "At least one license/certificate is required".
