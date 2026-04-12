@@ -20,25 +20,6 @@ public class DashboardMetricsDto
     public List<DashboardRevenuePointDto> DailyPlatformCommission { get; set; } = new();
 
     public List<int> MonthlyNewDoctorCounts { get; set; } = new();
-    public UserGrowthMetricDto Doctors { get; set; } = new();
-    public UserGrowthMetricDto Organisations { get; set; } = new();
-    public UserGrowthMetricDto Patients { get; set; } = new();
-    public List<PaymentMethodRevenueDto> PaymentMethodBreakdown { get; set; } = new();
-    public List<MonthlyRevenuePointDto> MonthlyRevenue { get; set; } = new();
-    public List<DailyRevenuePointDto> DailyRevenue { get; set; } = new();
-
-    /// <summary>Sum of completed patient top-ups (deposit requests) in the current calendar year.</summary>
-    public decimal TotalDepositRevenueYear { get; set; }
-
-    /// <summary>Platform share from consultations credited to the System wallet in the current calendar year.</summary>
-    public decimal TotalPlatformCommissionYear { get; set; }
-
-    public List<MonthlyRevenuePointDto> MonthlyPlatformCommission { get; set; } = new();
-    public List<DailyRevenuePointDto> DailyPlatformCommission { get; set; } = new();
-
-    /// <summary>Registration counts per calendar month (Jan = index 0) for sparklines.</summary>
-    public List<int> MonthlyNewDoctorCounts { get; set; } = new();
-
     public List<int> MonthlyNewOrganisationCounts { get; set; } = new();
     public List<int> MonthlyNewPatientCounts { get; set; } = new();
 
@@ -90,11 +71,11 @@ public class DashboardSystemStatusDto
 
 public class DashboardTopDoctorDto
 {
-    /// <summary>Sessions with open chat (active consultation window).</summary>
-    public int LiveConsultationSessions { get; set; }
-
-    public bool ApiHealthy { get; set; } = true;
-    public bool DatabaseHealthy { get; set; }
+    public Guid OphthalmologistId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public decimal Revenue { get; set; }
+    public decimal RatingAverage {  get; set; }
+    public int RatingCount { get; set; }
 }
 
 public class DashboardBetterStackDto
@@ -123,7 +104,9 @@ public class TopPerformerDoctorDto
 
 public class DashboardTopOrganisationDto
 {
-    /// <summary>Aggregate rating from patient feedback (1–5).</summary>
+
+    public Guid OrganisationId { get; set; }
+    public string Name { get; set; } = string.Empty;
     public decimal RatingAverage { get; set; }
 
     public int RatingCount { get; set; }
