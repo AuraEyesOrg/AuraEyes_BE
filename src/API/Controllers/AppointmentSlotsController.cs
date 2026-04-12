@@ -249,6 +249,120 @@ public class AppointmentSlotsController : BaseApiController
     }
 
     /// <summary>
+    /// Reserve a slot for the authenticated patient (slotId provided in request body).
+    /// Uses row-locking and transaction handling from the ReserveSlotCommand handler.
+    /// </summary>
+    [HttpPost("reserve")]
+    [Authorize(Policy = Policies.PatientOnly)]
+    [ProducesResponseType(typeof(ApiResponse<ReserveSlotResult>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ReserveSlotByBody([FromBody] ReserveSlotByBodyRequest request)
+    {
+        if (request is null)
+        {
+            return BadRequest(ApiResponseFactory.Error("Request body is required."));
+        }
+
+        if (!_currentUser.ProfileId.HasValue)
+        {
+            return Unauthorized(ApiResponseFactory.Unauthorized(
+                "Authenticated patient profile is required to reserve an appointment slot."));
+        }
+
+        var command = new ReserveSlotCommand
+        {
+            AppointmentSlotId = request.SlotId,
+            PatientId = _currentUser.ProfileId.Value,
+            ReservationMinutes = request.ReservationMinutes
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Confirm a reserved slot after payment (slotId provided in request body).
+    /// Deducts wallet balance (if needed) and creates a ConsultationSession in a single transaction.
+    /// Requires explicit consent flags for sharing AI results and retinal images with the doctor.
+    /// </summary>
+    [HttpPost("confirm")]
+    [Authorize(Policy = Policies.PatientOnly)]
+    [ProducesResponseType(typeof(ApiResponse<ConfirmReservationResult>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ConfirmReservationByBody([FromBody] ConfirmReservationByBodyRequest request)
+    {
+        if (request is null)
+        {
+            return BadRequest(ApiResponseFactory.Error("Request body is required."));
+        }
+
+        if (!_currentUser.ProfileId.HasValue)
+        {
+            return Unauthorized(ApiResponseFactory.Unauthorized(
+                "Authenticated patient profile is required to confirm a reservation."));
+        }
+
+        // Enforce explicit consent: client/n8n must send both flags (no implicit defaults).
+        if (request.ShareAiResults is null || request.ShareRetinalImages is null)
+        {
+            return BadRequest(ApiResponseFactory.Error(
+                "Consent is required. Please specify both 'shareAiResults' and 'shareRetinalImages'."));
+        }
+
+        var command = new ConfirmReservationCommand
+        {
+            AppointmentSlotId = request.SlotId,
+            PatientId = _currentUser.ProfileId.Value,
+            AiScreeningId = request.AiScreeningId,
+            ShareAiResults = request.ShareAiResults.Value,
+            ShareRetinalImages = request.ShareRetinalImages.Value
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Release a reserved slot (slotId provided in request body).
+    /// </summary>
+    [HttpPost("release")]
+    [Authorize(Policy = Policies.PatientOnly)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ReleaseReservationByBody([FromBody] ReleaseReservationByBodyRequest request)
+    {
+        if (request is null)
+        {
+            return BadRequest(ApiResponseFactory.Error("Request body is required."));
+        }
+
+        if (!_currentUser.ProfileId.HasValue)
+        {
+            return Unauthorized(ApiResponseFactory.Unauthorized(
+                "Authenticated patient profile is required to release a reservation."));
+        }
+
+        var command = new ReleaseReservationCommand
+        {
+            AppointmentSlotId = request.SlotId,
+            PatientId = _currentUser.ProfileId.Value,
+            IsSystemRelease = false
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result);
+    }
+
+    /// <summary>
     /// Update appointment slot status.
     /// </summary>
     [HttpPatch("{slotId:guid}/status")]
@@ -445,6 +559,25 @@ public record BookAppointmentSlotRequest
 }
 
 public record BookAppointmentSlotByBodyRequest
+{
+    public Guid SlotId { get; init; }
+}
+
+public record ReserveSlotByBodyRequest
+{
+    public Guid SlotId { get; init; }
+    public int ReservationMinutes { get; init; } = 5;
+}
+
+public record ConfirmReservationByBodyRequest
+{
+    public Guid SlotId { get; init; }
+    public Guid? AiScreeningId { get; init; }
+    public bool? ShareRetinalImages { get; init; }
+    public bool? ShareAiResults { get; init; }
+}
+
+public record ReleaseReservationByBodyRequest
 {
     public Guid SlotId { get; init; }
 }

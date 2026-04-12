@@ -15,6 +15,11 @@ public interface IWalletRepository : IRepository<Wallet>
     Task<Wallet?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Platform treasury wallet (<c>OwnerType == "System"</c>).
+    /// </summary>
+    Task<Wallet?> GetSystemWalletAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get wallet with transactions included.
     /// </summary>
     Task<Wallet?> GetByIdWithTransactionsAsync(Guid id, CancellationToken cancellationToken = default);

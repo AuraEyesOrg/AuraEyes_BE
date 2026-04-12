@@ -2,14 +2,12 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Screenings.Commands.CreateAiScreeningSession;
 using Application.Screenings.Commands.SaveAiScreeningResults;
-using Domain.Common;
-using Domain.Entities.Screening;
-using Domain.Entities.Users;
+using Application.Screenings.Queries.GetRecentScreeningSessions;
+using Application.Screenings.Queries.GetScreeningSessionDetail;
 using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace API.Controllers;
 
@@ -35,6 +33,7 @@ public class ScreeningsController : BaseApiController
         IRepository<AiScreening> screeningRepository,
         IRepository<MedicalDiagnosis> medicalDiagnosisRepository,
         IRepository<Patient> patientRepository,
+
         IFileStorageService fileStorageService,
         ILogger<ScreeningsController> logger)
     {
@@ -48,67 +47,33 @@ public class ScreeningsController : BaseApiController
     }
 
     [HttpGet("recent")]
-    [ProducesResponseType(typeof(ApiResponse<List<ScreeningSessionSummaryResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ScreeningSessionSummaryDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetRecentSessions(
         [FromQuery] int limit = 10,
         CancellationToken cancellationToken = default)
     {
-        if (_currentUserService.UserId is null)
-            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
-
-        var patients = await _patientRepository.FindAsync(
-            p => p.UserId == _currentUserService.UserId.Value,
+        var result = await _mediator.Send(
+            new GetRecentScreeningSessionsQuery
+            {
+                Limit = limit,
+            },
             cancellationToken);
 
-        var patient = patients.FirstOrDefault();
-        if (patient is null)
-            return NotFound(ApiResponseFactory.NotFound("Patient profile not found"));
-
-        var cappedLimit = Math.Clamp(limit, 1, 50);
-
-        var sessions = await _screeningRepository
-            .Query()
-            .Where(s => s.PatientId == patient.Id && !s.IsDeleted)
-            .OrderByDescending(s => s.CreatedAt)
-            .Take(cappedLimit)
-            .Select(s => new ScreeningSessionSummaryResponse
-            {
-                ScreeningId = s.Id,
-                ModelVersion = s.ModelVersion,
-                CreatedAt = s.CreatedAt,
-                ProcessedAt = s.ProcessedAt,
-                IsActive = s.IsActive,
-                ImagesCount = s.RetinalImages.Count,
-                ThumbnailUrl = s.RetinalImages
-                    .OrderBy(i => i.CreatedAt)
-                    .Select(i => i.ImageUrl)
-                    .FirstOrDefault(),
-                LatestRiskLevel = s.ScreeningResults
-                    .OrderByDescending(r => r.CreatedAt)
-                    .Select(r => r.RiskLevel.ToString())
-                    .FirstOrDefault(),
-            })
-            .ToListAsync(cancellationToken);
-
-        return Ok(ApiResponseFactory.Success(sessions, "Recent screening sessions loaded"));
+        return HandleResult(result, "Recent screening sessions loaded");
     }
 
     [HttpGet("{screeningId:guid}")]
-    [ProducesResponseType(typeof(ApiResponse<ScreeningSessionDetailResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<ScreeningSessionDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSessionById(
         [FromRoute] Guid screeningId,
         CancellationToken cancellationToken = default)
     {
-        if (_currentUserService.UserId is null)
-            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
-
-        var patients = await _patientRepository.FindAsync(
-            p => p.UserId == _currentUserService.UserId.Value,
+        var result = await _mediator.Send(
+            new GetScreeningSessionDetailQuery(screeningId),
             cancellationToken);
-
         var patient = patients.FirstOrDefault();
         if (patient is null)
             return NotFound(ApiResponseFactory.NotFound("Patient profile not found"));
@@ -203,7 +168,7 @@ public class ScreeningsController : BaseApiController
 
         var command = new CreateAiScreeningSessionCommand
         {
-            ModelVersion = request.ModelVersion ?? "CFP_v1",
+            ModelVersion = request.ModelVersion ?? "AURA_v1.0",
             RetinalImages = request.RetinalImages ?? new List<RetinalImageData>()
         };
 

@@ -50,20 +50,17 @@ public class UpdateOphthalmologistCommandHandler : ICommandHandler<UpdateOphthal
 
         try
         {
-            var previousEmploymentType = ophthalmologist.EmploymentType;
+            var (succeeded, errors) = await _identityService.UpdateUserProfileAsync(
+                request.UserId.Value,
+                request.FullName ?? string.Empty,
+                request.Phone,
+                null,
+                null,
+                request.Address,
+                null,
+                cancellationToken);
 
-            ophthalmologist.UpdateProfile(request.Bio, request.YearsOfExperience);
-
-            var targetEmploymentType = request.EmploymentType ?? ophthalmologist.EmploymentType;
-            var targetWorkingHours = request.WorkingHoursPerWeek ?? ophthalmologist.WorkingHoursPerWeek;
-            var targetExpectedSalary = request.ExpectedMonthlySalary ?? ophthalmologist.ExpectedMonthlySalary;
-
-            ophthalmologist.UpdateEmploymentPreferences(
-                targetEmploymentType,
-                targetWorkingHours,
-                targetExpectedSalary);
-
-            if (request.UserId.HasValue)
+            if (!succeeded)
             {
                 var (succeeded, errors) = await _identityService.UpdateUserProfileAsync(
                     request.UserId.Value,

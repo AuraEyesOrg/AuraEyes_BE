@@ -30,6 +30,11 @@ public class Notification : BaseEntity, IAggregateRoot
     public NotificationType Type { get; private set; }
 
     /// <summary>
+    /// Optional domain object reference this notification points to (session, appointment, screening, etc.)
+    /// </summary>
+    public Guid? ReferenceId { get; private set; }
+
+    /// <summary>
     /// Whether the notification has been read by the user
     /// </summary>
     public bool IsRead { get; private set; }
@@ -50,6 +55,7 @@ public class Notification : BaseEntity, IAggregateRoot
         string title,
         string message,
         NotificationType type,
+        Guid? referenceId = null,
         string? payload = null)
     {
         if (string.IsNullOrWhiteSpace(title))
@@ -61,6 +67,7 @@ public class Notification : BaseEntity, IAggregateRoot
         Title = title;
         Message = message;
         Type = type;
+        ReferenceId = referenceId;
         IsRead = false;
         Payload = payload;
     }

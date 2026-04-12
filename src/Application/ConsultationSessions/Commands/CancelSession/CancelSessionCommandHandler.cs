@@ -153,31 +153,48 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
                 }
             }
 
-            // ── 7. 100 % wallet refund to patient ──
+            // ── 7. Refund only if patient actually paid for this booking ──
             if (session.Price > 0)
             {
                 var patient = await _patientRepository.GetByIdAsync(session.PatientId, cancellationToken);
-                if (patient is not null)
+                if (patient is not null && patient.UserId.HasValue)
                 {
-                    var wallet = await _walletRepository.GetByUserIdAsync(patient.UserId, cancellationToken);
+                    var wallet = await _walletRepository.GetByUserIdWithTransactionsAsync(patient.UserId.Value, cancellationToken);
                     if (wallet is not null)
                     {
-                        wallet.Deposit(session.Price, $"Refund – cancelled session {session.Id}");
+                        var hasBookingPayment = wallet.Transactions.Any(tx =>
+                            tx.TransactionType == TransactionType.Payment
+                            && tx.ReferenceType == "Booking"
+                            && tx.ReferenceId.HasValue
+                            && (tx.ReferenceId.Value == session.Id
+                                || (session.AppointmentSlotId.HasValue
+                                    && tx.ReferenceId.Value == session.AppointmentSlotId.Value)));
 
-                        var refundTx = new WalletTransaction(
-                            wallet.Id,
-                            session.Price,
-                            TransactionType.Refund,
-                            "Consultation cancellation refund",
-                            referenceType: "Booking",
-                            referenceId: session.Id);
+                        if (!hasBookingPayment)
+                        {
+                            _logger.LogInformation(
+                                "Skipped refund for session {SessionId} because no booking payment transaction was found.",
+                                session.Id);
+                        }
+                        else
+                        {
+                            wallet.Deposit(session.Price, $"Refund – cancelled session {session.Id}");
 
-                        wallet.AddTransaction(refundTx);
-                        await _walletRepository.AddTransactionAsync(refundTx, cancellationToken);
+                            var refundTx = new WalletTransaction(
+                                wallet.Id,
+                                session.Price,
+                                TransactionType.Refund,
+                                "Consultation cancellation refund",
+                                referenceType: "Booking",
+                                referenceId: session.Id);
 
-                        _logger.LogInformation(
-                            "Refunded {Amount} VND to patient wallet {WalletId} for session {SessionId}.",
-                            session.Price, wallet.Id, session.Id);
+                            wallet.AddTransaction(refundTx);
+                            await _walletRepository.AddTransactionAsync(refundTx, cancellationToken);
+
+                            _logger.LogInformation(
+                                "Refunded {Amount} VND to patient wallet {WalletId} for session {SessionId}.",
+                                session.Price, wallet.Id, session.Id);
+                        }
                     }
                 }
             }

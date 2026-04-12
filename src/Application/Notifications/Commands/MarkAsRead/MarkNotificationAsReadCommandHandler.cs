@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Platform;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.Notifications.Commands.MarkAsRead;
 
@@ -13,15 +14,18 @@ public class MarkNotificationAsReadCommandHandler : ICommandHandler<MarkNotifica
     private readonly IRepository<Notification> _notificationRepository;
     private readonly ICurrentUserService _currentUser;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationHubService _notificationHubService;
 
     public MarkNotificationAsReadCommandHandler(
         IRepository<Notification> notificationRepository,
         ICurrentUserService currentUser,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        INotificationHubService notificationHubService)
     {
         _notificationRepository = notificationRepository;
         _currentUser = currentUser;
         _unitOfWork = unitOfWork;
+        _notificationHubService = notificationHubService;
     }
 
     public async Task<Result> Handle(
@@ -47,6 +51,13 @@ public class MarkNotificationAsReadCommandHandler : ICommandHandler<MarkNotifica
         notification.MarkAsRead();
         await _notificationRepository.UpdateAsync(notification, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var unreadCount = await _notificationRepository
+            .Query()
+            .AsNoTracking()
+            .CountAsync(n => n.UserId == userId && !n.IsRead, cancellationToken);
+
+        await _notificationHubService.BroadcastUnreadCountAsync(userId, unreadCount, cancellationToken);
 
         return Result.Success();
     }

@@ -3,8 +3,10 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Ophthalmologists.Contracts.GetMyContract;
 using Application.Ophthalmologists.Contracts.UploadSignedContract;
-using Application.Common.Interfaces;
+using Application.Organisations.Queries.GetBillingSummary;
 using Application.Organisations.Queries.GetDashboardMetrics;
+using Application.Organisations.Queries.GetScreeningReports;
+using Application.OrganisationScreenings;
 using Application.Scheduling.Appointments.Common;
 using Application.Scheduling.Appointments.Queries.GetOrganisationAppointments;
 using Application.Scheduling.Appointments.Queries.GetOrganisationAvailableSlots;
@@ -14,7 +16,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace API.Controllers;
+namespace API.Controllers.Organization;
 
 [Route("api/organisations")]
 public class OrganisationsController : BaseApiController
@@ -142,5 +144,35 @@ public class OrganisationsController : BaseApiController
         });
 
         return HandleResult(result, "Contract uploaded successfully. Waiting for admin verification.");
+    }
+
+    [HttpGet("billing/summary")]
+    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [ProducesResponseType(typeof(ApiResponse<OrgBillingSummaryDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetBillingSummary(CancellationToken cancellationToken)
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
+
+        var result = await _mediator.Send(
+            new GetBillingSummaryQuery(_currentUserService.UserId.Value),
+            cancellationToken);
+
+        return HandleResult(result, "Billing summary loaded");
+    }
+
+    [HttpGet("screening-reports")]
+    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [ProducesResponseType(typeof(ApiResponse<OrgScreeningReportDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetScreeningReports(CancellationToken cancellationToken)
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
+
+        var result = await _mediator.Send(
+            new GetScreeningReportsQuery(_currentUserService.UserId.Value),
+            cancellationToken);
+
+        return HandleResult(result, "Screening reports loaded");
     }
 }

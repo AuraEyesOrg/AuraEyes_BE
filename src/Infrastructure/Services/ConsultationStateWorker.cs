@@ -1,11 +1,15 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.ConsultationSessions.Commands.EndSession;
 using Domain.Common;
 using Domain.Entities.Users;
 using Domain.Repositories;
+using Infrastructure.Settings;
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Infrastructure.Services;
 
@@ -18,18 +22,24 @@ namespace Infrastructure.Services;
 public class ConsultationStateWorker : BackgroundService
 {
     private static readonly TimeSpan CheckInterval = TimeSpan.FromSeconds(15);
-    private static readonly TimeSpan SlotDuration = TimeSpan.FromMinutes(60);
     private static readonly TimeSpan GracePeriod = TimeSpan.FromHours(2);
 
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IBetterStackHeartbeatService _betterStackHeartbeat;
     private readonly ILogger<ConsultationStateWorker> _logger;
+    private readonly TimeSpan _slotDuration;
 
     public ConsultationStateWorker(
         IServiceScopeFactory scopeFactory,
+        IBetterStackHeartbeatService betterStackHeartbeat,
+        IOptions<GoogleMeetSettings> googleMeetSettings,
         ILogger<ConsultationStateWorker> logger)
     {
         _scopeFactory = scopeFactory;
+        _betterStackHeartbeat = betterStackHeartbeat;
         _logger = logger;
+        var durationMinutes = Math.Max(1, googleMeetSettings.Value.DefaultDurationMinutes);
+        _slotDuration = TimeSpan.FromMinutes(durationMinutes);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -40,7 +50,9 @@ public class ConsultationStateWorker : BackgroundService
         {
             try
             {
+                await _betterStackHeartbeat.NotifyStartedAsync(BetterStackMonitor.ConsultationStateWorker, stoppingToken);
                 await ProcessStateTransitionsAsync(stoppingToken);
+                await _betterStackHeartbeat.NotifySucceededAsync(BetterStackMonitor.ConsultationStateWorker, stoppingToken);
             }
             catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
             {
@@ -48,6 +60,7 @@ public class ConsultationStateWorker : BackgroundService
             }
             catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
+                await _betterStackHeartbeat.NotifyFailedAsync(BetterStackMonitor.ConsultationStateWorker, stoppingToken);
                 _logger.LogError(ex, "Error in ConsultationStateWorker cycle");
             }
 
@@ -72,10 +85,18 @@ public class ConsultationStateWorker : BackgroundService
         var patientRepo = scope.ServiceProvider.GetRequiredService<IRepository<Patient>>();
         var ophthalmologistRepo = scope.ServiceProvider.GetRequiredService<IRepository<Ophthalmologist>>();
         var chatHubService = scope.ServiceProvider.GetRequiredService<IChatHubService>();
+        var sender = scope.ServiceProvider.GetRequiredService<ISender>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
         await OpenReadySessionsAsync(sessionRepo, patientRepo, ophthalmologistRepo, chatHubService, unitOfWork, cancellationToken);
-        await ArchiveExpiredSessionsAsync(sessionRepo, patientRepo, ophthalmologistRepo, chatHubService, unitOfWork, cancellationToken);
+        await ArchiveExpiredSessionsAsync(
+            sessionRepo,
+            patientRepo,
+            ophthalmologistRepo,
+            chatHubService,
+            sender,
+            unitOfWork,
+            cancellationToken);
     }
 
     private async Task OpenReadySessionsAsync(
@@ -126,25 +147,61 @@ public class ConsultationStateWorker : BackgroundService
         IRepository<Patient> patientRepo,
         IRepository<Ophthalmologist> ophthalmologistRepo,
         IChatHubService chatHubService,
+        ISender sender,
         IUnitOfWork unitOfWork,
         CancellationToken cancellationToken)
     {
         var sessions = await sessionRepo.GetSessionsPastGracePeriodAsync(
-            SlotDuration, GracePeriod, cancellationToken);
+            _slotDuration, GracePeriod, cancellationToken);
 
         if (sessions.Count == 0) return;
 
-        _logger.LogInformation("Archiving {Count} session(s) past grace period", sessions.Count);
+        _logger.LogInformation("Auto-completing {Count} session(s) past grace period", sessions.Count);
+
+        var closedSessions = new List<(Guid SessionId, Guid PatientId, Guid? OphthalmologistId)>();
+        var closedBySystemCount = 0;
 
         foreach (var session in sessions)
         {
-            session.CompleteBySystem();
-            await sessionRepo.UpdateAsync(session, cancellationToken);
+            if (!session.OphthalmologistId.HasValue)
+            {
+                session.CompleteBySystem();
+                await sessionRepo.UpdateAsync(session, cancellationToken);
+                closedSessions.Add((session.Id, session.PatientId, session.OphthalmologistId));
+                closedBySystemCount++;
+
+                _logger.LogWarning(
+                    "Session {SessionId} has no assigned doctor. Closed by system without payout.",
+                    session.Id);
+
+                continue;
+            }
+
+            var result = await sender.Send(
+                new EndSessionCommand
+                {
+                    SessionId = session.Id,
+                    DoctorId = session.OphthalmologistId.Value,
+                    Reason = "GracePeriodExpired"
+                },
+                cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                _logger.LogWarning(
+                    "Failed to auto-complete session {SessionId}: {Error}",
+                    session.Id,
+                    result.ErrorMessage);
+                continue;
+            }
+
+            closedSessions.Add((session.Id, session.PatientId, session.OphthalmologistId));
         }
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        if (closedBySystemCount > 0)
+            await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        foreach (var session in sessions)
+        foreach (var session in closedSessions)
         {
             var userIds = await ResolveParticipantUserIdsAsync(
                 session.PatientId, session.OphthalmologistId,
@@ -154,7 +211,7 @@ public class ConsultationStateWorker : BackgroundService
                 userIds,
                 new RoomStateChangedDto
                 {
-                    SessionId = session.Id,
+                    SessionId = session.SessionId,
                     Event = "ROOM_CLOSED",
                     Timestamp = DateTime.UtcNow
                 },
@@ -162,7 +219,7 @@ public class ConsultationStateWorker : BackgroundService
 
             _logger.LogInformation(
                 "ROOM_CLOSED for session {SessionId} (grace period expired)",
-                session.Id);
+                session.SessionId);
         }
     }
 
@@ -176,8 +233,8 @@ public class ConsultationStateWorker : BackgroundService
         var userIds = new List<Guid>(2);
 
         var patient = await patientRepo.GetByIdAsync(patientId, cancellationToken);
-        if (patient is not null)
-            userIds.Add(patient.UserId);
+        if (patient is not null && patient.UserId.HasValue)
+            userIds.Add(patient.UserId.Value);
 
         if (ophthalmologistId.HasValue)
         {

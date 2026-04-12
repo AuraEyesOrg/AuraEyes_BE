@@ -6,4 +6,5 @@ public record EndSessionCommand : ICommand
 {
     public Guid SessionId { get; init; }
     public Guid DoctorId { get; init; }
+    public string Reason { get; init; } = "DoctorFinished";
 }

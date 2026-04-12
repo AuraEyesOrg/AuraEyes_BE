@@ -93,22 +93,29 @@ public class RegisterOphthalmologistRequest
     public Guid? OrganizationId { get; set; }
 
     /// <summary>
-    /// Medical degree credentials. At least one degree is required.
-    /// </summary>
-    [Required]
-    [MinLength(1)]
-    public List<CredentialItemDto> Degrees { get; set; } = new();
-
-    /// <summary>
-    /// Medical license/certificate credentials. At least one certificate is required.
+    /// Unified credentials list for both degrees and licenses/certificates.
+    /// At least one degree and one license must be provided.
     /// </summary>
     [Required]
     [MinLength(1)]
     public List<CredentialItemDto> Certificates { get; set; } = new();
+
+    /// <summary>
+    /// Legacy degrees payload kept for backward compatibility with older FE clients.
+    /// </summary>
+    public List<LegacyDegreeCredentialItemDto> Degrees { get; set; } = new();
 }
 
 public class CredentialItemDto
 {
+    [Required]
+    public CertificateType Type { get; set; }
+
+    /// <summary>
+    /// Required when Type is Degree; must be null for non-degree credentials.
+    /// </summary>
+    public DegreeLevel? DegreeLevel { get; set; }
+
     [Required]
     [MaxLength(200)]
     public string Name { get; set; } = string.Empty;
@@ -119,7 +126,29 @@ public class CredentialItemDto
     [Required]
     public DateTime IssuedDate { get; set; }
 
+    /// <summary>
+    /// Optional at DTO level because degrees do not require it.
+    /// Business rule enforces it for certificates/licenses.
+    /// </summary>
     public DateTime? ExpiryDate { get; set; }
+
+    [Required]
+    public IFormFile? File { get; set; }
+}
+
+public class LegacyDegreeCredentialItemDto
+{
+    [Required]
+    [MaxLength(200)]
+    public string Name { get; set; } = string.Empty;
+
+    public DegreeLevel? DegreeLevel { get; set; }
+
+    [MaxLength(200)]
+    public string? IssuingAuthority { get; set; }
+
+    [Required]
+    public DateTime IssuedDate { get; set; }
 
     [Required]
     public IFormFile? File { get; set; }

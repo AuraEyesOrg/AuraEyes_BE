@@ -38,6 +38,7 @@ public class AuthService : IAuthService
     private readonly IFullTimeTemplateProvisioningService _fullTimeTemplateProvisioningService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly GoogleAuthSettings _googleAuthSettings;
     private readonly ILogger<AuthService> _logger;
 
@@ -55,6 +56,7 @@ public class AuthService : IAuthService
         IFullTimeTemplateProvisioningService fullTimeTemplateProvisioningService,
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager,
+        SignInManager<ApplicationUser> signInManager,
         IOptions<GoogleAuthSettings> googleAuthSettings,
         ILogger<AuthService> logger)
     {
@@ -71,6 +73,7 @@ public class AuthService : IAuthService
         _fullTimeTemplateProvisioningService = fullTimeTemplateProvisioningService;
         _unitOfWork = unitOfWork;
         _userManager = userManager;
+        _signInManager = signInManager;
         _googleAuthSettings = googleAuthSettings.Value;
         _logger = logger;
     }
@@ -172,14 +175,58 @@ public class AuthService : IAuthService
 
         try
         {
-            if (request.Degrees.Count == 0)
+            var normalizedCredentials = NormalizeCredentials(request);
+
+            if (normalizedCredentials.Count == 0)
+            {
+                return Result<RegisterResponse>.Failure("At least one credential is required");
+            }
+
+            if (!normalizedCredentials.Any(c => c.Type == CertificateType.Degree))
             {
                 return Result<RegisterResponse>.Failure("At least one degree is required");
             }
 
-            if (request.Certificates.Count == 0)
+            if (!normalizedCredentials.Any(c => c.Type == CertificateType.License))
             {
-                return Result<RegisterResponse>.Failure("At least one certificate is required");
+                return Result<RegisterResponse>.Failure("At least one license/certificate is required");
+            }
+
+            foreach (var certificate in normalizedCredentials)
+            {
+                if (certificate.File is null || certificate.File.Length == 0)
+                {
+                    return Result<RegisterResponse>.Failure("Credential file is required");
+                }
+
+                var issuedDateUtc = EnsureUtc(certificate.IssuedDate);
+                var expiryDateUtc = EnsureUtc(certificate.ExpiryDate);
+
+                if (certificate.Type == CertificateType.Degree)
+                {
+                    if (!certificate.DegreeLevel.HasValue)
+                    {
+                        return Result<RegisterResponse>.Failure("Degree level is required for degree credentials");
+                    }
+
+                    if (expiryDateUtc.HasValue)
+                    {
+                        return Result<RegisterResponse>.Failure("Expiry date must be empty for degree credentials");
+                    }
+                }
+
+                if (certificate.Type == CertificateType.License)
+                {
+                    if (!expiryDateUtc.HasValue)
+                    {
+                        return Result<RegisterResponse>.Failure("Expiry date is required for license credentials");
+                    }
+
+                    if (expiryDateUtc.Value <= issuedDateUtc)
+                    {
+                        return Result<RegisterResponse>.Failure("Certificate expiry date must be later than issued date");
+                    }
+                }
             }
 
             var existingUser = await _identityService.GetUserByEmailAsync(request.Email, cancellationToken);
@@ -219,59 +266,43 @@ public class AuthService : IAuthService
                 request.WorkingHoursPerWeek,
                 request.ExpectedMonthlySalary);
 
-            foreach (var degree in request.Degrees)
+            foreach (var certificate in normalizedCredentials)
             {
-                if (degree.File is null || degree.File.Length == 0)
+                var file = certificate.File;
+                if (file is null || file.Length == 0)
                 {
-                    return Result<RegisterResponse>.Failure("Degree file is required");
+                    return Result<RegisterResponse>.Failure("Credential file is required");
                 }
 
-                await using var stream = degree.File.OpenReadStream();
+                await using var stream = file.OpenReadStream();
                 var uploadedUrl = await _fileStorageService.SaveFileAsync(
                     stream,
-                    degree.File.FileName,
+                    file.FileName,
                     $"credentials/{user.Id}",
                     cancellationToken);
 
                 uploadedFileUrls.Add(uploadedUrl);
 
-                degreeUrl ??= uploadedUrl;
-
-                ophthalmologist.AddCertificate(new Certificate(
-                    ophthalmologist.Id,
-                    CertificateType.Degree,
-                    degree.Name,
-                    degree.IssuingAuthority,
-                    degree.IssuedDate,
-                    degree.ExpiryDate,
-                    uploadedUrl));
-            }
-
-            foreach (var certificate in request.Certificates)
-            {
-                if (certificate.File is null || certificate.File.Length == 0)
+                if (certificate.Type == CertificateType.Degree)
                 {
-                    return Result<RegisterResponse>.Failure("Certificate file is required");
+                    degreeUrl ??= uploadedUrl;
+                }
+                else if (certificate.Type == CertificateType.License)
+                {
+                    licenseUrl ??= uploadedUrl;
                 }
 
-                await using var stream = certificate.File.OpenReadStream();
-                var uploadedUrl = await _fileStorageService.SaveFileAsync(
-                    stream,
-                    certificate.File.FileName,
-                    $"credentials/{user.Id}",
-                    cancellationToken);
-
-                uploadedFileUrls.Add(uploadedUrl);
-
-                licenseUrl ??= uploadedUrl;
+                var certificateIssuedDateUtc = EnsureUtc(certificate.IssuedDate);
+                var certificateExpiryDateUtc = EnsureUtc(certificate.ExpiryDate);
 
                 ophthalmologist.AddCertificate(new Certificate(
                     ophthalmologist.Id,
-                    CertificateType.License,
+                    certificate.Type,
                     certificate.Name,
+                    certificate.DegreeLevel,
                     certificate.IssuingAuthority,
-                    certificate.IssuedDate,
-                    certificate.ExpiryDate,
+                    certificateIssuedDateUtc,
+                    certificateExpiryDateUtc,
                     uploadedUrl));
             }
 
@@ -377,6 +408,77 @@ public class AuthService : IAuthService
 
             return Result<RegisterResponse>.Failure("An error occurred during registration");
         }
+    }
+
+    private static List<CredentialItemDto> NormalizeCredentials(RegisterOphthalmologistRequest request)
+    {
+        if (request.Degrees.Count > 0)
+        {
+            var merged = new List<CredentialItemDto>(request.Degrees.Count + request.Certificates.Count);
+
+            merged.AddRange(request.Degrees.Select(d => new CredentialItemDto
+            {
+                Type = CertificateType.Degree,
+                DegreeLevel = d.DegreeLevel,
+                Name = d.Name,
+                IssuingAuthority = d.IssuingAuthority,
+                IssuedDate = d.IssuedDate,
+                ExpiryDate = null,
+                File = d.File
+            }));
+
+            merged.AddRange(request.Certificates.Select(c => new CredentialItemDto
+            {
+                Type = CertificateType.License,
+                DegreeLevel = null,
+                Name = c.Name,
+                IssuingAuthority = c.IssuingAuthority,
+                IssuedDate = c.IssuedDate,
+                ExpiryDate = c.ExpiryDate,
+                File = c.File
+            }));
+
+            return merged;
+        }
+
+        // Fallback for partially-updated FE clients that send licenses without type.
+        return request.Certificates
+            .Select(c =>
+            {
+                var type = c.Type;
+                if (type == CertificateType.Degree && !c.DegreeLevel.HasValue && c.ExpiryDate.HasValue)
+                {
+                    type = CertificateType.License;
+                }
+
+                return new CredentialItemDto
+                {
+                    Type = type,
+                    DegreeLevel = type == CertificateType.Degree ? c.DegreeLevel : null,
+                    Name = c.Name,
+                    IssuingAuthority = c.IssuingAuthority,
+                    IssuedDate = c.IssuedDate,
+                    ExpiryDate = type == CertificateType.Degree ? null : c.ExpiryDate,
+                    File = c.File
+                };
+            })
+            .ToList();
+    }
+
+    private static DateTime EnsureUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            DateTimeKind.Unspecified => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
+    }
+
+    private static DateTime? EnsureUtc(DateTime? value)
+    {
+        return value.HasValue ? EnsureUtc(value.Value) : null;
     }
 
     public Task<Result<OrganisationRegistrationResponse>> RegisterOrganisationAsync(
@@ -511,14 +613,26 @@ public class AuthService : IAuthService
                 return Result<LoginResponse>.Unauthorized("Account is deactivated. Please contact support.");
             }
 
-            if (!await _userManager.CheckPasswordAsync(user, request.Password))
+            if (await _userManager.IsLockedOutAsync(user))
             {
-                return Result<LoginResponse>.Unauthorized("Invalid email or password");
+                return Result<LoginResponse>.Unauthorized("Account is temporarily locked due to multiple failed attempts. Please try again later.");
             }
 
-            if (!user.EmailConfirmed)
+            var signInResult = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
+
+            if (signInResult.IsLockedOut)
+            {
+                return Result<LoginResponse>.Unauthorized("Account is temporarily locked due to multiple failed attempts. Please try again later.");
+            }
+
+            if (signInResult.IsNotAllowed)
             {
                 return Result<LoginResponse>.Unauthorized("Please confirm your email before logging in.");
+            }
+
+            if (!signInResult.Succeeded && !signInResult.RequiresTwoFactor)
+            {
+                return Result<LoginResponse>.Unauthorized("Invalid email or password");
             }
 
             // Check ophthalmologist verification status — reject if credentials were denied
@@ -534,8 +648,8 @@ public class AuthService : IAuthService
                 }
             }
 
-            // Check if 2FA is enabled
-            if (await _userManager.GetTwoFactorEnabledAsync(user))
+            // 2FA may be requested by SignInManager pre-check or enabled at user level.
+            if (signInResult.RequiresTwoFactor || await _userManager.GetTwoFactorEnabledAsync(user))
             {
                 _logger.LogInformation("2FA required for user: {Email}", request.Email);
                 return Result<LoginResponse>.Success(LoginResponse.TwoFactorRequired(user.Id));

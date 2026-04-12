@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.Common.Constants;
 using Application.Wallets.Common;
 using Domain.Common;
 using Domain.Entities.Financial;
@@ -17,6 +18,7 @@ public class CreateDepositCommandHandler : ICommandHandler<CreateDepositCommand,
     private readonly IWalletRepository _walletRepository;
     private readonly IDepositRequestRepository _depositRequestRepository;
     private readonly IPayOSService _payOSService;
+    private readonly IIdentityService _identityService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CreateDepositCommandHandler> _logger;
 
@@ -24,12 +26,14 @@ public class CreateDepositCommandHandler : ICommandHandler<CreateDepositCommand,
         IWalletRepository walletRepository,
         IDepositRequestRepository depositRequestRepository,
         IPayOSService payOSService,
+        IIdentityService identityService,
         IUnitOfWork unitOfWork,
         ILogger<CreateDepositCommandHandler> logger)
     {
         _walletRepository = walletRepository;
         _depositRequestRepository = depositRequestRepository;
         _payOSService = payOSService;
+        _identityService = identityService;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -45,7 +49,14 @@ public class CreateDepositCommandHandler : ICommandHandler<CreateDepositCommand,
 
             if (wallet is null)
             {
-                wallet = new Wallet(request.UserId, "Patient", 0);
+                var roles = await _identityService.GetUserRolesAsync(request.UserId);
+                var ownerType = roles.Contains(Roles.Ophthalmologist)
+                    ? "Ophthalmologist"
+                    : roles.Contains(Roles.OrgAdmin)
+                        ? "Organisation"
+                        : "Patient";
+
+                wallet = new Wallet(request.UserId, ownerType, 0);
                 await _walletRepository.AddAsync(wallet, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 

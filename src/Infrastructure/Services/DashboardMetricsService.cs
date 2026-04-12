@@ -20,11 +20,16 @@ public class DashboardMetricsService : IDashboardMetricsService
 {
     private readonly ApplicationDbContext _context;
     private readonly IAiQuotaService _aiQuotaService;
+    private readonly IBetterStackHeartbeatService _betterStackHeartbeatService;
 
-    public DashboardMetricsService(ApplicationDbContext context, IAiQuotaService aiQuotaService)
+    public DashboardMetricsService(
+        ApplicationDbContext context,
+        IAiQuotaService aiQuotaService,
+        IBetterStackHeartbeatService betterStackHeartbeatService)
     {
         _context = context;
         _aiQuotaService = aiQuotaService;
+        _betterStackHeartbeatService = betterStackHeartbeatService;
     }
 
     public async Task<DashboardMetricsDto> GetSystemAdminMetricsAsync(CancellationToken cancellationToken = default)
@@ -410,30 +415,48 @@ public class DashboardMetricsService : IDashboardMetricsService
 
     public async Task<PagedResult<RecentScreeningDto>> GetRecentScreeningsAsync(int pageNumber, int pageSize, CancellationToken cancellationToken = default)
     {
-        var query = from screening in _context.AiScreenings.AsNoTracking()
-                    join patient in _context.Patients.AsNoTracking() on screening.PatientId equals patient.Id
-                    join user in _context.Users.AsNoTracking() on patient.UserId equals user.Id
-                    join result in _context.ScreeningResults.AsNoTracking() on screening.Id equals result.AiScreeningId into resultJoin
-                    from result in resultJoin.DefaultIfEmpty()
-                    select new
-                    {
-                        screening.Id,
-                        screening.CreatedAt,
-                        screening.ProcessedAt,
-                        PatientId = patient.Id,
-                        PatientName = user.FullName,
-                        RiskLevel = result != null ? result.RiskLevel.ToString() : null,
-                        IsCritical = result != null && (result.RiskLevel == RiskLevel.High || result.RiskLevel == RiskLevel.Critical)
-                    };
+        var visibleScreeningsQuery =
+            from screening in _context.AiScreenings.AsNoTracking()
+            join patient in _context.Patients.AsNoTracking() on screening.PatientId equals patient.Id
+            join user in _context.Users.AsNoTracking() on patient.UserId equals user.Id
+            select new
+            {
+                screening.Id,
+                screening.PatientId,
+                screening.CreatedAt,
+                screening.ProcessedAt,
+                PatientName = user.FullName
+            };
 
-        var totalCount = await query.CountAsync(cancellationToken);
-        var records = await query
-            .OrderByDescending(item => item.CreatedAt)
+        var totalCount = await visibleScreeningsQuery.CountAsync(cancellationToken);
+
+        var screeningRiskQuery = _context.ScreeningResults.AsNoTracking()
+            .GroupBy(result => result.AiScreeningId)
+            .Select(group => new
+            {
+                AiScreeningId = group.Key,
+                RiskLevel = group.Select(item => (RiskLevel?)item.RiskLevel).FirstOrDefault()
+            });
+
+        var pageRows = await (
+            from screening in visibleScreeningsQuery
+            join risk in screeningRiskQuery on screening.Id equals risk.AiScreeningId into riskJoin
+            from risk in riskJoin.DefaultIfEmpty()
+            orderby screening.CreatedAt descending
+            select new
+            {
+                screening.Id,
+                screening.PatientId,
+                screening.PatientName,
+                screening.CreatedAt,
+                screening.ProcessedAt,
+                RiskLevel = risk != null ? risk.RiskLevel : null
+            })
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        var items = records.Select(item => new RecentScreeningDto
+        var items = pageRows.Select(item => new RecentScreeningDto
         {
             Id = item.Id,
             ScreeningCode = $"SCR-{item.CreatedAt:yyyyMMdd}-{item.Id.ToString().Substring(0, 6).ToUpperInvariant()}",
@@ -442,8 +465,8 @@ public class DashboardMetricsService : IDashboardMetricsService
             ClinicId = null,
             ClinicName = null,
             Status = item.ProcessedAt.HasValue ? "Completed" : "Analyzing",
-            RiskLevel = item.RiskLevel,
-            IsCritical = item.IsCritical,
+            RiskLevel = item.RiskLevel?.ToString(),
+            IsCritical = item.RiskLevel == RiskLevel.High || item.RiskLevel == RiskLevel.Critical,
             CreatedAt = item.CreatedAt,
             CompletedAt = item.ProcessedAt
         }).ToList();
@@ -603,6 +626,42 @@ public class DashboardMetricsService : IDashboardMetricsService
                                  select session.Id)
             .Distinct()
             .CountAsync(cancellationToken);
+
+        var urgentCasesRaw = await (from session in _context.ConsultationSessions
+                                    join result in _context.ScreeningResults on session.AiScreeningId equals result.AiScreeningId
+                                    join patient in _context.Patients on session.PatientId equals patient.Id
+                                    join user in _context.Users on patient.UserId equals user.Id
+                                    where session.OphthalmologistId == doctorId
+                                        && session.Status == SessionStatus.Pending
+                                        && (result.RiskLevel == RiskLevel.High || result.RiskLevel == RiskLevel.Critical)
+                                    select new
+                                    {
+                                        ConsultationSessionId = session.Id,
+                                        PatientId = patient.Id,
+                                        PatientName = user.FullName,
+                                        result.RiskLevel,
+                                        result.ConfidenceScore,
+                                        AppointmentTime = session.AppointmentTime,
+                                        CreatedAt = session.CreatedAt
+                                    })
+            .OrderByDescending(item => item.RiskLevel == RiskLevel.Critical)
+            .ThenBy(item => item.AppointmentTime ?? DateTime.MaxValue)
+            .ThenByDescending(item => item.CreatedAt)
+            .Take(8)
+            .ToListAsync(cancellationToken);
+
+        var urgentCaseList = urgentCasesRaw
+            .Select(item => new OphthalmologistUrgentCaseDto
+            {
+                ConsultationSessionId = item.ConsultationSessionId,
+                PatientId = item.PatientId,
+                PatientName = item.PatientName,
+                RiskLevel = item.RiskLevel.ToString(),
+                ConfidenceScore = item.ConfidenceScore,
+                AppointmentTime = item.AppointmentTime,
+                CreatedAt = item.CreatedAt
+            })
+            .ToList();
         var completedToday = await _context.Appointments.CountAsync(
             appointment => appointment.DoctorId == doctorId &&
                            appointment.Status == AppointmentStatus.Completed &&
@@ -620,7 +679,8 @@ public class DashboardMetricsService : IDashboardMetricsService
             PendingReviews = pendingReviews,
             UrgentCases = urgentCases,
             CompletedToday = completedToday,
-            OpenSlotsToday = openSlotsToday
+            OpenSlotsToday = openSlotsToday,
+            UrgentCaseList = urgentCaseList
         };
     }
 
@@ -637,16 +697,52 @@ public class DashboardMetricsService : IDashboardMetricsService
         }
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var appointmentsQuery = _context.Appointments.Where(appointment => appointment.OrganisationId == organisationId);
+
+        var totalAppointments = await appointmentsQuery.CountAsync(cancellationToken);
+        var pendingCount = await appointmentsQuery.CountAsync(
+            appointment => appointment.Status == AppointmentStatus.Pending,
+            cancellationToken);
+        var confirmedCount = await appointmentsQuery.CountAsync(
+            appointment => appointment.Status == AppointmentStatus.Confirmed,
+            cancellationToken);
+        var completedCount = await appointmentsQuery.CountAsync(
+            appointment => appointment.Status == AppointmentStatus.Completed,
+            cancellationToken);
+        var cancelledCount = await appointmentsQuery.CountAsync(
+            appointment => appointment.Status == AppointmentStatus.Cancelled,
+            cancellationToken);
+        var noShowCount = await appointmentsQuery.CountAsync(
+            appointment => appointment.Status == AppointmentStatus.NoShow,
+            cancellationToken);
+
+        var todayCapacity = await (from slot in _context.AppointmentSlots
+                                   join template in _context.ScheduleTemplates on slot.ScheduleTemplateId equals template.Id
+                                   where template.OrgId == organisationId && slot.Date == today
+                                   select new { slot.BookedCount, slot.MaxCapacity })
+            .ToListAsync(cancellationToken);
+
+        var totalBooked = todayCapacity.Sum(item => item.BookedCount);
+        var totalCapacity = todayCapacity.Sum(item => item.MaxCapacity);
+        var utilizationRate = totalCapacity <= 0
+            ? 0m
+            : Math.Round((decimal)totalBooked / totalCapacity * 100m, 1);
+
+        var quota = await _aiQuotaService.GetQuotaAsync(userId, "OrgAdmin", cancellationToken);
 
         return new OrganisationDashboardMetricsDto
         {
-            TotalAppointments = await _context.Appointments.CountAsync(appointment => appointment.OrganisationId == organisationId, cancellationToken),
-            PendingAppointments = await _context.Appointments.CountAsync(appointment => appointment.OrganisationId == organisationId && (appointment.Status == AppointmentStatus.Pending || appointment.Status == AppointmentStatus.Confirmed), cancellationToken),
-            AvailableSlotsToday = await (from slot in _context.AppointmentSlots
-                                         join template in _context.ScheduleTemplates on slot.ScheduleTemplateId equals template.Id
-                                         where template.OrgId == organisationId && slot.Date == today && slot.Status == ScheduleStatus.Available
-                                         select slot.Id).CountAsync(cancellationToken),
-            ActiveDoctors = await _context.Users.CountAsync(user => user.OrganizationId == organisationId && !user.IsDeleted, cancellationToken)
+            UtilizationRatePercent = utilizationRate,
+            RemainingAiQuota = quota.RemainingQuota,
+            TotalAppointments = totalAppointments,
+            AppointmentStatus = new OrganisationAppointmentStatusBreakdownDto
+            {
+                Pending = pendingCount,
+                Confirmed = confirmedCount,
+                Completed = completedCount,
+                Cancelled = cancelledCount,
+                NoShow = noShowCount
+            }
         };
     }
 

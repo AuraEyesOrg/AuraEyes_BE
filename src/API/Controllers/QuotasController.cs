@@ -30,7 +30,7 @@ public class QuotasController : BaseApiController
     }
 
     /// <summary>
-    /// Buy AI quota bundles using internal wallet balance.
+    /// Buy AI quota amount using internal wallet balance.
     /// Deducts money from wallet and adds quota credits.
     /// </summary>
     [HttpPost("buy")]
@@ -40,7 +40,7 @@ public class QuotasController : BaseApiController
     {
         var command = new BuyAiQuotaCommand
         {
-            NumberOfBundles = request.NumberOfBundles
+            QuotaAmount = request.QuotaAmount
         };
 
         var result = await _mediator.Send(command, cancellationToken);
@@ -50,5 +50,5 @@ public class QuotasController : BaseApiController
 
 public record BuyAiQuotaRequest
 {
-    public int NumberOfBundles { get; init; } = 1;
+    public int QuotaAmount { get; init; } = 5;
 }

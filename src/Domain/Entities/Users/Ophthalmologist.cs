@@ -14,6 +14,8 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
     public OphthalmologistEmploymentType EmploymentType { get; private set; }
     public int? WorkingHoursPerWeek { get; private set; }
     public decimal? ExpectedMonthlySalary { get; private set; }
+    public decimal? CommissionRate { get; private set; }
+    public decimal? ActualMonthlySalary { get; private set; }
     public int YearsOfExperience { get; private set; }
     public bool IsVerified { get; private set; }
     public VerificationStatus VerificationStatus { get; private set; }
@@ -88,6 +90,18 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void UpdateDealTerms(decimal commissionRate, decimal actualMonthlySalary)
+    {
+        if (commissionRate < 0 || commissionRate > 100)
+            throw new ArgumentException("Commission rate must be between 0 and 100", nameof(commissionRate));
+        if (actualMonthlySalary < 0)
+            throw new ArgumentException("Actual monthly salary cannot be negative", nameof(actualMonthlySalary));
+
+        CommissionRate = commissionRate;
+        ActualMonthlySalary = actualMonthlySalary;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void Verify()
     {
         IsVerified = true;
@@ -121,6 +135,21 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
     {
         if (licenseUrl != null) LicenseUrl = licenseUrl;
         if (degreeUrl != null) DegreeUrl = degreeUrl;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void SubmitCredentialReviewRequest()
+    {
+        var previousStatus = VerificationStatus;
+
+        // First-time or re-submission flow stays in PendingVerification.
+        // Already-approved doctors move to PendingUpdate for re-review.
+        VerificationStatus = previousStatus == VerificationStatus.Approved
+            ? VerificationStatus.PendingUpdate
+            : VerificationStatus.PendingVerification;
+
+        IsVerified = false;
+        RejectionReason = null;
         UpdatedAt = DateTime.UtcNow;
     }
 

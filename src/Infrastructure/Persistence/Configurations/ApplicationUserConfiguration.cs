@@ -22,6 +22,9 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(u => u.AvatarUrl)
             .HasMaxLength(1000);
 
+        builder.Property(u => u.CitizenId)
+            .HasMaxLength(12);
+
         // Indexes for common queries
         builder.HasIndex(u => u.IsDeleted);
         builder.HasIndex(u => u.IsActive);

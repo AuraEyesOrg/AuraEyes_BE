@@ -21,6 +21,7 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
     private readonly Domain.Common.IUnitOfWork _unitOfWork;
     private readonly IIdentityService _identityService;
     private readonly IEmailService _emailService;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<VerifyOphthalmologistCommandHandler> _logger;
 
     public VerifyOphthalmologistCommandHandler(
@@ -30,6 +31,7 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
         Domain.Common.IUnitOfWork unitOfWork,
         IIdentityService identityService,
         IEmailService emailService,
+        INotificationService notificationService,
         ILogger<VerifyOphthalmologistCommandHandler> logger)
     {
         _ophthalmologistRepository = ophthalmologistRepository;
@@ -38,6 +40,7 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
         _unitOfWork = unitOfWork;
         _identityService = identityService;
         _emailService = emailService;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -50,6 +53,10 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
         {
             return Result<string>.Failure("Ophthalmologist not found");
         }
+
+        var reviewFlowType = ophthalmologist.VerificationStatus == VerificationStatus.PendingUpdate
+            ? "CredentialUpdateReview"
+            : "OnboardingVerification";
 
         if (request.Approve)
         {
@@ -86,23 +93,42 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
             var userDto = await _identityService.GetUserByIdAsync(ophthalmologist.UserId, cancellationToken);
             if (userDto != null)
             {
+                await _notificationService.SendAsync(
+                    ophthalmologist.UserId,
+                    request.Approve ? "Hồ sơ xác minh đã được duyệt" : "Hồ sơ xác minh bị từ chối",
+                    request.Approve
+                        ? "System Admin đã duyệt hồ sơ xác minh của bạn."
+                        : "System Admin đã từ chối hồ sơ xác minh của bạn. Vui lòng xem lý do và cập nhật lại.",
+                    NotificationType.SystemAlert,
+                    payload: new
+                    {
+                        action = "verification_review_completed",
+                        reviewFlowType,
+                        approved = request.Approve,
+                        rejectionReason = request.RejectionReason,
+                        ophthalmologistId = request.OphthalmologistId
+                    },
+                    cancellationToken: cancellationToken,
+                    referenceId: request.OphthalmologistId);
+
                 if (request.Approve)
                 {
                     await _emailService.SendAsync(
                         userDto.Email,
-                        "[AURA] Congratulations! Your Credentials Have Been Approved",
+                        "[AURA] Hồ sơ chứng chỉ đã được duyệt - Bước tiếp theo là ký và chốt điều khoản hợp đồng",
                         $"""
                         <h2>Chúc mừng, {userDto.FullName}!</h2>
                         <p>Hồ sơ chứng chỉ hành nghề của bạn đã được xác minh và phê duyệt thành công.</p>
-                        <p>Bước tiếp theo, bạn cần hoàn tất ký hợp đồng hợp tác:</p>
+                        <p>Tiếp theo, bạn cần hoàn tất quy trình hợp đồng để chốt điều khoản hợp tác (hoa hồng và lương thực tế):</p>
                         <ol>
                             <li>Đăng nhập vào hệ thống AURA</li>
                             <li>Xem và tải mẫu hợp đồng hợp tác đã được gửi kèm</li>
                             <li>In hợp đồng, ký tên và đóng dấu (nếu có)</li>
                             <li>Chụp ảnh hoặc scan hợp đồng đã ký</li>
-                            <li>Upload ảnh hợp đồng lên hệ thống</li>
+                            <li>Upload hợp đồng đã ký lên hệ thống để admin kiểm tra</li>
                         </ol>
-                        <p>Sau khi admin xác nhận hợp đồng, bạn sẽ được kích hoạt đầy đủ tính năng.</p>
+                        <p>Sau khi admin xác nhận hợp đồng và hoàn tất chốt Commission Rate + Actual Salary theo thỏa thuận, tài khoản của bạn sẽ được kích hoạt đầy đủ.</p>
+                        <p>Bạn vẫn có thể xem lại hợp đồng đã xác nhận trực tiếp trên trang hợp đồng của bác sĩ.</p>
                         <p>— Hệ thống AURA</p>
                         """,
                         isHtml: true,

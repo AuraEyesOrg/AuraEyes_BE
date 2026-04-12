@@ -20,11 +20,30 @@ public interface IIdentityService
         string role,
         CancellationToken cancellationToken = default);
 
+    Task<(bool Succeeded, Guid? UserId, string[] Errors)> CreateUserWalkInPatientAsync(
+        string email,
+        string password,
+        string fullName,
+        string role,
+        Guid? organizationId = null,
+        UserProfileWalkInDto? userProfile = null,
+        CancellationToken cancellationToken = default);
+
     Task<bool> CheckPasswordAsync(Guid userId, string password);
 
     Task<UserDto?> GetUserByEmailAsync(string email, CancellationToken cancellationToken = default);
 
     Task<UserDto?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    Task<bool> IsPhoneNumberInUseByOrganizationAsync(
+        Guid organizationId,
+        string phoneNumber,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> IsCitizenIdInUseByOrganizationAsync(
+        Guid organizationId,
+        string citizenId,
+        CancellationToken cancellationToken = default);
 
     Task<bool> IsEmailConfirmedAsync(Guid userId);
 
@@ -140,6 +159,15 @@ public interface IIdentityService
         DateTime? dateOfBirth,
         int? gender,
         string? address,
+        string? citizenId = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update user's email and username together.
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> UpdateUserEmailAsync(
+        Guid userId,
+        string email,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -148,6 +176,14 @@ public interface IIdentityService
     Task<(bool Succeeded, string[] Errors)> UpdateAvatarUrlAsync(
         Guid userId,
         string avatarUrl,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update user OrganizationId.
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> UpdateUserOrganizationAsync(
+        Guid userId,
+        Guid? organizationId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -217,7 +253,21 @@ public record UserDetailsDto
     public Domain.Enums.Gender? Gender { get; init; }
     public string? Address { get; init; }
     public string? AvatarUrl { get; init; }
+    public string? CitizenId { get; init; }
     public bool EmailConfirmed { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
 }
+
+/// <summary>
+/// User profile DTO for cross-layer communication.
+/// </summary>
+public record UserProfileWalkInDto(
+    string FullName,
+    string? PhoneNumber,
+    DateTime? DateOfBirth,
+    int? Gender,
+    string? Address,
+    string? AvatarUrl,
+    string? CitizenId = null
+);

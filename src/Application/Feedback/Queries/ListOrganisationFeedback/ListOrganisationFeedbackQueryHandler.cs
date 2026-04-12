@@ -39,15 +39,22 @@ public class ListOrganisationFeedbackQueryHandler
         foreach (var x in items)
         {
             var patientEntity = await _patientRepository.GetByIdAsync(x.PatientId, cancellationToken);
-            var patientUser = patientEntity != null
-                ? await _identityService.GetUserByIdAsync(patientEntity.UserId, cancellationToken)
-                : null;
+            string? patientFullName = null;
+            if (patientEntity is not null && patientEntity.IsWalkIn)
+            {
+                patientFullName = patientEntity.FullName;
+            }
+            else if (patientEntity is not null && patientEntity.UserId.HasValue)
+            {
+                var patientUser = await _identityService.GetUserByIdAsync(patientEntity.UserId.Value, cancellationToken);
+                patientFullName = patientUser?.FullName;
+            }
 
             dtoList.Add(new OrganisationFeedbackDto
             {
                 Id = x.Id,
                 PatientId = x.PatientId,
-                PatientFullName = patientUser?.FullName,
+                PatientFullName = patientFullName,
                 OrganisationId = x.OrganisationId,
                 AppointmentId = x.AppointmentId,
                 Rating = x.Rating,

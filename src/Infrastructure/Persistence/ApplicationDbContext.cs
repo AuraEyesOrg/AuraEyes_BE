@@ -40,6 +40,7 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<OrganisationOnboardingRequest> OrganisationOnboardingRequests => Set<OrganisationOnboardingRequest>();
     public DbSet<Ophthalmologist> Ophthalmologists => Set<Ophthalmologist>();
     public DbSet<Patient> Patients => Set<Patient>();
+    public DbSet<OrganisationPatientLink> OrganisationPatientLinks => Set<OrganisationPatientLink>();
     public DbSet<Certificate> Certificates => Set<Certificate>();
     public DbSet<Consent> Consents => Set<Consent>();
 
@@ -68,6 +69,7 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<Wallet> Wallets => Set<Wallet>();
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
     public DbSet<DepositRequest> DepositRequests => Set<DepositRequest>();
+    public DbSet<WithdrawalRequest> WithdrawalRequests => Set<WithdrawalRequest>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<Payment> Payments => Set<Payment>();
 
