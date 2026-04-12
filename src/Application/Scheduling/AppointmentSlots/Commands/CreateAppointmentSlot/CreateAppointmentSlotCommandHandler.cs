@@ -1,6 +1,7 @@
 using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.Scheduling.Pricing.Interfaces;
 using Application.SystemSettings.Interfaces;
 using Domain.Common;
 using Domain.Entities.Scheduling;
@@ -15,6 +16,7 @@ public class CreateAppointmentSlotCommandHandler : ICommandHandler<CreateAppoint
     private readonly IAppointmentSlotRepository _repository;
     private readonly IScheduleTemplateRepository _templateRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IExperiencePricingService _experiencePricingService;
     private readonly ISystemSettingService _settingService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CreateAppointmentSlotCommandHandler> _logger;
@@ -23,6 +25,7 @@ public class CreateAppointmentSlotCommandHandler : ICommandHandler<CreateAppoint
         IAppointmentSlotRepository repository,
         IScheduleTemplateRepository templateRepository,
         IOphthalmologistRepository ophthalmologistRepository,
+        IExperiencePricingService experiencePricingService,
         ISystemSettingService settingService,
         IUnitOfWork unitOfWork,
         ILogger<CreateAppointmentSlotCommandHandler> logger)
@@ -30,6 +33,7 @@ public class CreateAppointmentSlotCommandHandler : ICommandHandler<CreateAppoint
         _repository = repository;
         _templateRepository = templateRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
+        _experiencePricingService = experiencePricingService;
         _settingService = settingService;
         _unitOfWork = unitOfWork;
         _logger = logger;
@@ -62,6 +66,24 @@ public class CreateAppointmentSlotCommandHandler : ICommandHandler<CreateAppoint
                 {
                     await _unitOfWork.RollbackTransactionAsync(cancellationToken);
                     return Result<Guid>.Forbidden("Full-time ophthalmologists cannot manually create slots.");
+                }
+
+                if (ophthalmologist.EmploymentType == OphthalmologistEmploymentType.PartTime)
+                {
+                    var pricingValidation = await _experiencePricingService.ValidatePartTimeCostAsync(
+                        ophthalmologist.Id,
+                        request.Cost,
+                        cancellationToken);
+
+                    if (!pricingValidation.IsSuccess)
+                    {
+                        await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                        return pricingValidation.IsNotFound
+                            ? Result<Guid>.NotFound(pricingValidation.ErrorMessage)
+                            : pricingValidation.IsForbidden
+                                ? Result<Guid>.Forbidden(pricingValidation.ErrorMessage)
+                                : Result<Guid>.Failure(pricingValidation.ErrorMessage);
+                    }
                 }
             }
 

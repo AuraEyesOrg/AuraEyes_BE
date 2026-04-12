@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.Scheduling.Pricing.Interfaces;
 using Domain.Common;
 using Domain.Entities.Scheduling;
 using Domain.Enums;
@@ -11,15 +12,18 @@ public class CreateScheduleTemplateCommandHandler : ICommandHandler<CreateSchedu
 {
     private readonly IScheduleTemplateRepository _repository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IExperiencePricingService _experiencePricingService;
     private readonly IUnitOfWork _unitOfWork;
 
     public CreateScheduleTemplateCommandHandler(
         IScheduleTemplateRepository repository,
         IOphthalmologistRepository ophthalmologistRepository,
+        IExperiencePricingService experiencePricingService,
         IUnitOfWork unitOfWork)
     {
         _repository = repository;
         _ophthalmologistRepository = ophthalmologistRepository;
+        _experiencePricingService = experiencePricingService;
         _unitOfWork = unitOfWork;
     }
 
@@ -38,6 +42,23 @@ public class CreateScheduleTemplateCommandHandler : ICommandHandler<CreateSchedu
             if (ophthal.EmploymentType == OphthalmologistEmploymentType.FullTime)
             {
                 return Result<Guid>.Forbidden("Full-time ophthalmologists cannot manually create schedule templates.");
+            }
+
+            if (ophthal.EmploymentType == OphthalmologistEmploymentType.PartTime)
+            {
+                var pricingValidation = await _experiencePricingService.ValidatePartTimeCostAsync(
+                    ophthal.Id,
+                    request.Cost,
+                    cancellationToken);
+
+                if (!pricingValidation.IsSuccess)
+                {
+                    return pricingValidation.IsNotFound
+                        ? Result<Guid>.NotFound(pricingValidation.ErrorMessage)
+                        : pricingValidation.IsForbidden
+                            ? Result<Guid>.Forbidden(pricingValidation.ErrorMessage)
+                            : Result<Guid>.Failure(pricingValidation.ErrorMessage);
+                }
             }
 
             source = ScheduleTemplateSource.Doctor;
