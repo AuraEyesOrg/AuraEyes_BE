@@ -45,6 +45,7 @@ internal static class EmailTemplates
     public const string EmailConfirmationSubject = "Xác nhận địa chỉ email - Hệ thống Aura";
     public const string PasswordResetSubject = "Yêu cầu đặt lại mật khẩu - Hệ thống Aura";
     public const string WelcomeSubject = "Chào mừng bạn đến với Hệ thống Aura";
+    public const string ClinicAppointmentConfirmationSubject = "Xác nhận lịch khám tại cơ sở - Hệ thống Aura";
     public const string OrganisationOnboardingSubject = "[AURA] Yêu cầu đăng ký tổ chức mới";
     public const string OrganisationAccountProvisionedSubject = "[AURA] Tài khoản tổ chức đã được cấp";
 
@@ -291,6 +292,71 @@ internal static class EmailTemplates
                 Trân trọng,<br>
                 <strong>Đội ngũ Aura</strong>
             </p>";
+
+        return WrapInBaseTemplate(content);
+    }
+
+    public static string GetClinicAppointmentConfirmationBody(
+        string patientName,
+        string organisationName,
+        DateOnly appointmentDate,
+        TimeOnly startTime,
+        TimeOnly endTime,
+        string? visitReason,
+        Guid appointmentId,
+        string checkInCode,
+        string qrCodeBase64)
+    {
+        var displayName = string.IsNullOrWhiteSpace(patientName) ? "bạn" : patientName;
+        var displayOrganisation = string.IsNullOrWhiteSpace(organisationName)
+            ? "cơ sở y tế"
+            : organisationName;
+        var displayVisitReason = string.IsNullOrWhiteSpace(visitReason)
+            ? "Không có"
+            : visitReason;
+
+        var content = $@"
+            <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 22px; font-weight: 600;"">
+                Xác nhận lịch khám tại cơ sở
+            </h2>
+
+            <p style=""margin: 0 0 16px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Xin chào <strong>{displayName}</strong>,
+            </p>
+
+            <p style=""margin: 0 0 24px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Bạn đã đặt lịch khám thành công. Vui lòng mang email này (hoặc ảnh QR) đến <strong>{displayOrganisation}</strong> để nhân viên check-in.
+            </p>
+
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""border: 1px solid {BorderColor}; border-radius: 8px; margin-bottom: 24px;"">
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor}; width: 180px;"">Ngày khám</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{appointmentDate:dd/MM/yyyy}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Khung giờ</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{startTime:HH:mm} - {endTime:HH:mm}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Lý do khám</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{displayVisitReason}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã check-in</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};""><strong>{checkInCode}</strong></td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600;"">Mã lịch hẹn</td><td style=""padding: 12px 16px;"">{appointmentId}</td></tr>
+            </table>
+
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BrandSoft}; border: 1px solid {BrandSoftBorder}; border-radius: 8px; margin: 0 0 24px 0;"">
+                <tr>
+                    <td align=""center"" style=""padding: 20px 16px;"">
+                        <p style=""margin: 0 0 12px 0; color: {BrandDarkText}; font-size: 14px; font-weight: 600;"">
+                            QR check-in
+                        </p>
+                        <img
+                            src=""data:image/png;base64,{qrCodeBase64}""
+                            alt=""QR check-in appointment""
+                            width=""200""
+                            height=""200""
+                            style=""display:block; margin: 0 auto; width: 200px; height: 200px; border: 1px solid {BorderColor}; border-radius: 8px; background: #FFFFFF;"" />
+                    </td>
+                </tr>
+            </table>
+
+            <div style=""border-left: 3px solid {BorderWarning}; padding-left: 16px; margin-top: 8px;"">
+                <p style=""margin: 0; color: {AlertWarningText}; font-size: 13px; line-height: 1.5;"">
+                    Vui lòng đến sớm 10-15 phút trước giờ hẹn để hoàn tất check-in.
+                </p>
+            </div>";
 
         return WrapInBaseTemplate(content);
     }

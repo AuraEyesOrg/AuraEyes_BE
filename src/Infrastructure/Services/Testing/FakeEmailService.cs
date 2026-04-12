@@ -33,6 +33,19 @@ public sealed class FakeEmailService : IEmailService
         return Task.CompletedTask;
     }
 
+    public Task SendClinicAppointmentConfirmationAsync(
+        string email,
+        ClinicAppointmentConfirmationEmailPayload payload,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "[FAKE EMAIL] Clinic appointment email captured for {Email}. AppointmentId={AppointmentId}, CheckInCode={CheckInCode}",
+            email,
+            payload.AppointmentId,
+            payload.CheckInCode);
+        return Task.CompletedTask;
+    }
+
     public Task SendAsync(string to, string subject, string body, bool isHtml = true, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("[FAKE EMAIL] Generic email captured. To={To}, Subject={Subject}", to, subject);

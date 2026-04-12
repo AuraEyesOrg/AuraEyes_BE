@@ -6,6 +6,7 @@ using MailKit.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
+using QRCoder;
 
 namespace Infrastructure.Services;
 
@@ -61,6 +62,37 @@ public class EmailService : IEmailService
         _logger.LogInformation(
             "Welcome email sent to {Email}",
             MaskEmail(email));
+    }
+
+    /// <inheritdoc />
+    public async Task SendClinicAppointmentConfirmationAsync(
+        string email,
+        ClinicAppointmentConfirmationEmailPayload payload,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(email, nameof(email));
+        ArgumentNullException.ThrowIfNull(payload);
+
+        var qrCodeBase64 = CreateQrCodeBase64Png(payload.QrPayload);
+
+        var subject = EmailTemplates.ClinicAppointmentConfirmationSubject;
+        var body = EmailTemplates.GetClinicAppointmentConfirmationBody(
+            payload.PatientName,
+            payload.OrganisationName,
+            payload.AppointmentDate,
+            payload.StartTime,
+            payload.EndTime,
+            payload.VisitReason,
+            payload.AppointmentId,
+            payload.CheckInCode,
+            qrCodeBase64);
+
+        await SendAsync(email, subject, body, isHtml: true, cancellationToken);
+
+        _logger.LogInformation(
+            "Clinic appointment confirmation email sent to {Email} for appointment {AppointmentId}",
+            MaskEmail(email),
+            payload.AppointmentId);
     }
 
     /// <inheritdoc />
@@ -240,6 +272,18 @@ public class EmailService : IEmailService
 
         // Auto-detect (not recommended for production)
         return SecureSocketOptions.Auto;
+    }
+
+    private static string CreateQrCodeBase64Png(string payload)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(payload, nameof(payload));
+
+        using var qrGenerator = new QRCodeGenerator();
+        using var qrCodeData = qrGenerator.CreateQrCode(payload, QRCodeGenerator.ECCLevel.Q);
+
+        var qrCode = new PngByteQRCode(qrCodeData);
+        var qrBytes = qrCode.GetGraphic(8);
+        return Convert.ToBase64String(qrBytes);
     }
 
     /// <summary>

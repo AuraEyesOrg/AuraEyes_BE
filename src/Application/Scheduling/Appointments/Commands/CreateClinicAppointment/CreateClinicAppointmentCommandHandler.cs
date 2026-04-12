@@ -21,6 +21,7 @@ public class CreateClinicAppointmentCommandHandler
     private readonly IRepository<OrganisationPatientLink> _organisationPatientLinkRepository;
     private readonly ICurrentUserService _currentUser;
     private readonly IIdentityService _identityService;
+    private readonly IEmailService _emailService;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CreateClinicAppointmentCommandHandler> _logger;
@@ -33,6 +34,7 @@ public class CreateClinicAppointmentCommandHandler
         IRepository<OrganisationPatientLink> organisationPatientLinkRepository,
         ICurrentUserService currentUser,
         IIdentityService identityService,
+        IEmailService emailService,
         INotificationService notificationService,
         IUnitOfWork unitOfWork,
         ILogger<CreateClinicAppointmentCommandHandler> logger)
@@ -44,6 +46,7 @@ public class CreateClinicAppointmentCommandHandler
         _organisationPatientLinkRepository = organisationPatientLinkRepository;
         _currentUser = currentUser;
         _identityService = identityService;
+        _emailService = emailService;
         _notificationService = notificationService;
         _unitOfWork = unitOfWork;
         _logger = logger;
@@ -153,6 +156,7 @@ public class CreateClinicAppointmentCommandHandler
             var appointmentTime = slot.StartTime.ToString("HH:mm");
             var appointmentDate = slot.Date.ToString("dd/MM/yyyy");
             var patientName = "bệnh nhân";
+            string? patientEmail = null;
 
             var patient = await _patientRepository.GetByIdAsync(patientId, cancellationToken);
             if (patient is not null)
@@ -170,6 +174,11 @@ public class CreateClinicAppointmentCommandHandler
                     if (!string.IsNullOrWhiteSpace(patientUser?.FullName))
                     {
                         patientName = patientUser.FullName;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(patientUser?.Email))
+                    {
+                        patientEmail = patientUser.Email;
                     }
                 }
             }
@@ -219,6 +228,38 @@ public class CreateClinicAppointmentCommandHandler
                     _logger.LogError(
                         ex,
                         "Failed to send appointment booking notification for appointment {AppointmentId}",
+                        appointment.Id);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(patientEmail))
+            {
+                try
+                {
+                    var qrPayload =
+                        $"AURA-CLINIC-APPOINTMENT|{appointment.Id}|{patientId}|{request.OrganisationId}|{slot.Date:yyyy-MM-dd}|{slot.StartTime:HH:mm}|{slot.EndTime:HH:mm}";
+
+                    var checkInCode = appointment.Id.ToString("N")[..10].ToUpperInvariant();
+
+                    await _emailService.SendClinicAppointmentConfirmationAsync(
+                        patientEmail,
+                        new ClinicAppointmentConfirmationEmailPayload(
+                            appointment.Id,
+                            patientName,
+                            organisation.Name,
+                            slot.Date,
+                            slot.StartTime,
+                            slot.EndTime,
+                            request.VisitReason,
+                            checkInCode,
+                            qrPayload),
+                        cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Failed to send clinic appointment email for appointment {AppointmentId}",
                         appointment.Id);
                 }
             }

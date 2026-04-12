@@ -11,6 +11,11 @@ public interface IEmailService
 
     Task SendWelcomeEmailAsync(string email, string fullName, CancellationToken cancellationToken = default);
 
+    Task SendClinicAppointmentConfirmationAsync(
+        string email,
+        ClinicAppointmentConfirmationEmailPayload payload,
+        CancellationToken cancellationToken = default);
+
     Task SendAsync(string to, string subject, string body, bool isHtml = true, CancellationToken cancellationToken = default);
 
     Task SendWithAttachmentsAsync(
@@ -21,5 +26,17 @@ public interface IEmailService
         bool isHtml = true,
         CancellationToken cancellationToken = default);
 }
+
+public sealed record ClinicAppointmentConfirmationEmailPayload(
+    Guid AppointmentId,
+    string PatientName,
+    string OrganisationName,
+    DateOnly AppointmentDate,
+    TimeOnly StartTime,
+    TimeOnly EndTime,
+    string? VisitReason,
+    string CheckInCode,
+    string QrPayload
+);
 
 public sealed record EmailAttachment(string FileName, byte[] Content, string ContentType = "application/octet-stream");
