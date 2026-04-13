@@ -1,4 +1,5 @@
 using Domain.Common;
+using Domain.Enums;
 
 namespace Domain.Entities.Scheduling;
 
@@ -32,6 +33,12 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
     /// <summary>Default cost for slots generated from this template (optional).</summary>
     public decimal? Cost { get; private set; }
 
+    /// <summary>Template source (doctor-defined or system-generated).</summary>
+    public ScheduleTemplateSource Source { get; private set; }
+
+    /// <summary>Indicates whether this template is active and can be used for slot generation.</summary>
+    public bool IsActive { get; private set; }
+
     // Navigation
     private readonly List<AppointmentSlot> _appointmentSlots = new();
     public IReadOnlyCollection<AppointmentSlot> AppointmentSlots => _appointmentSlots.AsReadOnly();
@@ -46,7 +53,8 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         int maxCapacity,
         Guid? orgId = null,
         Guid? ophthalId = null,
-        decimal? cost = null)
+        decimal? cost = null,
+        ScheduleTemplateSource source = ScheduleTemplateSource.Doctor)
     {
         if (endTime <= startTime)
             throw new ArgumentException("End time must be after start time");
@@ -69,6 +77,8 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         Cost = cost;
         OrgId = orgId;
         OphthalId = ophthalId;
+        Source = source;
+        IsActive = true;
     }
 
     public void Update(
@@ -94,6 +104,18 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         SlotDuration = slotDuration;
         MaxCapacity = maxCapacity;
         Cost = cost;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Activate()
+    {
+        IsActive = true;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Deactivate()
+    {
+        IsActive = false;
         UpdatedAt = DateTime.UtcNow;
     }
 }

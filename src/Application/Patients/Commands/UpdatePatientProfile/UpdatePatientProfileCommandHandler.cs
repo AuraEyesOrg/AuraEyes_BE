@@ -53,7 +53,6 @@ public class UpdatePatientProfileCommandHandler : ICommandHandler<UpdatePatientP
         {
             dateOfBirth = DateTime.SpecifyKind(dob, DateTimeKind.Utc);
         }
-
         // Update ApplicationUser via identity service
         var (succeeded, errors) = await _identityService.UpdateUserProfileAsync(
             request.UserId,
@@ -62,7 +61,6 @@ public class UpdatePatientProfileCommandHandler : ICommandHandler<UpdatePatientP
             dateOfBirth,
             genderValue,
             request.Address,
-            request.CitizenId,
             cancellationToken);
 
         if (!succeeded)
