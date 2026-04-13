@@ -63,14 +63,14 @@ public class OphthalmologistsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetOphthalmologists(
         [FromQuery] string? searchTerm = null,
-        [FromQuery] bool? isVerified = null,
+        [FromQuery] string? verificationStatus = null,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10)
     {
         var query = new GetOphthalmologistsQuery
         {
             SearchTerm = searchTerm,
-            IsVerified = isVerified,
+            VerificationStatus = verificationStatus,
             PageNumber = pageNumber,
             PageSize = pageSize
         };
