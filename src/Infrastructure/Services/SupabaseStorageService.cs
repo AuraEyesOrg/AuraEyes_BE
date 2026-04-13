@@ -8,9 +8,8 @@ using Supabase;
 namespace Infrastructure.Services;
 
 /// <summary>
-/// Supabase Storage file service using supabase-csharp SDK.
-/// Uses service_role key to bypass RLS policies (server-side only).
-/// Modelled after EVCSMS Listings service pattern.
+/// Supabase Storage file service.
+/// Uses service_role key to bypass RLS policies.
 /// </summary>
 public sealed class SupabaseStorageService : IFileStorageService
 {

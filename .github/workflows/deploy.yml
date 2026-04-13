@@ -72,6 +72,9 @@ jobs:
           PayOS__ChecksumKey=${{ secrets.PAYOS_CHECKSUM_KEY }}
           PayOS__DefaultReturnUrl=${{ secrets.PAYOS_DEFAULT_RETURN_URL }}
           PayOS__DefaultCancelUrl=${{ secrets.PAYOS_DEFAULT_CANCEL_URL }}
+          PayOS__PayoutClientId=${{ secrets.PAYOS_PAYOUT_CLIENT_ID }}
+          PayOS__PayoutApiKey=${{ secrets.PAYOS_PAYOUT_API_KEY }}
+          PayOS__PayoutChecksumKey=${{ secrets.PAYOS_PAYOUT_CHECKSUM_KEY }}
 
           SupabaseStorage__Url=${{ secrets.SUPABASE_STORAGE_URL }}
           SupabaseStorage__ServiceKey=${{ secrets.SUPABASE_STORAGE_KEY }}

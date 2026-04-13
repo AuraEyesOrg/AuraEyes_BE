@@ -49,6 +49,7 @@
     <!-- Email (MailKit + MimeKit) -->
     <PackageReference Include="MailKit" Version="4.15.1" />
     <PackageReference Include="MimeKit" Version="4.15.1" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
     
     <!-- Payment (PayOS) -->
     <PackageReference Include="payOS" Version="1.0.8" />

@@ -25,10 +25,6 @@ public class CreateWalkInPatientCommandValidator : AbstractValidator<CreateWalkI
         RuleFor(x => x.Address)
             .MaximumLength(500).When(x => !string.IsNullOrWhiteSpace(x.Address))
             .WithMessage("Address must not exceed 500 characters");
-            
-        RuleFor(x => x.Email)
-            .EmailAddress().When(x => !string.IsNullOrEmpty(x.Email))
-            .WithMessage("Invalid email format");
     }
 
     private static bool BeAtLeastMinimumAge(DateTime dateOfBirth)
