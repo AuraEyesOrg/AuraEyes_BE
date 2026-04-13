@@ -256,7 +256,7 @@ public record UserInfoResponse
     public string? ContractStatus { get; init; }
 
     /// <summary>
-    /// Ophthalmologist employment type (FullTime, PartTime).
+    /// Employment type for ophthalmologist users (FullTime/PartTime).
     /// Null for non-ophthalmologist roles.
     /// </summary>
     public string? EmploymentType { get; init; }

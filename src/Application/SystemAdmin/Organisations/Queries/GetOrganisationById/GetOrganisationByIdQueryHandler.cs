@@ -32,6 +32,10 @@ public class GetOrganisationByIdQueryHandler
             LicenseNumber = organisation.LicenseNumber,
             OrgType = organisation.OrgType.ToString(),
             DeviceCount = 0,
+            PurchasedAiQuota = organisation.PurchasedAiQuota,
+            ManagedPatientCount = 0,
+            RegisteredPatientCount = 0,
+            WalkInPatientCount = 0,
             IsActive = !organisation.IsDeleted,
             CreatedAt = organisation.CreatedAt,
         };

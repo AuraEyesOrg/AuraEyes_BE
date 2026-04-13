@@ -208,7 +208,7 @@ var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnec
 
 var hangfireConnectionBuilder = new NpgsqlConnectionStringBuilder(defaultConnection)
 {
-    // Dedicated small pool for Hangfire to avoid saturating the main application pool.
+    // Use a tiny dedicated pool for Hangfire to avoid saturating Supabase session pool.
     MaxPoolSize = 5,
     MinPoolSize = 0
 };
@@ -239,6 +239,7 @@ if (enableHangfireServer)
 {
     builder.Services.AddHangfireServer(options =>
     {
+        // Keep worker count very low when using Supabase pooled connection.
         options.WorkerCount = Math.Max(1, hangfireWorkerCount);
         options.ServerName = $"{Environment.MachineName}:{Environment.ProcessId}:{hangfireSchema}";
     });
@@ -277,39 +278,31 @@ builder.Services.AddOutputCache(options =>
 
 var app = builder.Build();
 
-// Database initialization: apply pending migrations + seed data (idempotent)
+// Seed domain entities (Organisation, Ophthalmologist, Patient)
+// Note: This will skip if roles already exist (idempotent)
+using (var scope = app.Services.CreateScope())
 {
-    const int maxRetries = 3;
-    for (int attempt = 1; attempt <= maxRetries; attempt++)
+    var services = scope.ServiceProvider;
+    try
     {
-        using var scope = app.Services.CreateScope();
-        var services = scope.ServiceProvider;
-        try
-        {
-            var sw = System.Diagnostics.Stopwatch.StartNew();
+        var context = services.GetRequiredService<Infrastructure.Persistence.ApplicationDbContext>();
+        var userManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Infrastructure.Identity.ApplicationUser>>();
+        var roleManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Infrastructure.Identity.ApplicationRole>>();
+        var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
+        var seederLogger = loggerFactory.CreateLogger("DatabaseSeeder");
 
-            var context = services.GetRequiredService<Infrastructure.Persistence.ApplicationDbContext>();
-            var userManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Infrastructure.Identity.ApplicationUser>>();
-            var roleManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Infrastructure.Identity.ApplicationRole>>();
-            var configuration = services.GetRequiredService<IConfiguration>();
-            var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
-            var seederLogger = loggerFactory.CreateLogger("DatabaseSeeder");
-
-            await Infrastructure.Services.DatabaseSeeder.SeedAsync(context, userManager, roleManager, configuration, seederLogger);
-
-            sw.Stop();
-            Log.Information("Database initialization completed in {ElapsedMs}ms", sw.ElapsedMilliseconds);
-            break; // Success — exit retry loop
-        }
-        catch (Exception ex) when (attempt < maxRetries)
-        {
-            Log.Warning(ex, "Database initialization attempt {Attempt}/{MaxRetries} failed. Retrying in 5s...", attempt, maxRetries);
-            await Task.Delay(TimeSpan.FromSeconds(5));
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Database initialization failed after {MaxRetries} attempts", maxRetries);
-        }
+        await Infrastructure.Services.DatabaseSeeder.SeedAsync(
+            context,
+            userManager,
+            roleManager,
+            builder.Configuration,
+            seederLogger);
+        Log.Information("Database seeding completed successfully");
+    }
+    catch (Exception ex)
+    {
+        Log.Fatal(ex, "An error occurred while seeding or migrating the database. Application startup aborted.");
+        throw;
     }
 }
 
@@ -375,6 +368,18 @@ if (string.IsNullOrWhiteSpace(quotaResetCron))
     quotaResetCron = defaultQuotaResetCron;
 }
 
+var monthlyQuotaResetCron = Environment.GetEnvironmentVariable("HANGFIRE_MONTHLY_QUOTA_RESET_CRON");
+if (string.IsNullOrWhiteSpace(monthlyQuotaResetCron))
+{
+    monthlyQuotaResetCron = "0 0 1 * *";
+}
+
+var fullTimeSlotGenerationCron = Environment.GetEnvironmentVariable("HANGFIRE_FULLTIME_SLOT_GENERATION_CRON");
+if (string.IsNullOrWhiteSpace(fullTimeSlotGenerationCron))
+{
+    fullTimeSlotGenerationCron = "0 */6 * * *";
+}
+
 var slotMaintenanceCron = Environment.GetEnvironmentVariable("HANGFIRE_SLOT_MAINTENANCE_CRON");
 if (string.IsNullOrWhiteSpace(slotMaintenanceCron))
 {
@@ -411,6 +416,12 @@ if (enableHangfireServer)
         "daily-quota-reset",
         job => job.ExecuteAsync(),
         quotaResetCron,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+    recurringJobManager.AddOrUpdate<MonthlyQuotaResetJob>(
+        "monthly-quota-reset",
+        job => job.ExecuteAsync(),
+        monthlyQuotaResetCron,
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
     recurringJobManager.AddOrUpdate<SlotMaintenanceJob>(

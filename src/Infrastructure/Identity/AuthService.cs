@@ -1013,12 +1013,14 @@ public class AuthService : IAuthService
                         "Bác sĩ đã xác thực email",
                         $"Bác sĩ {user.FullName} đã xác thực email. Vui lòng kiểm tra hợp đồng.",
                         NotificationType.SystemAlert,
-                        new
+                        payload: new
                         {
+                            action = "ophthalmologist_email_confirmed",
                             ophthalmologistUserId = user.Id,
                             emailConfirmed = true
                         },
-                        cancellationToken);
+                        cancellationToken: cancellationToken,
+                        referenceId: user.Id);
                 }
             }
 
@@ -1220,5 +1222,50 @@ public class AuthService : IAuthService
         }
 
         return claims;
+    }
+
+    private async Task<(Guid? RoleId, bool? IsVerified, string? VerificationStatus, string? ContractStatus)>
+        ResolveRoleContextAsync(Guid userId, IList<string> roles, CancellationToken cancellationToken)
+    {
+        Guid? roleId = null;
+        bool? isVerified = null;
+        string? verificationStatus = null;
+        string? contractStatus = null;
+
+        if (roles.Contains(Roles.Patient))
+        {
+            var patients = await _patientRepository.FindAsync(
+                p => p.UserId == userId,
+                cancellationToken);
+
+            if (patients.Count > 0)
+            {
+                roleId = patients[0].Id;
+            }
+        }
+        else if (roles.Contains(Roles.Ophthalmologist))
+        {
+            var doctors = await _ophthalmologistRepository.FindAsync(
+                o => o.UserId == userId,
+                cancellationToken);
+
+            if (doctors.Count > 0)
+            {
+                roleId = doctors[0].Id;
+                isVerified = doctors[0].IsVerified;
+                verificationStatus = doctors[0].VerificationStatus.ToString();
+            }
+        }
+
+        if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+        {
+            var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
+            if (contract is not null)
+            {
+                contractStatus = contract.Status.ToString();
+            }
+        }
+
+        return (roleId, isVerified, verificationStatus, contractStatus);
     }
 }

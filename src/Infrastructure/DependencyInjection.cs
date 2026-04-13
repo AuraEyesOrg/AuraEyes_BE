@@ -209,6 +209,7 @@ public static class DependencyInjection
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
         services.AddScoped<ISystemSettingService, SystemSettingService>();
         services.AddScoped<IOrganisationScreeningPdfService, OrganisationScreeningPdfService>();
+        services.AddScoped<IFullTimeTemplateProvisioningService, FullTimeTemplateProvisioningService>();
         services.AddSingleton<IAiAssetBaseUrlProvider, AiAssetBaseUrlProvider>();
         services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();
         services.AddScoped<IFullTimeTemplateProvisioningService, FullTimeTemplateProvisioningService>();

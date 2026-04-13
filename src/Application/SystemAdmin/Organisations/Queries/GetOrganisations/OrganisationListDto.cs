@@ -14,6 +14,10 @@ public class OrganisationListDto
     public int RatingCount { get; set; }
     public string? OwnerAvatarUrl { get; set; }
     public int DeviceCount { get; set; }
+    public int PurchasedAiQuota { get; set; }
+    public int ManagedPatientCount { get; set; }
+    public int RegisteredPatientCount { get; set; }
+    public int WalkInPatientCount { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
 }

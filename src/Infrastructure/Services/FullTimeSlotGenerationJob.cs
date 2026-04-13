@@ -1,9 +1,4 @@
 using Application.Scheduling.ScheduleTemplates.Interfaces;
-using Application.SystemSettings.Interfaces;
-using Domain.Entities.Scheduling;
-using Domain.Enums;
-using Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Services;
