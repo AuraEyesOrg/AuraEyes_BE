@@ -10,6 +10,7 @@ namespace Domain.Entities.Screening;
 public class AiScreening : BaseEntity, IAggregateRoot
 {
     public Guid PatientId { get; private set; }
+    public Guid? OrganisationId { get; private set; }
     public string ModelVersion { get; private set; } = string.Empty;
     public DateTime? ProcessedAt { get; private set; }
 
@@ -32,12 +33,13 @@ public class AiScreening : BaseEntity, IAggregateRoot
 
     private AiScreening() { } // EF Core
 
-    public AiScreening(Guid patientId, string modelVersion)
+    public AiScreening(Guid patientId, string modelVersion, Guid? organisationId = null)
     {
         if (string.IsNullOrWhiteSpace(modelVersion))
             throw new ArgumentException("Model version cannot be empty", nameof(modelVersion));
 
         PatientId = patientId;
+        OrganisationId = organisationId;
         ModelVersion = modelVersion;
         IsActive = true;
     }

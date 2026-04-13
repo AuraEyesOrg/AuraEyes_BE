@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260408200333_AddOrganisationMonthlyQuotaAndOrgScreeningBilling")]
+    partial class AddOrganisationMonthlyQuotaAndOrgScreeningBilling
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1005,13 +1008,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<string>("BankBin")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("");
-
                     b.Property<string>("BankName")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -1027,32 +1023,12 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
 
-                    b.Property<string>("ExternalPayoutId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<decimal?>("Fee")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Note")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("PayOSApprovalState")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<string>("PayOSReferenceId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("PayOSTransactionId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTime?>("ProcessedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1276,9 +1252,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
-                    b.Property<Guid?>("AiScreeningId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("AuthorId")
                         .HasColumnType("uuid");
 
@@ -1378,8 +1351,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("AuthorId");
 
                     b.HasIndex("Category");
-
-                    b.HasIndex("AiScreeningId");
 
                     b.HasIndex("ConsultationSessionId");
 
@@ -1616,30 +1587,6 @@ namespace Infrastructure.Persistence.Migrations
                             Key = "MIN_ADVANCE_BOOKING_HOURS",
                             Description = "Minimum time notice to book a slot (hours)",
                             Value = "0.5"
-                        },
-                        new
-                        {
-                            Key = "PART_TIME_MAX_SLOTS_PER_DAY",
-                            Description = "Global daily slot quota for all part-time ophthalmologists",
-                            Value = "100"
-                        },
-                        new
-                        {
-                            Key = "FULLTIME_SLOT_WINDOW_DAYS",
-                            Description = "Rolling window (days) for auto-generating full-time slots",
-                            Value = "7"
-                        },
-                        new
-                        {
-                            Key = "FULLTIME_MIN_SLOT_COST",
-                            Description = "Minimum auto-generated slot cost for full-time ophthalmologists",
-                            Value = "100000"
-                        },
-                        new
-                        {
-                            Key = "FULLTIME_MAX_SLOT_COST",
-                            Description = "Maximum auto-generated slot cost for full-time ophthalmologists",
-                            Value = "400000"
                         });
                 });
 
@@ -1797,13 +1744,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ScheduleTemplateId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("Doctor");
-
                     b.Property<TimeOnly>("StartTime")
                         .HasColumnType("time without time zone");
 
@@ -1832,115 +1772,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("Status", "BookedCount", "MaxCapacity")
                         .HasDatabaseName("IX_AppointmentSlots_Capacity");
 
-                    b.HasIndex("ScheduleTemplateId", "Date", "StartTime", "EndTime")
-                        .IsUnique()
-                        .HasDatabaseName("UX_AppointmentSlots_TemplateDateTime")
-                        .HasFilter("\"IsDeleted\" = false");
-
                     b.ToTable("AppointmentSlots");
-                });
-
-            modelBuilder.Entity("Domain.Entities.Scheduling.ExperiencePricingRule", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<decimal>("MaxPrice")
-                        .HasPrecision(18)
-                        .HasColumnType("numeric(18,0)");
-
-                    b.Property<int>("MaxYearsExperience")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("MinPrice")
-                        .HasPrecision(18)
-                        .HasColumnType("numeric(18,0)");
-
-                    b.Property<int>("MinYearsExperience")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MinYearsExperience", "MaxYearsExperience")
-                        .IsUnique()
-                        .HasDatabaseName("UX_ExperiencePricingRules_YearsBand")
-                        .HasFilter("\"IsDeleted\" = false");
-
-                    b.ToTable("ExperiencePricingRules", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_ExperiencePricingRules_IntegerPrice", "\"MinPrice\" = TRUNC(\"MinPrice\") AND \"MaxPrice\" = TRUNC(\"MaxPrice\")");
-
-                            t.HasCheckConstraint("CK_ExperiencePricingRules_PriceRange", "\"MinPrice\" > 0 AND \"MaxPrice\" >= \"MinPrice\"");
-
-                            t.HasCheckConstraint("CK_ExperiencePricingRules_YearsRange", "\"MinYearsExperience\" >= 0 AND \"MaxYearsExperience\" >= \"MinYearsExperience\"");
-                        });
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("65f0a3f8-17f0-4bc4-a97a-d5f11f63a2d1"),
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            CreatedBy = "system",
-                            IsActive = true,
-                            IsDeleted = false,
-                            MaxPrice = 200000m,
-                            MaxYearsExperience = 2,
-                            MinPrice = 100000m,
-                            MinYearsExperience = 0,
-                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            UpdatedBy = "system"
-                        },
-                        new
-                        {
-                            Id = new Guid("1b7d3f39-e7b7-46e0-80ef-c5436a95f7af"),
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            CreatedBy = "system",
-                            IsActive = true,
-                            IsDeleted = false,
-                            MaxPrice = 300000m,
-                            MaxYearsExperience = 5,
-                            MinPrice = 200000m,
-                            MinYearsExperience = 3,
-                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            UpdatedBy = "system"
-                        },
-                        new
-                        {
-                            Id = new Guid("70eb8d16-3709-4d06-a3d2-8f65f5f31184"),
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            CreatedBy = "system",
-                            IsActive = true,
-                            IsDeleted = false,
-                            MaxPrice = 400000m,
-                            MaxYearsExperience = 70,
-                            MinPrice = 300000m,
-                            MinYearsExperience = 6,
-                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            UpdatedBy = "system"
-                        });
                 });
 
             modelBuilder.Entity("Domain.Entities.Scheduling.ScheduleTemplate", b =>
@@ -1967,11 +1799,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<TimeOnly>("EndTime")
                         .HasColumnType("time without time zone");
 
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -1989,13 +1816,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<int>("SlotDuration")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasDefaultValue("Doctor");
-
                     b.Property<TimeOnly>("StartTime")
                         .HasColumnType("time without time zone");
 
@@ -2012,11 +1832,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("OphthalId");
 
                     b.HasIndex("OrgId");
-
-                    b.HasIndex("OphthalId", "DayOfWeek")
-                        .IsUnique()
-                        .HasDatabaseName("UX_ScheduleTemplates_FullTime_SystemGenerated_Day")
-                        .HasFilter("\"IsDeleted\" = false AND \"IsActive\" = true AND \"Source\" = 'SystemGenerated' AND \"OphthalId\" IS NOT NULL");
 
                     b.ToTable("ScheduleTemplates", t =>
                         {
@@ -2747,76 +2562,15 @@ namespace Infrastructure.Persistence.Migrations
                     b.ToTable("OrganisationOnboardingRequests");
                 });
 
-            modelBuilder.Entity("Domain.Entities.Users.OrganisationPatientLink", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("FirstLinkedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("LastSeenAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("OrganisationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("PatientId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LastSeenAt");
-
-                    b.HasIndex("OrganisationId");
-
-                    b.HasIndex("PatientId");
-
-                    b.HasIndex("OrganisationId", "PatientId")
-                        .IsUnique()
-                        .HasFilter("\"IsDeleted\" = false");
-
-                    b.ToTable("OrganisationPatientLinks");
-                });
-
             modelBuilder.Entity("Domain.Entities.Users.Patient", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Address")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<decimal?>("BMI")
                         .HasPrecision(5, 2)
                         .HasColumnType("numeric(5,2)");
-
-                    b.Property<string>("CitizenId")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2824,28 +2578,14 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
 
-                    b.Property<DateTime?>("DateOfBirth")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("DiseaseHistory")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("FullName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<int?>("GenderId")
-                        .HasColumnType("integer");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
-
-                    b.Property<string>("PhoneNumber")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
 
                     b.Property<int>("PurchasedAiQuota")
                         .ValueGeneratedOnAdd()
@@ -2863,14 +2603,13 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
 
-                    b.Property<Guid?>("UserId")
+                    b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
                     b.HasIndex("UserId")
-                        .IsUnique()
-                        .HasFilter("\"UserId\" IS NOT NULL");
+                        .IsUnique();
 
                     b.ToTable("Patients");
                 });
@@ -2951,10 +2690,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<string>("AvatarUrl")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("CitizenId")
-                        .HasMaxLength(12)
-                        .HasColumnType("character varying(12)");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
@@ -3589,25 +3324,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("Domain.Entities.Users.OrganisationPatientLink", b =>
-                {
-                    b.HasOne("Domain.Entities.Users.Organisation", "Organisation")
-                        .WithMany()
-                        .HasForeignKey("OrganisationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Entities.Users.Patient", "Patient")
-                        .WithMany()
-                        .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Organisation");
-
-                    b.Navigation("Patient");
                 });
 
             modelBuilder.Entity("Infrastructure.Identity.ApplicationRoleClaim", b =>

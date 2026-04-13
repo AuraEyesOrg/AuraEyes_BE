@@ -57,23 +57,17 @@ public class ShareConsultationToNetworkCommandHandler : ICommandHandler<ShareCon
             return Result<Guid>.Forbidden("You are not allowed to share this consultation case.");
         }
 
-        if (!session.AiScreeningId.HasValue)
+        AiScreening? screening = null;
+        if (session.AiScreeningId.HasValue)
         {
-            return Result<Guid>.Failure("This consultation session has no linked AI screening to share.");
+            screening = await _aiScreeningRepository
+                .Query()
+                .Include(x => x.RetinalImages)
+                .Include(x => x.ScreeningResults)
+                .FirstOrDefaultAsync(x => x.Id == session.AiScreeningId.Value, cancellationToken);
         }
 
-        var screening = await _aiScreeningRepository
-            .Query()
-            .Include(x => x.RetinalImages)
-            .Include(x => x.ScreeningResults)
-            .FirstOrDefaultAsync(x => x.Id == session.AiScreeningId.Value, cancellationToken);
-
-        if (screening is null)
-        {
-            return Result<Guid>.NotFound("Linked AI screening was not found.");
-        }
-
-        var latestResult = screening.ScreeningResults
+        var latestResult = screening?.ScreeningResults
             .OrderByDescending(x => x.CreatedAt)
             .FirstOrDefault();
 
@@ -115,10 +109,14 @@ public class ShareConsultationToNetworkCommandHandler : ICommandHandler<ShareCon
         post.SetClinicalCaseMetadata(
             isInternalCase: true,
             consultationSessionId: session.Id,
+            aiScreeningId: session.AiScreeningId,
             patientAge: patientAge,
             patientGender: patientGender);
 
-        AddRetinalImageAttachments(post, screening.RetinalImages);
+        if (screening is not null)
+        {
+            AddRetinalImageAttachments(post, screening.RetinalImages);
+        }
 
         await _postRepository.AddAsync(post, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
