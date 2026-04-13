@@ -4,8 +4,10 @@ namespace Infrastructure.Services.Email;
 /// Email template provider for Aura healthcare system.
 /// Generates minimalist, card-based HTML emails in Vietnamese.
 /// </summary>
-internal static class EmailTemplates
+public static class EmailTemplates
 {
+    private const string AuraLogoUrl = "https://rjtkpvqrjnbthcicyaza.supabase.co/storage/v1/object/public/aura-uploads/logo.png";
+
     #region Color Palette
 
     // Brand
@@ -32,12 +34,7 @@ internal static class EmailTemplates
 
     private static string ResolveLogoUrl(string baseLink)
     {
-        if (!Uri.TryCreate(baseLink, UriKind.Absolute, out var uri))
-        {
-            return "http://localhost:3000/logo.png";
-        }
-
-        return $"{uri.Scheme}://{uri.Authority}/logo.png";
+        return AuraLogoUrl;
     }
 
     #region Email Subjects
@@ -53,7 +50,11 @@ internal static class EmailTemplates
 
     #region Base Template
 
-    private static string WrapInBaseTemplate(string content, string? logoUrl = null) => $@"
+    private static string WrapInBaseTemplate(string content, string? logoUrl = null)
+    {
+        var resolvedLogoUrl = string.IsNullOrWhiteSpace(logoUrl) ? AuraLogoUrl : logoUrl;
+
+        return $@"
 <!DOCTYPE html>
 <html lang=""vi"">
 <head>
@@ -87,10 +88,16 @@ internal static class EmailTemplates
                     
                     <tr>
                         <td style=""padding: 32px 40px 16px 40px; text-align: center; border-bottom: 1px solid #F1F3F4;"">
-                            {(string.IsNullOrWhiteSpace(logoUrl) ? string.Empty : $"<img src=\"{logoUrl}\" alt=\"AURA Logo\" style=\"display:block; margin:0 auto 16px auto; width:72px; height:72px; object-fit:contain;\" />")}
-                            <h1 style=""margin: 0; color: {BrandPrimary}; font-size: 26px; font-weight: 700; letter-spacing: 1px;"">
-                                ❖ AURA
-                            </h1>
+                            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" style=""margin: 0 auto 8px auto;"">
+                                <tr>
+                                    <td style=""vertical-align: middle; padding-right: 10px;"">
+                                        <img src=""{resolvedLogoUrl}"" alt=""AURA Logo"" width=""40"" height=""40"" style=""display:block; width:40px; height:40px; object-fit:contain;"" />
+                                    </td>
+                                    <td style=""vertical-align: middle;"">
+                                        <h1 style=""margin: 0; color: {BrandPrimary}; font-size: 26px; font-weight: 700; letter-spacing: 1px; line-height: 1;"">AURA</h1>
+                                    </td>
+                                </tr>
+                            </table>
                             <p style=""margin: 6px 0 0 0; color: {TextMuted}; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;"">
                                 Hệ thống quản lý khám sàng lọc mắt
                             </p>
@@ -110,7 +117,7 @@ internal static class EmailTemplates
                             </p>
                             <p style=""margin: 0 0 0 0; color: {TextMuted}; font-size: 12px; line-height: 1.5;"">
                                 Email này được tạo tự động, vui lòng không trả lời.<br>
-                                Cần hỗ trợ? Liên hệ <a href=""mailto:support@auraeyes.vn"" style=""color: {BrandDarkText}; text-decoration: underline;"">support@auraeyes.vn</a>
+                                Cần hỗ trợ? Liên hệ <a href=""mailto:auraeyes4se@gmail.com"" style=""color: {BrandDarkText}; text-decoration: underline;"">auraeyes4se@gmail.com</a>
                             </p>
                         </td>
                     </tr>
@@ -120,6 +127,7 @@ internal static class EmailTemplates
     </table>
 </body>
 </html>";
+    }
 
     #endregion
 
@@ -305,7 +313,7 @@ internal static class EmailTemplates
         string? visitReason,
         Guid appointmentId,
         string checkInCode,
-        string qrCodeBase64)
+        string qrImageSrc)
     {
         var displayName = string.IsNullOrWhiteSpace(patientName) ? "bạn" : patientName;
         var displayOrganisation = string.IsNullOrWhiteSpace(organisationName)
@@ -343,7 +351,7 @@ internal static class EmailTemplates
                             QR check-in
                         </p>
                         <img
-                            src=""data:image/png;base64,{qrCodeBase64}""
+                            src=""{qrImageSrc}""
                             alt=""QR check-in appointment""
                             width=""200""
                             height=""200""

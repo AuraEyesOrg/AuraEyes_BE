@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
 using QRCoder;
+using MimeKit.Utils;
 
 namespace Infrastructure.Services;
 
@@ -73,7 +74,8 @@ public class EmailService : IEmailService
         ArgumentException.ThrowIfNullOrWhiteSpace(email, nameof(email));
         ArgumentNullException.ThrowIfNull(payload);
 
-        var qrCodeBase64 = CreateQrCodeBase64Png(payload.QrPayload);
+        var qrCodeBytes = CreateQrCodePngBytes(payload.QrPayload);
+        var qrContentId = MimeUtils.GenerateMessageId();
 
         var subject = EmailTemplates.ClinicAppointmentConfirmationSubject;
         var body = EmailTemplates.GetClinicAppointmentConfirmationBody(
@@ -85,14 +87,33 @@ public class EmailService : IEmailService
             payload.VisitReason,
             payload.AppointmentId,
             payload.CheckInCode,
-            qrCodeBase64);
+            $"cid:{qrContentId}");
 
-        await SendAsync(email, subject, body, isHtml: true, cancellationToken);
+        var message = CreateMessageWithInlineImage(
+            email,
+            subject,
+            body,
+            qrCodeBytes,
+            qrContentId);
 
-        _logger.LogInformation(
-            "Clinic appointment confirmation email sent to {Email} for appointment {AppointmentId}",
-            MaskEmail(email),
-            payload.AppointmentId);
+        try
+        {
+            await SendMessageAsync(message, cancellationToken);
+
+            _logger.LogInformation(
+                "Clinic appointment confirmation email sent to {Email} for appointment {AppointmentId}",
+                MaskEmail(email),
+                payload.AppointmentId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to send clinic appointment confirmation email - To: {To}, AppointmentId: {AppointmentId}",
+                MaskEmail(email),
+                payload.AppointmentId);
+            throw;
+        }
     }
 
     /// <inheritdoc />
@@ -211,6 +232,35 @@ public class EmailService : IEmailService
         return message;
     }
 
+    private MimeMessage CreateMessageWithInlineImage(
+        string to,
+        string subject,
+        string htmlBody,
+        byte[] imageContent,
+        string imageContentId)
+    {
+        var message = new MimeMessage();
+
+        message.From.Add(new MailboxAddress(_settings.FromName, _settings.FromEmail));
+        message.To.Add(MailboxAddress.Parse(to));
+        message.Subject = subject;
+
+        var bodyBuilder = new BodyBuilder
+        {
+            HtmlBody = htmlBody
+        };
+
+        var inlineImage = bodyBuilder.LinkedResources.Add(
+            $"clinic-appointment-qr-{Guid.NewGuid():N}.png",
+            imageContent,
+            ContentType.Parse("image/png"));
+        inlineImage.ContentId = imageContentId;
+        inlineImage.ContentDisposition = new ContentDisposition(ContentDisposition.Inline);
+
+        message.Body = bodyBuilder.ToMessageBody();
+        return message;
+    }
+
     private async Task SendMessageAsync(MimeMessage message, CancellationToken cancellationToken)
     {
         using var client = new SmtpClient();
@@ -274,7 +324,7 @@ public class EmailService : IEmailService
         return SecureSocketOptions.Auto;
     }
 
-    private static string CreateQrCodeBase64Png(string payload)
+    private static byte[] CreateQrCodePngBytes(string payload)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(payload, nameof(payload));
 
@@ -282,8 +332,7 @@ public class EmailService : IEmailService
         using var qrCodeData = qrGenerator.CreateQrCode(payload, QRCodeGenerator.ECCLevel.Q);
 
         var qrCode = new PngByteQRCode(qrCodeData);
-        var qrBytes = qrCode.GetGraphic(8);
-        return Convert.ToBase64String(qrBytes);
+        return qrCode.GetGraphic(8);
     }
 
     /// <summary>
