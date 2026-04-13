@@ -16,6 +16,40 @@ using Serilog;
 using System.Reflection;
 using System.Text.Json.Serialization;
 
+static string ResolveHangfireSchema(string? configuredSchema, bool isDevelopment)
+{
+    var rawSchema = configuredSchema;
+
+    if (string.IsNullOrWhiteSpace(rawSchema) && isDevelopment)
+    {
+        rawSchema = $"hangfire_dev_{Environment.MachineName}";
+    }
+
+    if (string.IsNullOrWhiteSpace(rawSchema))
+    {
+        rawSchema = "hangfire";
+    }
+
+    var normalized = new string(
+        rawSchema
+            .Trim()
+            .ToLowerInvariant()
+            .Select(ch => char.IsLetterOrDigit(ch) ? ch : '_')
+            .ToArray());
+
+    if (string.IsNullOrWhiteSpace(normalized))
+    {
+        normalized = "hangfire";
+    }
+
+    if (char.IsDigit(normalized[0]))
+    {
+        normalized = $"h_{normalized}";
+    }
+
+    return normalized.Length > 63 ? normalized[..63] : normalized;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add Serilog
@@ -174,10 +208,15 @@ var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnec
 
 var hangfireConnectionBuilder = new NpgsqlConnectionStringBuilder(defaultConnection)
 {
-    // Dedicated small pool for Hangfire to avoid saturating the main application pool.
+    // Use a tiny dedicated pool for Hangfire to avoid saturating Supabase session pool.
     MaxPoolSize = 5,
     MinPoolSize = 0
 };
+
+var configuredHangfireSchema = builder.Configuration["Hangfire:Schema"]
+    ?? Environment.GetEnvironmentVariable("HANGFIRE_SCHEMA");
+var hangfireSchema = ResolveHangfireSchema(configuredHangfireSchema, builder.Environment.IsDevelopment());
+Log.Information("Using Hangfire schema '{HangfireSchema}'", hangfireSchema);
 
 var enableHangfireServer = builder.Configuration.GetValue<bool?>("Hangfire:ServerEnabled")
     ?? !builder.Environment.IsDevelopment();
@@ -189,14 +228,20 @@ builder.Services.AddHangfire(config => config
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
-    .UsePostgreSqlStorage(options =>
-        options.UseNpgsqlConnection(hangfireConnectionBuilder.ConnectionString)));
+    .UsePostgreSqlStorage(
+        options => options.UseNpgsqlConnection(hangfireConnectionBuilder.ConnectionString),
+        new PostgreSqlStorageOptions
+        {
+            SchemaName = hangfireSchema
+        }));
 
 if (enableHangfireServer)
 {
     builder.Services.AddHangfireServer(options =>
     {
+        // Keep worker count very low when using Supabase pooled connection.
         options.WorkerCount = Math.Max(1, hangfireWorkerCount);
+        options.ServerName = $"{Environment.MachineName}:{Environment.ProcessId}:{hangfireSchema}";
     });
 }
 
@@ -233,39 +278,26 @@ builder.Services.AddOutputCache(options =>
 
 var app = builder.Build();
 
-// Database initialization: apply pending migrations + seed data (idempotent)
+// Seed domain entities (Organisation, Ophthalmologist, Patient)
+// Note: This will skip if roles already exist (idempotent)
+using (var scope = app.Services.CreateScope())
 {
-    const int maxRetries = 3;
-    for (int attempt = 1; attempt <= maxRetries; attempt++)
+    var services = scope.ServiceProvider;
+    try
     {
-        using var scope = app.Services.CreateScope();
-        var services = scope.ServiceProvider;
-        try
-        {
-            var sw = System.Diagnostics.Stopwatch.StartNew();
+        var context = services.GetRequiredService<Infrastructure.Persistence.ApplicationDbContext>();
+        var userManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Infrastructure.Identity.ApplicationUser>>();
+        var roleManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Infrastructure.Identity.ApplicationRole>>();
+        var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
+        var seederLogger = loggerFactory.CreateLogger("DatabaseSeeder");
 
-            var context = services.GetRequiredService<Infrastructure.Persistence.ApplicationDbContext>();
-            var userManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Infrastructure.Identity.ApplicationUser>>();
-            var roleManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Infrastructure.Identity.ApplicationRole>>();
-            var configuration = services.GetRequiredService<IConfiguration>();
-            var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
-            var seederLogger = loggerFactory.CreateLogger("DatabaseSeeder");
-
-            await Infrastructure.Services.DatabaseSeeder.SeedAsync(context, userManager, roleManager, configuration, seederLogger);
-
-            sw.Stop();
-            Log.Information("Database initialization completed in {ElapsedMs}ms", sw.ElapsedMilliseconds);
-            break; // Success — exit retry loop
-        }
-        catch (Exception ex) when (attempt < maxRetries)
-        {
-            Log.Warning(ex, "Database initialization attempt {Attempt}/{MaxRetries} failed. Retrying in 5s...", attempt, maxRetries);
-            await Task.Delay(TimeSpan.FromSeconds(5));
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Database initialization failed after {MaxRetries} attempts", maxRetries);
-        }
+        await Infrastructure.Services.DatabaseSeeder.SeedAsync(context, userManager, roleManager, seederLogger);
+        Log.Information("Database seeding completed successfully");
+    }
+    catch (Exception ex)
+    {
+        Log.Fatal(ex, "An error occurred while seeding or migrating the database. Application startup aborted.");
+        throw;
     }
 }
 
@@ -341,10 +373,31 @@ if (enableHangfireServer)
 {
     // Register recurring jobs
     var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+    var legacyRecurringJobIds = new[]
+    {
+        "monthly-quota-reset",
+        "fulltime-slot-generation",
+        "full-time-slot-generation",
+        "fulltime-slot-generation-job",
+        // Remove the current id first to force a clean re-registration payload.
+        "fulltime-slot-rolling-window"
+    };
+
+    foreach (var recurringJobId in legacyRecurringJobIds)
+    {
+        recurringJobManager.RemoveIfExists(recurringJobId);
+    }
+
     recurringJobManager.AddOrUpdate<DailyQuotaResetJob>(
         "daily-quota-reset",
         job => job.ExecuteAsync(),
         quotaResetCron,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+    recurringJobManager.AddOrUpdate<MonthlyQuotaResetJob>(
+        "monthly-quota-reset",
+        job => job.ExecuteAsync(),
+        monthlyQuotaResetCron,
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
     recurringJobManager.AddOrUpdate<SlotMaintenanceJob>(
@@ -352,6 +405,68 @@ if (enableHangfireServer)
         job => job.ExpireUnusedSlotsAsync(CancellationToken.None),
         slotMaintenanceCron,
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+    recurringJobManager.AddOrUpdate<FullTimeSlotGenerationJob>(
+        "fulltime-slot-rolling-window",
+        job => job.ExecuteAsync(CancellationToken.None),
+        fullTimeSlotGenerationCron,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+    try
+    {
+        var monitoringApi = JobStorage.Current.GetMonitoringApi();
+        const int pageSize = 100;
+        var from = 0;
+        var deletedCount = 0;
+
+        while (true)
+        {
+            var failedJobs = monitoringApi.FailedJobs(from, pageSize);
+            if (failedJobs.Count == 0)
+            {
+                break;
+            }
+
+            foreach (var failed in failedJobs)
+            {
+                var jobId = failed.Key;
+                var details = failed.Value;
+
+                var errorText = string.Join(
+                    " | ",
+                    new[]
+                    {
+                        details.ExceptionType,
+                        details.ExceptionMessage,
+                        details.ExceptionDetails
+                    }.Where(text => !string.IsNullOrWhiteSpace(text)));
+
+                var isIncompatibleLegacyJob =
+                    errorText.Contains("Could not load type 'Infrastructure.Services.FullTimeSlotGenerationJob'", StringComparison.OrdinalIgnoreCase)
+                    || errorText.Contains("target method was not found", StringComparison.OrdinalIgnoreCase)
+                    || errorText.Contains("Hangfire.Common.JobLoadException", StringComparison.OrdinalIgnoreCase)
+                    || errorText.Contains("System.TypeLoadException", StringComparison.OrdinalIgnoreCase);
+
+                if (isIncompatibleLegacyJob && BackgroundJob.Delete(jobId))
+                {
+                    deletedCount++;
+                }
+            }
+
+            from += pageSize;
+        }
+
+        if (deletedCount > 0)
+        {
+            Log.Warning(
+                "Deleted {DeletedCount} incompatible legacy Hangfire failed jobs during startup cleanup.",
+                deletedCount);
+        }
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Failed to cleanup incompatible legacy Hangfire jobs during startup.");
+    }
 }
 else
 {
