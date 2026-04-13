@@ -291,7 +291,12 @@ using (var scope = app.Services.CreateScope())
         var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
         var seederLogger = loggerFactory.CreateLogger("DatabaseSeeder");
 
-        await Infrastructure.Services.DatabaseSeeder.SeedAsync(context, userManager, roleManager, seederLogger);
+        await Infrastructure.Services.DatabaseSeeder.SeedAsync(
+            context,
+            userManager,
+            roleManager,
+            builder.Configuration,
+            seederLogger);
         Log.Information("Database seeding completed successfully");
     }
     catch (Exception ex)
@@ -361,6 +366,18 @@ var quotaResetCron = Environment.GetEnvironmentVariable("HANGFIRE_DAILY_QUOTA_RE
 if (string.IsNullOrWhiteSpace(quotaResetCron))
 {
     quotaResetCron = defaultQuotaResetCron;
+}
+
+var monthlyQuotaResetCron = Environment.GetEnvironmentVariable("HANGFIRE_MONTHLY_QUOTA_RESET_CRON");
+if (string.IsNullOrWhiteSpace(monthlyQuotaResetCron))
+{
+    monthlyQuotaResetCron = "0 0 1 * *";
+}
+
+var fullTimeSlotGenerationCron = Environment.GetEnvironmentVariable("HANGFIRE_FULLTIME_SLOT_GENERATION_CRON");
+if (string.IsNullOrWhiteSpace(fullTimeSlotGenerationCron))
+{
+    fullTimeSlotGenerationCron = "0 */6 * * *";
 }
 
 var slotMaintenanceCron = Environment.GetEnvironmentVariable("HANGFIRE_SLOT_MAINTENANCE_CRON");

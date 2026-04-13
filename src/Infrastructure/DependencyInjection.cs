@@ -3,6 +3,7 @@ using Application.AiQuota.Interfaces;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.OrganisationScreenings.Interfaces;
+using Application.Scheduling.ScheduleTemplates.Interfaces;
 using Application.SystemAdmin.Interfaces;
 using Application.SystemSettings.Interfaces;
 using Domain.Common;
@@ -207,6 +208,7 @@ public static class DependencyInjection
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
         services.AddScoped<ISystemSettingService, SystemSettingService>();
         services.AddScoped<IOrganisationScreeningPdfService, OrganisationScreeningPdfService>();
+        services.AddScoped<IFullTimeTemplateProvisioningService, FullTimeTemplateProvisioningService>();
         services.AddSingleton<IAiAssetBaseUrlProvider, AiAssetBaseUrlProvider>();
         services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();
 
@@ -217,7 +219,9 @@ public static class DependencyInjection
 
         // Register Hangfire daily job
         services.AddScoped<DailyQuotaResetJob>();
+        services.AddScoped<MonthlyQuotaResetJob>();
         services.AddScoped<SlotMaintenanceJob>();
+        services.AddScoped<FullTimeSlotGenerationJob>();
 
         // Configure PayOS Settings
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));

@@ -758,6 +758,7 @@ public class AuthService : IAuthService
         bool? isVerified = null;
         string? verificationStatus = null;
         string? contractStatus = null;
+        string? employmentType = null;
 
         if (roles.Contains(Roles.Patient))
         {
@@ -775,6 +776,7 @@ public class AuthService : IAuthService
                 roleId = doctors[0].Id;
                 isVerified = doctors[0].IsVerified;
                 verificationStatus = doctors[0].VerificationStatus.ToString();
+                employmentType = doctors[0].EmploymentType.ToString();
             }
 
             var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
@@ -881,6 +883,7 @@ public class AuthService : IAuthService
             bool? isVerified = null;
             string? verificationStatus = null;
             string? contractStatus = null;
+            string? employmentType = null;
 
             if (roles.Contains(Roles.Patient))
             {
@@ -898,6 +901,7 @@ public class AuthService : IAuthService
                     roleId = doctors[0].Id;
                     isVerified = doctors[0].IsVerified;
                     verificationStatus = doctors[0].VerificationStatus.ToString();
+                    employmentType = doctors[0].EmploymentType.ToString();
                 }
 
                 var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
@@ -1116,6 +1120,7 @@ public class AuthService : IAuthService
             bool? isVerified = null;
             string? verificationStatus = null;
             string? contractStatus = null;
+            string? employmentType = null;
 
             if (roles.Contains(Roles.Patient))
             {
@@ -1133,6 +1138,7 @@ public class AuthService : IAuthService
                     roleId = doctors[0].Id;
                     isVerified = doctors[0].IsVerified;
                     verificationStatus = doctors[0].VerificationStatus.ToString();
+                    employmentType = doctors[0].EmploymentType.ToString();
                 }
 
                 var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
