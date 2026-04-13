@@ -44,7 +44,17 @@ jobs:
           ASPNETCORE_ENVIRONMENT=Production
           ASPNETCORE_URLS=http://0.0.0.0:8080
 
-          ConnectionStrings__DefaultConnection=${{ secrets.SUPABASE_CONNECTION_STRING }}
+          # ── Database ──
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_NAME=${{ secrets.DB_NAME }}
+
+          # ── pgAdmin ──
+          PGADMIN_EMAIL=${{ secrets.PGADMIN_EMAIL }}
+          PGADMIN_PASSWORD=${{ secrets.PGADMIN_PASSWORD }}
+
+          # ── Connection String ──
+          ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=${{ secrets.DB_NAME }};Username=${{ secrets.DB_USER }};Password=${{ secrets.DB_PASSWORD }};Pooling=true;Minimum Pool Size=5;Maximum Pool Size=100;Connection Idle Lifetime=60;Connection Pruning Interval=10
 
           JwtSettings__SecretKey=${{ secrets.JWT_SECRET_KEY }}
           JwtSettings__Issuer=${{ secrets.JWT_ISSUER }}
@@ -72,6 +82,9 @@ jobs:
           PayOS__ChecksumKey=${{ secrets.PAYOS_CHECKSUM_KEY }}
           PayOS__DefaultReturnUrl=${{ secrets.PAYOS_DEFAULT_RETURN_URL }}
           PayOS__DefaultCancelUrl=${{ secrets.PAYOS_DEFAULT_CANCEL_URL }}
+          PayOS__PayoutClientId=${{ secrets.PAYOS_PAYOUT_CLIENT_ID }}
+          PayOS__PayoutApiKey=${{ secrets.PAYOS_PAYOUT_API_KEY }}
+          PayOS__PayoutChecksumKey=${{ secrets.PAYOS_PAYOUT_CHECKSUM_KEY }}
 
           SupabaseStorage__Url=${{ secrets.SUPABASE_STORAGE_URL }}
           SupabaseStorage__ServiceKey=${{ secrets.SUPABASE_STORAGE_KEY }}
@@ -127,12 +140,12 @@ jobs:
 
       - name: Pull & run containers
         run: |
-          docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" pull
+          docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" pull api
           docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" up -d
 
       - name: Health check
         run: |
-          for i in {1..60}; do
+          for i in {1..30}; do
             if curl -fs "http://localhost:${API_PORT}/health"; then
               echo "✅ API healthy"
               exit 0
@@ -144,6 +157,7 @@ jobs:
           docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" ps
           docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" logs --tail=200
           exit 1
+
 
       - name: Cleanup unused Docker images
         if: success()

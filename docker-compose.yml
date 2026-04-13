@@ -1,4 +1,71 @@
+x-common-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: auraeye_db
+    restart: unless-stopped
+
+    security_opt:
+      - no-new-privileges:true
+
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: Asia/Ho_Chi_Minh
+
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+    command: >-
+      postgres
+        -c max_connections=300
+        -c shared_buffers=512MB
+        -c effective_cache_size=1536MB
+        -c work_mem=4MB
+        -c maintenance_work_mem=128MB
+        -c wal_buffers=16MB
+        -c checkpoint_completion_target=0.9
+        -c random_page_cost=1.1
+        -c effective_io_concurrency=200
+        -c min_wal_size=1GB
+        -c max_wal_size=4GB
+        -c log_timezone=Asia/Ho_Chi_Minh
+        -c timezone=Asia/Ho_Chi_Minh
+        -c idle_in_transaction_session_timeout=30000
+        -c statement_timeout=60000
+        -c log_min_duration_statement=1000
+        -c log_checkpoints=on
+        -c log_connections=on
+        -c log_disconnections=on
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+    networks:
+      - internal
+
+    logging: *logging
+
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.50"
+        reservations:
+          memory: 512M
+          cpus: "0.50"
+
   api:
     image: ${DOCKER_IMAGE_NAME}:latest
     container_name: auraeye_api
@@ -12,10 +79,15 @@ services:
       - NET_BIND_SERVICE
 
     env_file:
-      - .env
+      - path: .env
+        required: true
 
     ports:
       - "${API_PORT}:8080"
+
+    depends_on:
+      db:
+        condition: service_healthy
 
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health > /dev/null || exit 1"]
@@ -24,12 +96,12 @@ services:
       retries: 3
       start_period: 60s
 
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    
+    networks:
+      - internal
+      - external
+
+    logging: *logging
+
     deploy:
       resources:
         limits:
@@ -39,6 +111,52 @@ services:
           memory: 1G
           cpus: "1.00"
 
+  # ── pgAdmin (internal only — access via SSH tunnel) ────────────────
+  # Access: ssh -L 5050:localhost:5050 user@vps
+  # Then open http://localhost:5050 in your browser
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: auraeye_pgadmin
+    restart: unless-stopped
+
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_LISTEN_PORT: 5050
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "True"
+      PGADMIN_CONFIG_LOGIN_BANNER: "'AuraEyes Database Admin'"
+      PGADMIN_CONFIG_CONSOLE_LOG_LEVEL: "10"
+
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+    ports:
+      - "127.0.0.1:5050:5050"
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    networks:
+      - internal
+
+    logging: *logging
+
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.50"
+
+volumes:
+  pgdata:
+    name: auraeye_pgdata
+  pgadmin_data:
+    name: auraeye_pgadmin_data
+
 networks:
-  default:
+  internal:
+    driver: bridge
+    internal: true
+  external:
     driver: bridge

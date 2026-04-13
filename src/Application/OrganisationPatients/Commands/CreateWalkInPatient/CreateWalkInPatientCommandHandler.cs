@@ -2,7 +2,6 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Users;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Application.OrganisationPatients.Commands.CreateWalkInPatient;
@@ -48,6 +47,8 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
             return Result<Guid>.NotFound("Organisation not found");
         }
 
+        // ── Normalise optional string fields ──
+
         var phoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber)
             ? null
             : request.PhoneNumber.Trim();
@@ -60,42 +61,6 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
             ? null
             : request.Address.Trim();
 
-        // ── Duplicate checks scoped to organisation via OrganisationPatientLink → Patient ──
-
-        if (phoneNumber is not null)
-        {
-            var phoneInUse = await _organisationPatientLinkRepository.Query()
-                .Where(link => link.OrganisationId == org.Id && !link.IsDeleted)
-                .Join(
-                    _patientRepository.Query().Where(p => p.PhoneNumber == phoneNumber && !p.IsDeleted),
-                    link => link.PatientId,
-                    patient => patient.Id,
-                    (link, patient) => patient)
-                .AnyAsync(cancellationToken);
-
-            if (phoneInUse)
-            {
-                return Result<Guid>.Conflict("Phone number already exists in this organisation");
-            }
-        }
-
-        if (citizenId is not null)
-        {
-            var citizenIdInUse = await _organisationPatientLinkRepository.Query()
-                .Where(link => link.OrganisationId == org.Id && !link.IsDeleted)
-                .Join(
-                    _patientRepository.Query().Where(p => p.CitizenId == citizenId && !p.IsDeleted),
-                    link => link.PatientId,
-                    patient => patient.Id,
-                    (link, patient) => patient)
-                .AnyAsync(cancellationToken);
-
-            if (citizenIdInUse)
-            {
-                return Result<Guid>.Conflict("Citizen ID already exists in this organisation");
-            }
-        }
-
         // ── Parse gender ──
 
         int? genderId = string.IsNullOrWhiteSpace(request.Gender) ? null
@@ -103,6 +68,11 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
             : request.Gender.StartsWith("F", StringComparison.OrdinalIgnoreCase) ? 2 : 3;
 
         // ── Create walk-in patient (no Identity user) ──
+        //
+        // Note: Phone and CitizenId are NOT used as unique identifiers.
+        // Duplicate entries are permitted — staff must reconcile manually.
+        // Shared identifiers (family phone numbers, typos, shared CCCD) are real-world
+        // occurrences and auto-blocking or auto-merging would risk corrupting medical records.
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
 

@@ -3,6 +3,7 @@ using Application.Common.Models;
 using Application.Screenings.Queries.GetScreeningSessionDetail;
 using Domain.Common;
 using Domain.Entities.Screening;
+using Domain.Entities.Users;
 using Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,14 +13,20 @@ public sealed class GetOrgScreeningSessionDetailQueryHandler
     : IQueryHandler<GetOrgScreeningSessionDetailQuery, ScreeningSessionDetailDto>
 {
     private readonly IRepository<AiScreening> _screeningRepository;
+    private readonly IRepository<Patient> _patientRepository;
     private readonly IOrganisationPatientsRepository _organisationPatientsRepository;
+    private readonly IIdentityService _identityService;
 
     public GetOrgScreeningSessionDetailQueryHandler(
         IRepository<AiScreening> screeningRepository,
-        IOrganisationPatientsRepository organisationPatientsRepository)
+        IRepository<Patient> patientRepository,
+        IOrganisationPatientsRepository organisationPatientsRepository,
+        IIdentityService identityService)
     {
         _screeningRepository = screeningRepository;
+        _patientRepository = patientRepository;
         _organisationPatientsRepository = organisationPatientsRepository;
+        _identityService = identityService;
     }
 
     public async Task<Result<ScreeningSessionDetailDto>> Handle(
@@ -76,15 +83,46 @@ public sealed class GetOrgScreeningSessionDetailQueryHandler
         if (!hasAccess)
             return Result<ScreeningSessionDetailDto>.NotFound("Screening session not found");
 
-        var patientName = await _organisationPatientsRepository.GetPatientDisplayNameForOrganisationAdminAsync(
-            request.OrgAdminUserId,
-            session.PatientId,
-            cancellationToken);
+        var patient = await _patientRepository.GetByIdAsync(session.PatientId, cancellationToken);
+        if (patient is null)
+            return Result<ScreeningSessionDetailDto>.NotFound("Patient not found");
 
-        if (!string.IsNullOrWhiteSpace(patientName))
+        var patientName = session.PatientName;
+        var patientEmail = session.PatientEmail;
+        var isWalkIn = patient.IsWalkIn;
+
+        if (patient.IsWalkIn)
         {
-            session = session with { PatientName = patientName };
+            if (string.IsNullOrWhiteSpace(patientName))
+            {
+                patientName = patient.FullName;
+            }
         }
+        else if (patient.UserId.HasValue)
+        {
+            var user = await _identityService.GetUserByIdAsync(patient.UserId.Value, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(user?.FullName) && string.IsNullOrWhiteSpace(patientName))
+            {
+                patientName = user.FullName;
+            }
+
+            patientEmail = user?.Email;
+        }
+
+        if (string.IsNullOrWhiteSpace(patientName))
+        {
+            patientName = await _organisationPatientsRepository.GetPatientDisplayNameForOrganisationAdminAsync(
+                request.OrgAdminUserId,
+                session.PatientId,
+                cancellationToken);
+        }
+
+        session = session with
+        {
+            PatientName = patientName,
+            PatientEmail = patientEmail,
+            IsWalkIn = isWalkIn
+        };
 
         return Result<ScreeningSessionDetailDto>.Success(session);
     }

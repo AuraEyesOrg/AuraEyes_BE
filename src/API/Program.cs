@@ -174,7 +174,7 @@ var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnec
 
 var hangfireConnectionBuilder = new NpgsqlConnectionStringBuilder(defaultConnection)
 {
-    // Use a tiny dedicated pool for Hangfire to avoid saturating Supabase session pool.
+    // Dedicated small pool for Hangfire to avoid saturating the main application pool.
     MaxPoolSize = 5,
     MinPoolSize = 0
 };
@@ -196,7 +196,6 @@ if (enableHangfireServer)
 {
     builder.Services.AddHangfireServer(options =>
     {
-        // Keep worker count very low when using Supabase pooled connection.
         options.WorkerCount = Math.Max(1, hangfireWorkerCount);
     });
 }
@@ -234,25 +233,39 @@ builder.Services.AddOutputCache(options =>
 
 var app = builder.Build();
 
-// Seed domain entities (Organisation, Ophthalmologist, Patient)
-// Note: This will skip if roles already exist (idempotent)
-using (var scope = app.Services.CreateScope())
+// Database initialization: apply pending migrations + seed data (idempotent)
 {
-    var services = scope.ServiceProvider;
-    try
+    const int maxRetries = 3;
+    for (int attempt = 1; attempt <= maxRetries; attempt++)
     {
-        var context = services.GetRequiredService<Infrastructure.Persistence.ApplicationDbContext>();
-        var userManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Infrastructure.Identity.ApplicationUser>>();
-        var roleManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Infrastructure.Identity.ApplicationRole>>();
-        var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
-        var seederLogger = loggerFactory.CreateLogger("DatabaseSeeder");
+        using var scope = app.Services.CreateScope();
+        var services = scope.ServiceProvider;
+        try
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
 
-        await Infrastructure.Services.DatabaseSeeder.SeedAsync(context, userManager, roleManager, seederLogger);
-        Log.Information("Database seeding completed successfully");
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "An error occurred while seeding the database");
+            var context = services.GetRequiredService<Infrastructure.Persistence.ApplicationDbContext>();
+            var userManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Infrastructure.Identity.ApplicationUser>>();
+            var roleManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Infrastructure.Identity.ApplicationRole>>();
+            var configuration = services.GetRequiredService<IConfiguration>();
+            var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
+            var seederLogger = loggerFactory.CreateLogger("DatabaseSeeder");
+
+            await Infrastructure.Services.DatabaseSeeder.SeedAsync(context, userManager, roleManager, configuration, seederLogger);
+
+            sw.Stop();
+            Log.Information("Database initialization completed in {ElapsedMs}ms", sw.ElapsedMilliseconds);
+            break; // Success — exit retry loop
+        }
+        catch (Exception ex) when (attempt < maxRetries)
+        {
+            Log.Warning(ex, "Database initialization attempt {Attempt}/{MaxRetries} failed. Retrying in 5s...", attempt, maxRetries);
+            await Task.Delay(TimeSpan.FromSeconds(5));
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Database initialization failed after {MaxRetries} attempts", maxRetries);
+        }
     }
 }
 

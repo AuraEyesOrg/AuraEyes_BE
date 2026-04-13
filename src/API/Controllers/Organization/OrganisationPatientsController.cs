@@ -57,14 +57,14 @@ public class OrganisationPatientsController : BaseApiController
         return HandleResult(result, "Walk-in patient created successfully");
     }
 
-    [HttpPut("{patientId:guid}/contact")]
+    [HttpPut("{patientId:guid}")]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdatePatientContact(
+    public async Task<IActionResult> UpdatePatient(
         Guid patientId,
-        [FromBody] UpdateOrganisationPatientContactRequest request,
+        [FromBody] UpdateOrganisationPatientRequest request,
         CancellationToken cancellationToken = default)
     {
         if (_currentUser.UserId is null)
@@ -74,20 +74,32 @@ public class OrganisationPatientsController : BaseApiController
         {
             OrgAdminUserId = _currentUser.UserId.Value,
             PatientId = patientId,
+            FullName = request.FullName,
+            DateOfBirth = request.DateOfBirth,
+            Gender = request.Gender,
+            CitizenId = request.CitizenId,
             Address = request.Address,
             PhoneNumber = request.PhoneNumber,
-            Email = request.Email,
+            Bmi = request.Bmi,
+            DiseaseHistory = request.DiseaseHistory,
         };
 
         var result = await _mediator.Send(command, cancellationToken);
-        return HandleResult(result, "Patient contact updated successfully");
+        return HandleResult(result, "Patient updated successfully");
     }
 }
 
-public sealed record UpdateOrganisationPatientContactRequest
+public sealed record UpdateOrganisationPatientRequest
 {
+    // Walk-in only fields (ignored by backend for registered patients)
+    public string? FullName { get; init; }
+    public DateTime? DateOfBirth { get; init; }
+    public string? Gender { get; init; }
+    public string? CitizenId { get; init; }
+
+    // Shared fields
     public string? Address { get; init; }
     public string? PhoneNumber { get; init; }
-    public string? Email { get; init; }
+    public decimal? Bmi { get; init; }
+    public string? DiseaseHistory { get; init; }
 }
-
