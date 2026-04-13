@@ -46,6 +46,20 @@ public sealed class FakeEmailService : IEmailService
         return Task.CompletedTask;
     }
 
+    public Task SendOrganisationScreeningResultShareAsync(
+        string email,
+        OrganisationScreeningResultShareEmailPayload payload,
+        IReadOnlyCollection<EmailAttachment> attachments,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "[FAKE EMAIL] Organisation screening result email captured for {Email}. ScreeningId={ScreeningId}, Attachments={AttachmentCount}",
+            email,
+            payload.ScreeningId,
+            attachments.Count);
+        return Task.CompletedTask;
+    }
+
     public Task SendAsync(string to, string subject, string body, bool isHtml = true, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("[FAKE EMAIL] Generic email captured. To={To}, Subject={Subject}", to, subject);
