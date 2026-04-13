@@ -316,15 +316,15 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
             .AsNoTracking()
             .Where(scr => organisationScreeningIds.Contains(scr.Id));
 
-        var allTimeCountTask = screeningsQuery.CountAsync(cancellationToken);
-        var fromDateCountTask = screeningsQuery.CountAsync(scr => scr.CreatedAt >= fromUtc, cancellationToken);
-
-        await Task.WhenAll(allTimeCountTask, fromDateCountTask);
+        // Execute sequentially because EF Core DbContext does not support parallel operations.
+        var allTimeCount = await screeningsQuery.CountAsync(cancellationToken);
+        var fromDateCount = await screeningsQuery
+            .CountAsync(scr => scr.CreatedAt >= fromUtc, cancellationToken);
 
         return new OrganisationScreeningCountsReadModel
         {
-            TotalScreeningsAllTime = allTimeCountTask.Result,
-            TotalScreeningsFromDate = fromDateCountTask.Result
+            TotalScreeningsAllTime = allTimeCount,
+            TotalScreeningsFromDate = fromDateCount
         };
     }
 

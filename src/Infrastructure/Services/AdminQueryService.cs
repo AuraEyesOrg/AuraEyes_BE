@@ -2,6 +2,7 @@ using Application.SystemAdmin.Interfaces;
 using Application.Common.Models;
 using Application.SystemAdmin.AuditLogs.Queries.GetAuditLogs;
 using Application.SystemAdmin.Ophthalmologists.Queries.GetOphthalmologists;
+using Application.SystemAdmin.Patients.Queries.GetPatientMetrics;
 using Application.SystemAdmin.Patients.Queries.GetPatients;
 using Domain.Enums;
 using Infrastructure.Persistence;
@@ -177,26 +178,39 @@ public class AdminQueryService : IAdminQueryService
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        var query = from p in _context.Patients.AsNoTracking()
-                    join u in _context.Users.AsNoTracking() on p.UserId equals u.Id
-                    where !u.IsDeleted
-                    select new { Patient = p, User = u };
+        var query =
+            from p in _context.Patients.AsNoTracking()
+            join u in _context.Users.AsNoTracking() on p.UserId equals (Guid?)u.Id into userJoin
+            from u in userJoin.DefaultIfEmpty()
+            where u == null || !u.IsDeleted
+            select new { Patient = p, User = u };
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
             var term = $"%{searchTerm.Trim()}%";
             query = query.Where(x =>
-                EF.Functions.ILike(x.User.FullName, term) ||
-                (x.User.Email != null && EF.Functions.ILike(x.User.Email, term)));
+                EF.Functions.ILike(
+                    x.User != null
+                        ? x.User.FullName
+                        : (x.Patient.FullName ?? string.Empty),
+                    term)
+                || (x.User != null && x.User.Email != null && EF.Functions.ILike(x.User.Email, term))
+                || EF.Functions.ILike(
+                    x.User != null
+                        ? (x.User.PhoneNumber ?? string.Empty)
+                        : (x.Patient.PhoneNumber ?? string.Empty),
+                    term));
         }
 
         if (!string.IsNullOrWhiteSpace(status))
         {
             query = status.ToLower() switch
             {
-                "active" => query.Where(x => x.User.IsActive && x.User.EmailConfirmed),
-                "pending" => query.Where(x => !x.User.EmailConfirmed),
-                "suspended" => query.Where(x => !x.User.IsActive),
+                "active" => query.Where(x => x.User != null && x.User.IsActive),
+                "pending" => query.Where(x => x.User != null && !x.User.EmailConfirmed),
+                "locked" or "inactive" or "suspended" => query.Where(x => x.User != null && !x.User.IsActive),
+                "walkin" => query.Where(x => x.Patient.UserId == null),
+                "registered" => query.Where(x => x.Patient.UserId != null),
                 _ => query
             };
         }
@@ -210,21 +224,67 @@ public class AdminQueryService : IAdminQueryService
             .Select(x => new PatientListDto
             {
                 Id = x.Patient.Id,
-                UserId = x.User.Id,
-                FullName = x.User.FullName,
-                Email = x.User.Email!,
-                Phone = x.User.PhoneNumber,
+                UserId = x.Patient.UserId,
+                FullName = x.User != null
+                    ? x.User.FullName
+                    : (x.Patient.FullName ?? "Walk-in Patient"),
+                Email = x.User != null ? x.User.Email : null,
+                Phone = x.User != null ? x.User.PhoneNumber : x.Patient.PhoneNumber,
                 BMI = x.Patient.BMI,
                 DiseaseHistory = x.Patient.DiseaseHistory,
-                IsActive = x.User.IsActive,
-                EmailConfirmed = x.User.EmailConfirmed,
+                IsActive = x.User == null || x.User.IsActive,
+                EmailConfirmed = x.User != null && x.User.EmailConfirmed,
+                IsWalkIn = x.Patient.UserId == null,
+                PatientType = x.Patient.UserId == null ? "WalkIn" : "Registered",
+                LinkedOrganisationName =
+                    (from link in _context.OrganisationPatientLinks.AsNoTracking()
+                     join org in _context.Organisations.AsNoTracking() on link.OrganisationId equals org.Id
+                     where link.PatientId == x.Patient.Id
+                     orderby link.CreatedAt descending
+                     select org.Name)
+                    .FirstOrDefault(),
                 CreatedAt = x.Patient.CreatedAt,
-                LastLoginAt = x.User.LastLoginAt
+                LastLoginAt = x.User != null ? x.User.LastLoginAt : null
             })
             .ToListAsync(cancellationToken);
 
         return new PagedResult<PatientListDto>(
             items, totalCount, pageNumber, pageSize);
+    }
+
+    public async Task<PatientMetricsDto> GetPatientMetricsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var totalPatients = await _context.Patients
+            .AsNoTracking()
+            .CountAsync(cancellationToken);
+
+        var walkInPatients = await _context.Patients
+            .AsNoTracking()
+            .CountAsync(x => x.UserId == null, cancellationToken);
+
+        var activeRegisteredPatients = await (
+            from patient in _context.Patients.AsNoTracking()
+            join user in _context.Users.AsNoTracking() on patient.UserId equals (Guid?)user.Id
+            where !user.IsDeleted && user.IsActive
+            select patient.Id)
+            .CountAsync(cancellationToken);
+
+        var lockedRegisteredPatients = await (
+            from patient in _context.Patients.AsNoTracking()
+            join user in _context.Users.AsNoTracking() on patient.UserId equals (Guid?)user.Id
+            where !user.IsDeleted && !user.IsActive
+            select patient.Id)
+            .CountAsync(cancellationToken);
+
+        return new PatientMetricsDto
+        {
+            TotalPatients = totalPatients,
+            WalkInPatients = walkInPatients,
+            RegisteredPatients = Math.Max(totalPatients - walkInPatients, 0),
+            ActiveRegisteredPatients = activeRegisteredPatients,
+            LockedRegisteredPatients = lockedRegisteredPatients
+        };
     }
 
     public async Task<PagedResult<AuditLogDto>> GetAuditLogsAsync(
