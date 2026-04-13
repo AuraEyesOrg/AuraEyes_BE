@@ -1,10 +1,7 @@
-using System.Net;
-using System.Text;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.OrganisationScreenings.Queries.ExportOrgScreeningReportPdf;
 using Application.OrganisationScreenings.Queries.GetOrgScreeningSessionDetail;
-using Application.Screenings.Queries.GetScreeningSessionDetail;
 using Domain.Common;
 using Domain.Entities.Users;
 using MediatR;
@@ -89,30 +86,32 @@ public sealed class ShareOrgScreeningResultCommandHandler
                 pdfResult.Data.ContentType));
         }
 
-        var subject = $"AuraEyes Screening Result - {request.ScreeningId.ToString("N")[..8]}";
-        var body = BuildEmailBody(detail, request.IncludePdf, request.IncludeRetinalImages);
+        var retinalImageUrls = request.IncludeRetinalImages
+            ? detail.Images
+                .Where(x => !string.IsNullOrWhiteSpace(x.ImageUrl))
+                .Select(x => x.ImageUrl.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(6)
+                .ToList()
+            : [];
+
+        var payload = new OrganisationScreeningResultShareEmailPayload(
+            request.ScreeningId,
+            string.IsNullOrWhiteSpace(detail.PatientName) ? "Bệnh nhân" : detail.PatientName.Trim(),
+            detail.CreatedAt,
+            detail.LatestResult?.RiskLevel ?? "N/A",
+            detail.LatestResult?.ConfidenceScore,
+            detail.LatestResult?.Summary,
+            request.IncludePdf,
+            retinalImageUrls);
 
         try
         {
-            if (attachments.Count > 0)
-            {
-                await _emailService.SendWithAttachmentsAsync(
-                    recipientEmail,
-                    subject,
-                    body,
-                    attachments,
-                    isHtml: true,
-                    cancellationToken);
-            }
-            else
-            {
-                await _emailService.SendAsync(
-                    recipientEmail,
-                    subject,
-                    body,
-                    isHtml: true,
-                    cancellationToken);
-            }
+            await _emailService.SendOrganisationScreeningResultShareAsync(
+                recipientEmail,
+                payload,
+                attachments,
+                cancellationToken);
         }
         catch (Exception ex)
         {
@@ -136,66 +135,6 @@ public sealed class ShareOrgScreeningResultCommandHandler
             RecipientEmail = recipientEmail,
             SharedAt = DateTime.UtcNow
         });
-    }
-
-    private static string BuildEmailBody(
-        ScreeningSessionDetailDto detail,
-        bool includePdf,
-        bool includeRetinalImages)
-    {
-        var patientName = string.IsNullOrWhiteSpace(detail.PatientName) ? "Patient" : detail.PatientName.Trim();
-        var riskLevel = detail.LatestResult?.RiskLevel ?? "N/A";
-        var confidence = detail.LatestResult?.ConfidenceScore;
-        var summary = detail.LatestResult?.Summary;
-
-        var sb = new StringBuilder();
-        sb.Append("<p>Hello,</p>");
-        sb.Append("<p>Your organisation has shared a retinal screening result from AuraEyes.</p>");
-        sb.Append("<ul>");
-        sb.Append($"<li><strong>Patient:</strong> {WebUtility.HtmlEncode(patientName)}</li>");
-        sb.Append($"<li><strong>Screening ID:</strong> {detail.ScreeningId}</li>");
-        sb.Append($"<li><strong>Created At (UTC):</strong> {detail.CreatedAt:yyyy-MM-dd HH:mm:ss}</li>");
-        sb.Append($"<li><strong>Risk Level:</strong> {WebUtility.HtmlEncode(riskLevel)}</li>");
-        if (confidence.HasValue)
-        {
-            sb.Append($"<li><strong>Confidence:</strong> {Math.Round(confidence.Value, 2)}%</li>");
-        }
-
-        sb.Append("</ul>");
-
-        if (!string.IsNullOrWhiteSpace(summary))
-        {
-            sb.Append($"<p><strong>Summary:</strong> {WebUtility.HtmlEncode(summary)}</p>");
-        }
-
-        if (includePdf)
-        {
-            sb.Append("<p>The report PDF is attached to this email.</p>");
-        }
-
-        if (includeRetinalImages)
-        {
-            var imageUrls = detail.Images
-                .Where(x => !string.IsNullOrWhiteSpace(x.ImageUrl))
-                .Take(6)
-                .Select(x => x.ImageUrl)
-                .ToList();
-
-            if (imageUrls.Count > 0)
-            {
-                sb.Append("<p><strong>Retinal Images:</strong></p><ul>");
-                foreach (var imageUrl in imageUrls)
-                {
-                    var encodedUrl = WebUtility.HtmlEncode(imageUrl);
-                    sb.Append($"<li><a href=\"{encodedUrl}\">{encodedUrl}</a></li>");
-                }
-
-                sb.Append("</ul>");
-            }
-        }
-
-        sb.Append("<p>Regards,<br/>AuraEyes</p>");
-        return sb.ToString();
     }
 
     private static Result<ShareOrgScreeningResultResponse> MapFailure<T>(Result<T> source)

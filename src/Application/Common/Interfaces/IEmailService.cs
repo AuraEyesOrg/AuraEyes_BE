@@ -16,6 +16,12 @@ public interface IEmailService
         ClinicAppointmentConfirmationEmailPayload payload,
         CancellationToken cancellationToken = default);
 
+    Task SendOrganisationScreeningResultShareAsync(
+        string email,
+        OrganisationScreeningResultShareEmailPayload payload,
+        IReadOnlyCollection<EmailAttachment> attachments,
+        CancellationToken cancellationToken = default);
+
     Task SendAsync(string to, string subject, string body, bool isHtml = true, CancellationToken cancellationToken = default);
 
     Task SendWithAttachmentsAsync(
@@ -37,6 +43,17 @@ public sealed record ClinicAppointmentConfirmationEmailPayload(
     string? VisitReason,
     string CheckInCode,
     string QrPayload
+);
+
+public sealed record OrganisationScreeningResultShareEmailPayload(
+    Guid ScreeningId,
+    string PatientName,
+    DateTime CreatedAtUtc,
+    string RiskLevel,
+    decimal? ConfidenceScore,
+    string? Summary,
+    bool IncludePdf,
+    IReadOnlyCollection<string> RetinalImageUrls
 );
 
 public sealed record EmailAttachment(string FileName, byte[] Content, string ContentType = "application/octet-stream");

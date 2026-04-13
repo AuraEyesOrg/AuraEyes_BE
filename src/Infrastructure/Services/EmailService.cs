@@ -117,6 +117,50 @@ public class EmailService : IEmailService
     }
 
     /// <inheritdoc />
+    public async Task SendOrganisationScreeningResultShareAsync(
+        string email,
+        OrganisationScreeningResultShareEmailPayload payload,
+        IReadOnlyCollection<EmailAttachment> attachments,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(email, nameof(email));
+        ArgumentNullException.ThrowIfNull(payload);
+        ArgumentNullException.ThrowIfNull(attachments);
+
+        var subject = EmailTemplates.GetOrganisationScreeningResultShareSubject(payload.ScreeningId);
+        var body = EmailTemplates.GetOrganisationScreeningResultShareBody(
+            payload.PatientName,
+            payload.ScreeningId,
+            payload.CreatedAtUtc,
+            payload.RiskLevel,
+            payload.ConfidenceScore,
+            payload.Summary,
+            payload.IncludePdf,
+            payload.RetinalImageUrls);
+
+        var message = CreateMessage(email, subject, body, isHtml: true, attachments);
+
+        try
+        {
+            await SendMessageAsync(message, cancellationToken);
+
+            _logger.LogInformation(
+                "Organisation screening result share email sent to {Email} for screening {ScreeningId}",
+                MaskEmail(email),
+                payload.ScreeningId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to send organisation screening result share email - To: {To}, ScreeningId: {ScreeningId}",
+                MaskEmail(email),
+                payload.ScreeningId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
     public async Task SendAsync(string to, string subject, string body, bool isHtml = true, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(to, nameof(to));
