@@ -9,6 +9,6 @@ public record UpdateAppointmentSlotCostCommand : ICommand
 {
     public Guid AppointmentSlotId { get; init; }
 
-    /// <summary>New cost value. Pass null to remove the cost.</summary>
+    /// <summary>New cost value.</summary>
     public decimal? Cost { get; init; }
 }

@@ -373,4 +373,30 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
             .ThenBy(s => s.StartTime)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyDictionary<DateOnly, int>> GetPartTimeSlotCountsByDateRangeAsync(
+        DateOnly fromDate,
+        DateOnly toDate,
+        CancellationToken cancellationToken = default)
+    {
+        var counts = await (
+            from slot in _context.AppointmentSlots
+            join template in _context.ScheduleTemplates on slot.ScheduleTemplateId equals template.Id
+            where slot.Date >= fromDate
+                  && slot.Date <= toDate
+                  && slot.Status != ScheduleStatus.Cancelled
+                && template.OphthalId.HasValue
+            join ophthal in _context.Ophthalmologists on template.OphthalId!.Value equals ophthal.Id
+            where ophthal.EmploymentType == OphthalmologistEmploymentType.PartTime
+            group slot by slot.Date
+            into grouped
+            select new
+            {
+                Date = grouped.Key,
+                Count = grouped.Count()
+            })
+            .ToListAsync(cancellationToken);
+
+        return counts.ToDictionary(x => x.Date, x => x.Count);
+    }
 }

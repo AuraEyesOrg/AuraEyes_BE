@@ -386,6 +386,13 @@ if (string.IsNullOrWhiteSpace(slotMaintenanceCron))
     slotMaintenanceCron = "*/5 * * * *";
 }
 
+var fullTimeSlotGenerationCron = Environment.GetEnvironmentVariable("HANGFIRE_FULLTIME_SLOT_GENERATION_CRON");
+if (string.IsNullOrWhiteSpace(fullTimeSlotGenerationCron))
+{
+    // Default: run weekly at 01:00 UTC (every 7 days cadence).
+    fullTimeSlotGenerationCron = "0 1 * * 1";
+}
+
 if (enableHangfireServer)
 {
     // Register recurring jobs
