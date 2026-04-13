@@ -374,12 +374,6 @@ if (string.IsNullOrWhiteSpace(monthlyQuotaResetCron))
     monthlyQuotaResetCron = "0 0 1 * *";
 }
 
-var fullTimeSlotGenerationCron = Environment.GetEnvironmentVariable("HANGFIRE_FULLTIME_SLOT_GENERATION_CRON");
-if (string.IsNullOrWhiteSpace(fullTimeSlotGenerationCron))
-{
-    fullTimeSlotGenerationCron = "0 */6 * * *";
-}
-
 var slotMaintenanceCron = Environment.GetEnvironmentVariable("HANGFIRE_SLOT_MAINTENANCE_CRON");
 if (string.IsNullOrWhiteSpace(slotMaintenanceCron))
 {

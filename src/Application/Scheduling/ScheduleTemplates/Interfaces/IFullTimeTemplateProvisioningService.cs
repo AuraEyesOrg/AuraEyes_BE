@@ -7,8 +7,4 @@ public interface IFullTimeTemplateProvisioningService
     Task<int> EnsureSystemGeneratedTemplatesAsync(
         Ophthalmologist ophthalmologist,
         CancellationToken cancellationToken = default);
-
-    Task<int> EnsureFutureSlotsForFullTimeAsync(
-        int rollingWindowDays,
-        CancellationToken cancellationToken = default);
 }
