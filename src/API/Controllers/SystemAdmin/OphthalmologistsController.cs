@@ -144,7 +144,7 @@ public class OphthalmologistsController : BaseApiController
     /// <summary>
     /// Get current authenticated ophthalmologist profile.
     /// </summary>
-    [HttpGet("~/api/ophthalmologist/profile")]
+    [HttpGet("profile")]
     [Authorize(Policy = Policies.OphthalmologistOnly)]
     [ProducesResponseType(typeof(ApiResponse<OphthalmologistDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -163,7 +163,7 @@ public class OphthalmologistsController : BaseApiController
     /// <summary>
     /// Update current authenticated ophthalmologist profile information.
     /// </summary>
-    [HttpPut("~/api/ophthalmologist/profile")]
+    [HttpPut("profile")]
     [Authorize(Policy = Policies.OphthalmologistOnly)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -204,7 +204,7 @@ public class OphthalmologistsController : BaseApiController
     /// Upload a new profile avatar for the authenticated ophthalmologist.
     /// Accepts multipart form data with an image file.
     /// </summary>
-    [HttpPost("~/api/ophthalmologist/profile/avatar")]
+    [HttpPost("profile/avatar")]
     [Authorize(Policy = Policies.OphthalmologistOnly)]
     [ProducesResponseType(typeof(ApiResponse<UploadAvatarResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
