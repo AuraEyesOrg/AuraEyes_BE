@@ -148,7 +148,6 @@ public interface IIdentityService
     /// Get extended user details for profile display.
     /// </summary>
     Task<UserDetailsDto?> GetUserDetailsAsync(Guid userId, CancellationToken cancellationToken = default);
-
     /// <summary>
     /// Update user profile information (name, phone, address, etc.).
     /// </summary>
@@ -159,7 +158,6 @@ public interface IIdentityService
         DateTime? dateOfBirth,
         int? gender,
         string? address,
-        string? citizenId = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
