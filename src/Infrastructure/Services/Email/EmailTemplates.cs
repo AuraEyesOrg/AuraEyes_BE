@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace Infrastructure.Services.Email;
 
 /// <summary>
@@ -45,6 +47,7 @@ public static class EmailTemplates
     public const string ClinicAppointmentConfirmationSubject = "Xác nhận lịch khám tại cơ sở - Hệ thống Aura";
     public const string OrganisationOnboardingSubject = "[AURA] Yêu cầu đăng ký tổ chức mới";
     public const string OrganisationAccountProvisionedSubject = "[AURA] Tài khoản tổ chức đã được cấp";
+    public const string OrganisationScreeningResultShareSubjectPrefix = "[AURA] Kết quả sàng lọc võng mạc";
 
     #endregion
 
@@ -363,6 +366,125 @@ public static class EmailTemplates
             <div style=""border-left: 3px solid {BorderWarning}; padding-left: 16px; margin-top: 8px;"">
                 <p style=""margin: 0; color: {AlertWarningText}; font-size: 13px; line-height: 1.5;"">
                     Vui lòng đến sớm 10-15 phút trước giờ hẹn để hoàn tất check-in.
+                </p>
+            </div>";
+
+        return WrapInBaseTemplate(content);
+    }
+
+    public static string GetOrganisationScreeningResultShareSubject(Guid screeningId)
+        => $"{OrganisationScreeningResultShareSubjectPrefix} - {screeningId.ToString("N")[..8].ToUpperInvariant()}";
+
+    public static string GetOrganisationScreeningResultShareBody(
+        string patientName,
+        Guid screeningId,
+        DateTime createdAtUtc,
+        string riskLevel,
+        decimal? confidenceScore,
+        string? summary,
+        bool includePdf,
+        IReadOnlyCollection<string> retinalImageUrls)
+    {
+        var displayPatientName = string.IsNullOrWhiteSpace(patientName) ? "Bệnh nhân" : patientName.Trim();
+        var displayRiskLevel = string.IsNullOrWhiteSpace(riskLevel) ? "N/A" : riskLevel.Trim();
+        var confidenceText = confidenceScore.HasValue ? $"{Math.Round(confidenceScore.Value, 2):0.##}%" : "N/A";
+
+        var riskColor = displayRiskLevel.ToLowerInvariant() switch
+        {
+            "high" or "critical" => (Background: "#FEE2E2", Text: "#B91C1C"),
+            "moderate" or "medium" => (Background: "#FEF3C7", Text: "#92400E"),
+            "low" => (Background: "#DCFCE7", Text: "#166534"),
+            _ => (Background: "#E2E8F0", Text: "#334155")
+        };
+
+        var encodedSummary = string.IsNullOrWhiteSpace(summary)
+            ? string.Empty
+            : $@"
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BgPrimary}; border: 1px solid {BorderColor}; border-radius: 8px; margin: 0 0 24px 0;"">
+                <tr>
+                    <td style=""padding: 16px;"">
+                        <p style=""margin: 0 0 8px 0; color: {TextMain}; font-size: 14px; font-weight: 600;"">Tóm tắt kết quả</p>
+                        <p style=""margin: 0; color: {TextMain}; font-size: 14px; line-height: 1.6;"">{WebUtility.HtmlEncode(summary.Trim())}</p>
+                    </td>
+                </tr>
+            </table>";
+
+        var pdfSection = includePdf
+            ? $@"
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BrandSoft}; border: 1px solid {BrandSoftBorder}; border-radius: 8px; margin: 0 0 24px 0;"">
+                <tr>
+                    <td style=""padding: 16px;"">
+                        <p style=""margin: 0; color: {BrandDarkText}; font-size: 14px; line-height: 1.6;"">
+                            Báo cáo PDF chi tiết đã được đính kèm trong email này.
+                        </p>
+                    </td>
+                </tr>
+            </table>"
+            : string.Empty;
+
+        var imageLinks = retinalImageUrls
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .Select(url => url.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(6)
+            .Select((url, index) =>
+            {
+                var encodedUrl = WebUtility.HtmlEncode(url);
+                return $@"
+                <tr>
+                    <td style=""padding: 10px 0; border-bottom: 1px solid {BorderColor};"">
+                        <a href=""{encodedUrl}"" style=""font-size: 13px; color: #009CA6; text-decoration: underline;"">Xem ảnh võng mạc #{index + 1}</a>
+                    </td>
+                </tr>";
+            })
+            .ToList();
+
+        var imageSection = imageLinks.Count > 0
+            ? $@"
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""border: 1px solid {BorderColor}; border-radius: 8px; margin: 0 0 24px 0;"">
+                <tr>
+                    <td style=""padding: 14px 16px; border-bottom: 1px solid {BorderColor};"">
+                        <p style=""margin: 0; color: {TextMain}; font-size: 14px; font-weight: 600;"">Hình ảnh võng mạc</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style=""padding: 0 16px 4px 16px;"">
+                        <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"">
+                            {string.Join(string.Empty, imageLinks)}
+                        </table>
+                    </td>
+                </tr>
+            </table>"
+            : string.Empty;
+
+        var content = $@"
+            <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 22px; font-weight: 600;"">
+                Kết quả sàng lọc võng mạc
+            </h2>
+
+            <p style=""margin: 0 0 16px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Xin chào,
+            </p>
+
+            <p style=""margin: 0 0 24px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Tổ chức của bạn đã chia sẻ kết quả sàng lọc từ hệ thống <strong>AURA</strong>. Vui lòng xem thông tin chi tiết bên dưới.
+            </p>
+
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""border: 1px solid {BorderColor}; border-radius: 8px; margin-bottom: 24px;"">
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor}; width: 180px;"">Bệnh nhân</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{WebUtility.HtmlEncode(displayPatientName)}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã phiên sàng lọc</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor}; font-family: 'Courier New', Courier, monospace; font-size: 13px;"">{screeningId}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Thời gian tạo (UTC)</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{createdAtUtc:yyyy-MM-dd HH:mm:ss}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mức rủi ro</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};""><span style=""display: inline-block; padding: 4px 10px; border-radius: 999px; background: {riskColor.Background}; color: {riskColor.Text}; font-size: 12px; font-weight: 600;"">{WebUtility.HtmlEncode(displayRiskLevel)}</span></td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600;"">Độ tin cậy</td><td style=""padding: 12px 16px;"">{confidenceText}</td></tr>
+            </table>
+
+            {encodedSummary}
+            {pdfSection}
+            {imageSection}
+
+            <div style=""border-left: 3px solid {BorderWarning}; padding-left: 16px; margin-top: 8px;"">
+                <p style=""margin: 0; color: {AlertWarningText}; font-size: 13px; line-height: 1.5;"">
+                    Nội dung email này chỉ phục vụ mục đích tham khảo. Vui lòng liên hệ bác sĩ chuyên khoa để được tư vấn chẩn đoán chính xác.
                 </p>
             </div>";
 
