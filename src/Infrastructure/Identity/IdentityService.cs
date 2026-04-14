@@ -836,4 +836,28 @@ public class IdentityService : IIdentityService
 
         return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
     }
+
+    public async Task<(bool Succeeded, string[] Errors)> UpdateUserProfileAsync(
+        Guid userId,
+        string fullName,
+        string? phone,
+        DateTime? dateOfBirth,
+        int? gender,
+        string? address,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null || user.IsDeleted)
+            return (false, new[] { "User not found" });
+
+        user.FullName = fullName;
+        user.PhoneNumber = phone;
+        user.DateOfBirth = dateOfBirth;
+        user.Gender = gender.HasValue ? (Domain.Enums.Gender)gender.Value : null;
+        user.Address = address;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var result = await _userManager.UpdateAsync(user);
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
 }

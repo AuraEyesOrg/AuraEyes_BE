@@ -33,9 +33,52 @@ public sealed class FakeEmailService : IEmailService
         return Task.CompletedTask;
     }
 
+    public Task SendClinicAppointmentConfirmationAsync(
+        string email,
+        ClinicAppointmentConfirmationEmailPayload payload,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "[FAKE EMAIL] Clinic appointment email captured for {Email}. AppointmentId={AppointmentId}, CheckInCode={CheckInCode}",
+            email,
+            payload.AppointmentId,
+            payload.CheckInCode);
+        return Task.CompletedTask;
+    }
+
+    public Task SendOrganisationScreeningResultShareAsync(
+        string email,
+        OrganisationScreeningResultShareEmailPayload payload,
+        IReadOnlyCollection<EmailAttachment> attachments,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "[FAKE EMAIL] Organisation screening result email captured for {Email}. ScreeningId={ScreeningId}, Attachments={AttachmentCount}",
+            email,
+            payload.ScreeningId,
+            attachments.Count);
+        return Task.CompletedTask;
+    }
+
     public Task SendAsync(string to, string subject, string body, bool isHtml = true, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("[FAKE EMAIL] Generic email captured. To={To}, Subject={Subject}", to, subject);
+        return Task.CompletedTask;
+    }
+
+    public Task SendWithAttachmentsAsync(
+        string to,
+        string subject,
+        string body,
+        IReadOnlyCollection<EmailAttachment> attachments,
+        bool isHtml = true,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "[FAKE EMAIL] Email with attachments captured. To={To}, Subject={Subject}, Attachments={AttachmentCount}",
+            to,
+            subject,
+            attachments.Count);
         return Task.CompletedTask;
     }
 }

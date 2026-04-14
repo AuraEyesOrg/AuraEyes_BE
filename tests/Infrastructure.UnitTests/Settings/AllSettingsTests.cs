@@ -46,7 +46,7 @@ public class GoogleAiStudioSettingsTests
 
         settings.ApiKey.Should().BeEmpty();
         settings.BaseUrl.Should().Be("https://generativelanguage.googleapis.com/v1beta/models");
-        settings.Model.Should().Be("gemini-2.0-flash");
+        settings.Model.Should().Be("gemini-2.5-flash");
         settings.TimeoutSeconds.Should().Be(30);
         settings.MaxRetries.Should().Be(2);
         settings.InitialBackoffMs.Should().Be(500);

@@ -4,7 +4,8 @@ namespace Application.AiQuota.Interfaces;
 
 /// <summary>
 /// AI Quota service interface — Stored State architecture.
-/// Reads PurchasedAiQuota / UsedAiQuota directly from Patient or Organisation columns.
+/// Patient quota: daily free + purchased.
+/// Organisation quota: monthly contract + purchased.
 /// </summary>
 public interface IAiQuotaService
 {
@@ -19,7 +20,7 @@ public interface IAiQuotaService
     Task<bool> HasAvailableQuotaAsync(Guid userId, string role, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Increment UsedAiQuota by 1 on the Patient or Organisation entity and save.
+    /// Deduct one available credit from the user quota source and save.
     /// </summary>
     Task DeductQuotaAsync(Guid userId, string role, CancellationToken cancellationToken = default);
 

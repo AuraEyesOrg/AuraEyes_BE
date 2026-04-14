@@ -15,15 +15,18 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
     private readonly IMediator _mediator;
     private readonly IOrganisationPatientsRepository _organisationPatientsRepository;
     private readonly IOrganisationScreeningPdfService _organisationScreeningPdfService;
+    private readonly Uri _aiAssetBaseUri;
 
     public ExportOrgScreeningReportPdfQueryHandler(
         IMediator mediator,
         IOrganisationPatientsRepository organisationPatientsRepository,
-        IOrganisationScreeningPdfService organisationScreeningPdfService)
+        IOrganisationScreeningPdfService organisationScreeningPdfService,
+        IAiAssetBaseUrlProvider aiAssetBaseUrlProvider)
     {
         _mediator = mediator;
         _organisationPatientsRepository = organisationPatientsRepository;
         _organisationScreeningPdfService = organisationScreeningPdfService;
+        _aiAssetBaseUri = aiAssetBaseUrlProvider.BaseUri;
     }
 
     public async Task<Result<OrgScreeningReportPdfFileDto>> Handle(
@@ -53,6 +56,14 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             cancellationToken);
 
         var aiFindingDetails = ParseAiFindingDetails(detail.RawJsonOutput);
+        var localizationBoxes = ParseLocalizationBoxes(detail.RawJsonOutput);
+        var visualAssets = ParseVisualAssets(detail.RawJsonOutput);
+        var originalImageUrls = detail.Images
+            .Select(x => x.ImageUrl)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var originalImageBaseUri = TryGetBaseUri(originalImageUrls);
 
         var pdfModel = new OrgScreeningReportPdfModel
         {
@@ -65,12 +76,16 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             CreatedAt = detail.CreatedAt,
             ModelVersion = detail.ModelVersion,
             ImagesCount = detail.Images.Count,
+            OriginalImageUrls = originalImageUrls,
+            AnnotatedImageUrl = ResolveAssetUrl(visualAssets.AnnotatedImageUrl, originalImageBaseUri),
+            HeatmapImageUrl = ResolveAiHeatmapUrl(visualAssets.HeatmapImageUrl),
             RiskLevel = detail.LatestResult?.RiskLevel,
             ConfidenceScore = detail.LatestResult?.ConfidenceScore,
             Summary = detail.LatestResult?.Summary,
             Findings = detail.LatestResult?.Findings,
             AssessedAt = detail.LatestResult?.AssessedAt,
             AiFindingDetails = aiFindingDetails,
+            LocalizationBoxes = localizationBoxes,
         };
 
         var pdfBytes = _organisationScreeningPdfService.GenerateScreeningReportPdf(pdfModel);
@@ -139,11 +154,11 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             using var document = JsonDocument.Parse(rawJsonOutput);
             var root = document.RootElement;
 
-            var findings = ParseTopK(root);
+            var findings = ParseAnomalies(root);
             if (findings.Count > 0)
                 return findings;
 
-            return ParseAnomalies(root);
+            return ParseTopK(root);
         }
         catch
         {
@@ -167,7 +182,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
         {
             index++;
 
-            var diseaseName = TryReadString(item, "class_name");
+            var diseaseName = ResolveTopKFindingName(item);
             if (string.IsNullOrWhiteSpace(diseaseName))
                 continue;
 
@@ -231,6 +246,197 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
         return Math.Clamp(normalized, 0m, 100m);
     }
 
+    private static VisualAssets ParseVisualAssets(string? rawJsonOutput)
+    {
+        if (string.IsNullOrWhiteSpace(rawJsonOutput))
+            return VisualAssets.Empty;
+
+        try
+        {
+            using var document = JsonDocument.Parse(rawJsonOutput);
+            var root = document.RootElement;
+
+            var annotatedImageUrl =
+                TryReadString(root, "annotatedImageUrl") ??
+                TryReadString(root, "annotated_image_url") ??
+                TryReadString(root, "image_url");
+
+            var heatmapImageUrl =
+                TryReadString(root, "heatmap_url") ??
+                TryReadString(root, "heatmap_colormap_url") ??
+                TryReadString(root, "heatmapUrl");
+
+            return new VisualAssets(annotatedImageUrl, heatmapImageUrl);
+        }
+        catch
+        {
+            return VisualAssets.Empty;
+        }
+    }
+
+    private static Uri? TryGetBaseUri(IEnumerable<string> originalImageUrls)
+    {
+        foreach (var imageUrl in originalImageUrls)
+        {
+            if (!Uri.TryCreate(imageUrl, UriKind.Absolute, out var uri))
+                continue;
+
+            return new UriBuilder(uri.Scheme, uri.Host, uri.IsDefaultPort ? -1 : uri.Port).Uri;
+        }
+
+        return null;
+    }
+
+    private string? ResolveAssetUrl(string? candidate, Uri? baseUri)
+    {
+        if (string.IsNullOrWhiteSpace(candidate))
+            return null;
+
+        if (Uri.TryCreate(candidate, UriKind.Absolute, out var absolute))
+            return absolute.ToString();
+
+        if (candidate.StartsWith('/'))
+        {
+            if (Uri.TryCreate(_aiAssetBaseUri, candidate, out var aiAssetResolved))
+                return aiAssetResolved.ToString();
+        }
+
+        if (baseUri is not null && Uri.TryCreate(baseUri, candidate, out var resolved))
+            return resolved.ToString();
+
+        return candidate;
+    }
+
+    private string? ResolveAiHeatmapUrl(string? candidate)
+    {
+        if (string.IsNullOrWhiteSpace(candidate))
+            return null;
+
+        var normalizedCandidate = candidate.Trim();
+
+        if (Uri.TryCreate(normalizedCandidate, UriKind.Absolute, out var absolute))
+            return absolute.ToString();
+
+        if (normalizedCandidate.StartsWith("api/", StringComparison.OrdinalIgnoreCase))
+        {
+            normalizedCandidate = "/" + normalizedCandidate;
+        }
+
+        if (Uri.TryCreate(_aiAssetBaseUri, normalizedCandidate, out var resolved))
+            return resolved.ToString();
+
+        return normalizedCandidate;
+    }
+
+    private static string? ResolveTopKFindingName(JsonElement item)
+    {
+        return
+            TryReadString(item, "name_en") ??
+            TryReadString(item, "code") ??
+            TryReadString(item, "name_vi") ??
+            TryReadString(item, "class_name");
+    }
+
+    private static List<AiLocalizationBox> ParseLocalizationBoxes(string? rawJsonOutput)
+    {
+        if (string.IsNullOrWhiteSpace(rawJsonOutput))
+            return [];
+
+        try
+        {
+            using var document = JsonDocument.Parse(rawJsonOutput);
+            var root = document.RootElement;
+
+            // Prefer manually edited boxes persisted in anomalies.
+            var anomalyBoxes = ParseLocalizationBoxesFromAnomalies(root);
+            if (anomalyBoxes.Count > 0)
+                return anomalyBoxes;
+
+            if (!root.TryGetProperty("localization", out var localization) ||
+                !localization.TryGetProperty("all_lesions", out var lesions) ||
+                lesions.ValueKind != JsonValueKind.Array)
+            {
+                return [];
+            }
+
+            var boxes = new List<AiLocalizationBox>();
+
+            foreach (var lesion in lesions.EnumerateArray())
+            {
+                if (!lesion.TryGetProperty("bbox", out var bbox))
+                    continue;
+
+                var x = TryReadDecimal(bbox, "x");
+                var y = TryReadDecimal(bbox, "y");
+                var width = TryReadDecimal(bbox, "width");
+                var height = TryReadDecimal(bbox, "height");
+
+                if (!x.HasValue || !y.HasValue || !width.HasValue || !height.HasValue)
+                    continue;
+
+                if (width.Value <= 0 || height.Value <= 0)
+                    continue;
+
+                boxes.Add(new AiLocalizationBox
+                {
+                    X = x.Value,
+                    Y = y.Value,
+                    Width = width.Value,
+                    Height = height.Value,
+                    Confidence = TryReadDecimal(lesion, "confidence")
+                });
+            }
+
+            return boxes;
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static List<AiLocalizationBox> ParseLocalizationBoxesFromAnomalies(JsonElement root)
+    {
+        if (!root.TryGetProperty("anomalies", out var anomalies) ||
+            anomalies.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var boxes = new List<AiLocalizationBox>();
+
+        foreach (var anomaly in anomalies.EnumerateArray())
+        {
+            if (!anomaly.TryGetProperty("location", out var location) ||
+                location.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            var x = TryReadDecimal(location, "x");
+            var y = TryReadDecimal(location, "y");
+            var width = TryReadDecimal(location, "width");
+            var height = TryReadDecimal(location, "height");
+
+            if (!x.HasValue || !y.HasValue || !width.HasValue || !height.HasValue)
+                continue;
+
+            if (width.Value <= 0 || height.Value <= 0)
+                continue;
+
+            boxes.Add(new AiLocalizationBox
+            {
+                X = x.Value,
+                Y = y.Value,
+                Width = width.Value,
+                Height = height.Value,
+                Confidence = TryReadDecimal(anomaly, "confidence")
+            });
+        }
+
+        return boxes;
+    }
+
     private static string? TryReadString(JsonElement item, string propertyName)
     {
         if (!item.TryGetProperty(propertyName, out var property))
@@ -276,5 +482,10 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
         }
 
         return null;
+    }
+
+    private sealed record VisualAssets(string? AnnotatedImageUrl, string? HeatmapImageUrl)
+    {
+        public static VisualAssets Empty { get; } = new(null, null);
     }
 }

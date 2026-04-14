@@ -219,3 +219,7 @@ healthchecksdb
 
 **/aura-google-meet-token/
 /src/API/credentials.json
+
+# Local Hangfire debug artifacts
+.hangfire-cookies.txt
+.hangfire-recurring.html

@@ -32,8 +32,14 @@ public class OrganisationConfiguration : IEntityTypeConfiguration<Organisation>
         builder.Property(e => e.PurchasedAiQuota)
             .HasDefaultValue(0);
 
-        builder.Property(e => e.UsedAiQuota)
+        builder.Property(e => e.MonthlyQuotaLimit)
             .HasDefaultValue(0);
+
+        builder.Property(e => e.MonthlyQuotaUsed)
+            .HasDefaultValue(0);
+
+        builder.Property(e => e.MonthlyQuotaLastResetAt)
+            .IsRequired(false);
 
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);

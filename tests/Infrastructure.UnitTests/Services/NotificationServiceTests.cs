@@ -69,6 +69,52 @@ public class NotificationServiceTests
     }
 
     [Fact]
+    public async Task SendAsync_WithConsultationSessionIdInPayload_ShouldSetReferenceId()
+    {
+        await using var ctx = CreateContext();
+        var repo = new Repository<Notification>(ctx);
+        var hub = Substitute.For<INotificationHubService>();
+        var logger = Substitute.For<ILogger<NotificationService>>();
+        var sut = new NotificationService(repo, ctx, hub, logger);
+        var userId = Guid.NewGuid();
+        var refId = Guid.NewGuid();
+
+        await sut.SendAsync(
+            userId,
+            "T",
+            "M",
+            NotificationType.NewConsultationRequest,
+            new { consultationSessionId = refId.ToString() },
+            CancellationToken.None);
+
+        var n = await ctx.Notifications.FirstAsync();
+        n.ReferenceId.Should().Be(refId);
+    }
+
+    [Fact]
+    public async Task SendAsync_SystemAlert_WithOphthalmologistIdInPayload_ShouldSetReferenceId()
+    {
+        await using var ctx = CreateContext();
+        var repo = new Repository<Notification>(ctx);
+        var hub = Substitute.For<INotificationHubService>();
+        var logger = Substitute.For<ILogger<NotificationService>>();
+        var sut = new NotificationService(repo, ctx, hub, logger);
+        var userId = Guid.NewGuid();
+        var refId = Guid.NewGuid();
+
+        await sut.SendAsync(
+            userId,
+            "T",
+            "M",
+            NotificationType.SystemAlert,
+            new { ophthalmologistId = refId.ToString() },
+            CancellationToken.None);
+
+        var n = await ctx.Notifications.FirstAsync();
+        n.ReferenceId.Should().Be(refId);
+    }
+
+    [Fact]
     public async Task SendAsync_WithoutPayload_ShouldPersistWithoutPayload()
     {
         await using var ctx = CreateContext();

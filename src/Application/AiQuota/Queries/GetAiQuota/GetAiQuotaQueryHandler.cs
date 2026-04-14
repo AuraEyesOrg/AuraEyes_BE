@@ -1,5 +1,6 @@
 using Application.AiQuota.Common;
 using Application.AiQuota.Interfaces;
+using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 
@@ -25,7 +26,7 @@ public class GetAiQuotaQueryHandler : IQueryHandler<GetAiQuotaQuery, AiQuotaDto>
         if (_currentUser.UserId is null)
             return Result<AiQuotaDto>.Failure("User is not authenticated.");
 
-        var role = _currentUser.Roles.FirstOrDefault() ?? "Patient";
+        var role = _currentUser.Roles.FirstOrDefault() ?? Roles.Patient;
         var quota = await _quotaService.GetQuotaAsync(_currentUser.UserId.Value, role, cancellationToken);
 
         return Result<AiQuotaDto>.Success(quota);

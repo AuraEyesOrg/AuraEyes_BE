@@ -86,8 +86,14 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
                     return Result.NotFound($"Patient '{session.PatientId}' not found.");
                 }
 
+                if (!patient.UserId.HasValue)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result.Failure("Walk-in patient does not have a wallet for payment.");
+                }
+
                 var patientWallet = await _walletRepository.GetByUserIdWithTransactionsAsync(
-                    patient.UserId,
+                    patient.UserId.Value,
                     cancellationToken);
 
                 if (patientWallet is null)

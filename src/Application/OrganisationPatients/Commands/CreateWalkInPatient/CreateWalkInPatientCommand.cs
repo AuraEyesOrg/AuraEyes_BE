@@ -9,6 +9,5 @@ public record CreateWalkInPatientCommand : ICommand<Guid>
     public required string Gender { get; init; }
     public string? Address { get; init; }
     public string? PhoneNumber { get; init; }
-    public string? Email { get; init; }
     public string? CitizenId { get; init; }
 }

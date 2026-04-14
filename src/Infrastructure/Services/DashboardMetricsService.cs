@@ -1,4 +1,5 @@
 using Application.AiQuota.Interfaces;
+using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Ophthalmologists.Queries.GetDashboardMetrics;
@@ -698,7 +699,7 @@ public class DashboardMetricsService : IDashboardMetricsService
             ? 0m
             : Math.Round((decimal)totalBooked / totalCapacity * 100m, 1);
 
-        var quota = await _aiQuotaService.GetQuotaAsync(userId, "OrgAdmin", cancellationToken);
+        var quota = await _aiQuotaService.GetQuotaAsync(userId, Roles.OrgAdmin, cancellationToken);
 
         return new OrganisationDashboardMetricsDto
         {
@@ -724,7 +725,7 @@ public class DashboardMetricsService : IDashboardMetricsService
             return new PatientDashboardMetricsDto();
         }
 
-        var quota = await _aiQuotaService.GetQuotaAsync(userId, "Patient", cancellationToken);
+        var quota = await _aiQuotaService.GetQuotaAsync(userId, Roles.Patient, cancellationToken);
 
         return new PatientDashboardMetricsDto
         {

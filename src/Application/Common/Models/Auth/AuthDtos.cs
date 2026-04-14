@@ -254,6 +254,12 @@ public record UserInfoResponse
     /// Null for non-ophthalmologist roles or if no contract exists.
     /// </summary>
     public string? ContractStatus { get; init; }
+
+    /// <summary>
+    /// Employment type for ophthalmologist users (FullTime/PartTime).
+    /// Null for non-ophthalmologist roles.
+    /// </summary>
+    public string? EmploymentType { get; init; }
 }
 
 /// <summary>

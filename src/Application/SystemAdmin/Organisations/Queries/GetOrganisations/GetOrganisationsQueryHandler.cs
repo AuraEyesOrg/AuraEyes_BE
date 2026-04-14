@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Users;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.SystemAdmin.Organisations.Queries.GetOrganisations;
 
@@ -11,13 +12,19 @@ namespace Application.SystemAdmin.Organisations.Queries.GetOrganisations;
 public class GetOrganisationsQueryHandler : IQueryHandler<GetOrganisationsQuery, PagedResult<OrganisationListDto>>
 {
     private readonly IRepository<Organisation> _organisationRepository;
+    private readonly IRepository<OrganisationPatientLink> _organisationPatientLinkRepository;
+    private readonly IRepository<Patient> _patientRepository;
     private readonly IIdentityService _identityService;
 
     public GetOrganisationsQueryHandler(
         IRepository<Organisation> organisationRepository,
+        IRepository<OrganisationPatientLink> organisationPatientLinkRepository,
+        IRepository<Patient> patientRepository,
         IIdentityService identityService)
     {
         _organisationRepository = organisationRepository;
+        _organisationPatientLinkRepository = organisationPatientLinkRepository;
+        _patientRepository = patientRepository;
         _identityService = identityService;
     }
 
@@ -54,10 +61,28 @@ public class GetOrganisationsQueryHandler : IQueryHandler<GetOrganisationsQuery,
             .Take(request.PageSize)
             .ToList();
 
+        var organisationIds = orgPage.Select(x => x.Id).ToList();
+
+        var patientCountLookup = await (
+            from link in _organisationPatientLinkRepository.Query()
+            join patient in _patientRepository.Query() on link.PatientId equals patient.Id
+            where organisationIds.Contains(link.OrganisationId)
+            group patient by link.OrganisationId
+            into grouped
+            select new
+            {
+                OrganisationId = grouped.Key,
+                ManagedPatientCount = grouped.Select(x => x.Id).Distinct().Count(),
+                RegisteredPatientCount = grouped.Count(x => x.UserId != null),
+                WalkInPatientCount = grouped.Count(x => x.UserId == null)
+            })
+            .ToDictionaryAsync(x => x.OrganisationId, cancellationToken);
+
         var items = new List<OrganisationListDto>(orgPage.Count);
         foreach (var org in orgPage)
         {
             var owner = await _identityService.GetUserByIdAsync(org.OwnerId, cancellationToken);
+            patientCountLookup.TryGetValue(org.Id, out var patientCounts);
 
             items.Add(new OrganisationListDto
             {
@@ -70,6 +95,10 @@ public class GetOrganisationsQueryHandler : IQueryHandler<GetOrganisationsQuery,
                 RatingCount = org.RatingCount,
                 OwnerAvatarUrl = owner?.AvatarUrl,
                 DeviceCount = 0, // TODO: join with Device count when available
+                PurchasedAiQuota = org.PurchasedAiQuota,
+                ManagedPatientCount = patientCounts?.ManagedPatientCount ?? 0,
+                RegisteredPatientCount = patientCounts?.RegisteredPatientCount ?? 0,
+                WalkInPatientCount = patientCounts?.WalkInPatientCount ?? 0,
                 IsActive = !org.IsDeleted,
                 CreatedAt = org.CreatedAt
             });

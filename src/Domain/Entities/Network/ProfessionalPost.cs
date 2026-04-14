@@ -95,6 +95,11 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
     public Guid? ConsultationSessionId { get; private set; }
 
     /// <summary>
+    /// Source AI screening ID for case shares created from organisation screening flow.
+    /// </summary>
+    public Guid? AiScreeningId { get; private set; }
+
+    /// <summary>
     /// Masked patient age used in clinical case post.
     /// </summary>
     public int? PatientAge { get; private set; }
@@ -264,6 +269,7 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
     public void SetClinicalCaseMetadata(
         bool isInternalCase,
         Guid? consultationSessionId,
+        Guid? aiScreeningId,
         int? patientAge,
         string? patientGender)
     {
@@ -275,8 +281,23 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
 
         IsInternalCase = isInternalCase;
         ConsultationSessionId = consultationSessionId;
+        AiScreeningId = aiScreeningId;
         PatientAge = patientAge;
         PatientGender = patientGender;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void SetClinicalCaseMetadata(
+        bool isInternalCase,
+        Guid? consultationSessionId,
+        int? patientAge,
+        string? patientGender)
+    {
+        SetClinicalCaseMetadata(
+            isInternalCase,
+            consultationSessionId,
+            aiScreeningId: null,
+            patientAge,
+            patientGender);
     }
 }
