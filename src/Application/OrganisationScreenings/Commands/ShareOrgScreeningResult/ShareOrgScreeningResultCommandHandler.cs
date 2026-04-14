@@ -6,6 +6,7 @@ using Domain.Common;
 using Domain.Entities.Users;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace Application.OrganisationScreenings.Commands.ShareOrgScreeningResult;
 
@@ -36,15 +37,19 @@ public sealed class ShareOrgScreeningResultCommandHandler
         ShareOrgScreeningResultCommand request,
         CancellationToken cancellationToken)
     {
+        var totalStopwatch = Stopwatch.StartNew();
+
         if (!request.IncludePdf && !request.IncludeRetinalImages)
         {
             return Result<ShareOrgScreeningResultResponse>.Failure(
                 "At least one sharing option is required.");
         }
 
+        var detailStopwatch = Stopwatch.StartNew();
         var detailResult = await _mediator.Send(
             new GetOrgScreeningSessionDetailQuery(request.OrgAdminUserId, request.ScreeningId),
             cancellationToken);
+        detailStopwatch.Stop();
 
         if (!detailResult.IsSuccess || detailResult.Data is null)
             return MapFailure(detailResult);
@@ -73,9 +78,11 @@ public sealed class ShareOrgScreeningResultCommandHandler
         var attachments = new List<EmailAttachment>();
         if (request.IncludePdf)
         {
+            var pdfStopwatch = Stopwatch.StartNew();
             var pdfResult = await _mediator.Send(
                 new ExportOrgScreeningReportPdfQuery(request.OrgAdminUserId, request.ScreeningId),
                 cancellationToken);
+            pdfStopwatch.Stop();
 
             if (!pdfResult.IsSuccess || pdfResult.Data is null)
                 return MapFailure(pdfResult);
@@ -84,6 +91,11 @@ public sealed class ShareOrgScreeningResultCommandHandler
                 pdfResult.Data.FileName,
                 pdfResult.Data.Content,
                 pdfResult.Data.ContentType));
+
+            _logger.LogInformation(
+                "Generated PDF for screening share {ScreeningId} in {ElapsedMs}ms",
+                request.ScreeningId,
+                pdfStopwatch.ElapsedMilliseconds);
         }
 
         var retinalImageUrls = request.IncludeRetinalImages
@@ -107,11 +119,18 @@ public sealed class ShareOrgScreeningResultCommandHandler
 
         try
         {
+            var emailStopwatch = Stopwatch.StartNew();
             await _emailService.SendOrganisationScreeningResultShareAsync(
                 recipientEmail,
                 payload,
                 attachments,
                 cancellationToken);
+            emailStopwatch.Stop();
+
+            _logger.LogInformation(
+                "Sent screening share email {ScreeningId} in {ElapsedMs}ms",
+                request.ScreeningId,
+                emailStopwatch.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
@@ -124,11 +143,13 @@ public sealed class ShareOrgScreeningResultCommandHandler
         }
 
         _logger.LogInformation(
-            "Organisation screening {ScreeningId} shared to {RecipientEmail}. IncludePdf={IncludePdf}, IncludeRetinalImages={IncludeRetinalImages}",
+            "Organisation screening {ScreeningId} shared to {RecipientEmail}. IncludePdf={IncludePdf}, IncludeRetinalImages={IncludeRetinalImages}, DetailFetchMs={DetailFetchMs}, TotalMs={TotalMs}",
             request.ScreeningId,
             recipientEmail,
             request.IncludePdf,
-            request.IncludeRetinalImages);
+            request.IncludeRetinalImages,
+            detailStopwatch.ElapsedMilliseconds,
+            totalStopwatch.ElapsedMilliseconds);
 
         return Result<ShareOrgScreeningResultResponse>.Success(new ShareOrgScreeningResultResponse
         {

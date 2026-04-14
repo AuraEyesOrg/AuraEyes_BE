@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Scheduling.Appointments.Common;
 using Domain.Common;
+using Domain.Entities.Financial;
 using Domain.Entities.Scheduling;
 using Domain.Entities.Users;
 using Domain.Enums;
@@ -19,6 +20,7 @@ public class CreateClinicAppointmentCommandHandler
     private readonly IRepository<Organisation> _organisationRepository;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IRepository<OrganisationPatientLink> _organisationPatientLinkRepository;
+    private readonly IWalletRepository _walletRepository;
     private readonly ICurrentUserService _currentUser;
     private readonly IIdentityService _identityService;
     private readonly IEmailService _emailService;
@@ -32,6 +34,7 @@ public class CreateClinicAppointmentCommandHandler
         IRepository<Organisation> organisationRepository,
         IRepository<Patient> patientRepository,
         IRepository<OrganisationPatientLink> organisationPatientLinkRepository,
+        IWalletRepository walletRepository,
         ICurrentUserService currentUser,
         IIdentityService identityService,
         IEmailService emailService,
@@ -44,6 +47,7 @@ public class CreateClinicAppointmentCommandHandler
         _organisationRepository = organisationRepository;
         _patientRepository = patientRepository;
         _organisationPatientLinkRepository = organisationPatientLinkRepository;
+        _walletRepository = walletRepository;
         _currentUser = currentUser;
         _identityService = identityService;
         _emailService = emailService;
@@ -111,6 +115,49 @@ public class CreateClinicAppointmentCommandHandler
                 return Result<CreateClinicAppointmentResult>.Conflict("You already have an appointment for this slot.");
             }
 
+            // ── Wallet deposit deduction (anti-spam) ──
+            var depositFee = slot.Cost ?? 0;
+
+            if (depositFee > 0)
+            {
+                if (!_currentUser.UserId.HasValue)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.Forbidden(
+                        "Unable to resolve user identity for wallet operation.");
+                }
+
+                var wallet = await _walletRepository.GetByUserIdAsync(
+                    _currentUser.UserId.Value, cancellationToken);
+
+                if (wallet is null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.Failure(
+                        "Wallet not found. Please top up your wallet first.");
+                }
+
+                if (wallet.Balance < depositFee)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.Failure(
+                        $"Insufficient wallet balance. Required: {depositFee:N0} VND, Available: {wallet.Balance:N0} VND.");
+                }
+
+                wallet.Withdraw(depositFee, $"Clinic booking deposit – Slot {slot.Id}");
+
+                var transaction = new WalletTransaction(
+                    wallet.Id,
+                    depositFee,
+                    TransactionType.Payment,
+                    $"Clinic visit deposit – {organisation.Name}",
+                    referenceType: "ClinicBooking",
+                    referenceId: slot.Id);
+
+                wallet.AddTransaction(transaction);
+                await _walletRepository.AddTransactionAsync(transaction, cancellationToken);
+            }
+
             slot.BookWithCapacity();
             if (slot.BookedCount >= slot.MaxCapacity)
             {
@@ -147,11 +194,12 @@ public class CreateClinicAppointmentCommandHandler
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Created clinic appointment {AppointmentId} for patient {PatientId} at slot {SlotId} organisation {OrganisationId}",
+                "Created clinic appointment {AppointmentId} for patient {PatientId} at slot {SlotId} organisation {OrganisationId}, deposit {DepositFee} VND",
                 appointment.Id,
                 patientId,
                 request.SlotId,
-                request.OrganisationId);
+                request.OrganisationId,
+                depositFee);
 
             var appointmentTime = slot.StartTime.ToString("HH:mm");
             var appointmentDate = slot.Date.ToString("dd/MM/yyyy");

@@ -182,7 +182,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
         {
             index++;
 
-            var diseaseName = TryReadString(item, "class_name");
+            var diseaseName = ResolveTopKFindingName(item);
             if (string.IsNullOrWhiteSpace(diseaseName))
                 continue;
 
@@ -262,9 +262,9 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
                 TryReadString(root, "image_url");
 
             var heatmapImageUrl =
+                TryReadString(root, "heatmap_url") ??
                 TryReadString(root, "heatmap_colormap_url") ??
-                TryReadString(root, "heatmapUrl") ??
-                TryReadString(root, "heatmap_url");
+                TryReadString(root, "heatmapUrl");
 
             return new VisualAssets(annotatedImageUrl, heatmapImageUrl);
         }
@@ -312,13 +312,29 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
         if (string.IsNullOrWhiteSpace(candidate))
             return null;
 
-        if (Uri.TryCreate(candidate, UriKind.Absolute, out var absolute))
+        var normalizedCandidate = candidate.Trim();
+
+        if (Uri.TryCreate(normalizedCandidate, UriKind.Absolute, out var absolute))
             return absolute.ToString();
 
-        if (Uri.TryCreate(_aiAssetBaseUri, candidate, out var resolved))
+        if (normalizedCandidate.StartsWith("api/", StringComparison.OrdinalIgnoreCase))
+        {
+            normalizedCandidate = "/" + normalizedCandidate;
+        }
+
+        if (Uri.TryCreate(_aiAssetBaseUri, normalizedCandidate, out var resolved))
             return resolved.ToString();
 
-        return candidate;
+        return normalizedCandidate;
+    }
+
+    private static string? ResolveTopKFindingName(JsonElement item)
+    {
+        return
+            TryReadString(item, "name_en") ??
+            TryReadString(item, "code") ??
+            TryReadString(item, "name_vi") ??
+            TryReadString(item, "class_name");
     }
 
     private static List<AiLocalizationBox> ParseLocalizationBoxes(string? rawJsonOutput)

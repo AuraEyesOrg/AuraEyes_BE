@@ -35,10 +35,11 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
     public byte[] GenerateScreeningReportPdf(OrgScreeningReportPdfModel model)
     {
         var originalImageUrl = model.OriginalImageUrls.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
-        var originalImageData = TryDownloadImageData(originalImageUrl);
-        var annotatedImageData = TryDownloadImageData(model.AnnotatedImageUrl)
+        var imageAssets = FetchImageAssets(originalImageUrl, model.AnnotatedImageUrl, model.HeatmapImageUrl);
+        var originalImageData = imageAssets.OriginalImageData;
+        var annotatedImageData = imageAssets.AnnotatedImageData
             ?? TryBuildBoxedImage(originalImageData, model.LocalizationBoxes);
-        var heatmapImageData = TryDownloadImageData(model.HeatmapImageUrl);
+        var heatmapImageData = imageAssets.HeatmapImageData;
 
         return Document.Create(container =>
         {
@@ -79,6 +80,20 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                 page.Footer().Element(ComposeFooter);
             });
         }).GeneratePdf();
+    }
+
+    private static (byte[]? OriginalImageData, byte[]? AnnotatedImageData, byte[]? HeatmapImageData) FetchImageAssets(
+        string? originalImageUrl,
+        string? annotatedImageUrl,
+        string? heatmapImageUrl)
+    {
+        var originalTask = TryDownloadImageDataAsync(originalImageUrl);
+        var annotatedTask = TryDownloadImageDataAsync(annotatedImageUrl);
+        var heatmapTask = TryDownloadImageDataAsync(heatmapImageUrl);
+
+        Task.WhenAll(originalTask, annotatedTask, heatmapTask).GetAwaiter().GetResult();
+
+        return (originalTask.Result, annotatedTask.Result, heatmapTask.Result);
     }
 
     private void ComposeHeader(IContainer container, OrgScreeningReportPdfModel model)
@@ -173,12 +188,6 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                         .FontSize(12)
                         .FontColor(riskColor);
                 });
-
-                row.RelativeItem().AlignRight().Text(text =>
-                {
-                    text.Span("Highest Confidence: ").SemiBold().FontSize(12).FontColor(TextStrong);
-                    text.Span(FormatPercentage(model.ConfidenceScore)).SemiBold().FontSize(12).FontColor(BrandBlue);
-                });
             });
 
             column.Item().LineHorizontal(1).LineColor(Border);
@@ -222,7 +231,6 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                 {
                     columns.ConstantColumn(30);  // Rank Number
                     columns.RelativeColumn(3);   // Finding Name
-                    columns.ConstantColumn(80);  // Confidence %
                     columns.ConstantColumn(110); // Status
                 });
 
@@ -230,7 +238,6 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                 {
                     header.Cell().Element(TableHeaderCell).AlignCenter().Text("#").FontColor(Colors.White).SemiBold();
                     header.Cell().Element(TableHeaderCell).Text("Finding").FontColor(Colors.White).SemiBold();
-                    header.Cell().Element(TableHeaderCell).AlignRight().Text("Confidence").FontColor(Colors.White).SemiBold();
                     header.Cell().Element(TableHeaderCell).AlignCenter().Text("Status").FontColor(Colors.White).SemiBold();
                 });
 
@@ -238,8 +245,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                 {
                     table.Cell().Element(TableBodyCell).AlignCenter().Text(finding.Rank.ToString()).FontColor(TextStrong);
                     table.Cell().Element(TableBodyCell).Text(finding.DiseaseName).FontColor(TextStrong);
-                    table.Cell().Element(TableBodyCell).AlignRight().Text($"{finding.ConfidencePercentage:0.##}%").FontColor(TextStrong);
-                    
+
                     var status = string.IsNullOrWhiteSpace(finding.Status) ? "Detected" : finding.Status.Replace("_", " ");
                     if (status.Length > 0)
                     {
@@ -407,19 +413,6 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
         };
     }
 
-    private static string FormatPercentage(decimal? confidenceScore)
-    {
-        if (!confidenceScore.HasValue)
-            return "N/A";
-
-        var value = confidenceScore.Value <= 1m
-            ? confidenceScore.Value * 100m
-            : confidenceScore.Value;
-
-        value = Math.Clamp(value, 0m, 100m);
-        return $"{value:0.##}%";
-    }
-
     private static string FormatReportDateTime(DateTime value, string format = "yyyy-MM-dd HH:mm:ss")
     {
         var utcValue = value.Kind switch
@@ -433,7 +426,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
         return localValue.ToString(format);
     }
 
-    private static byte[]? TryDownloadImageData(string? url)
+    private static async Task<byte[]?> TryDownloadImageDataAsync(string? url)
     {
         if (string.IsNullOrWhiteSpace(url)) return null;
         if (url.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)) return TryDecodeDataImage(url);
@@ -442,10 +435,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
 
         try
         {
-            using var response = ImageHttpClient
-                .GetAsync(uri, HttpCompletionOption.ResponseHeadersRead)
-                .GetAwaiter()
-                .GetResult();
+            using var response = await ImageHttpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
 
             if (!response.IsSuccessStatusCode) return null;
 
@@ -453,9 +443,9 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
             if (string.IsNullOrWhiteSpace(mediaType) || !mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
                 return null;
 
-            using var contentStream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+            await using var contentStream = await response.Content.ReadAsStreamAsync();
             using var buffer = new MemoryStream();
-            contentStream.CopyTo(buffer);
+            await contentStream.CopyToAsync(buffer);
 
             var data = buffer.ToArray();
             return data.Length == 0 ? null : data;
