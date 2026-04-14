@@ -113,6 +113,15 @@ public class Organisation : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void UpdateMonthlyQuotaLimit(int monthlyQuotaLimit)
+    {
+        if (monthlyQuotaLimit < 0)
+            throw new ArgumentOutOfRangeException(nameof(monthlyQuotaLimit));
+
+        MonthlyQuotaLimit = monthlyQuotaLimit;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void ResetMonthlyQuota(DateTime resetAtUtc)
     {
         MonthlyQuotaUsed = 0;

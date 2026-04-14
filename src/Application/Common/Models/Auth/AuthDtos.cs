@@ -227,7 +227,19 @@ public record UserInfoResponse
     public Guid Id { get; init; }
     public string Email { get; init; } = string.Empty;
     public string FullName { get; init; } = string.Empty;
+    /// <summary>
+    /// Backward-compatible effective avatar URL.
+    /// Prefer using UploadedAvatarUrl and ProviderAvatarUrl on the client.
+    /// </summary>
     public string? AvatarUrl { get; init; }
+    /// <summary>
+    /// Avatar uploaded directly by the user.
+    /// </summary>
+    public string? UploadedAvatarUrl { get; init; }
+    /// <summary>
+    /// Avatar from external provider (for example Google OAuth).
+    /// </summary>
+    public string? ProviderAvatarUrl { get; init; }
     public string[] Roles { get; init; } = Array.Empty<string>();
     public bool EmailConfirmed { get; init; }
     public Guid? OrganizationId { get; init; }

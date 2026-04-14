@@ -12,6 +12,8 @@ namespace Infrastructure.Identity;
 /// </summary>
 public class IdentityService : IIdentityService
 {
+    private const string ProviderAvatarClaimType = "provider_avatar_url";
+
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<ApplicationRole> _roleManager;
 
@@ -152,7 +154,7 @@ public class IdentityService : IIdentityService
         var user = await _userManager.Users
             .FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted, cancellationToken);
 
-        return user == null ? null : MapToDto(user);
+        return user == null ? null : await MapToDtoAsync(user);
     }
 
     public async Task<UserDto?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -160,7 +162,7 @@ public class IdentityService : IIdentityService
         var user = await _userManager.Users
             .FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted, cancellationToken);
 
-        return user == null ? null : MapToDto(user);
+        return user == null ? null : await MapToDtoAsync(user);
     }
 
     public async Task<bool> IsPhoneNumberInUseByOrganizationAsync(
@@ -359,8 +361,10 @@ public class IdentityService : IIdentityService
         return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
     }
 
-    private static UserDto MapToDto(ApplicationUser user)
+    private async Task<UserDto> MapToDtoAsync(ApplicationUser user)
     {
+        var avatarUrl = await ResolveEffectiveAvatarUrlAsync(user);
+
         return new UserDto(
             user.Id,
             user.Email ?? string.Empty,
@@ -370,8 +374,22 @@ public class IdentityService : IIdentityService
             user.IsDeleted,
             user.OrganizationId,
             user.TwoFactorEnabled,
-            user.AvatarUrl
+            avatarUrl
         );
+    }
+
+    private async Task<string?> ResolveEffectiveAvatarUrlAsync(ApplicationUser user)
+    {
+        if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
+            return user.AvatarUrl;
+
+        var claims = await _userManager.GetClaimsAsync(user);
+        var providerAvatar = claims.FirstOrDefault(c =>
+            string.Equals(c.Type, ProviderAvatarClaimType, StringComparison.Ordinal));
+
+        return string.IsNullOrWhiteSpace(providerAvatar?.Value)
+            ? null
+            : providerAvatar.Value;
     }
 
     private static string NormalizePhone(string phoneNumber)
@@ -716,6 +734,8 @@ public class IdentityService : IIdentityService
         if (user == null || user.IsDeleted)
             return null;
 
+        var avatarUrl = await ResolveEffectiveAvatarUrlAsync(user);
+
         return new UserDetailsDto
         {
             Id = user.Id,
@@ -725,7 +745,7 @@ public class IdentityService : IIdentityService
             DateOfBirth = user.DateOfBirth,
             Gender = user.Gender,
             Address = user.Address,
-            AvatarUrl = user.AvatarUrl,
+            AvatarUrl = avatarUrl,
             CitizenId = user.CitizenId,
             EmailConfirmed = user.EmailConfirmed,
             CreatedAt = user.CreatedAt,

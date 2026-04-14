@@ -17,6 +17,7 @@ public class CreateOrgScreeningSessionCommandHandler
 
     private readonly IRepository<AiScreening> _screeningRepository;
     private readonly IRepository<Patient> _patientRepository;
+    private readonly IRepository<Organisation> _organisationRepository;
     private readonly IOrganisationPatientsRepository _organisationPatientsRepository;
     private readonly ICurrentUserService _currentUserService;
     private readonly IIdentityService _identityService;
@@ -26,6 +27,7 @@ public class CreateOrgScreeningSessionCommandHandler
     public CreateOrgScreeningSessionCommandHandler(
         IRepository<AiScreening> screeningRepository,
         IRepository<Patient> patientRepository,
+        IRepository<Organisation> organisationRepository,
         IOrganisationPatientsRepository organisationPatientsRepository,
         ICurrentUserService currentUserService,
         IIdentityService identityService,
@@ -34,6 +36,7 @@ public class CreateOrgScreeningSessionCommandHandler
     {
         _screeningRepository = screeningRepository;
         _patientRepository = patientRepository;
+        _organisationRepository = organisationRepository;
         _organisationPatientsRepository = organisationPatientsRepository;
         _currentUserService = currentUserService;
         _identityService = identityService;
@@ -74,6 +77,19 @@ public class CreateOrgScreeningSessionCommandHandler
             return Result<CreateOrgScreeningSessionResponse>.NotFound("Patient not found");
         }
 
+        var organisation = await _organisationRepository.GetByIdAsync(
+            orgAdminUser.OrganizationId.Value,
+            cancellationToken);
+
+        if (organisation is null)
+            return Result<CreateOrgScreeningSessionResponse>.NotFound("Organisation not found");
+
+        if (!organisation.HasAvailableQuota())
+        {
+            return Result<CreateOrgScreeningSessionResponse>.PaymentRequired(
+                "AI screening quota exhausted. Please top up organisation quota.");
+        }
+
         // Create new screening session for the patient
         var screening = new AiScreening(patient.Id, request.ModelVersion, orgAdminUser.OrganizationId.Value);
 
@@ -108,6 +124,7 @@ public class CreateOrgScreeningSessionCommandHandler
 
         try
         {
+            organisation.ConsumeQuota();
             await _screeningRepository.AddAsync(screening, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -123,6 +140,12 @@ public class CreateOrgScreeningSessionCommandHandler
                 Images = savedImages,
                 CreatedAt = screening.CreatedAt
             });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Quota exhausted while creating screening for organisation {OrganisationId}", organisation.Id);
+            return Result<CreateOrgScreeningSessionResponse>.PaymentRequired(
+                "AI screening quota exhausted. Please top up organisation quota.");
         }
         catch (Exception ex)
         {

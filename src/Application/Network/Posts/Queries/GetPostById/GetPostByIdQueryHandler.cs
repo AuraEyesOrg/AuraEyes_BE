@@ -46,7 +46,7 @@ public class GetPostByIdQueryHandler : IQueryHandler<GetPostByIdQuery, PostDetai
             Id = post.AuthorId,
             AuthorType = post.AuthorType,
             FullName = user?.FullName ?? "Unknown",
-            AvatarUrl = null
+            AvatarUrl = user?.AvatarUrl
         };
 
         // Get user's reaction and bookmark status

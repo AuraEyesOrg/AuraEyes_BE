@@ -41,7 +41,7 @@ public class GetCommentsQueryHandler : IQueryHandler<GetCommentsQuery, PagedResu
                 Id = authorId,
                 AuthorType = comments.First(c => c.AuthorId == authorId).AuthorType,
                 FullName = user?.FullName ?? "Unknown",
-                AvatarUrl = null
+                AvatarUrl = user?.AvatarUrl
             };
         }
 
