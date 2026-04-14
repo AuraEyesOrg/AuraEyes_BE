@@ -37,8 +37,9 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
         var originalImageUrl = model.OriginalImageUrls.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
         var imageAssets = FetchImageAssets(originalImageUrl, model.AnnotatedImageUrl, model.HeatmapImageUrl);
         var originalImageData = imageAssets.OriginalImageData;
-        var annotatedImageData = imageAssets.AnnotatedImageData
-            ?? TryBuildBoxedImage(originalImageData, model.LocalizationBoxes);
+        // Prefer rendering from persisted localization boxes (includes manual edits).
+        var generatedAnnotatedImageData = TryBuildBoxedImage(originalImageData, model.LocalizationBoxes);
+        var annotatedImageData = generatedAnnotatedImageData ?? imageAssets.AnnotatedImageData;
         var heatmapImageData = imageAssets.HeatmapImageData;
 
         return Document.Create(container =>
@@ -492,12 +493,20 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
             {
                 foreach (var box in boxes)
                 {
-                    var x = Math.Clamp(box.X, 0, image.Width - 1);
-                    var y = Math.Clamp(box.Y, 0, image.Height - 1);
+                    // Support both absolute pixel coordinates (AI localization)
+                    // and percentage coordinates (manually edited anomalies).
+                    var isPercentLocation = box.X <= 100m && box.Y <= 100m && box.Width <= 100m && box.Height <= 100m;
+                    var rawX = isPercentLocation ? (box.X / 100m) * image.Width : box.X;
+                    var rawY = isPercentLocation ? (box.Y / 100m) * image.Height : box.Y;
+                    var rawWidth = isPercentLocation ? (box.Width / 100m) * image.Width : box.Width;
+                    var rawHeight = isPercentLocation ? (box.Height / 100m) * image.Height : box.Height;
+
+                    var x = Math.Clamp((int)Math.Round(rawX), 0, image.Width - 1);
+                    var y = Math.Clamp((int)Math.Round(rawY), 0, image.Height - 1);
                     var maxWidth = image.Width - x;
                     var maxHeight = image.Height - y;
-                    var width = Math.Clamp(box.Width, 1, maxWidth);
-                    var height = Math.Clamp(box.Height, 1, maxHeight);
+                    var width = Math.Clamp((int)Math.Round(rawWidth), 1, maxWidth);
+                    var height = Math.Clamp((int)Math.Round(rawHeight), 1, maxHeight);
 
                     var rectangle = new RectangleF(x, y, width, height);
                     ctx.Fill(fillColor, rectangle);
