@@ -15,6 +15,9 @@ public class OrganisationListDto
     public string? OwnerAvatarUrl { get; set; }
     public int DeviceCount { get; set; }
     public int PurchasedAiQuota { get; set; }
+    public int MonthlyQuotaLimit { get; set; }
+    public int MonthlyQuotaUsed { get; set; }
+    public int MonthlyQuotaRemaining { get; set; }
     public int ManagedPatientCount { get; set; }
     public int RegisteredPatientCount { get; set; }
     public int WalkInPatientCount { get; set; }
