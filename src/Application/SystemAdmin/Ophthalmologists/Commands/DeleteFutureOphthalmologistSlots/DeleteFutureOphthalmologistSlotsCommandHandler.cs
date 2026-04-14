@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace Application.SystemAdmin.Ophthalmologists.Commands.DeleteFutureOphthalmologistSlots;
 
 /// <summary>
-/// Deletes all future slots for one ophthalmologist while preserving historical slots.
+/// Deletes all slots from today onward for one ophthalmologist while preserving historical slots.
 /// Slots linked to appointments or consultation sessions are protected.
 /// </summary>
 public class DeleteFutureOphthalmologistSlotsCommandHandler
@@ -55,14 +55,14 @@ public class DeleteFutureOphthalmologistSlotsCommandHandler
                 $"Ophthalmologist '{request.OphthalmologistId}' was not found.");
         }
 
-        var nowUtc = DateTime.UtcNow;
-        var today = DateOnly.FromDateTime(nowUtc);
-        var currentTimeUtc = TimeOnly.FromDateTime(nowUtc);
+        var vietnamNow = GetVietnamNow();
+        var today = DateOnly.FromDateTime(vietnamNow);
+        var currentTimeUtc = TimeOnly.FromDateTime(DateTime.UtcNow);
 
         var futureSlots = await _appointmentSlotRepository
             .Query()
             .Where(slot => slot.ScheduleTemplate != null && slot.ScheduleTemplate.OphthalId == request.OphthalmologistId)
-            .Where(slot => slot.Date > today || (slot.Date == today && slot.EndTime > currentTimeUtc))
+            .Where(slot => slot.Date >= today)
             .OrderBy(slot => slot.Date)
             .ThenBy(slot => slot.StartTime)
             .ToListAsync(cancellationToken);
@@ -127,7 +127,7 @@ public class DeleteFutureOphthalmologistSlotsCommandHandler
         };
 
         _logger.LogInformation(
-            "Deleted future slots for ophthalmologist {OphthalmologistId}. Matched={Matched}, Deleted={Deleted}, Protected={Protected}, Today={Today}, CurrentTimeUtc={CurrentTimeUtc}",
+            "Deleted slots from today onward for ophthalmologist {OphthalmologistId}. Matched={Matched}, Deleted={Deleted}, Protected={Protected}, Today={Today}, CurrentTimeUtc={CurrentTimeUtc}",
             request.OphthalmologistId,
             result.MatchedFutureSlots,
             result.DeletedSlots,
@@ -136,5 +136,27 @@ public class DeleteFutureOphthalmologistSlotsCommandHandler
             result.CurrentTimeUtc);
 
         return Result<DeleteFutureOphthalmologistSlotsResultDto>.Success(result);
+    }
+
+    private static DateTime GetVietnamNow()
+    {
+        var utcNow = DateTime.UtcNow;
+        foreach (var timeZoneId in new[] { "SE Asia Standard Time", "Asia/Ho_Chi_Minh" })
+        {
+            try
+            {
+                var timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+                return TimeZoneInfo.ConvertTimeFromUtc(utcNow, timeZone);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+            }
+            catch (InvalidTimeZoneException)
+            {
+            }
+        }
+
+        // UTC+7 fallback in case timezone metadata is unavailable.
+        return utcNow + TimeSpan.FromHours(7);
     }
 }

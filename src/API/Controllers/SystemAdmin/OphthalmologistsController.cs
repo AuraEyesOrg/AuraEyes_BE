@@ -8,7 +8,10 @@ using Application.SystemAdmin.Ophthalmologists.Commands.BackfillFullTimeSchedule
 using Application.SystemAdmin.Ophthalmologists.Commands.DeleteFutureOphthalmologistSlots;
 using Application.SystemAdmin.Ophthalmologists.Commands.NormalizeAllFullTimeSchedules;
 using Application.SystemAdmin.Ophthalmologists.Commands.NormalizeFullTimeSchedule;
+using Application.SystemAdmin.Ophthalmologists.Commands.ApproveLeaveRequest;
+using Application.SystemAdmin.Ophthalmologists.Commands.RejectLeaveRequest;
 using Application.SystemAdmin.Ophthalmologists.Queries.GetOphthalmologists;
+using Application.SystemAdmin.Ophthalmologists.Queries.GetLeaveRequests;
 using Application.SystemAdmin.Ophthalmologists.Queries.GetWithdrawalRequests;
 using Application.Wallets.Common;
 using Domain.Enums;
@@ -464,6 +467,79 @@ public class OphthalmologistsController : BaseApiController
         var result = await _mediator.Send(command);
         return HandleResult(result);
     }
+
+    /// <summary>
+    /// Get ophthalmologist leave requests for review.
+    /// </summary>
+    [HttpGet("leave-requests")]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<AdminOphthalmologistLeaveRequestDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetLeaveRequests(
+        [FromQuery] OphthalmologistLeaveRequestStatus? status = null,
+        [FromQuery] Guid? ophthalmologistId = null,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var query = new GetLeaveRequestsQuery
+        {
+            Status = status,
+            OphthalmologistId = ophthalmologistId,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+
+        var result = await _mediator.Send(query);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Approve an ophthalmologist leave request.
+    /// </summary>
+    [HttpPost("leave-requests/{leaveRequestId:guid}/approve")]
+    [ProducesResponseType(typeof(ApiResponse<ApproveLeaveRequestResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ApproveLeaveRequest(
+        Guid leaveRequestId,
+        [FromBody] ReviewLeaveRequestApi request)
+    {
+        if (!_currentUserService.UserId.HasValue)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated."));
+
+        var result = await _mediator.Send(new ApproveLeaveRequestCommand
+        {
+            LeaveRequestId = leaveRequestId,
+            ReviewedByAdminUserId = _currentUserService.UserId.Value,
+            AdminNote = request.AdminNote
+        });
+
+        return HandleResult(result, "Leave request approved successfully.");
+    }
+
+    /// <summary>
+    /// Reject an ophthalmologist leave request.
+    /// </summary>
+    [HttpPost("leave-requests/{leaveRequestId:guid}/reject")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RejectLeaveRequest(
+        Guid leaveRequestId,
+        [FromBody] ReviewLeaveRequestApi request)
+    {
+        if (!_currentUserService.UserId.HasValue)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated."));
+
+        var result = await _mediator.Send(new RejectLeaveRequestCommand
+        {
+            LeaveRequestId = leaveRequestId,
+            ReviewedByAdminUserId = _currentUserService.UserId.Value,
+            AdminNote = request.AdminNote
+        });
+
+        return HandleResult(result, "Leave request rejected successfully.");
+    }
 }
 
 /// <summary>
@@ -491,6 +567,12 @@ public class RejectWithdrawalRequestApi
 {
     public string? Reason { get; set; }
 }
+
+public class ReviewLeaveRequestApi
+{
+    public string? AdminNote { get; set; }
+}
+
 public record UpdateOphthalmologistProfileRequest
 {
     public string FullName { get; init; } = string.Empty;

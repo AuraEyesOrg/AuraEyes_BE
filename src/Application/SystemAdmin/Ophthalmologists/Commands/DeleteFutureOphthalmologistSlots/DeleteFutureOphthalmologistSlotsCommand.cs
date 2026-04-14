@@ -4,8 +4,8 @@ using MediatR;
 namespace Application.SystemAdmin.Ophthalmologists.Commands.DeleteFutureOphthalmologistSlots;
 
 /// <summary>
-/// Deletes future appointment slots for one ophthalmologist.
-/// Past slots are preserved.
+/// Deletes appointment slots from today onward for one ophthalmologist.
+/// Slots before today are preserved.
 /// </summary>
 public record DeleteFutureOphthalmologistSlotsCommand : IRequest<Result<DeleteFutureOphthalmologistSlotsResultDto>>
 {

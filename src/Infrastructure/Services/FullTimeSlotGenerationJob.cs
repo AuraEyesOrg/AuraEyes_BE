@@ -69,6 +69,24 @@ public class FullTimeSlotGenerationJob
 
         var createdSlots = 0;
         var skippedInvalidTemplates = 0;
+
+        var approvedLeaveRangesByDoctor = await _context.OphthalmologistLeaveRequests
+            .Where(x => x.Status == OphthalmologistLeaveRequestStatus.Approved)
+            .Where(x => x.StartDate <= toDate && x.EndDate >= fromDate)
+            .Select(x => new
+            {
+                x.OphthalmologistId,
+                x.StartDate,
+                x.EndDate
+            })
+            .ToListAsync(cancellationToken);
+
+        var leaveDateLookup = approvedLeaveRangesByDoctor
+            .GroupBy(x => x.OphthalmologistId)
+            .ToDictionary(
+                x => x.Key,
+                x => x.Select(range => (range.StartDate, range.EndDate)).ToList());
+
         foreach (var template in templates)
         {
             var slotDuration = TimeSpan.FromMinutes(template.SlotDuration);
@@ -105,6 +123,14 @@ public class FullTimeSlotGenerationJob
                 var currentDate = fromDate;
                 while (currentDate <= toDate)
                 {
+                    if (template.OphthalId.HasValue
+                        && leaveDateLookup.TryGetValue(template.OphthalId.Value, out var leaveRanges)
+                        && leaveRanges.Any(range => currentDate >= range.StartDate && currentDate <= range.EndDate))
+                    {
+                        currentDate = currentDate.AddDays(1);
+                        continue;
+                    }
+
                     if (currentDate.DayOfWeek == template.DayOfWeek && !existingDateSet.Contains(currentDate))
                     {
                         for (var currentStart = templateStart; currentStart + slotDuration <= templateEnd; currentStart += slotDuration)
