@@ -14,6 +14,9 @@ using Application.Ophthalmologists.Contracts.UploadSignedContract;
 using Application.Ophthalmologists.Queries.GetDashboardMetrics;
 using Application.Ophthalmologists.Queries.GetOphthalmologist;
 using Application.Ophthalmologists.Queries.GetOphthalmologists;
+using Application.Ophthalmologists.LeaveRequests.Commands.CancelLeaveRequest;
+using Application.Ophthalmologists.LeaveRequests.Commands.CreateLeaveRequest;
+using Application.Ophthalmologists.LeaveRequests.Queries.GetMyLeaveRequests;
 using Application.SystemAdmin.Contracts.Common;
 using Domain.Enums;
 using Domain.Repositories;
@@ -355,6 +358,93 @@ public class OphthalmologistsController : BaseApiController
     }
 
     /// <summary>
+    /// Get leave requests for the current authenticated ophthalmologist.
+    /// </summary>
+    [HttpGet("~/api/ophthalmologist/leave-requests")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<Application.Ophthalmologists.Common.OphthalmologistLeaveRequestDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMyLeaveRequests(
+        [FromQuery] OphthalmologistLeaveRequestStatus? status = null,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var profileId = await ResolveCurrentOphthalmologistProfileIdAsync(cancellationToken);
+        if (!profileId.HasValue)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
+
+        var result = await _mediator.Send(
+            new GetMyLeaveRequestsQuery
+            {
+                OphthalmologistId = profileId.Value,
+                Status = status,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            },
+            cancellationToken);
+
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Submit a leave request for the current authenticated ophthalmologist.
+    /// </summary>
+    [HttpPost("~/api/ophthalmologist/leave-requests")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateLeaveRequest(
+        [FromBody] CreateLeaveRequestApiRequest request,
+        CancellationToken cancellationToken)
+    {
+        var profileId = await ResolveCurrentOphthalmologistProfileIdAsync(cancellationToken);
+        if (!profileId.HasValue)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
+
+        var result = await _mediator.Send(
+            new CreateLeaveRequestCommand
+            {
+                OphthalmologistId = profileId.Value,
+                StartDate = request.StartDate,
+                EndDate = request.EndDate,
+                Reason = request.Reason
+            },
+            cancellationToken);
+
+        return HandleResult(result, "Leave request submitted successfully.");
+    }
+
+    /// <summary>
+    /// Cancel a pending leave request owned by the current authenticated ophthalmologist.
+    /// </summary>
+    [HttpPost("~/api/ophthalmologist/leave-requests/{leaveRequestId:guid}/cancel")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CancelLeaveRequest(
+        Guid leaveRequestId,
+        CancellationToken cancellationToken)
+    {
+        var profileId = await ResolveCurrentOphthalmologistProfileIdAsync(cancellationToken);
+        if (!profileId.HasValue)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
+
+        var result = await _mediator.Send(
+            new CancelLeaveRequestCommand
+            {
+                LeaveRequestId = leaveRequestId,
+                OphthalmologistId = profileId.Value
+            },
+            cancellationToken);
+
+        return HandleResult(result, "Leave request cancelled successfully.");
+    }
+
+    /// <summary>
     /// Delete (soft-delete) an ophthalmologist profile.
     /// </summary>
     /// <param name="id">Ophthalmologist ID.</param>
@@ -489,4 +579,11 @@ public record UpdateOphthalmologistProfileRequest
     public string? Address { get; init; }
     public string? Bio { get; init; }
     public int YearsOfExperience { get; init; }
+}
+
+public record CreateLeaveRequestApiRequest
+{
+    public DateOnly StartDate { get; init; }
+    public DateOnly EndDate { get; init; }
+    public string Reason { get; init; } = string.Empty;
 }
