@@ -19,6 +19,7 @@ public class CreateOrgScreeningSessionCommandHandler
     private readonly IRepository<Patient> _patientRepository;
     private readonly IOrganisationPatientsRepository _organisationPatientsRepository;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IIdentityService _identityService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CreateOrgScreeningSessionCommandHandler> _logger;
 
@@ -27,6 +28,7 @@ public class CreateOrgScreeningSessionCommandHandler
         IRepository<Patient> patientRepository,
         IOrganisationPatientsRepository organisationPatientsRepository,
         ICurrentUserService currentUserService,
+        IIdentityService identityService,
         IUnitOfWork unitOfWork,
         ILogger<CreateOrgScreeningSessionCommandHandler> logger)
     {
@@ -34,6 +36,7 @@ public class CreateOrgScreeningSessionCommandHandler
         _patientRepository = patientRepository;
         _organisationPatientsRepository = organisationPatientsRepository;
         _currentUserService = currentUserService;
+        _identityService = identityService;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -45,6 +48,10 @@ public class CreateOrgScreeningSessionCommandHandler
         var userId = _currentUserService.UserId;
         if (userId is null)
             return Result<CreateOrgScreeningSessionResponse>.Unauthorized("User not authenticated");
+
+        var orgAdminUser = await _identityService.GetUserByIdAsync(userId.Value, cancellationToken);
+        if (orgAdminUser?.OrganizationId is null)
+            return Result<CreateOrgScreeningSessionResponse>.Forbidden("Organisation is not assigned for this account");
 
         // Verify patient exists
         var patient = await _patientRepository.GetByIdAsync(request.PatientId, cancellationToken);
@@ -68,7 +75,7 @@ public class CreateOrgScreeningSessionCommandHandler
         }
 
         // Create new screening session for the patient
-        var screening = new AiScreening(patient.Id, request.ModelVersion);
+        var screening = new AiScreening(patient.Id, request.ModelVersion, orgAdminUser.OrganizationId.Value);
 
         // Organisation flow is performed by staff on behalf of the patient.
         // Record consent at session creation so the AI result persistence step remains valid.

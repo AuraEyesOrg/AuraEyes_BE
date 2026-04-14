@@ -154,11 +154,11 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             using var document = JsonDocument.Parse(rawJsonOutput);
             var root = document.RootElement;
 
-            var findings = ParseTopK(root);
+            var findings = ParseAnomalies(root);
             if (findings.Count > 0)
                 return findings;
 
-            return ParseAnomalies(root);
+            return ParseTopK(root);
         }
         catch
         {
@@ -347,6 +347,11 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             using var document = JsonDocument.Parse(rawJsonOutput);
             var root = document.RootElement;
 
+            // Prefer manually edited boxes persisted in anomalies.
+            var anomalyBoxes = ParseLocalizationBoxesFromAnomalies(root);
+            if (anomalyBoxes.Count > 0)
+                return anomalyBoxes;
+
             if (!root.TryGetProperty("localization", out var localization) ||
                 !localization.TryGetProperty("all_lesions", out var lesions) ||
                 lesions.ValueKind != JsonValueKind.Array)
@@ -361,10 +366,10 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
                 if (!lesion.TryGetProperty("bbox", out var bbox))
                     continue;
 
-                var x = TryReadInt(bbox, "x");
-                var y = TryReadInt(bbox, "y");
-                var width = TryReadInt(bbox, "width");
-                var height = TryReadInt(bbox, "height");
+                var x = TryReadDecimal(bbox, "x");
+                var y = TryReadDecimal(bbox, "y");
+                var width = TryReadDecimal(bbox, "width");
+                var height = TryReadDecimal(bbox, "height");
 
                 if (!x.HasValue || !y.HasValue || !width.HasValue || !height.HasValue)
                     continue;
@@ -388,6 +393,48 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
         {
             return [];
         }
+    }
+
+    private static List<AiLocalizationBox> ParseLocalizationBoxesFromAnomalies(JsonElement root)
+    {
+        if (!root.TryGetProperty("anomalies", out var anomalies) ||
+            anomalies.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var boxes = new List<AiLocalizationBox>();
+
+        foreach (var anomaly in anomalies.EnumerateArray())
+        {
+            if (!anomaly.TryGetProperty("location", out var location) ||
+                location.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            var x = TryReadDecimal(location, "x");
+            var y = TryReadDecimal(location, "y");
+            var width = TryReadDecimal(location, "width");
+            var height = TryReadDecimal(location, "height");
+
+            if (!x.HasValue || !y.HasValue || !width.HasValue || !height.HasValue)
+                continue;
+
+            if (width.Value <= 0 || height.Value <= 0)
+                continue;
+
+            boxes.Add(new AiLocalizationBox
+            {
+                X = x.Value,
+                Y = y.Value,
+                Width = width.Value,
+                Height = height.Value,
+                Confidence = TryReadDecimal(anomaly, "confidence")
+            });
+        }
+
+        return boxes;
     }
 
     private static string? TryReadString(JsonElement item, string propertyName)

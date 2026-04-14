@@ -142,6 +142,7 @@ public sealed class ShareOrgScreeningResultCommandHandler
             return Result<ShareOrgScreeningResultResponse>.Failure("Failed to send share email.");
         }
 
+        totalStopwatch.Stop();
         _logger.LogInformation(
             "Organisation screening {ScreeningId} shared to {RecipientEmail}. IncludePdf={IncludePdf}, IncludeRetinalImages={IncludeRetinalImages}, DetailFetchMs={DetailFetchMs}, TotalMs={TotalMs}",
             request.ScreeningId,
