@@ -42,6 +42,7 @@ public class NormalizeFullTimeScheduleCommandHandler : IRequestHandler<Normalize
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IScheduleTemplateRepository _scheduleTemplateRepository;
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
+    private readonly IOphthalmologistLeaveRequestRepository _leaveRequestRepository;
     private readonly IFullTimeTemplateProvisioningService _fullTimeTemplateProvisioningService;
     private readonly ISystemSettingService _settingService;
     private readonly IUnitOfWork _unitOfWork;
@@ -51,6 +52,7 @@ public class NormalizeFullTimeScheduleCommandHandler : IRequestHandler<Normalize
         IOphthalmologistRepository ophthalmologistRepository,
         IScheduleTemplateRepository scheduleTemplateRepository,
         IAppointmentSlotRepository appointmentSlotRepository,
+        IOphthalmologistLeaveRequestRepository leaveRequestRepository,
         IFullTimeTemplateProvisioningService fullTimeTemplateProvisioningService,
         ISystemSettingService settingService,
         IUnitOfWork unitOfWork,
@@ -59,6 +61,7 @@ public class NormalizeFullTimeScheduleCommandHandler : IRequestHandler<Normalize
         _ophthalmologistRepository = ophthalmologistRepository;
         _scheduleTemplateRepository = scheduleTemplateRepository;
         _appointmentSlotRepository = appointmentSlotRepository;
+        _leaveRequestRepository = leaveRequestRepository;
         _fullTimeTemplateProvisioningService = fullTimeTemplateProvisioningService;
         _settingService = settingService;
         _unitOfWork = unitOfWork;
@@ -90,6 +93,12 @@ public class NormalizeFullTimeScheduleCommandHandler : IRequestHandler<Normalize
         var windowDays = await ResolveWindowDaysAsync(request.WindowDays, cancellationToken);
         var fromDate = DateOnly.FromDateTime(DateTime.UtcNow);
         var toDate = fromDate.AddDays(windowDays - 1);
+
+        var approvedLeaveRanges = await _leaveRequestRepository.GetApprovedOverlappingAsync(
+            ophthalmologist.Id,
+            fromDate,
+            toDate,
+            cancellationToken);
 
         var templatesEnsured = await _fullTimeTemplateProvisioningService.EnsureSystemGeneratedTemplatesAsync(
             ophthalmologist,
@@ -200,6 +209,12 @@ public class NormalizeFullTimeScheduleCommandHandler : IRequestHandler<Normalize
             var currentDate = fromDate;
             while (currentDate <= toDate)
             {
+                if (approvedLeaveRanges.Any(leave => leave.Overlaps(currentDate, currentDate)))
+                {
+                    currentDate = currentDate.AddDays(1);
+                    continue;
+                }
+
                 if (currentDate.DayOfWeek != template.DayOfWeek)
                 {
                     currentDate = currentDate.AddDays(1);
