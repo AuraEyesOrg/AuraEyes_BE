@@ -380,14 +380,12 @@ public static class EmailTemplates
         Guid screeningId,
         DateTime createdAtUtc,
         string riskLevel,
-        decimal? confidenceScore,
         string? summary,
         bool includePdf,
         IReadOnlyCollection<string> retinalImageUrls)
     {
         var displayPatientName = string.IsNullOrWhiteSpace(patientName) ? "Bệnh nhân" : patientName.Trim();
         var displayRiskLevel = string.IsNullOrWhiteSpace(riskLevel) ? "N/A" : riskLevel.Trim();
-        var confidenceText = confidenceScore.HasValue ? $"{Math.Round(confidenceScore.Value, 2):0.##}%" : "N/A";
 
         var riskColor = displayRiskLevel.ToLowerInvariant() switch
         {
@@ -475,7 +473,6 @@ public static class EmailTemplates
                 <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã phiên sàng lọc</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor}; font-family: 'Courier New', Courier, monospace; font-size: 13px;"">{screeningId}</td></tr>
                 <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Thời gian tạo (UTC)</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{createdAtUtc:yyyy-MM-dd HH:mm:ss}</td></tr>
                 <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mức rủi ro</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};""><span style=""display: inline-block; padding: 4px 10px; border-radius: 999px; background: {riskColor.Background}; color: {riskColor.Text}; font-size: 12px; font-weight: 600;"">{WebUtility.HtmlEncode(displayRiskLevel)}</span></td></tr>
-                <tr><td style=""padding: 12px 16px; font-weight: 600;"">Độ tin cậy</td><td style=""padding: 12px 16px;"">{confidenceText}</td></tr>
             </table>
 
             {encodedSummary}

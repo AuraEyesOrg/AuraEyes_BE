@@ -35,10 +35,11 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
     public byte[] GenerateScreeningReportPdf(OrgScreeningReportPdfModel model)
     {
         var originalImageUrl = model.OriginalImageUrls.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
-        var originalImageData = TryDownloadImageData(originalImageUrl);
-        var annotatedImageData = TryDownloadImageData(model.AnnotatedImageUrl)
+        var imageAssets = FetchImageAssets(originalImageUrl, model.AnnotatedImageUrl, model.HeatmapImageUrl);
+        var originalImageData = imageAssets.OriginalImageData;
+        var annotatedImageData = imageAssets.AnnotatedImageData
             ?? TryBuildBoxedImage(originalImageData, model.LocalizationBoxes);
-        var heatmapImageData = TryDownloadImageData(model.HeatmapImageUrl);
+        var heatmapImageData = imageAssets.HeatmapImageData;
 
         return Document.Create(container =>
         {
@@ -79,6 +80,20 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                 page.Footer().Element(ComposeFooter);
             });
         }).GeneratePdf();
+    }
+
+    private static (byte[]? OriginalImageData, byte[]? AnnotatedImageData, byte[]? HeatmapImageData) FetchImageAssets(
+        string? originalImageUrl,
+        string? annotatedImageUrl,
+        string? heatmapImageUrl)
+    {
+        var originalTask = TryDownloadImageDataAsync(originalImageUrl);
+        var annotatedTask = TryDownloadImageDataAsync(annotatedImageUrl);
+        var heatmapTask = TryDownloadImageDataAsync(heatmapImageUrl);
+
+        Task.WhenAll(originalTask, annotatedTask, heatmapTask).GetAwaiter().GetResult();
+
+        return (originalTask.Result, annotatedTask.Result, heatmapTask.Result);
     }
 
     private void ComposeHeader(IContainer container, OrgScreeningReportPdfModel model)
@@ -411,7 +426,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
         return localValue.ToString(format);
     }
 
-    private static byte[]? TryDownloadImageData(string? url)
+    private static async Task<byte[]?> TryDownloadImageDataAsync(string? url)
     {
         if (string.IsNullOrWhiteSpace(url)) return null;
         if (url.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)) return TryDecodeDataImage(url);
@@ -420,10 +435,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
 
         try
         {
-            using var response = ImageHttpClient
-                .GetAsync(uri, HttpCompletionOption.ResponseHeadersRead)
-                .GetAwaiter()
-                .GetResult();
+            using var response = await ImageHttpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
 
             if (!response.IsSuccessStatusCode) return null;
 
@@ -431,9 +443,9 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
             if (string.IsNullOrWhiteSpace(mediaType) || !mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
                 return null;
 
-            using var contentStream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+            await using var contentStream = await response.Content.ReadAsStreamAsync();
             using var buffer = new MemoryStream();
-            contentStream.CopyTo(buffer);
+            await contentStream.CopyToAsync(buffer);
 
             var data = buffer.ToArray();
             return data.Length == 0 ? null : data;

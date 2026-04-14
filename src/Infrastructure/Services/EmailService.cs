@@ -133,7 +133,6 @@ public class EmailService : IEmailService
             payload.ScreeningId,
             payload.CreatedAtUtc,
             payload.RiskLevel,
-            payload.ConfidenceScore,
             payload.Summary,
             payload.IncludePdf,
             payload.RetinalImageUrls);
