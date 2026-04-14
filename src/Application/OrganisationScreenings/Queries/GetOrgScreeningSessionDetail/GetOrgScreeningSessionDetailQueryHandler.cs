@@ -33,6 +33,14 @@ public sealed class GetOrgScreeningSessionDetailQueryHandler
         GetOrgScreeningSessionDetailQuery request,
         CancellationToken cancellationToken)
     {
+        var hasScreeningAccess = await _organisationPatientsRepository.IsScreeningManagedByOrganisationAdminAsync(
+            request.OrgAdminUserId,
+            request.ScreeningId,
+            cancellationToken);
+
+        if (!hasScreeningAccess)
+            return Result<ScreeningSessionDetailDto>.NotFound("Screening session not found");
+
         var session = await _screeningRepository
             .Query()
             .Where(s => s.Id == request.ScreeningId && !s.IsDeleted)

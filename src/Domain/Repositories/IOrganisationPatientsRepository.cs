@@ -87,6 +87,11 @@ public interface IOrganisationPatientsRepository
         Guid patientId,
         CancellationToken cancellationToken = default);
 
+    Task<bool> IsScreeningManagedByOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        Guid screeningId,
+        CancellationToken cancellationToken = default);
+
     Task<string?> GetPatientDisplayNameForOrganisationAdminAsync(
         Guid orgAdminUserId,
         Guid patientId,
