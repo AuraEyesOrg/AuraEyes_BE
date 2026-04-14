@@ -16,6 +16,7 @@ using Application.Ophthalmologists.Queries.GetOphthalmologist;
 using Application.Ophthalmologists.Queries.GetOphthalmologists;
 using Application.SystemAdmin.Contracts.Common;
 using Domain.Enums;
+using Domain.Repositories;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -31,15 +32,33 @@ public class OphthalmologistsController : BaseApiController
     private readonly IMediator _mediator;
     private readonly ICurrentUserService _currentUserService;
     private readonly IFileStorageService _fileStorageService;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
 
     public OphthalmologistsController(
         IMediator mediator,
         ICurrentUserService currentUserService,
-        IFileStorageService fileStorageService)
+        IFileStorageService fileStorageService,
+        IOphthalmologistRepository ophthalmologistRepository)
     {
         _mediator = mediator;
         _currentUserService = currentUserService;
         _fileStorageService = fileStorageService;
+        _ophthalmologistRepository = ophthalmologistRepository;
+    }
+
+    private async Task<Guid?> ResolveCurrentOphthalmologistProfileIdAsync(CancellationToken cancellationToken)
+    {
+        if (_currentUserService.ProfileId.HasValue)
+            return _currentUserService.ProfileId.Value;
+
+        if (!_currentUserService.UserId.HasValue)
+            return null;
+
+        var ophthalmologist = await _ophthalmologistRepository.GetByUserIdAsync(
+            _currentUserService.UserId.Value,
+            cancellationToken);
+
+        return ophthalmologist?.Id;
     }
 
     /// <summary>
@@ -143,11 +162,12 @@ public class OphthalmologistsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetMyProfile(CancellationToken cancellationToken)
     {
-        if (_currentUserService.ProfileId is null)
-            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found in token"));
+        var profileId = await ResolveCurrentOphthalmologistProfileIdAsync(cancellationToken);
+        if (!profileId.HasValue)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
 
         var result = await _mediator.Send(
-            new GetOphthalmologistQuery(_currentUserService.ProfileId.Value),
+            new GetOphthalmologistQuery(profileId.Value),
             cancellationToken);
 
         return HandleResult(result, "Profile retrieved successfully");
@@ -162,11 +182,12 @@ public class OphthalmologistsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetCurrentOphthalmologist(CancellationToken cancellationToken)
     {
-        if (_currentUserService.ProfileId is null)
-            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found in token"));
+        var profileId = await ResolveCurrentOphthalmologistProfileIdAsync(cancellationToken);
+        if (!profileId.HasValue)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
 
         var result = await _mediator.Send(
-            new GetOphthalmologistQuery(_currentUserService.ProfileId.Value),
+            new GetOphthalmologistQuery(profileId.Value),
             cancellationToken);
 
         return HandleResult(result, "Profile retrieved successfully");
@@ -187,11 +208,12 @@ public class OphthalmologistsController : BaseApiController
         if (_currentUserService.UserId is null)
             return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
 
-        if (_currentUserService.ProfileId is null)
-            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found in token"));
+        var profileId = await ResolveCurrentOphthalmologistProfileIdAsync(cancellationToken);
+        if (!profileId.HasValue)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
 
         var existingProfileResult = await _mediator.Send(
-            new GetOphthalmologistQuery(_currentUserService.ProfileId.Value),
+            new GetOphthalmologistQuery(profileId.Value),
             cancellationToken);
 
         if (!existingProfileResult.IsSuccess || existingProfileResult.Data is null)
@@ -199,7 +221,7 @@ public class OphthalmologistsController : BaseApiController
 
         var command = new UpdateOphthalmologistCommand
         {
-            Id = _currentUserService.ProfileId.Value,
+            Id = profileId.Value,
             UserId = _currentUserService.UserId.Value,
             FullName = request.FullName,
             Phone = request.Phone,
@@ -267,8 +289,9 @@ public class OphthalmologistsController : BaseApiController
         if (_currentUserService.UserId is null)
             return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
 
-        if (_currentUserService.ProfileId is null)
-            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found in token"));
+        var profileId = await ResolveCurrentOphthalmologistProfileIdAsync(cancellationToken);
+        if (!profileId.HasValue)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
 
         var form = await Request.ReadFormAsync(cancellationToken);
         var certificates = new List<UploadCredentialItemDto>();
@@ -323,7 +346,7 @@ public class OphthalmologistsController : BaseApiController
 
         var command = new UploadCredentialsCommand
         {
-            OphthalmologistId = _currentUserService.ProfileId.Value,
+            OphthalmologistId = profileId.Value,
             Certificates = certificates
         };
 
