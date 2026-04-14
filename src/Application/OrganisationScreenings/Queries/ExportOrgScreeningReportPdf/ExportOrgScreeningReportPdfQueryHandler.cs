@@ -331,9 +331,9 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
     private static string? ResolveTopKFindingName(JsonElement item)
     {
         return
-            TryReadString(item, "name_vi") ??
             TryReadString(item, "name_en") ??
             TryReadString(item, "code") ??
+            TryReadString(item, "name_vi") ??
             TryReadString(item, "class_name");
     }
 

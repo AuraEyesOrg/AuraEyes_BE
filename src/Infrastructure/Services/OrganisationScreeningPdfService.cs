@@ -173,12 +173,6 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                         .FontSize(12)
                         .FontColor(riskColor);
                 });
-
-                row.RelativeItem().AlignRight().Text(text =>
-                {
-                    text.Span("Highest Confidence: ").SemiBold().FontSize(12).FontColor(TextStrong);
-                    text.Span(FormatPercentage(model.ConfidenceScore)).SemiBold().FontSize(12).FontColor(BrandBlue);
-                });
             });
 
             column.Item().LineHorizontal(1).LineColor(Border);
@@ -222,7 +216,6 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                 {
                     columns.ConstantColumn(30);  // Rank Number
                     columns.RelativeColumn(3);   // Finding Name
-                    columns.ConstantColumn(80);  // Confidence %
                     columns.ConstantColumn(110); // Status
                 });
 
@@ -230,7 +223,6 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                 {
                     header.Cell().Element(TableHeaderCell).AlignCenter().Text("#").FontColor(Colors.White).SemiBold();
                     header.Cell().Element(TableHeaderCell).Text("Finding").FontColor(Colors.White).SemiBold();
-                    header.Cell().Element(TableHeaderCell).AlignRight().Text("Confidence").FontColor(Colors.White).SemiBold();
                     header.Cell().Element(TableHeaderCell).AlignCenter().Text("Status").FontColor(Colors.White).SemiBold();
                 });
 
@@ -238,8 +230,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                 {
                     table.Cell().Element(TableBodyCell).AlignCenter().Text(finding.Rank.ToString()).FontColor(TextStrong);
                     table.Cell().Element(TableBodyCell).Text(finding.DiseaseName).FontColor(TextStrong);
-                    table.Cell().Element(TableBodyCell).AlignRight().Text($"{finding.ConfidencePercentage:0.##}%").FontColor(TextStrong);
-                    
+
                     var status = string.IsNullOrWhiteSpace(finding.Status) ? "Detected" : finding.Status.Replace("_", " ");
                     if (status.Length > 0)
                     {
@@ -405,19 +396,6 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
             "low" => "#027A48",
             _ => BrandBlue
         };
-    }
-
-    private static string FormatPercentage(decimal? confidenceScore)
-    {
-        if (!confidenceScore.HasValue)
-            return "N/A";
-
-        var value = confidenceScore.Value <= 1m
-            ? confidenceScore.Value * 100m
-            : confidenceScore.Value;
-
-        value = Math.Clamp(value, 0m, 100m);
-        return $"{value:0.##}%";
     }
 
     private static string FormatReportDateTime(DateTime value, string format = "yyyy-MM-dd HH:mm:ss")
