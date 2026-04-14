@@ -3,6 +3,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Wallets.Common;
 using Domain.Common;
+using Domain.Entities.Financial;
 using Domain.Enums;
 using Domain.Repositories;
 
@@ -77,9 +78,12 @@ public class SyncPayoutStatusCommandHandler
 
         var firstTxn = payoutResult.Transactions.FirstOrDefault();
 
-        // Nếu SUCCEEDED và wallet chưa bị trừ
-        if (payoutResult.ApprovalState.Equals("SUCCEEDED", StringComparison.OrdinalIgnoreCase)
-            && withdrawalRequest.Status != PaymentStatus.Completed)
+        var isCompleted =
+            payoutResult.ApprovalState.Equals("SUCCEEDED", StringComparison.OrdinalIgnoreCase)
+            || payoutResult.ApprovalState.Equals("COMPLETED", StringComparison.OrdinalIgnoreCase);
+
+        // Nếu payout đã hoàn tất và wallet chưa bị trừ
+        if (isCompleted && withdrawalRequest.Status != PaymentStatus.Completed)
         {
             var wallet = await _walletRepository.GetByIdAsync(withdrawalRequest.WalletId, cancellationToken);
             if (wallet != null)
@@ -87,6 +91,16 @@ public class SyncPayoutStatusCommandHandler
                 wallet.Withdraw(
                     withdrawalRequest.Amount,
                     $"Payout via PayOS: {withdrawalRequest.PayOSReferenceId}");
+
+                var transaction = new WalletTransaction(
+                    wallet.Id,
+                    withdrawalRequest.Amount,
+                    TransactionType.Withdrawal,
+                    $"Rút tiền về {withdrawalRequest.BankName} - {withdrawalRequest.BankAccountNumber}",
+                    "WithdrawalRequest",
+                    withdrawalRequest.Id);
+
+                await _walletRepository.AddTransactionAsync(transaction, cancellationToken);
             }
         }
 
