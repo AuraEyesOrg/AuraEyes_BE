@@ -291,12 +291,12 @@ using (var scope = app.Services.CreateScope())
         var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
         var seederLogger = loggerFactory.CreateLogger("DatabaseSeeder");
 
-        await Infrastructure.Services.DatabaseSeeder.SeedAsync(
-            context,
-            userManager,
-            roleManager,
-            builder.Configuration,
-            seederLogger);
+        // await Infrastructure.Services.DatabaseSeeder.SeedAsync(
+        //     context,
+        //     userManager,
+        //     roleManager,
+        //     builder.Configuration,
+        //     seederLogger);
         Log.Information("Database seeding completed successfully");
     }
     catch (Exception ex)
