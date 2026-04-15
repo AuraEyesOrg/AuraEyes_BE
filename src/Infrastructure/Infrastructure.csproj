@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <!-- EF Core -->
+	<PackageReference Include="CloudinaryDotNet" Version="1.28.0" />
 	<PackageReference Include="Google.Apis.Auth" Version="1.73.0" />
 	<PackageReference Include="Google.Apis.Calendar.v3" Version="1.73.0.4073" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
