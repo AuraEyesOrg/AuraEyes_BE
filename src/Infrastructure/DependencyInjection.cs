@@ -4,6 +4,7 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.OrganisationScreenings.Interfaces;
 using Application.Scheduling.ScheduleTemplates.Interfaces;
+using Application.SystemAdmin.Ophthalmologists.Interfaces;
 using Application.SystemAdmin.Interfaces;
 using Application.SystemSettings.Interfaces;
 using Domain.Common;
@@ -176,6 +177,7 @@ public static class DependencyInjection
         services.AddScoped<IDepositRequestRepository, DepositRequestRepository>();
         services.AddScoped<IWithdrawalRequestRepository, WithdrawalRequestRepository>();
         services.AddScoped<IOphthalmologistLeaveRequestRepository, OphthalmologistLeaveRequestRepository>();
+        services.AddScoped<IOphthalmologistEmploymentTypeChangeRequestRepository, OphthalmologistEmploymentTypeChangeRequestRepository>();
         services.AddScoped<IScheduleTemplateRepository, ScheduleTemplateRepository>();
         services.AddScoped<IAppointmentSlotRepository, AppointmentSlotRepository>();
         services.AddScoped<IExperiencePricingRuleRepository, ExperiencePricingRuleRepository>();
@@ -211,6 +213,7 @@ public static class DependencyInjection
         services.AddScoped<ISystemSettingService, SystemSettingService>();
         services.AddScoped<IOrganisationScreeningPdfService, OrganisationScreeningPdfService>();
         services.AddScoped<IFullTimeTemplateProvisioningService, FullTimeTemplateProvisioningService>();
+        services.AddScoped<IOphthalmologistContractProvisioningService, OphthalmologistContractProvisioningService>();
         services.AddSingleton<IAiAssetBaseUrlProvider, AiAssetBaseUrlProvider>();
         services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();
         services.AddScoped<IFullTimeTemplateProvisioningService, FullTimeTemplateProvisioningService>();
