@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Screenings.Commands.CreateAiScreeningSession;
 using Application.Screenings.Commands.SaveAiScreeningResults;
+using Application.Screenings.Queries.ExportPatientScreeningReportPdf;
 using Application.Screenings.Queries.GetRecentScreeningSessions;
 using Application.Screenings.Queries.GetScreeningSessionDetail;
 using Domain.Common;
@@ -156,6 +157,36 @@ public class ScreeningsController : BaseApiController
         };
 
         return Ok(ApiResponseFactory.Success(session, "Screening session loaded"));
+    }
+
+    /// <summary>
+    /// Download screening report as PDF for current patient.
+    /// </summary>
+    [HttpGet("{screeningId:guid}/report-pdf")]
+    [Produces("application/pdf")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadScreeningReportPdf(
+        [FromRoute] Guid screeningId,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
+
+        var result = await _mediator.Send(
+            new ExportPatientScreeningReportPdfQuery(_currentUserService.UserId.Value, screeningId),
+            cancellationToken);
+
+        if (!result.IsSuccess || result.Data is null)
+            return HandleResult(result, "Screening report generated");
+
+        Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
+
+        return File(
+            result.Data.Content,
+            result.Data.ContentType,
+            result.Data.FileName);
     }
 
 
