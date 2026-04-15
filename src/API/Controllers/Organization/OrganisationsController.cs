@@ -3,8 +3,11 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Ophthalmologists.Contracts.GetMyContract;
 using Application.Ophthalmologists.Contracts.UploadSignedContract;
+using Application.Organisations.Commands.UpdateOrganisationSettings;
+using Application.Organisations.Common;
 using Application.Organisations.Queries.GetBillingSummary;
 using Application.Organisations.Queries.GetDashboardMetrics;
+using Application.Organisations.Queries.GetOrganisationSettings;
 using Application.Organisations.Queries.GetScreeningReports;
 using Application.OrganisationScreenings;
 using Application.Scheduling.Appointments.Common;
@@ -175,4 +178,63 @@ public class OrganisationsController : BaseApiController
 
         return HandleResult(result, "Screening reports loaded");
     }
+
+    [HttpGet("settings")]
+    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [ProducesResponseType(typeof(ApiResponse<OrganisationSettingsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetSettings(CancellationToken cancellationToken)
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
+
+        var result = await _mediator.Send(
+            new GetOrganisationSettingsQuery(_currentUserService.UserId.Value),
+            cancellationToken);
+
+        return HandleResult(result, "Organisation settings loaded.");
+    }
+
+    [HttpPut("settings")]
+    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [ProducesResponseType(typeof(ApiResponse<OrganisationSettingsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateSettings(
+        [FromBody] UpdateOrganisationSettingsRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
+
+        var command = new UpdateOrganisationSettingsCommand
+        {
+            OrgAdminUserId = _currentUserService.UserId.Value,
+            Name = request.Name,
+            Address = request.Address,
+            LicenseNumber = request.LicenseNumber,
+            TaxCode = request.TaxCode,
+            Description = request.Description,
+            ContactFullName = request.ContactFullName,
+            ContactEmail = request.ContactEmail,
+            ContactPhone = request.ContactPhone,
+            AvatarUrl = request.AvatarUrl
+        };
+
+        var result = await _mediator.Send(command, cancellationToken);
+        return HandleResult(result, "Organisation settings updated successfully.");
+    }
+}
+
+public record UpdateOrganisationSettingsRequest
+{
+    public string Name { get; init; } = string.Empty;
+    public string? Address { get; init; }
+    public string? LicenseNumber { get; init; }
+    public string? TaxCode { get; init; }
+    public string? Description { get; init; }
+    public string? ContactFullName { get; init; }
+    public string? ContactEmail { get; init; }
+    public string? ContactPhone { get; init; }
+    public string? AvatarUrl { get; init; }
 }

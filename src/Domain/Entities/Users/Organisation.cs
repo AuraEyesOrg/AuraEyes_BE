@@ -12,6 +12,8 @@ public class Organisation : BaseEntity, IAggregateRoot
     public string Name { get; private set; } = string.Empty;
     public string? Address { get; private set; }
     public string? LicenseNumber { get; private set; }
+    public string? TaxCode { get; private set; }
+    public string? Description { get; private set; }
     public OrgType OrgType { get; private set; }
     public decimal RatingAverage { get; private set; }
     public int RatingCount { get; private set; }
@@ -30,7 +32,14 @@ public class Organisation : BaseEntity, IAggregateRoot
 
     private Organisation() { } // EF Core
 
-    public Organisation(Guid ownerId, string name, OrgType orgType, string? address = null, string? licenseNumber = null)
+    public Organisation(
+        Guid ownerId,
+        string name,
+        OrgType orgType,
+        string? address = null,
+        string? licenseNumber = null,
+        string? taxCode = null,
+        string? description = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Organisation name cannot be empty", nameof(name));
@@ -40,11 +49,18 @@ public class Organisation : BaseEntity, IAggregateRoot
         OrgType = orgType;
         Address = address;
         LicenseNumber = licenseNumber;
+        TaxCode = taxCode;
+        Description = description;
         RatingAverage = 0m;
         RatingCount = 0;
     }
 
-    public void UpdateDetails(string name, string? address, string? licenseNumber)
+    public void UpdateDetails(
+        string name,
+        string? address,
+        string? licenseNumber,
+        string? taxCode,
+        string? description)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Organisation name cannot be empty", nameof(name));
@@ -52,6 +68,8 @@ public class Organisation : BaseEntity, IAggregateRoot
         Name = name;
         Address = address;
         LicenseNumber = licenseNumber;
+        TaxCode = taxCode;
+        Description = description;
         UpdatedAt = DateTime.UtcNow;
     }
 

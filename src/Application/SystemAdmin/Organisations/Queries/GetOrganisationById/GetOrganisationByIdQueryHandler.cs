@@ -30,6 +30,7 @@ public class GetOrganisationByIdQueryHandler
             Name = organisation.Name,
             Address = organisation.Address,
             LicenseNumber = organisation.LicenseNumber,
+            TaxCode = organisation.TaxCode,
             OrgType = organisation.OrgType.ToString(),
             DeviceCount = 0,
             PurchasedAiQuota = organisation.PurchasedAiQuota,

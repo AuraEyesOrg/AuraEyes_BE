@@ -195,7 +195,8 @@ public static class DatabaseSeeder
                     name: "Auski Hospital",
                     orgType: OrgType.Hospital,
                     address: "S1006 Vinhomes Grand Park, Ho Chi Minh City, Viet Nam",
-                    licenseNumber: "MED-HCM-2024-001"
+                    licenseNumber: "MED-HCM-2024-001",
+                    taxCode: "0312345678"
                 );
 
                 await context.Organisations.AddAsync(organisation);
