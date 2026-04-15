@@ -851,6 +851,7 @@ public class AuthService : IAuthService
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
                 ContractStatus = contractStatus,
+                MustChangePassword = user.MustChangePassword,
                 EmploymentType = employmentType
             }
         };
@@ -981,6 +982,7 @@ public class AuthService : IAuthService
                     IsVerified = isVerified,
                     VerificationStatus = verificationStatus,
                     ContractStatus = contractStatus,
+                    MustChangePassword = user.MustChangePassword,
                     EmploymentType = employmentType
                 }
             });
@@ -1216,6 +1218,7 @@ public class AuthService : IAuthService
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
                 ContractStatus = contractStatus,
+                MustChangePassword = identityUser?.MustChangePassword ?? false,
                 EmploymentType = employmentType
             });
         }

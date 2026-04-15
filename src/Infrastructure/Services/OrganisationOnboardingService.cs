@@ -75,6 +75,7 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
             request.ContactPhone,
             request.Address,
             request.LicenseNumber,
+            request.TaxCode,
             request.Notes);
 
         await _requestRepository.AddAsync(onboardingRequest, cancellationToken);
@@ -104,6 +105,7 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
                 ContactPhone = r.ContactPhone,
                 Address = r.Address,
                 LicenseNumber = r.LicenseNumber,
+                TaxCode = r.TaxCode,
                 Notes = r.Notes,
                 Status = r.Status.ToString(),
                 CreatedAt = r.CreatedAt,
@@ -151,7 +153,8 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
                 FullName = request.ContactFullName,
                 Address = request.Address,
                 EmailConfirmed = true,
-                IsActive = true
+                IsActive = true,
+                MustChangePassword = true
             };
 
             var createResult = await _userManager.CreateAsync(orgAdmin, temporaryPassword);
@@ -169,7 +172,8 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
                 request.OrganisationName,
                 request.OrgType,
                 request.Address,
-                request.LicenseNumber);
+                request.LicenseNumber,
+                request.TaxCode);
 
             await _organisationRepository.AddAsync(organisation, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -250,7 +254,7 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
                 "mã số doanh nghiệp",
                 "ma so doanh nghiep");
 
-            var taxCode = ExtractStructuredNoteValue(
+            var taxCode = request.TaxCode ?? ExtractStructuredNoteValue(
                 request.Notes,
                 "tax code",
                 "tax id",

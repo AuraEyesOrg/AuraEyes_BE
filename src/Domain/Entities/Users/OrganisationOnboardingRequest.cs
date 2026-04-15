@@ -12,6 +12,7 @@ public class OrganisationOnboardingRequest : BaseEntity, IAggregateRoot
     public string? ContactPhone { get; private set; }
     public string? Address { get; private set; }
     public string? LicenseNumber { get; private set; }
+    public string? TaxCode { get; private set; }
     public string? Notes { get; private set; }
     public OrganisationOnboardingStatus Status { get; private set; }
     public DateTime? ApprovedAt { get; private set; }
@@ -29,6 +30,7 @@ public class OrganisationOnboardingRequest : BaseEntity, IAggregateRoot
         string? contactPhone = null,
         string? address = null,
         string? licenseNumber = null,
+        string? taxCode = null,
         string? notes = null)
     {
         if (string.IsNullOrWhiteSpace(organisationName))
@@ -45,6 +47,7 @@ public class OrganisationOnboardingRequest : BaseEntity, IAggregateRoot
         ContactPhone = string.IsNullOrWhiteSpace(contactPhone) ? null : contactPhone.Trim();
         Address = string.IsNullOrWhiteSpace(address) ? null : address.Trim();
         LicenseNumber = string.IsNullOrWhiteSpace(licenseNumber) ? null : licenseNumber.Trim();
+        TaxCode = string.IsNullOrWhiteSpace(taxCode) ? null : taxCode.Trim();
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         Status = OrganisationOnboardingStatus.Pending;
     }

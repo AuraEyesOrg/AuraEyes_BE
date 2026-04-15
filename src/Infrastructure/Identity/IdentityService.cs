@@ -851,6 +851,7 @@ public class IdentityService : IIdentityService
         if (result.Succeeded)
         {
             user.UpdatedAt = DateTime.UtcNow;
+            user.MustChangePassword = false;
             await _userManager.UpdateAsync(user);
         }
 
