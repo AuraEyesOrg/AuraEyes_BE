@@ -3,6 +3,7 @@ using Application.AiQuota.Interfaces;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.OrganisationScreenings.Interfaces;
+using Application.Screenings.Interfaces;
 using Application.Scheduling.ScheduleTemplates.Interfaces;
 using Application.SystemAdmin.Ophthalmologists.Interfaces;
 using Application.SystemAdmin.Interfaces;
@@ -212,6 +213,7 @@ public static class DependencyInjection
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
         services.AddScoped<ISystemSettingService, SystemSettingService>();
         services.AddScoped<IOrganisationScreeningPdfService, OrganisationScreeningPdfService>();
+        services.AddScoped<IPatientScreeningPdfService, PatientScreeningPdfService>();
         services.AddScoped<IOphthalmologistContractProvisioningService, OphthalmologistContractProvisioningService>();
         services.AddSingleton<IAiAssetBaseUrlProvider, AiAssetBaseUrlProvider>();
         services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();
