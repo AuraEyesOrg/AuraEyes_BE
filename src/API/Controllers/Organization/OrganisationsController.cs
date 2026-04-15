@@ -137,7 +137,7 @@ public class OrganisationsController : BaseApiController
             scannedUrl = await _fileStorageService.SaveFileAsync(
                 stream,
                 contractImage.FileName,
-                $"contracts/{userId.Value}");
+                $"organisations/contracts/{userId.Value}");
         }
 
         var result = await _mediator.Send(new UploadSignedContractCommand

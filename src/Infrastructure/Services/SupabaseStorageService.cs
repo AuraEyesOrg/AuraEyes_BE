@@ -8,7 +8,8 @@ using Supabase;
 namespace Infrastructure.Services;
 
 /// <summary>
-/// Supabase Storage file service.
+/// Legacy Supabase Storage file service.
+/// @deprecated Switch to CloudinaryStorageService should be preferred for new uploads.
 /// Uses service_role key to bypass RLS policies.
 /// </summary>
 public sealed class SupabaseStorageService : IFileStorageService
