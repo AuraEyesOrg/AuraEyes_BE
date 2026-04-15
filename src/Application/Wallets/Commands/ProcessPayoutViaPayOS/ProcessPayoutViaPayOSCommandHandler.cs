@@ -3,6 +3,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Wallets.Common;
 using Domain.Common;
+using Domain.Entities.Financial;
 using Domain.Enums;
 using Domain.Repositories;
 
@@ -114,6 +115,16 @@ public class ProcessPayoutViaPayOSCommandHandler
             if (wallet != null)
             {
                 wallet.Withdraw(withdrawalRequest.Amount, $"Payout via PayOS: {referenceId}");
+
+                var transaction = new WalletTransaction(
+                    wallet.Id,
+                    withdrawalRequest.Amount,
+                    TransactionType.Withdrawal,
+                    $"Rút tiền về {withdrawalRequest.BankName} - {withdrawalRequest.BankAccountNumber}",
+                    "WithdrawalRequest",
+                    withdrawalRequest.Id);
+
+                await _walletRepository.AddTransactionAsync(transaction, cancellationToken);
             }
             withdrawalRequest.UpdatePayOSApprovalState("COMPLETED", firstTxn?.Id);
         }

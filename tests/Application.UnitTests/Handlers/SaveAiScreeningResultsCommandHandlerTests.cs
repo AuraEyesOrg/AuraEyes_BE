@@ -16,6 +16,8 @@ public class SaveAiScreeningResultsCommandHandlerTests
 {
     private readonly IRepository<AiScreening> _screeningRepository;
     private readonly IRepository<Patient> _patientRepository;
+    private readonly INotificationService _notificationService;
+    private readonly IIdentityService _identityService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAiScreeningQuery _query;
     private readonly SaveAiScreeningResultsCommandHandler _handler;
@@ -24,11 +26,31 @@ public class SaveAiScreeningResultsCommandHandlerTests
     {
         _screeningRepository = Substitute.For<IRepository<AiScreening>>();
         _patientRepository = Substitute.For<IRepository<Patient>>();
+        _notificationService = Substitute.For<INotificationService>();
+        _identityService = Substitute.For<IIdentityService>();
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _query = Substitute.For<IAiScreeningQuery>();
+        _notificationService
+            .SendAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<NotificationType>(),
+                Arg.Any<object?>(),
+                Arg.Any<CancellationToken>(),
+                Arg.Any<Guid?>())
+            .Returns(Task.CompletedTask);
+        _identityService
+            .GetUserIdsByRoleAndOrganizationAsync(
+                Arg.Any<string>(),
+                Arg.Any<Guid>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Guid>());
         _handler = new SaveAiScreeningResultsCommandHandler(
             _screeningRepository,
             _patientRepository,
+            _notificationService,
+            _identityService,
             _unitOfWork,
             _query,
             Substitute.For<ILogger<SaveAiScreeningResultsCommandHandler>>());

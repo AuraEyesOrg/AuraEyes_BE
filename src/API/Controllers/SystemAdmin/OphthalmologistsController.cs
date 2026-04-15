@@ -9,8 +9,11 @@ using Application.SystemAdmin.Ophthalmologists.Commands.DeleteFutureOphthalmolog
 using Application.SystemAdmin.Ophthalmologists.Commands.NormalizeAllFullTimeSchedules;
 using Application.SystemAdmin.Ophthalmologists.Commands.NormalizeFullTimeSchedule;
 using Application.SystemAdmin.Ophthalmologists.Commands.ApproveLeaveRequest;
+using Application.SystemAdmin.Ophthalmologists.Commands.ApproveEmploymentTypeChangeRequest;
+using Application.SystemAdmin.Ophthalmologists.Commands.RejectEmploymentTypeChangeRequest;
 using Application.SystemAdmin.Ophthalmologists.Commands.RejectLeaveRequest;
 using Application.SystemAdmin.Ophthalmologists.Queries.GetOphthalmologists;
+using Application.SystemAdmin.Ophthalmologists.Queries.GetEmploymentTypeChangeRequests;
 using Application.SystemAdmin.Ophthalmologists.Queries.GetLeaveRequests;
 using Application.SystemAdmin.Ophthalmologists.Queries.GetWithdrawalRequests;
 using Application.Wallets.Common;
@@ -540,6 +543,79 @@ public class OphthalmologistsController : BaseApiController
 
         return HandleResult(result, "Leave request rejected successfully.");
     }
+
+    /// <summary>
+    /// Get ophthalmologist employment type change requests for review.
+    /// </summary>
+    [HttpGet("employment-type-change-requests")]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<AdminOphthalmologistEmploymentTypeChangeRequestDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetEmploymentTypeChangeRequests(
+        [FromQuery] OphthalmologistEmploymentTypeChangeRequestStatus? status = null,
+        [FromQuery] Guid? ophthalmologistId = null,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var query = new GetEmploymentTypeChangeRequestsQuery
+        {
+            Status = status,
+            OphthalmologistId = ophthalmologistId,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+
+        var result = await _mediator.Send(query);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Approve an ophthalmologist employment type change request.
+    /// </summary>
+    [HttpPost("employment-type-change-requests/{requestId:guid}/approve")]
+    [ProducesResponseType(typeof(ApiResponse<ApproveEmploymentTypeChangeRequestResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ApproveEmploymentTypeChangeRequest(
+        Guid requestId,
+        [FromBody] ReviewEmploymentTypeChangeRequestApi request)
+    {
+        if (!_currentUserService.UserId.HasValue)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated."));
+
+        var result = await _mediator.Send(new ApproveEmploymentTypeChangeRequestCommand
+        {
+            RequestId = requestId,
+            ReviewedByAdminUserId = _currentUserService.UserId.Value,
+            AdminNote = request.AdminNote
+        });
+
+        return HandleResult(result, "Employment type change request approved successfully.");
+    }
+
+    /// <summary>
+    /// Reject an ophthalmologist employment type change request.
+    /// </summary>
+    [HttpPost("employment-type-change-requests/{requestId:guid}/reject")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RejectEmploymentTypeChangeRequest(
+        Guid requestId,
+        [FromBody] ReviewEmploymentTypeChangeRequestApi request)
+    {
+        if (!_currentUserService.UserId.HasValue)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated."));
+
+        var result = await _mediator.Send(new RejectEmploymentTypeChangeRequestCommand
+        {
+            RequestId = requestId,
+            ReviewedByAdminUserId = _currentUserService.UserId.Value,
+            AdminNote = request.AdminNote
+        });
+
+        return HandleResult(result, "Employment type change request rejected successfully.");
+    }
 }
 
 /// <summary>
@@ -569,6 +645,11 @@ public class RejectWithdrawalRequestApi
 }
 
 public class ReviewLeaveRequestApi
+{
+    public string? AdminNote { get; set; }
+}
+
+public class ReviewEmploymentTypeChangeRequestApi
 {
     public string? AdminNote { get; set; }
 }
