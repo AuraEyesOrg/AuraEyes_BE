@@ -268,7 +268,7 @@ public class ConsultationSessionsController : BaseApiController
                 var url = await _fileStorageService.SaveFileAsync(
                     stream,
                     image.FileName,
-                    $"consultation-chat/{_currentUser.UserId}/images",
+                    $"consultations/chat_images/{_currentUser.UserId}",
                     cancellationToken);
 
                 uploadedUrls.Add(url);

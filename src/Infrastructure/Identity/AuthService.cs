@@ -281,7 +281,7 @@ public class AuthService : IAuthService
                 var uploadedUrl = await _fileStorageService.SaveFileAsync(
                     stream,
                     file.FileName,
-                    $"credentials/{user.Id}",
+                    $"ophthalmologists/credentials/{user.Id}",
                     cancellationToken);
 
                 uploadedFileUrls.Add(uploadedUrl);

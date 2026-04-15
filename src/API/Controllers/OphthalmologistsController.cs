@@ -647,7 +647,7 @@ public class OphthalmologistsController : BaseApiController
             scannedUrl = await _fileStorageService.SaveFileAsync(
                 stream,
                 contractImage.FileName,
-                $"contracts/{userId.Value}");
+                $"ophthalmologists/contracts/{userId.Value}");
         }
 
         var command = new UploadSignedContractCommand

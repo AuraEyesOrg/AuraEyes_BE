@@ -61,7 +61,10 @@ public static class DependencyInjection
         // Admin notification settings
         services.Configure<AdminNotificationSettings>(configuration.GetSection(AdminNotificationSettings.SectionName));
 
-        // Supabase Storage Settings
+        // Cloudinary Settings
+        services.Configure<CloudinarySettings>(configuration.GetSection(CloudinarySettings.SectionName));
+
+        // Supabase Storage Settings (Keep for potential legacy needs)
         services.Configure<SupabaseStorageSettings>(configuration.GetSection(SupabaseStorageSettings.SectionName));
 
         // Google Meet Settings
@@ -203,7 +206,7 @@ public static class DependencyInjection
         services.AddTransient<IDateTime, DateTimeService>();
         services.AddTransient<IEmailService, EmailService>();
         services.AddScoped<IOrganisationOnboardingService, OrganisationOnboardingService>();
-        services.AddScoped<IFileStorageService, SupabaseStorageService>();
+        services.AddScoped<IFileStorageService, CloudinaryStorageService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IGoogleMeetService, GoogleMeetService>();
         services.AddScoped<IPatientRoadmapGenerationService, PatientRoadmapGenerationService>();
