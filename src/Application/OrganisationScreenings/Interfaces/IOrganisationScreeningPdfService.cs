@@ -36,6 +36,11 @@ public sealed record OrgScreeningReportPdfModel
     public DateTime? AssessedAt { get; init; }
     public List<AiFindingDetail> AiFindingDetails { get; init; } = new();
     public List<AiLocalizationBox> LocalizationBoxes { get; init; } = new();
+    /// <summary>
+    /// Doctor-edited heatmap matrix (rows × cols, values 0–1).
+    /// When present, takes priority over HeatmapImageUrl for PDF rendering.
+    /// </summary>
+    public float[][]? HeatmapMatrix { get; init; }
 }
 
 public interface IOrganisationScreeningPdfService
