@@ -59,6 +59,8 @@ public sealed record OphthalmologistScreeningDetailReadModel
     public required IReadOnlyList<OphthalmologistRetinalImageReadModel> Images { get; init; }
     // Null if IsAIResultShared = false (redacted by repository)
     public OphthalmologistScreeningResultReadModel? LatestResult { get; init; }
+    /// <summary>pending-review | reviewed | approved | flagged</summary>
+    public required string ReviewStatus { get; init; }
 }
 
 public sealed record OphthalmologistRetinalImageReadModel

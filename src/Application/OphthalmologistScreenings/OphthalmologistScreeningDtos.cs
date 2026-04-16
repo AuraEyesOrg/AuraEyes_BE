@@ -31,6 +31,8 @@ public sealed record OphthalmologistScreeningDetailDto
     public string? RawJsonOutput { get; init; }
     public IReadOnlyList<OphthalmologistRetinalImageDto> Images { get; init; } = [];
     public OphthalmologistScreeningResultDto? LatestResult { get; init; }
+    /// <summary>pending-review | reviewed | approved | flagged</summary>
+    public string ReviewStatus { get; init; } = "pending-review";
 }
 
 public sealed record OphthalmologistRetinalImageDto
