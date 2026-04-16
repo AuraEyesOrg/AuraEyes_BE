@@ -248,7 +248,7 @@ public sealed class PatientScreeningPdfService : IPatientScreeningPdfService
         container.Border(1).BorderColor(Border).Padding(10).Column(column =>
         {
             column.Spacing(6);
-            column.Item().Text("Clinical Diagnosis Summary")
+            column.Item().Text("Ophthamologist Diagnosis Summary")
                 .SemiBold()
                 .FontSize(12)
                 .FontColor(BrandBlue);
@@ -280,7 +280,7 @@ public sealed class PatientScreeningPdfService : IPatientScreeningPdfService
                     model.IsReferralNeeded ? "Yes" : "No"));
             });
 
-            column.Item().Element(c => ComposeLongFormText(c, "Clinical Findings", model.ClinicalFindings));
+            column.Item().Element(c => ComposeLongFormText(c, "Ophthamologist Findings", model.OphthamologistFindings));
             column.Item().Element(c => ComposeLongFormText(c, "Treatment Plan", model.TreatmentPlan));
             column.Item().Element(c => ComposeLongFormText(c, "Recommendations", model.Recommendations));
 

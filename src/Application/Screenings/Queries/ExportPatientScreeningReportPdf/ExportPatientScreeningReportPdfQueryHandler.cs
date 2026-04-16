@@ -183,7 +183,7 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
             ReportedByDoctorName = doctorName,
             DiagnosisCode = diagnosisSnapshot?.DiagnosisCode,
             CodingSystem = diagnosisSnapshot?.CodingSystem,
-            ClinicalFindings = diagnosisSnapshot?.ClinicalFindings,
+            OphthamologistFindings = diagnosisSnapshot?.ClinicalFindings,
             SeverityLevel = diagnosisSnapshot?.SeverityLevel,
             ConfidenceLevel = diagnosisSnapshot?.ConfidenceLevel,
             TreatmentPlan = diagnosisSnapshot?.TreatmentPlan,

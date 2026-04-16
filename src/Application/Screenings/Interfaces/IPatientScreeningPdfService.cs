@@ -36,7 +36,7 @@ public sealed record PatientScreeningReportPdfModel
     public string? ReportedByDoctorName { get; init; }
     public string? DiagnosisCode { get; init; }
     public string? CodingSystem { get; init; }
-    public string? ClinicalFindings { get; init; }
+    public string? OphthamologistFindings { get; init; }
     public string? SeverityLevel { get; init; }
     public decimal? ConfidenceLevel { get; init; }
     public string? TreatmentPlan { get; init; }
