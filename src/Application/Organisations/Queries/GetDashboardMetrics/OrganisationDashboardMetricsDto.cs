@@ -4,6 +4,7 @@ public class OrganisationDashboardMetricsDto
 {
     public decimal UtilizationRatePercent { get; set; }
     public int RemainingAiQuota { get; set; }
+    public int TotalPatients { get; set; }
     public int TotalAppointments { get; set; }
     public OrganisationAppointmentStatusBreakdownDto AppointmentStatus { get; set; } = new();
 }

@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260415182817_AddOrganisationTaxCodeAndFirstLoginPolicy")]
+    partial class AddOrganisationTaxCodeAndFirstLoginPolicy
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2648,79 +2651,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.ToTable("Ophthalmologists");
                 });
 
-            modelBuilder.Entity("Domain.Entities.Users.OphthalmologistEmploymentTypeChangeRequest", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("AdminNote")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<string>("CurrentEmploymentType")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("OphthalmologistId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<DateTime?>("ReviewedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ReviewedByAdminUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<string>("TargetEmploymentType")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("OphthalmologistId");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("OphthalmologistId", "Status")
-                        .IsUnique()
-                        .HasDatabaseName("UX_OphthalmologistEmploymentTypeChangeRequests_Pending")
-                        .HasFilter("\"Status\" = 'Pending'");
-
-                    b.ToTable("OphthalmologistEmploymentTypeChangeRequests", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_OphthalmologistEmploymentTypeChangeRequests_TargetDifferent", "\"CurrentEmploymentType\" <> \"TargetEmploymentType\"");
-                        });
-                });
-
             modelBuilder.Entity("Domain.Entities.Users.Organisation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3751,17 +3681,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("Domain.Entities.Users.OphthalmologistEmploymentTypeChangeRequest", b =>
-                {
-                    b.HasOne("Domain.Entities.Users.Ophthalmologist", "Ophthalmologist")
-                        .WithMany()
-                        .HasForeignKey("OphthalmologistId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Ophthalmologist");
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.OrganisationPatientLink", b =>

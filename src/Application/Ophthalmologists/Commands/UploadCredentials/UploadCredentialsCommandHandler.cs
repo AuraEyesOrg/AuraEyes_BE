@@ -45,7 +45,7 @@ public class UploadCredentialsCommandHandler : ICommandHandler<UploadCredentials
             var uploadedUrl = await _fileStorageService.SaveFileAsync(
                 stream,
                 cert.File.FileName,
-                $"credentials/{ophthalmologist.UserId}",
+                $"ophthalmologists/credentials/{ophthalmologist.UserId}",
                 cancellationToken);
 
             var newCert = new Certificate(

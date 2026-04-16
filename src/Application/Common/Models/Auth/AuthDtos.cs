@@ -178,6 +178,8 @@ public record RegisterOrganisationRequest
 
     public string? LicenseNumber { get; init; }
 
+    public string? TaxCode { get; init; }
+
     public string? Notes { get; init; }
 }
 
@@ -266,6 +268,12 @@ public record UserInfoResponse
     /// Null for non-ophthalmologist roles or if no contract exists.
     /// </summary>
     public string? ContractStatus { get; init; }
+
+    /// <summary>
+    /// Indicates whether the user must change password before accessing protected features.
+    /// Used for first login after temporary credentials are provisioned.
+    /// </summary>
+    public bool MustChangePassword { get; init; }
 
     /// <summary>
     /// Employment type for ophthalmologist users (FullTime/PartTime).

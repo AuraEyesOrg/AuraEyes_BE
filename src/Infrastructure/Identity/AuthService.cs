@@ -281,7 +281,7 @@ public class AuthService : IAuthService
                 var uploadedUrl = await _fileStorageService.SaveFileAsync(
                     stream,
                     file.FileName,
-                    $"credentials/{user.Id}",
+                    $"ophthalmologists/credentials/{user.Id}",
                     cancellationToken);
 
                 uploadedFileUrls.Add(uploadedUrl);
@@ -851,6 +851,7 @@ public class AuthService : IAuthService
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
                 ContractStatus = contractStatus,
+                MustChangePassword = user.MustChangePassword,
                 EmploymentType = employmentType
             }
         };
@@ -981,6 +982,7 @@ public class AuthService : IAuthService
                     IsVerified = isVerified,
                     VerificationStatus = verificationStatus,
                     ContractStatus = contractStatus,
+                    MustChangePassword = user.MustChangePassword,
                     EmploymentType = employmentType
                 }
             });
@@ -1216,6 +1218,7 @@ public class AuthService : IAuthService
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
                 ContractStatus = contractStatus,
+                MustChangePassword = identityUser?.MustChangePassword ?? false,
                 EmploymentType = employmentType
             });
         }

@@ -62,7 +62,7 @@ public class OrganisationTests
     {
         var org = CreateValidOrganisation();
 
-        org.UpdateDetails("New Name", "New Address", "NEW-LIC");
+        org.UpdateDetails("New Name", "New Address", "NEW-LIC", null, null);
 
         org.Name.Should().Be("New Name");
         org.Address.Should().Be("New Address");
@@ -78,7 +78,7 @@ public class OrganisationTests
     {
         var org = CreateValidOrganisation();
 
-        var act = () => org.UpdateDetails(name!, null, null);
+        var act = () => org.UpdateDetails(name!, null, null, null, null);
 
         act.Should().Throw<ArgumentException>().WithParameterName("name");
     }

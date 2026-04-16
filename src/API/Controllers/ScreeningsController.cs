@@ -221,7 +221,7 @@ public class ScreeningsController : BaseApiController
     /// </summary>
     /// <remarks>
     /// This endpoint should be called after AI analysis finishes and results are ready.
-    /// Images should already be uploaded to Supabase and URLs provided.
+    /// Images should already be uploaded to Cloudinary and URLs provided.
     /// </remarks>
     [HttpPost("{screeningId:guid}/save-results")]
     [ProducesResponseType(typeof(ApiResponse<SaveAiScreeningResultsResponse>), StatusCodes.Status200OK)]
@@ -266,7 +266,7 @@ public class ScreeningsController : BaseApiController
     }
 
     /// <summary>
-    /// Upload retinal images to Supabase storage.
+    /// Upload retinal images to Cloudinary storage.
     /// Returns public URLs. Images are persisted to database when creating screening session.
     /// </summary>
     [HttpPost]
@@ -318,7 +318,7 @@ public class ScreeningsController : BaseApiController
                 var url = await _fileStorageService.SaveFileAsync(
                     stream,
                     image.FileName,
-                    $"screenings/{_currentUserService.UserId}/images",
+                    $"patients/screenings/{_currentUserService.UserId}",
                     cancellationToken);
 
                 uploadedUrls.Add(url);
@@ -386,7 +386,7 @@ public record CreateScreeningSessionRequest
     public string? ModelVersion { get; init; }
 
     /// <summary>
-    /// Optional: retinal images with URLs already uploaded to Supabase
+    /// Optional: retinal images with URLs already uploaded to Cloudinary
     /// </summary>
     public List<RetinalImageData>? RetinalImages { get; init; }
 }
