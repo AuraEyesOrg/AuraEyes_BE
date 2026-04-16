@@ -156,6 +156,7 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
         var aiFindingDetails = ParseAiFindingDetails(detail.RawJsonOutput);
         var localizationBoxes = ParseLocalizationBoxes(detail.RawJsonOutput);
         var visualAssets = ParseVisualAssets(detail.RawJsonOutput);
+        var heatmapMatrix = ParseHeatmapMatrix(detail.RawJsonOutput);
         var originalImageUrls = detail.Images
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -195,7 +196,8 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
             FollowUpDate = diagnosisSnapshot?.FollowUpDate,
             FinalizedAt = diagnosisSnapshot?.FinalizedAt,
             AiFindingDetails = aiFindingDetails,
-            LocalizationBoxes = localizationBoxes
+            LocalizationBoxes = localizationBoxes,
+            HeatmapMatrix = heatmapMatrix
         };
 
         var pdfBytes = _patientScreeningPdfService.GenerateScreeningReportPdf(pdfModel);
@@ -443,10 +445,17 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
             using var document = JsonDocument.Parse(rawJsonOutput);
             var root = document.RootElement;
 
+            // Highest priority: doctor-reviewed and adjusted bounding boxes.
+            var doctorBoxes = ParseDoctorBboxOverrides(root);
+            if (doctorBoxes.Count > 0)
+                return doctorBoxes;
+
+            // Legacy FE format (anomalies[].location).
             var anomalyBoxes = ParseLocalizationBoxesFromAnomalies(root);
             if (anomalyBoxes.Count > 0)
                 return anomalyBoxes;
 
+            // Original AI output (localization.all_lesions[].bbox).
             if (!root.TryGetProperty("localization", out var localization) ||
                 !localization.TryGetProperty("all_lesions", out var lesions) ||
                 lesions.ValueKind != JsonValueKind.Array)
@@ -488,6 +497,50 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
         }
     }
 
+    /// <summary>
+    /// Reads doctor_bbox_overrides — the bounding boxes as adjusted/confirmed by the reviewing ophthalmologist.
+    /// These take highest priority over raw AI localization data.
+    /// </summary>
+    private static List<PatientAiLocalizationBox> ParseDoctorBboxOverrides(JsonElement root)
+    {
+        if (!root.TryGetProperty("doctor_bbox_overrides", out var overrides) ||
+            overrides.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var boxes = new List<PatientAiLocalizationBox>();
+        foreach (var item in overrides.EnumerateArray())
+        {
+            if (!item.TryGetProperty("location", out var location) ||
+                location.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            var x = TryReadDecimal(location, "x");
+            var y = TryReadDecimal(location, "y");
+            var width = TryReadDecimal(location, "width");
+            var height = TryReadDecimal(location, "height");
+
+            if (!x.HasValue || !y.HasValue || !width.HasValue || !height.HasValue)
+                continue;
+            if (width.Value <= 0 || height.Value <= 0)
+                continue;
+
+            boxes.Add(new PatientAiLocalizationBox
+            {
+                X = x.Value,
+                Y = y.Value,
+                Width = width.Value,
+                Height = height.Value,
+                Confidence = TryReadDecimal(item, "confidence")
+            });
+        }
+
+        return boxes;
+    }
+
     private static List<PatientAiLocalizationBox> ParseLocalizationBoxesFromAnomalies(JsonElement root)
     {
         if (!root.TryGetProperty("anomalies", out var anomalies) ||
@@ -526,6 +579,48 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
         }
 
         return boxes;
+    }
+
+    /// <summary>
+    /// Extracts the doctor-edited heatmap matrix (heatmap_data) from rawJsonOutput.
+    /// Returns null if absent or malformed.
+    /// </summary>
+    private static float[][]? ParseHeatmapMatrix(string? rawJsonOutput)
+    {
+        if (string.IsNullOrWhiteSpace(rawJsonOutput))
+            return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(rawJsonOutput);
+            var root = document.RootElement;
+
+            if (!root.TryGetProperty("heatmap_data", out var heatmapData) ||
+                heatmapData.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            var rows = new List<float[]>();
+            foreach (var rowElement in heatmapData.EnumerateArray())
+            {
+                if (rowElement.ValueKind != JsonValueKind.Array)
+                    return null;
+
+                var row = new List<float>();
+                foreach (var cell in rowElement.EnumerateArray())
+                {
+                    row.Add(cell.ValueKind == JsonValueKind.Number && cell.TryGetSingle(out var f) ? f : 0f);
+                }
+                rows.Add(row.ToArray());
+            }
+
+            return rows.Count > 0 ? rows.ToArray() : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static string? TryReadString(JsonElement item, string propertyName)

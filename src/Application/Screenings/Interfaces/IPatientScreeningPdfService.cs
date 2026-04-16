@@ -49,6 +49,11 @@ public sealed record PatientScreeningReportPdfModel
     public DateTime? FinalizedAt { get; init; }
     public List<PatientAiFindingDetail> AiFindingDetails { get; init; } = new();
     public List<PatientAiLocalizationBox> LocalizationBoxes { get; init; } = new();
+    /// <summary>
+    /// Doctor-edited heatmap matrix (rows × cols, values 0–1).
+    /// When present, takes priority over HeatmapImageUrl for PDF rendering.
+    /// </summary>
+    public float[][]? HeatmapMatrix { get; init; }
 }
 
 public interface IPatientScreeningPdfService
