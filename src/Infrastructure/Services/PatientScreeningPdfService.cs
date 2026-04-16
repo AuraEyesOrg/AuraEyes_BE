@@ -1,5 +1,5 @@
 using Application.Common.Helpers;
-using Application.OrganisationScreenings.Interfaces;
+using Application.Screenings.Interfaces;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -13,7 +13,7 @@ using ImgSharpImage = SixLabors.ImageSharp.Image;
 
 namespace Infrastructure.Services;
 
-public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfService
+public sealed class PatientScreeningPdfService : IPatientScreeningPdfService
 {
     private const string BrandBlue = "#0B4A8B";
     private const string BrandSky = "#1C7ED6";
@@ -27,17 +27,16 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
         Timeout = TimeSpan.FromSeconds(8)
     };
 
-    static OrganisationScreeningPdfService()
+    static PatientScreeningPdfService()
     {
         QuestPDF.Settings.License = LicenseType.Community;
     }
 
-    public byte[] GenerateScreeningReportPdf(OrgScreeningReportPdfModel model)
+    public byte[] GenerateScreeningReportPdf(PatientScreeningReportPdfModel model)
     {
         var originalImageUrl = model.OriginalImageUrls.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
         var imageAssets = FetchImageAssets(originalImageUrl, model.AnnotatedImageUrl, model.HeatmapImageUrl);
         var originalImageData = imageAssets.OriginalImageData;
-        // Prefer rendering from persisted localization boxes (includes manual edits).
         var generatedAnnotatedImageData = TryBuildBoxedImage(originalImageData, model.LocalizationBoxes);
         var annotatedImageData = generatedAnnotatedImageData ?? imageAssets.AnnotatedImageData;
         // Prefer doctor-edited heatmap matrix over the original AI static URL.
@@ -68,7 +67,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                     });
 
                     column.Item().Element(c => ComposeHeroResult(c, model));
-
+                    column.Item().Element(c => ComposeClinicalDiagnosisSection(c, model));
                     column.Item().Element(c => ComposeRetinalImagesSection(
                         c,
                         originalImageData,
@@ -77,7 +76,6 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                         originalImageUrl,
                         model.AnnotatedImageUrl,
                         model.HeatmapImageUrl));
-
                     column.Item().Element(c => ComposeAiFindingsTable(c, model));
                 });
 
@@ -96,11 +94,10 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
         var heatmapTask = TryDownloadImageDataAsync(heatmapImageUrl);
 
         Task.WhenAll(originalTask, annotatedTask, heatmapTask).GetAwaiter().GetResult();
-
         return (originalTask.Result, annotatedTask.Result, heatmapTask.Result);
     }
 
-    private void ComposeHeader(IContainer container, OrgScreeningReportPdfModel model)
+    private void ComposeHeader(IContainer container, PatientScreeningReportPdfModel model)
     {
         container.Border(1).BorderColor(Border).Padding(12).Column(column =>
         {
@@ -118,16 +115,10 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                 row.RelativeItem().AlignRight().Column(right =>
                 {
                     right.Spacing(2);
-                    right.Item().Text("Healthcare Copy")
+                    right.Item().Text("Patient Copy")
                         .FontSize(9)
                         .SemiBold()
                         .FontColor(BrandSky);
-                    right.Item().Text(text =>
-                    {
-                        text.DefaultTextStyle(x => x.FontSize(9).FontColor(TextStrong));
-                        text.Span("Organisation: ").SemiBold();
-                        text.Span(model.OrganisationName);
-                    });
                     right.Item().Text(text =>
                     {
                         text.DefaultTextStyle(x => x.FontSize(9).FontColor(TextMuted));
@@ -140,7 +131,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
         });
     }
 
-    private void ComposePatientInfo(IContainer container, OrgScreeningReportPdfModel model)
+    private void ComposePatientInfo(IContainer container, PatientScreeningReportPdfModel model)
     {
         Card(container).Column(column =>
         {
@@ -150,13 +141,13 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                 .FontSize(12)
                 .FontColor(BrandBlue);
             column.Item().PaddingBottom(4).LineHorizontal(1).LineColor(Border);
-            
+
             ComposeInfoRow(column, "Patient Name", model.PatientName);
             ComposeInfoRow(column, "Patient ID", model.PatientId.ToString());
         });
     }
 
-    private void ComposeSessionInfo(IContainer container, OrgScreeningReportPdfModel model)
+    private void ComposeSessionInfo(IContainer container, PatientScreeningReportPdfModel model)
     {
         Card(container).Column(column =>
         {
@@ -166,42 +157,35 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                 .FontSize(12)
                 .FontColor(BrandBlue);
             column.Item().PaddingBottom(4).LineHorizontal(1).LineColor(Border);
-            
+
             ComposeInfoRow(column, "Screening ID", model.ScreeningId.ToString());
             ComposeInfoRow(column, "Model Version", string.IsNullOrWhiteSpace(model.ModelVersion) ? "N/A" : model.ModelVersion);
             ComposeInfoRow(column, "Session Created", FormatReportDateTime(model.CreatedAt));
+            ComposeInfoRow(column, "Reported By", string.IsNullOrWhiteSpace(model.ReportedByDoctorName) ? "N/A" : model.ReportedByDoctorName);
         });
     }
 
-    private void ComposeHeroResult(IContainer container, OrgScreeningReportPdfModel model)
+    private void ComposeHeroResult(IContainer container, PatientScreeningReportPdfModel model)
     {
         var riskColor = ResolveRiskColor(model.RiskLevel);
 
         container.BorderLeft(4).BorderColor(riskColor).Background(Surface).Padding(12).Column(column =>
         {
             column.Spacing(6);
-            
-            // Top Level Metrics
-            column.Item().Row(row =>
+            column.Item().Text(text =>
             {
-                row.RelativeItem().Text(text =>
-                {
-                    text.Span("Risk Level: ").SemiBold().FontSize(12).FontColor(TextStrong);
-                    text.Span(string.IsNullOrWhiteSpace(model.RiskLevel) ? "N/A" : model.RiskLevel.ToUpperInvariant())
-                        .SemiBold()
-                        .FontSize(12)
-                        .FontColor(riskColor);
-                });
+                text.Span("Risk Level: ").SemiBold().FontSize(12).FontColor(TextStrong);
+                text.Span(string.IsNullOrWhiteSpace(model.RiskLevel) ? "N/A" : model.RiskLevel.ToUpperInvariant())
+                    .SemiBold()
+                    .FontSize(12)
+                    .FontColor(riskColor);
             });
-
             column.Item().LineHorizontal(1).LineColor(Border);
-
             column.Item().PaddingVertical(2).Text(text =>
             {
                 text.Span("AI Summary: ").SemiBold().FontColor(BrandBlue);
                 text.Span(string.IsNullOrWhiteSpace(model.Summary) ? "No summary available." : " " + model.Summary).FontColor(TextStrong);
             });
-            
             column.Item().Text(text =>
             {
                 text.DefaultTextStyle(x => x.FontSize(8).FontColor(TextMuted));
@@ -211,7 +195,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
         });
     }
 
-    private void ComposeAiFindingsTable(IContainer container, OrgScreeningReportPdfModel model)
+    private void ComposeAiFindingsTable(IContainer container, PatientScreeningReportPdfModel model)
     {
         container.Border(1).BorderColor(Border).Padding(10).Column(column =>
         {
@@ -224,7 +208,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
             if (model.AiFindingDetails.Count == 0)
             {
                 column.Item().Background(Surface).Padding(10).Text(
-                    "No structured finding percentages are available for this screening session.")
+                        "No structured finding percentages are available for this screening session.")
                     .FontColor(TextMuted);
                 return;
             }
@@ -233,9 +217,9 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
             {
                 table.ColumnsDefinition(columns =>
                 {
-                    columns.ConstantColumn(30);  // Rank Number
-                    columns.RelativeColumn(3);   // Finding Name
-                    columns.ConstantColumn(110); // Status
+                    columns.ConstantColumn(30);
+                    columns.RelativeColumn(3);
+                    columns.ConstantColumn(110);
                 });
 
                 table.Header(header =>
@@ -253,12 +237,58 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
                     var status = string.IsNullOrWhiteSpace(finding.Status) ? "Detected" : finding.Status.Replace("_", " ");
                     if (status.Length > 0)
                     {
-                        status = char.ToUpperInvariant(status[0]) + status.Substring(1).ToLowerInvariant();
+                        status = char.ToUpperInvariant(status[0]) + status[1..].ToLowerInvariant();
                     }
-                    
+
                     table.Cell().Element(TableBodyCell).AlignCenter().Text(status).FontColor(TextMuted);
                 }
             });
+        });
+    }
+
+    private void ComposeClinicalDiagnosisSection(IContainer container, PatientScreeningReportPdfModel model)
+    {
+        container.Border(1).BorderColor(Border).Padding(10).Column(column =>
+        {
+            column.Spacing(6);
+            column.Item().Text("Ophthamologist Diagnosis Summary")
+                .SemiBold()
+                .FontSize(12)
+                .FontColor(BrandBlue);
+
+            column.Item().Row(row =>
+            {
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(c, "Diagnosis Code", model.DiagnosisCode));
+                row.ConstantItem(8);
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(c, "Coding System", model.CodingSystem));
+                row.ConstantItem(8);
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(c, "Severity", model.SeverityLevel));
+            });
+
+            column.Item().Row(row =>
+            {
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(
+                    c,
+                    "Confidence",
+                    model.ConfidenceLevel.HasValue ? $"{model.ConfidenceLevel.Value:0.#}%" : null));
+                row.ConstantItem(8);
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(
+                    c,
+                    "Urgent",
+                    model.IsUrgent ? "Yes" : "No"));
+                row.ConstantItem(8);
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(
+                    c,
+                    "Referral Needed",
+                    model.IsReferralNeeded ? "Yes" : "No"));
+            });
+
+            column.Item().Element(c => ComposeLongFormText(c, "Ophthamologist Findings", model.OphthamologistFindings));
+            column.Item().Element(c => ComposeLongFormText(c, "Treatment Plan", model.TreatmentPlan));
+            column.Item().Element(c => ComposeLongFormText(c, "Recommendations", model.Recommendations));
+
+            if (!string.IsNullOrWhiteSpace(model.LifestyleAdvice))
+                column.Item().Element(c => ComposeLongFormText(c, "Lifestyle Advice", model.LifestyleAdvice));
         });
     }
 
@@ -281,27 +311,15 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
 
             column.Item().Row(row =>
             {
-                row.RelativeItem().Element(c => ComposeImageCard(
-                    c,
-                    "Original Scan",
-                    originalImageData,
-                    originalImageUrl));
-
+                row.RelativeItem().Element(c => ComposeImageCard(c, "Original Scan", originalImageData, originalImageUrl));
                 row.ConstantItem(8);
-
                 row.RelativeItem().Element(c => ComposeImageCard(
                     c,
                     "AI Localization",
                     annotatedImageData,
                     annotatedImageData is null ? annotatedImageUrl : "generated"));
-
                 row.ConstantItem(8);
-
-                row.RelativeItem().Element(c => ComposeImageCard(
-                    c,
-                    "Attention Heatmap",
-                    heatmapImageData,
-                    heatmapImageUrl));
+                row.RelativeItem().Element(c => ComposeImageCard(c, "Attention Heatmap", heatmapImageData, heatmapImageUrl));
             });
         });
     }
@@ -311,11 +329,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
         container.Border(1).BorderColor(Border).Background(Surface).Padding(8).Column(column =>
         {
             column.Spacing(5);
-            column.Item().Text(title)
-                .SemiBold()
-                .FontSize(10)
-                .FontColor(TextStrong)
-                .AlignCenter();
+            column.Item().Text(title).SemiBold().FontSize(10).FontColor(TextStrong).AlignCenter();
 
             if (imageData is { Length: > 0 })
             {
@@ -344,6 +358,29 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
         });
     }
 
+    private void ComposeImageCardlessInfo(IContainer container, string label, string? value)
+    {
+        container.Border(1).BorderColor(Border).Background(Surface).Padding(8).Column(column =>
+        {
+            column.Spacing(3);
+            column.Item().Text(label).SemiBold().FontSize(9).FontColor(TextMuted);
+            column.Item().Text(string.IsNullOrWhiteSpace(value) ? "N/A" : value).FontSize(10).FontColor(TextStrong);
+        });
+    }
+
+    private void ComposeLongFormText(IContainer container, string label, string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return;
+
+        container.Border(1).BorderColor(Border).Background(Surface).Padding(8).Column(column =>
+        {
+            column.Spacing(3);
+            column.Item().Text(label).SemiBold().FontSize(9).FontColor(TextMuted);
+            column.Item().Text(content.Trim()).FontSize(10).FontColor(TextStrong);
+        });
+    }
+
     private void ComposeFooter(IContainer container)
     {
         container.Column(column =>
@@ -352,7 +389,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
             column.Item().PaddingTop(4).Row(row =>
             {
                 row.RelativeItem().Text(
-                    "This report is generated by AuraEyes AI to support medical evaluation and does not replace definitive clinical diagnosis.")
+                        "This report is generated by AuraEyes AI to support medical evaluation and does not replace definitive clinical diagnosis.")
                     .FontSize(8)
                     .FontColor(TextMuted);
 
@@ -367,7 +404,6 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
             });
         });
     }
-
 
     private static IContainer Card(IContainer container)
     {
@@ -440,7 +476,6 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
         try
         {
             using var response = await ImageHttpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
-
             if (!response.IsSuccessStatusCode) return null;
 
             var mediaType = response.Content.Headers.ContentType?.MediaType;
@@ -467,7 +502,6 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
 
         var metadata = dataUrl[..commaIndex];
         var payload = dataUrl[(commaIndex + 1)..];
-
         if (!metadata.Contains(";base64", StringComparison.OrdinalIgnoreCase)) return null;
 
         try
@@ -536,7 +570,7 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
         }
     }
 
-    private static byte[]? TryBuildBoxedImage(byte[]? originalImageData, IReadOnlyCollection<AiLocalizationBox> boxes)
+    private static byte[]? TryBuildBoxedImage(byte[]? originalImageData, IReadOnlyCollection<PatientAiLocalizationBox> boxes)
     {
         if (originalImageData is not { Length: > 0 } || boxes.Count == 0)
             return null;
@@ -552,8 +586,6 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
             {
                 foreach (var box in boxes)
                 {
-                    // Support both absolute pixel coordinates (AI localization)
-                    // and percentage coordinates (manually edited anomalies).
                     var isPercentLocation = box.X <= 100m && box.Y <= 100m && box.Width <= 100m && box.Height <= 100m;
                     var rawX = isPercentLocation ? (box.X / 100m) * image.Width : box.X;
                     var rawY = isPercentLocation ? (box.Y / 100m) * image.Height : box.Y;

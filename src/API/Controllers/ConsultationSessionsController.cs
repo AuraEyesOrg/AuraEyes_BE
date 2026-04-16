@@ -9,6 +9,7 @@ using Application.ConsultationSessions.Commands.SubmitVerificationReport;
 using Application.ConsultationSessions.Common;
 using Application.ConsultationSessions.Queries.GetConsultationSession;
 using Application.ConsultationSessions.Queries.GetConsultationSessions;
+using Application.Screenings.Queries.ExportPatientScreeningReportPdf;
 using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -84,6 +85,45 @@ public class ConsultationSessionsController : BaseApiController
     {
         var result = await _mediator.Send(new GetConsultationSessionQuery(sessionId));
         return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Download screening report PDF for a consultation session.
+    /// Allows assigned ophthalmologist or patient to export the same report.
+    /// </summary>
+    [HttpGet("{sessionId:guid}/report-pdf")]
+    [Authorize]
+    [Produces("application/pdf")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadSessionReportPdf(
+        Guid sessionId,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUser.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
+
+        var sessionResult = await _mediator.Send(new GetConsultationSessionQuery(sessionId), cancellationToken);
+        if (!sessionResult.IsSuccess || sessionResult.Data is null)
+            return HandleResult(sessionResult);
+
+        var screeningId = sessionResult.Data.AiScreeningId;
+        if (!screeningId.HasValue)
+            return BadRequest(ApiResponseFactory.Error("Session has no linked AI screening."));
+
+        var pdfResult = await _mediator.Send(
+            new ExportPatientScreeningReportPdfQuery(
+                _currentUser.UserId.Value,
+                screeningId.Value,
+                _currentUser.ProfileId),
+            cancellationToken);
+
+        if (!pdfResult.IsSuccess || pdfResult.Data is null)
+            return HandleResult(pdfResult, "Screening report generated");
+
+        Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
+        return File(pdfResult.Data.Content, pdfResult.Data.ContentType, pdfResult.Data.FileName);
     }
 
     /// <summary>

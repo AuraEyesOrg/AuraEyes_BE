@@ -1,79 +1,175 @@
-using Application.Common.Interfaces;
-using Application.Common.Models;
-using Application.OrganisationScreenings.Interfaces;
-using Application.OrganisationScreenings.Queries.GetOrgScreeningSessionDetail;
-using Domain.Repositories;
-using MediatR;
 using System.Globalization;
 using System.Text.Json;
+using Application.Common.Interfaces;
+using Application.Common.Models;
+using Application.Screenings.Interfaces;
+using Domain.Common;
+using Domain.Entities.Consultation;
+using Domain.Entities.Screening;
+using Domain.Entities.Users;
+using Domain.Repositories;
+using Microsoft.EntityFrameworkCore;
 
-namespace Application.OrganisationScreenings.Queries.ExportOrgScreeningReportPdf;
+namespace Application.Screenings.Queries.ExportPatientScreeningReportPdf;
 
-public sealed class ExportOrgScreeningReportPdfQueryHandler
-    : IQueryHandler<ExportOrgScreeningReportPdfQuery, OrgScreeningReportPdfFileDto>
+public sealed class ExportPatientScreeningReportPdfQueryHandler
+    : IQueryHandler<ExportPatientScreeningReportPdfQuery, PatientScreeningReportPdfFileDto>
 {
-    private readonly IMediator _mediator;
-    private readonly IOrganisationPatientsRepository _organisationPatientsRepository;
-    private readonly IOrganisationScreeningPdfService _organisationScreeningPdfService;
+    private readonly IRepository<Patient> _patientRepository;
+    private readonly IRepository<AiScreening> _screeningRepository;
+    private readonly IRepository<MedicalDiagnosis> _medicalDiagnosisRepository;
+    private readonly IRepository<ConsultationSession> _consultationSessionRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IIdentityService _identityService;
+    private readonly IPatientScreeningPdfService _patientScreeningPdfService;
     private readonly Uri _aiAssetBaseUri;
 
-    public ExportOrgScreeningReportPdfQueryHandler(
-        IMediator mediator,
-        IOrganisationPatientsRepository organisationPatientsRepository,
-        IOrganisationScreeningPdfService organisationScreeningPdfService,
+    public ExportPatientScreeningReportPdfQueryHandler(
+        IRepository<Patient> patientRepository,
+        IRepository<AiScreening> screeningRepository,
+        IRepository<MedicalDiagnosis> medicalDiagnosisRepository,
+        IRepository<ConsultationSession> consultationSessionRepository,
+        IOphthalmologistRepository ophthalmologistRepository,
+        IIdentityService identityService,
+        IPatientScreeningPdfService patientScreeningPdfService,
         IAiAssetBaseUrlProvider aiAssetBaseUrlProvider)
     {
-        _mediator = mediator;
-        _organisationPatientsRepository = organisationPatientsRepository;
-        _organisationScreeningPdfService = organisationScreeningPdfService;
+        _patientRepository = patientRepository;
+        _screeningRepository = screeningRepository;
+        _medicalDiagnosisRepository = medicalDiagnosisRepository;
+        _consultationSessionRepository = consultationSessionRepository;
+        _ophthalmologistRepository = ophthalmologistRepository;
+        _identityService = identityService;
+        _patientScreeningPdfService = patientScreeningPdfService;
         _aiAssetBaseUri = aiAssetBaseUrlProvider.BaseUri;
     }
 
-    public async Task<Result<OrgScreeningReportPdfFileDto>> Handle(
-        ExportOrgScreeningReportPdfQuery request,
+    public async Task<Result<PatientScreeningReportPdfFileDto>> Handle(
+        ExportPatientScreeningReportPdfQuery request,
         CancellationToken cancellationToken)
     {
-        var detailResult = await _mediator.Send(
-            new GetOrgScreeningSessionDetailQuery(request.OrgAdminUserId, request.ScreeningId),
-            cancellationToken);
+        var requesterPatient = await _patientRepository
+            .Query()
+            .Where(x => x.UserId == request.RequesterUserId && !x.IsDeleted)
+            .Select(x => new
+            {
+                x.Id,
+                x.FullName
+            })
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (!detailResult.IsSuccess || detailResult.Data is null)
-            return MapFailure(detailResult);
-
-        var detail = detailResult.Data;
-
-        var patientName = detail.PatientName;
-        if (string.IsNullOrWhiteSpace(patientName))
+        Guid? requesterPatientId = requesterPatient?.Id;
+        if (requesterPatient is null && request.RequesterProfileId.HasValue)
         {
-            patientName = await _organisationPatientsRepository.GetPatientDisplayNameForOrganisationAdminAsync(
-                request.OrgAdminUserId,
-                detail.PatientId,
-                cancellationToken);
+            var isDoctorReviewer = await _consultationSessionRepository
+                .Query()
+                .AnyAsync(
+                    s => s.AiScreeningId == request.ScreeningId &&
+                         s.OphthalmologistId == request.RequesterProfileId.Value &&
+                         !s.IsDeleted,
+                    cancellationToken);
+
+            if (!isDoctorReviewer)
+                return Result<PatientScreeningReportPdfFileDto>.Forbidden("You are not allowed to export this screening report.");
         }
 
-        var organisationName = await _organisationPatientsRepository.GetOrganisationNameForOrganisationAdminAsync(
-            request.OrgAdminUserId,
-            cancellationToken);
+        var detail = await _screeningRepository
+            .Query()
+            .Where(x => x.Id == request.ScreeningId && !x.IsDeleted)
+            .Where(x => !requesterPatientId.HasValue || x.PatientId == requesterPatientId.Value)
+            .Select(x => new
+            {
+                ScreeningId = x.Id,
+                x.PatientId,
+                x.CreatedAt,
+                x.ModelVersion,
+                x.RawJsonOutput,
+                Images = x.RetinalImages
+                    .Where(i => !i.IsDeleted)
+                    .Select(i => i.ImageUrl)
+                    .ToList(),
+                LatestResult = x.ScreeningResults
+                    .Where(r => !r.IsDeleted)
+                    .OrderByDescending(r => r.CreatedAt)
+                    .Select(r => new
+                    {
+                        RiskLevel = r.RiskLevel.ToString(),
+                        r.ConfidenceScore,
+                        r.Summary,
+                        r.Findings,
+                        AssessedAt = r.CreatedAt
+                    })
+                    .FirstOrDefault()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (detail is null)
+        {
+            return Result<PatientScreeningReportPdfFileDto>.NotFound("Screening session not found.");
+        }
+
+        var patientSnapshot = await _patientRepository
+            .Query()
+            .Where(p => p.Id == detail.PatientId && !p.IsDeleted)
+            .Select(p => new
+            {
+                p.FullName,
+                p.UserId
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var diagnosisSnapshot = await _medicalDiagnosisRepository
+            .Query()
+            .Where(d => d.AiScreeningId == detail.ScreeningId && !d.IsDeleted)
+            .OrderByDescending(d => d.FinalizedAt ?? d.CreatedAt)
+            .Select(d => new
+            {
+                d.DoctorId,
+                d.DiagnosisCode,
+                d.CodingSystem,
+                d.ClinicalFindings,
+                d.SeverityLevel,
+                d.ConfidenceLevel,
+                d.TreatmentPlan,
+                d.Recommendations,
+                d.LifestyleAdvice,
+                d.IsUrgent,
+                d.Status,
+                d.FollowUpDate,
+                d.IsReferralNeeded,
+                d.FinalizedAt
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var doctorName = "N/A";
+        if (diagnosisSnapshot?.DoctorId is Guid doctorId)
+        {
+            var doctor = await _ophthalmologistRepository.GetByIdAsync(doctorId, cancellationToken);
+            if (doctor is not null)
+            {
+                var doctorUser = await _identityService.GetUserByIdAsync(doctor.UserId, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(doctorUser?.FullName))
+                    doctorName = doctorUser.FullName.Trim();
+            }
+        }
 
         var aiFindingDetails = ParseAiFindingDetails(detail.RawJsonOutput);
         var localizationBoxes = ParseLocalizationBoxes(detail.RawJsonOutput);
         var visualAssets = ParseVisualAssets(detail.RawJsonOutput);
         var heatmapMatrix = ParseHeatmapMatrix(detail.RawJsonOutput);
         var originalImageUrls = detail.Images
-            .Select(x => x.ImageUrl)
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
         var originalImageBaseUri = TryGetBaseUri(originalImageUrls);
 
-        var pdfModel = new OrgScreeningReportPdfModel
+        var patientName = ResolvePatientName(patientSnapshot?.FullName);
+
+        var pdfModel = new PatientScreeningReportPdfModel
         {
             ScreeningId = detail.ScreeningId,
             PatientId = detail.PatientId,
-            OrganisationName = string.IsNullOrWhiteSpace(organisationName)
-                ? "AuraEyes Partner Organisation"
-                : organisationName.Trim(),
-            PatientName = string.IsNullOrWhiteSpace(patientName) ? "Patient" : patientName,
+            PatientName = patientName,
             CreatedAt = detail.CreatedAt,
             ModelVersion = detail.ModelVersion,
             ImagesCount = detail.Images.Count,
@@ -85,46 +181,48 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             Summary = detail.LatestResult?.Summary,
             Findings = detail.LatestResult?.Findings,
             AssessedAt = detail.LatestResult?.AssessedAt,
+            ReportedByDoctorName = doctorName,
+            DiagnosisCode = diagnosisSnapshot?.DiagnosisCode,
+            CodingSystem = diagnosisSnapshot?.CodingSystem,
+            OphthamologistFindings = diagnosisSnapshot?.ClinicalFindings,
+            SeverityLevel = diagnosisSnapshot?.SeverityLevel,
+            ConfidenceLevel = diagnosisSnapshot?.ConfidenceLevel,
+            TreatmentPlan = diagnosisSnapshot?.TreatmentPlan,
+            Recommendations = diagnosisSnapshot?.Recommendations,
+            LifestyleAdvice = diagnosisSnapshot?.LifestyleAdvice,
+            ClinicalStatus = diagnosisSnapshot?.Status,
+            IsUrgent = diagnosisSnapshot?.IsUrgent ?? false,
+            IsReferralNeeded = diagnosisSnapshot?.IsReferralNeeded ?? false,
+            FollowUpDate = diagnosisSnapshot?.FollowUpDate,
+            FinalizedAt = diagnosisSnapshot?.FinalizedAt,
             AiFindingDetails = aiFindingDetails,
             LocalizationBoxes = localizationBoxes,
-            HeatmapMatrix = heatmapMatrix,
+            HeatmapMatrix = heatmapMatrix
         };
 
-        var pdfBytes = _organisationScreeningPdfService.GenerateScreeningReportPdf(pdfModel);
+        var pdfBytes = _patientScreeningPdfService.GenerateScreeningReportPdf(pdfModel);
 
-        return Result<OrgScreeningReportPdfFileDto>.Success(new OrgScreeningReportPdfFileDto
+        return Result<PatientScreeningReportPdfFileDto>.Success(new PatientScreeningReportPdfFileDto
         {
             Content = pdfBytes,
             ContentType = "application/pdf",
-            FileName = BuildFileName(pdfModel.PatientName, pdfModel.ScreeningId, pdfModel.CreatedAt),
+            FileName = BuildFileName(pdfModel.PatientName, pdfModel.ScreeningId, pdfModel.CreatedAt)
         });
     }
 
-    private static Result<OrgScreeningReportPdfFileDto> MapFailure<T>(Result<T> source)
+    private static string ResolvePatientName(string? fullName)
     {
-        if (source.IsUnauthorized)
-            return Result<OrgScreeningReportPdfFileDto>.Unauthorized(source.ErrorMessage);
+        if (string.IsNullOrWhiteSpace(fullName))
+            return "Patient";
 
-        if (source.IsForbidden)
-            return Result<OrgScreeningReportPdfFileDto>.Forbidden(source.ErrorMessage);
-
-        if (source.IsNotFound)
-            return Result<OrgScreeningReportPdfFileDto>.NotFound(source.ErrorMessage);
-
-        if (source.IsConflict)
-            return Result<OrgScreeningReportPdfFileDto>.Conflict(source.ErrorMessage);
-
-        if (source.IsPaymentRequired)
-            return Result<OrgScreeningReportPdfFileDto>.PaymentRequired(source.ErrorMessage);
-
-        return Result<OrgScreeningReportPdfFileDto>.Failure(source.Errors);
+        return fullName.Trim();
     }
 
     private static string BuildFileName(string patientName, Guid screeningId, DateTime createdAt)
     {
         var safeName = SanitizeFileToken(patientName);
         var screeningShortId = screeningId.ToString("N")[..8];
-        return $"screening-report-{safeName}-{createdAt:yyyyMMdd}-{screeningShortId}.pdf";
+        return $"patient-screening-report-{safeName}-{createdAt:yyyyMMdd}-{screeningShortId}.pdf";
     }
 
     private static string SanitizeFileToken(string value)
@@ -136,7 +234,6 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             char.IsLetterOrDigit(ch) ? ch : '-');
 
         var cleaned = new string(cleanedChars.ToArray());
-
         while (cleaned.Contains("--", StringComparison.Ordinal))
         {
             cleaned = cleaned.Replace("--", "-", StringComparison.Ordinal);
@@ -146,7 +243,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
         return string.IsNullOrWhiteSpace(cleaned) ? "patient" : cleaned;
     }
 
-    private static List<AiFindingDetail> ParseAiFindingDetails(string? rawJsonOutput)
+    private static List<PatientAiFindingDetail> ParseAiFindingDetails(string? rawJsonOutput)
     {
         if (string.IsNullOrWhiteSpace(rawJsonOutput))
             return [];
@@ -168,7 +265,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
         }
     }
 
-    private static List<AiFindingDetail> ParseTopK(JsonElement root)
+    private static List<PatientAiFindingDetail> ParseTopK(JsonElement root)
     {
         if (!root.TryGetProperty("prediction", out var prediction) ||
             !prediction.TryGetProperty("top_k", out var topK) ||
@@ -177,7 +274,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             return [];
         }
 
-        var findings = new List<AiFindingDetail>();
+        var findings = new List<PatientAiFindingDetail>();
         var index = 0;
 
         foreach (var item in topK.EnumerateArray())
@@ -191,7 +288,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             var confidenceValue = TryReadDecimal(item, "confidence") ?? 0m;
             var rank = TryReadInt(item, "rank") ?? index;
 
-            findings.Add(new AiFindingDetail
+            findings.Add(new PatientAiFindingDetail
             {
                 Rank = rank,
                 DiseaseName = diseaseName.Trim(),
@@ -206,7 +303,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             .ToList();
     }
 
-    private static List<AiFindingDetail> ParseAnomalies(JsonElement root)
+    private static List<PatientAiFindingDetail> ParseAnomalies(JsonElement root)
     {
         if (!root.TryGetProperty("anomalies", out var anomalies) ||
             anomalies.ValueKind != JsonValueKind.Array)
@@ -214,7 +311,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             return [];
         }
 
-        var findings = new List<AiFindingDetail>();
+        var findings = new List<PatientAiFindingDetail>();
         var index = 0;
 
         foreach (var item in anomalies.EnumerateArray())
@@ -227,7 +324,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
 
             var confidenceValue = TryReadDecimal(item, "confidence") ?? 0m;
 
-            findings.Add(new AiFindingDetail
+            findings.Add(new PatientAiFindingDetail
             {
                 Rank = index,
                 DiseaseName = diseaseName.Trim(),
@@ -315,7 +412,6 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             return null;
 
         var normalizedCandidate = candidate.Trim();
-
         if (Uri.TryCreate(normalizedCandidate, UriKind.Absolute, out var absolute))
             return absolute.ToString();
 
@@ -339,7 +435,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             TryReadString(item, "class_name");
     }
 
-    private static List<AiLocalizationBox> ParseLocalizationBoxes(string? rawJsonOutput)
+    private static List<PatientAiLocalizationBox> ParseLocalizationBoxes(string? rawJsonOutput)
     {
         if (string.IsNullOrWhiteSpace(rawJsonOutput))
             return [];
@@ -367,7 +463,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
                 return [];
             }
 
-            var boxes = new List<AiLocalizationBox>();
+            var boxes = new List<PatientAiLocalizationBox>();
             foreach (var lesion in lesions.EnumerateArray())
             {
                 if (!lesion.TryGetProperty("bbox", out var bbox))
@@ -383,7 +479,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
                 if (width.Value <= 0 || height.Value <= 0)
                     continue;
 
-                boxes.Add(new AiLocalizationBox
+                boxes.Add(new PatientAiLocalizationBox
                 {
                     X = x.Value,
                     Y = y.Value,
@@ -405,7 +501,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
     /// Reads doctor_bbox_overrides — the bounding boxes as adjusted/confirmed by the reviewing ophthalmologist.
     /// These take highest priority over raw AI localization data.
     /// </summary>
-    private static List<AiLocalizationBox> ParseDoctorBboxOverrides(JsonElement root)
+    private static List<PatientAiLocalizationBox> ParseDoctorBboxOverrides(JsonElement root)
     {
         if (!root.TryGetProperty("doctor_bbox_overrides", out var overrides) ||
             overrides.ValueKind != JsonValueKind.Array)
@@ -413,7 +509,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             return [];
         }
 
-        var boxes = new List<AiLocalizationBox>();
+        var boxes = new List<PatientAiLocalizationBox>();
         foreach (var item in overrides.EnumerateArray())
         {
             if (!item.TryGetProperty("location", out var location) ||
@@ -432,7 +528,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             if (width.Value <= 0 || height.Value <= 0)
                 continue;
 
-            boxes.Add(new AiLocalizationBox
+            boxes.Add(new PatientAiLocalizationBox
             {
                 X = x.Value,
                 Y = y.Value,
@@ -445,7 +541,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
         return boxes;
     }
 
-    private static List<AiLocalizationBox> ParseLocalizationBoxesFromAnomalies(JsonElement root)
+    private static List<PatientAiLocalizationBox> ParseLocalizationBoxesFromAnomalies(JsonElement root)
     {
         if (!root.TryGetProperty("anomalies", out var anomalies) ||
             anomalies.ValueKind != JsonValueKind.Array)
@@ -453,7 +549,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             return [];
         }
 
-        var boxes = new List<AiLocalizationBox>();
+        var boxes = new List<PatientAiLocalizationBox>();
         foreach (var anomaly in anomalies.EnumerateArray())
         {
             if (!anomaly.TryGetProperty("location", out var location) ||
@@ -472,7 +568,7 @@ public sealed class ExportOrgScreeningReportPdfQueryHandler
             if (width.Value <= 0 || height.Value <= 0)
                 continue;
 
-            boxes.Add(new AiLocalizationBox
+            boxes.Add(new PatientAiLocalizationBox
             {
                 X = x.Value,
                 Y = y.Value,

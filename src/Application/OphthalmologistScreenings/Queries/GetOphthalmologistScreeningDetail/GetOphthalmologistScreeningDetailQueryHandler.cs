@@ -43,6 +43,7 @@ public sealed class GetOphthalmologistScreeningDetailQueryHandler
             CreatedAt = readModel.CreatedAt,
             ProcessedAt = readModel.ProcessedAt,
             RawJsonOutput = readModel.RawJsonOutput, // Null if not shared
+            ReviewStatus = readModel.ReviewStatus,
             Images = readModel.Images.Select(i => new OphthalmologistRetinalImageDto
             {
                 Id = i.Id,

@@ -90,6 +90,13 @@ jobs:
           SupabaseStorage__ServiceKey=${{ secrets.SUPABASE_STORAGE_KEY }}
           SupabaseStorage__BucketName=${{ secrets.SUPABASE_STORAGE_BUCKET }}
 
+          # ── Cloudinary ──
+          Cloudinary__CloudName=${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          Cloudinary__ApiKey=${{ secrets.CLOUDINARY_API_KEY }}
+          Cloudinary__ApiSecret=${{ secrets.CLOUDINARY_API_SECRET }}
+          Cloudinary__Folder=auraeyes_dev
+
+
           GoogleAuth__ClientId=${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GoogleMeet__ClientId=${{ secrets.GOOGLE_MEET_CLIENT_ID }}
           GoogleMeet__ClientSecret=${{ secrets.GOOGLE_MEET_CLIENT_SECRET }}

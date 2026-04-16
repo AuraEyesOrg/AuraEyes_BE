@@ -2,12 +2,14 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Screenings.Commands.CreateAiScreeningSession;
 using Application.Screenings.Commands.SaveAiScreeningResults;
+using Application.Screenings.Queries.ExportPatientScreeningReportPdf;
 using Application.Screenings.Queries.GetRecentScreeningSessions;
 using Application.Screenings.Queries.GetScreeningSessionDetail;
 using Domain.Common;
 using Domain.Entities.Screening;
 using Domain.Entities.Users;
 using Domain.Enums;
+using Domain.Repositories;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,7 +30,9 @@ public class ScreeningsController : BaseApiController
     private readonly IRepository<AiScreening> _screeningRepository;
     private readonly IRepository<MedicalDiagnosis> _medicalDiagnosisRepository;
     private readonly IRepository<Patient> _patientRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IFileStorageService _fileStorageService;
+    private readonly IIdentityService _identityService;
     private readonly ILogger<ScreeningsController> _logger;
 
     public ScreeningsController(
@@ -38,6 +42,8 @@ public class ScreeningsController : BaseApiController
         IRepository<MedicalDiagnosis> medicalDiagnosisRepository,
         IRepository<Patient> patientRepository,
         IFileStorageService fileStorageService,
+        IOphthalmologistRepository ophthalmologistRepository,
+        IIdentityService identityService,
         ILogger<ScreeningsController> logger)
     {
         _mediator = mediator;
@@ -46,6 +52,8 @@ public class ScreeningsController : BaseApiController
         _medicalDiagnosisRepository = medicalDiagnosisRepository;
         _patientRepository = patientRepository;
         _fileStorageService = fileStorageService;
+        _ophthalmologistRepository = ophthalmologistRepository;
+        _identityService = identityService;
         _logger = logger;
     }
 
@@ -131,8 +139,9 @@ public class ScreeningsController : BaseApiController
             .Query()
             .Where(d => d.AiScreeningId == screeningId && !d.IsDeleted)
             .OrderByDescending(d => d.FinalizedAt ?? d.CreatedAt)
-            .Select(d => new MedicalDiagnosisDto
+            .Select(d => new
             {
+                d.DoctorId,
                 DiagnosisCode = d.DiagnosisCode,
                 CodingSystem = d.CodingSystem,
                 ClinicalFindings = d.ClinicalFindings,
@@ -150,12 +159,77 @@ public class ScreeningsController : BaseApiController
             })
             .FirstOrDefaultAsync(cancellationToken);
 
+        MedicalDiagnosisDto? diagnosisDto = null;
+        if (latestDiagnosis is not null)
+        {
+            string? doctorName = null;
+            var doctor = await _ophthalmologistRepository.GetByIdAsync(latestDiagnosis.DoctorId, cancellationToken);
+            if (doctor is not null)
+            {
+                var doctorUser = await _identityService.GetUserByIdAsync(doctor.UserId, cancellationToken);
+                doctorName = doctorUser?.FullName;
+            }
+
+            diagnosisDto = new MedicalDiagnosisDto
+            {
+                DiagnosisCode = latestDiagnosis.DiagnosisCode,
+                CodingSystem = latestDiagnosis.CodingSystem,
+                ClinicalFindings = latestDiagnosis.ClinicalFindings,
+                SeverityLevel = latestDiagnosis.SeverityLevel,
+                ConfidenceLevel = latestDiagnosis.ConfidenceLevel,
+                TreatmentPlan = latestDiagnosis.TreatmentPlan,
+                Recommendations = latestDiagnosis.Recommendations,
+                LifestyleAdvice = latestDiagnosis.LifestyleAdvice,
+                IsUrgent = latestDiagnosis.IsUrgent,
+                Status = latestDiagnosis.Status,
+                FollowUpDate = latestDiagnosis.FollowUpDate,
+                IsReferralNeeded = latestDiagnosis.IsReferralNeeded,
+                FinalizedAt = latestDiagnosis.FinalizedAt,
+                ConfirmedAt = latestDiagnosis.ConfirmedAt,
+                ReportedByDoctorId = latestDiagnosis.DoctorId,
+                ReportedByDoctorName = string.IsNullOrWhiteSpace(doctorName) ? null : doctorName.Trim(),
+            };
+        }
+
         session = session with
         {
-            LatestDiagnosis = latestDiagnosis
+            LatestDiagnosis = diagnosisDto
         };
 
         return Ok(ApiResponseFactory.Success(session, "Screening session loaded"));
+    }
+
+    /// <summary>
+    /// Download screening report as PDF for current patient.
+    /// </summary>
+    [HttpGet("{screeningId:guid}/report-pdf")]
+    [Produces("application/pdf")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadScreeningReportPdf(
+        [FromRoute] Guid screeningId,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
+
+        var result = await _mediator.Send(
+            new ExportPatientScreeningReportPdfQuery(
+                _currentUserService.UserId.Value,
+                screeningId,
+                _currentUserService.ProfileId),
+            cancellationToken);
+
+        if (!result.IsSuccess || result.Data is null)
+            return HandleResult(result, "Screening report generated");
+
+        Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
+
+        return File(
+            result.Data.Content,
+            result.Data.ContentType,
+            result.Data.FileName);
     }
 
 
@@ -418,6 +492,8 @@ public record MedicalDiagnosisDto
     public bool IsReferralNeeded { get; init; }
     public DateTime? FinalizedAt { get; init; }
     public DateTime? ConfirmedAt { get; init; }
+    public Guid? ReportedByDoctorId { get; init; }
+    public string? ReportedByDoctorName { get; init; }
 }
 
 public record RetinalImageDto
