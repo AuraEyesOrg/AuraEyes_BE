@@ -33,6 +33,20 @@ public sealed record PatientScreeningReportPdfModel
     public string? Summary { get; init; }
     public string? Findings { get; init; }
     public DateTime? AssessedAt { get; init; }
+    public string? ReportedByDoctorName { get; init; }
+    public string? DiagnosisCode { get; init; }
+    public string? CodingSystem { get; init; }
+    public string? ClinicalFindings { get; init; }
+    public string? SeverityLevel { get; init; }
+    public decimal? ConfidenceLevel { get; init; }
+    public string? TreatmentPlan { get; init; }
+    public string? Recommendations { get; init; }
+    public string? LifestyleAdvice { get; init; }
+    public string? ClinicalStatus { get; init; }
+    public bool IsUrgent { get; init; }
+    public bool IsReferralNeeded { get; init; }
+    public DateTime? FollowUpDate { get; init; }
+    public DateTime? FinalizedAt { get; init; }
     public List<PatientAiFindingDetail> AiFindingDetails { get; init; } = new();
     public List<PatientAiLocalizationBox> LocalizationBoxes { get; init; } = new();
 }

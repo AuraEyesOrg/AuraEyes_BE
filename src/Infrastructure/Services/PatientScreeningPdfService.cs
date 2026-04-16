@@ -64,6 +64,7 @@ public sealed class PatientScreeningPdfService : IPatientScreeningPdfService
                     });
 
                     column.Item().Element(c => ComposeHeroResult(c, model));
+                    column.Item().Element(c => ComposeClinicalDiagnosisSection(c, model));
                     column.Item().Element(c => ComposeRetinalImagesSection(
                         c,
                         originalImageData,
@@ -157,6 +158,7 @@ public sealed class PatientScreeningPdfService : IPatientScreeningPdfService
             ComposeInfoRow(column, "Screening ID", model.ScreeningId.ToString());
             ComposeInfoRow(column, "Model Version", string.IsNullOrWhiteSpace(model.ModelVersion) ? "N/A" : model.ModelVersion);
             ComposeInfoRow(column, "Session Created", FormatReportDateTime(model.CreatedAt));
+            ComposeInfoRow(column, "Reported By", string.IsNullOrWhiteSpace(model.ReportedByDoctorName) ? "N/A" : model.ReportedByDoctorName);
         });
     }
 
@@ -241,6 +243,52 @@ public sealed class PatientScreeningPdfService : IPatientScreeningPdfService
         });
     }
 
+    private void ComposeClinicalDiagnosisSection(IContainer container, PatientScreeningReportPdfModel model)
+    {
+        container.Border(1).BorderColor(Border).Padding(10).Column(column =>
+        {
+            column.Spacing(6);
+            column.Item().Text("Clinical Diagnosis Summary")
+                .SemiBold()
+                .FontSize(12)
+                .FontColor(BrandBlue);
+
+            column.Item().Row(row =>
+            {
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(c, "Diagnosis Code", model.DiagnosisCode));
+                row.ConstantItem(8);
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(c, "Coding System", model.CodingSystem));
+                row.ConstantItem(8);
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(c, "Severity", model.SeverityLevel));
+            });
+
+            column.Item().Row(row =>
+            {
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(
+                    c,
+                    "Confidence",
+                    model.ConfidenceLevel.HasValue ? $"{model.ConfidenceLevel.Value:0.#}%" : null));
+                row.ConstantItem(8);
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(
+                    c,
+                    "Urgent",
+                    model.IsUrgent ? "Yes" : "No"));
+                row.ConstantItem(8);
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(
+                    c,
+                    "Referral Needed",
+                    model.IsReferralNeeded ? "Yes" : "No"));
+            });
+
+            column.Item().Element(c => ComposeLongFormText(c, "Clinical Findings", model.ClinicalFindings));
+            column.Item().Element(c => ComposeLongFormText(c, "Treatment Plan", model.TreatmentPlan));
+            column.Item().Element(c => ComposeLongFormText(c, "Recommendations", model.Recommendations));
+
+            if (!string.IsNullOrWhiteSpace(model.LifestyleAdvice))
+                column.Item().Element(c => ComposeLongFormText(c, "Lifestyle Advice", model.LifestyleAdvice));
+        });
+    }
+
     private void ComposeRetinalImagesSection(
         IContainer container,
         byte[]? originalImageData,
@@ -304,6 +352,29 @@ public sealed class PatientScreeningPdfService : IPatientScreeningPdfService
                     .FontSize(9)
                     .FontColor(TextMuted);
             }
+        });
+    }
+
+    private void ComposeImageCardlessInfo(IContainer container, string label, string? value)
+    {
+        container.Border(1).BorderColor(Border).Background(Surface).Padding(8).Column(column =>
+        {
+            column.Spacing(3);
+            column.Item().Text(label).SemiBold().FontSize(9).FontColor(TextMuted);
+            column.Item().Text(string.IsNullOrWhiteSpace(value) ? "N/A" : value).FontSize(10).FontColor(TextStrong);
+        });
+    }
+
+    private void ComposeLongFormText(IContainer container, string label, string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return;
+
+        container.Border(1).BorderColor(Border).Background(Surface).Padding(8).Column(column =>
+        {
+            column.Spacing(3);
+            column.Item().Text(label).SemiBold().FontSize(9).FontColor(TextMuted);
+            column.Item().Text(content.Trim()).FontSize(10).FontColor(TextStrong);
         });
     }
 

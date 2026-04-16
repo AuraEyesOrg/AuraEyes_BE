@@ -4,8 +4,10 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Screenings.Interfaces;
 using Domain.Common;
+using Domain.Entities.Consultation;
 using Domain.Entities.Screening;
 using Domain.Entities.Users;
+using Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Screenings.Queries.ExportPatientScreeningReportPdf;
@@ -15,17 +17,29 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
 {
     private readonly IRepository<Patient> _patientRepository;
     private readonly IRepository<AiScreening> _screeningRepository;
+    private readonly IRepository<MedicalDiagnosis> _medicalDiagnosisRepository;
+    private readonly IRepository<ConsultationSession> _consultationSessionRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IIdentityService _identityService;
     private readonly IPatientScreeningPdfService _patientScreeningPdfService;
     private readonly Uri _aiAssetBaseUri;
 
     public ExportPatientScreeningReportPdfQueryHandler(
         IRepository<Patient> patientRepository,
         IRepository<AiScreening> screeningRepository,
+        IRepository<MedicalDiagnosis> medicalDiagnosisRepository,
+        IRepository<ConsultationSession> consultationSessionRepository,
+        IOphthalmologistRepository ophthalmologistRepository,
+        IIdentityService identityService,
         IPatientScreeningPdfService patientScreeningPdfService,
         IAiAssetBaseUrlProvider aiAssetBaseUrlProvider)
     {
         _patientRepository = patientRepository;
         _screeningRepository = screeningRepository;
+        _medicalDiagnosisRepository = medicalDiagnosisRepository;
+        _consultationSessionRepository = consultationSessionRepository;
+        _ophthalmologistRepository = ophthalmologistRepository;
+        _identityService = identityService;
         _patientScreeningPdfService = patientScreeningPdfService;
         _aiAssetBaseUri = aiAssetBaseUrlProvider.BaseUri;
     }
@@ -34,9 +48,9 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
         ExportPatientScreeningReportPdfQuery request,
         CancellationToken cancellationToken)
     {
-        var patient = await _patientRepository
+        var requesterPatient = await _patientRepository
             .Query()
-            .Where(x => x.UserId == request.PatientUserId && !x.IsDeleted)
+            .Where(x => x.UserId == request.RequesterUserId && !x.IsDeleted)
             .Select(x => new
             {
                 x.Id,
@@ -44,14 +58,25 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (patient is null)
+        Guid? requesterPatientId = requesterPatient?.Id;
+        if (requesterPatient is null && request.RequesterProfileId.HasValue)
         {
-            return Result<PatientScreeningReportPdfFileDto>.NotFound("Patient profile not found.");
+            var isDoctorReviewer = await _consultationSessionRepository
+                .Query()
+                .AnyAsync(
+                    s => s.AiScreeningId == request.ScreeningId &&
+                         s.OphthalmologistId == request.RequesterProfileId.Value &&
+                         !s.IsDeleted,
+                    cancellationToken);
+
+            if (!isDoctorReviewer)
+                return Result<PatientScreeningReportPdfFileDto>.Forbidden("You are not allowed to export this screening report.");
         }
 
         var detail = await _screeningRepository
             .Query()
-            .Where(x => x.Id == request.ScreeningId && x.PatientId == patient.Id && !x.IsDeleted)
+            .Where(x => x.Id == request.ScreeningId && !x.IsDeleted)
+            .Where(x => !requesterPatientId.HasValue || x.PatientId == requesterPatientId.Value)
             .Select(x => new
             {
                 ScreeningId = x.Id,
@@ -83,6 +108,51 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
             return Result<PatientScreeningReportPdfFileDto>.NotFound("Screening session not found.");
         }
 
+        var patientSnapshot = await _patientRepository
+            .Query()
+            .Where(p => p.Id == detail.PatientId && !p.IsDeleted)
+            .Select(p => new
+            {
+                p.FullName,
+                p.UserId
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var diagnosisSnapshot = await _medicalDiagnosisRepository
+            .Query()
+            .Where(d => d.AiScreeningId == detail.ScreeningId && !d.IsDeleted)
+            .OrderByDescending(d => d.FinalizedAt ?? d.CreatedAt)
+            .Select(d => new
+            {
+                d.DoctorId,
+                d.DiagnosisCode,
+                d.CodingSystem,
+                d.ClinicalFindings,
+                d.SeverityLevel,
+                d.ConfidenceLevel,
+                d.TreatmentPlan,
+                d.Recommendations,
+                d.LifestyleAdvice,
+                d.IsUrgent,
+                d.Status,
+                d.FollowUpDate,
+                d.IsReferralNeeded,
+                d.FinalizedAt
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var doctorName = "N/A";
+        if (diagnosisSnapshot?.DoctorId is Guid doctorId)
+        {
+            var doctor = await _ophthalmologistRepository.GetByIdAsync(doctorId, cancellationToken);
+            if (doctor is not null)
+            {
+                var doctorUser = await _identityService.GetUserByIdAsync(doctor.UserId, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(doctorUser?.FullName))
+                    doctorName = doctorUser.FullName.Trim();
+            }
+        }
+
         var aiFindingDetails = ParseAiFindingDetails(detail.RawJsonOutput);
         var localizationBoxes = ParseLocalizationBoxes(detail.RawJsonOutput);
         var visualAssets = ParseVisualAssets(detail.RawJsonOutput);
@@ -92,7 +162,7 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
             .ToList();
         var originalImageBaseUri = TryGetBaseUri(originalImageUrls);
 
-        var patientName = ResolvePatientName(patient.FullName);
+        var patientName = ResolvePatientName(patientSnapshot?.FullName);
 
         var pdfModel = new PatientScreeningReportPdfModel
         {
@@ -110,6 +180,20 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
             Summary = detail.LatestResult?.Summary,
             Findings = detail.LatestResult?.Findings,
             AssessedAt = detail.LatestResult?.AssessedAt,
+            ReportedByDoctorName = doctorName,
+            DiagnosisCode = diagnosisSnapshot?.DiagnosisCode,
+            CodingSystem = diagnosisSnapshot?.CodingSystem,
+            ClinicalFindings = diagnosisSnapshot?.ClinicalFindings,
+            SeverityLevel = diagnosisSnapshot?.SeverityLevel,
+            ConfidenceLevel = diagnosisSnapshot?.ConfidenceLevel,
+            TreatmentPlan = diagnosisSnapshot?.TreatmentPlan,
+            Recommendations = diagnosisSnapshot?.Recommendations,
+            LifestyleAdvice = diagnosisSnapshot?.LifestyleAdvice,
+            ClinicalStatus = diagnosisSnapshot?.Status,
+            IsUrgent = diagnosisSnapshot?.IsUrgent ?? false,
+            IsReferralNeeded = diagnosisSnapshot?.IsReferralNeeded ?? false,
+            FollowUpDate = diagnosisSnapshot?.FollowUpDate,
+            FinalizedAt = diagnosisSnapshot?.FinalizedAt,
             AiFindingDetails = aiFindingDetails,
             LocalizationBoxes = localizationBoxes
         };

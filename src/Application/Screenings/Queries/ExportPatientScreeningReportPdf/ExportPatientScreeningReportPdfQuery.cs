@@ -2,7 +2,10 @@ using Application.Common.Interfaces;
 
 namespace Application.Screenings.Queries.ExportPatientScreeningReportPdf;
 
-public sealed record ExportPatientScreeningReportPdfQuery(Guid PatientUserId, Guid ScreeningId)
+public sealed record ExportPatientScreeningReportPdfQuery(
+    Guid RequesterUserId,
+    Guid ScreeningId,
+    Guid? RequesterProfileId = null)
     : IQuery<PatientScreeningReportPdfFileDto>;
 
 public sealed record PatientScreeningReportPdfFileDto
