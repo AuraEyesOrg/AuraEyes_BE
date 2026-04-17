@@ -4,11 +4,12 @@ using Application.SystemAdmin.Cashflow.Queries.GetCashflowTransactions;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Infrastructure.Identity.Authorization;
 
 namespace API.Controllers.SystemAdmin;
 
 [Route("api/system-admin/[controller]")]
-[Authorize(Policy = Policies.SystemAdminOnly)]
+[AuthorizePermission(Permissions.CashflowRead)]
 public class CashflowController : BaseApiController
 {
     private readonly IMediator _mediator;

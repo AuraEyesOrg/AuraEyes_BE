@@ -9,10 +9,14 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using Infrastructure.Identity.Authorization;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
 namespace API.Controllers.Organization;
 
 [Route("api/organisations/patients")]
-[Authorize(Policy = Policies.OrgAdminOnly)]
+[AuthorizePermission(Permissions.PatientsRead)]
 public class OrganisationPatientsController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -44,6 +48,7 @@ public class OrganisationPatientsController : BaseApiController
     }
 
     [HttpPost("walk-in")]
+    [AuthorizePermission(Permissions.PatientsCreate)]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateWalkInPatient(
@@ -58,6 +63,7 @@ public class OrganisationPatientsController : BaseApiController
     }
 
     [HttpPut("{patientId:guid}")]
+    [AuthorizePermission(Permissions.PatientsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]

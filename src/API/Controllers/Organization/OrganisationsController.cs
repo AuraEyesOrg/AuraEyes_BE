@@ -18,6 +18,7 @@ using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Infrastructure.Identity.Authorization;
 
 namespace API.Controllers.Organization;
 
@@ -39,7 +40,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpGet("dashboard-metrics")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.DashboardRead)]
     [ProducesResponseType(typeof(ApiResponse<OrganisationDashboardMetricsDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDashboardMetrics()
     {
@@ -73,7 +74,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpGet("{orgId:guid}/appointments")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.AppointmentsRead)]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ClinicAppointmentDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetOrganisationAppointments(
         Guid orgId,
@@ -96,7 +97,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpGet("my-contract")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.ContractsRead)]
     [ProducesResponseType(typeof(ApiResponse<ContractDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetMyContract()
@@ -110,7 +111,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpPost("my-contract/upload")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.ContractsRead)]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -150,7 +151,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpGet("billing/summary")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.WalletsRead)]
     [ProducesResponseType(typeof(ApiResponse<OrgBillingSummaryDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetBillingSummary(CancellationToken cancellationToken)
     {
@@ -165,7 +166,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpGet("screening-reports")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.ScreeningRead)]
     [ProducesResponseType(typeof(ApiResponse<OrgScreeningReportDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetScreeningReports(CancellationToken cancellationToken)
     {
@@ -180,7 +181,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpGet("settings")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.OrganisationsRead)]
     [ProducesResponseType(typeof(ApiResponse<OrganisationSettingsDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSettings(CancellationToken cancellationToken)
@@ -196,7 +197,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpPut("settings")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.OrganisationsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<OrganisationSettingsDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]

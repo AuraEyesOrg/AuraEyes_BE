@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using Application.Common.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Infrastructure.Persistence;
 
 namespace Infrastructure.Identity;
 
@@ -16,6 +17,7 @@ public class IdentityService : IIdentityService
 
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<ApplicationRole> _roleManager;
+    private readonly ApplicationDbContext _context;
 
     // Number of recovery codes to generate
     private const int DefaultRecoveryCodesCount = 10;
@@ -25,10 +27,12 @@ public class IdentityService : IIdentityService
 
     public IdentityService(
         UserManager<ApplicationUser> userManager,
-        RoleManager<ApplicationRole> roleManager)
+        RoleManager<ApplicationRole> roleManager,
+        ApplicationDbContext context)
     {
         _userManager = userManager;
         _roleManager = roleManager;
+        _context = context;
     }
 
     public async Task<(bool Succeeded, string[] Errors)> CreateUserAsync(
@@ -835,6 +839,42 @@ public class IdentityService : IIdentityService
 
         var result = await _userManager.UpdateAsync(user);
         return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<IList<string>> GetUserPermissionsAsync(Guid userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null) return Array.Empty<string>();
+
+        var userRoles = await _userManager.GetRolesAsync(user);
+
+        // 1. Get permissions assigned to user roles
+        var rolePermissions = await (from rp in _context.RolePermissions
+                                     join r in _roleManager.Roles on rp.RoleId equals r.Id
+                                     join p in _context.Permissions on rp.PermissionId equals p.Id
+                                     where userRoles.Contains(r.Name)
+                                     select p.Name).ToListAsync();
+
+        // 2. Get direct user overrides
+        var userOverrides = await (from up in _context.UserPermissions
+                                    join p in _context.Permissions on up.PermissionId equals p.Id
+                                    where up.UserId == userId && up.IsActive
+                                    where up.ExpiresAt == null || up.ExpiresAt > DateTime.UtcNow
+                                    select new { p.Name, up.IsGranted })
+                                    .ToListAsync();
+
+        // 3. Compute final set: (Role-based + Explicitly Granted) - Explicitly Revoked
+        var finalPermissions = new HashSet<string>(rolePermissions, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var over in userOverrides)
+        {
+            if (over.IsGranted)
+                finalPermissions.Add(over.Name);
+            else
+                finalPermissions.Remove(over.Name);
+        }
+
+        return finalPermissions.ToList();
     }
 
     public async Task<(bool Succeeded, string[] Errors)> ChangePasswordAsync(

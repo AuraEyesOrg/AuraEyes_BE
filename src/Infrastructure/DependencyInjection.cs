@@ -24,6 +24,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authorization;
+using Infrastructure.Identity.Authorization;
+
 
 namespace Infrastructure;
 
@@ -155,7 +158,7 @@ public static class DependencyInjection
         });
 
         // Configure Authorization Policies
-        services.AddAuthorizationBuilder()
+        var authBuilder = services.AddAuthorizationBuilder()
             .AddPolicy(Policies.Authenticated, policy => policy.RequireAuthenticatedUser())
             .AddPolicy(Policies.PatientOnly, policy => policy.RequireRole(Roles.Patient))
             .AddPolicy(Policies.OphthalmologistOnly, policy => policy.RequireRole(Roles.Ophthalmologist))
@@ -173,6 +176,19 @@ public static class DependencyInjection
             .AddPolicy(Policies.OrganizationMember, policy =>
                 policy.RequireAssertion(context =>
                     context.User.HasClaim(c => c.Type == "org_id" && !string.IsNullOrEmpty(c.Value))));
+
+        // Register Permission-based policies dynamically from Permissions constant class
+        foreach (var prop in typeof(Permissions).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.FlattenHierarchy))
+        {
+            if (prop.IsLiteral && !prop.IsInitOnly && prop.FieldType == typeof(string))
+            {
+                var permissionValue = (string)prop.GetValue(null)!;
+                authBuilder.AddPolicy(permissionValue, policy => 
+                    policy.Requirements.Add(new PermissionRequirement(permissionValue)));
+            }
+        }
+
+        services.AddScoped<IAuthorizationHandler, PermissionHandler>();
 
         // Register repositories
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));

@@ -3,10 +3,11 @@ using Application.Common.Models;
 using Application.SystemAdmin.Users.Queries.GetUserMetrics;
 using Application.SystemAdmin.Users.Queries.GetUsers;
 using MediatR;
+using Infrastructure.Identity;
+using Infrastructure.Identity.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Infrastructure.Identity;
 
 namespace API.Controllers.SystemAdmin;
 
@@ -15,7 +16,7 @@ namespace API.Controllers.SystemAdmin;
 /// Provides centralized interface to manage users, roles, permissions, and monitor user activity.
 /// </summary>
 [Route("api/system-admin/[controller]")]
-[Authorize(Policy = Policies.SystemAdminOnly)]
+[AuthorizePermission(Permissions.UsersRead)]
 public class UsersController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -81,6 +82,7 @@ public class UsersController : BaseApiController
     /// <param name="id">User ID</param>
     /// <param name="request">Role update data</param>
     [HttpPatch("{id:guid}/role")]
+    [AuthorizePermission(Permissions.UsersManageRoles)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateUserRole(Guid id, [FromBody] UpdateUserRoleRequest request)
@@ -114,6 +116,7 @@ public class UsersController : BaseApiController
     /// <param name="id">User ID</param>
     /// <param name="request">Status update data</param>
     [HttpPatch("{id:guid}/status")]
+    [AuthorizePermission(Permissions.UsersUpdate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateUserStatus(Guid id, [FromBody] UpdateUserStatusRequest request)

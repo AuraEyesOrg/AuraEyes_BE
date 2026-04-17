@@ -7,6 +7,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Infrastructure.Identity.Authorization;
 
 namespace API.Controllers.SystemAdmin;
 
@@ -15,7 +16,7 @@ namespace API.Controllers.SystemAdmin;
 /// Paginated list, search, lock/unlock.
 /// </summary>
 [Route("api/system-admin/[controller]")]
-[Authorize(Policy = Policies.SystemAdminOnly)]
+[AuthorizePermission(Permissions.PatientsRead)]
 public class PatientsController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -67,6 +68,7 @@ public class PatientsController : BaseApiController
     /// <param name="userId">The ApplicationUser ID of the patient</param>
     /// <param name="request">Lock/unlock action</param>
     [HttpPatch("{userId:guid}/status")]
+    [AuthorizePermission(Permissions.PatientsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdatePatientStatus(Guid userId, [FromBody] PatientStatusRequest request)

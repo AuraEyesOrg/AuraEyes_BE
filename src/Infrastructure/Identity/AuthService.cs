@@ -1278,6 +1278,13 @@ public class AuthService : IAuthService
             }
         }
 
+        // Add permissions as claims
+        var permissions = await _identityService.GetUserPermissionsAsync(userId);
+        foreach (var permission in permissions)
+        {
+            claims.Add(new Claim("permission", permission));
+        }
+
         return claims;
     }
 
