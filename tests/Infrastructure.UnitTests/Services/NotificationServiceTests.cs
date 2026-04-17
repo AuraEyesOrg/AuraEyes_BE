@@ -6,14 +6,201 @@ using FluentAssertions;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.Services;
+using Infrastructure.UnitTests.Common;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using NSubstitute;
 
 namespace Infrastructure.UnitTests.Services;
 
 public class NotificationServiceTests
 {
+    [Fact]
+    public async Task SendAsync_Typed_ShouldPersistAndBroadcastAndCountUnread()
+    {
+        await using var context = CreateContext();
+        var repo = new Repository<Notification>(context);
+        var hub = new FakeNotificationHubService();
+        var logger = new TestLogger<NotificationService>();
+        var service = new NotificationService(repo, context, hub, logger);
+        var userId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+
+        await service.SendAsync(
+            userId,
+            "New Session",
+            "Session created",
+            NotificationType.NewConsultationRequest,
+            new { sessionId },
+            CancellationToken.None);
+
+        var persisted = await context.Notifications.FirstAsync();
+        persisted.UserId.Should().Be(userId);
+        persisted.Title.Should().Be("New Session");
+        persisted.ReferenceId.Should().Be(sessionId);
+        hub.BroadcastedToUser.Should().HaveCount(1);
+        hub.UnreadCountEvents.Should().ContainSingle(x => x.UserId == userId && x.Count == 1);
+    }
+
+    [Fact]
+    public async Task SendAsync_Typed_WithAppointmentIdPayload_ShouldExtractReferenceId()
+    {
+        await using var context = CreateContext();
+        var repo = new Repository<Notification>(context);
+        var hub = new FakeNotificationHubService();
+        var logger = new TestLogger<NotificationService>();
+        var service = new NotificationService(repo, context, hub, logger);
+        var userId = Guid.NewGuid();
+        var appointmentId = Guid.NewGuid();
+
+        await service.SendAsync(
+            userId,
+            "Appointment Updated",
+            "Your appointment was updated",
+            NotificationType.SystemAlert,
+            new { appointmentId },
+            CancellationToken.None);
+
+        var persisted = await context.Notifications.FirstAsync();
+        persisted.ReferenceId.Should().Be(appointmentId);
+    }
+
+    [Fact]
+    public async Task SendAsync_Typed_WithMalformedStringPayload_ShouldKeepReferenceIdNull()
+    {
+        await using var context = CreateContext();
+        var repo = new Repository<Notification>(context);
+        var hub = new FakeNotificationHubService();
+        var logger = new TestLogger<NotificationService>();
+        var service = new NotificationService(repo, context, hub, logger);
+        var userId = Guid.NewGuid();
+
+        // payload is string => serialized JSON string, extractor should ignore
+        await service.SendAsync(
+            userId,
+            "Text Payload",
+            "payload is text",
+            NotificationType.SystemAlert,
+            "not-an-object-json",
+            CancellationToken.None);
+
+        var persisted = await context.Notifications.FirstAsync();
+        persisted.ReferenceId.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("consultationId")]
+    [InlineData("sessionId")]
+    [InlineData("appointmentId")]
+    [InlineData("screeningId")]
+    [InlineData("aiScreeningId")]
+    [InlineData("transactionId")]
+    [InlineData("messageId")]
+    public async Task SendAsync_Typed_ShouldExtractReferenceId_FromKnownPayloadKeys(string keyName)
+    {
+        await using var context = CreateContext();
+        var repo = new Repository<Notification>(context);
+        var hub = new FakeNotificationHubService();
+        var logger = new TestLogger<NotificationService>();
+        var service = new NotificationService(repo, context, hub, logger);
+        var userId = Guid.NewGuid();
+        var refId = Guid.NewGuid();
+        var payload = new Dictionary<string, string> { [keyName] = refId.ToString() };
+
+        await service.SendAsync(
+            userId,
+            "Ref Test",
+            "testing known keys",
+            NotificationType.SystemAlert,
+            payload,
+            CancellationToken.None);
+
+        var persisted = await context.Notifications.FirstAsync();
+        persisted.ReferenceId.Should().Be(refId);
+    }
+
+    [Fact]
+    public async Task SendAsync_Legacy_ShouldUseDefaultTitleAndType()
+    {
+        await using var context = CreateContext();
+        var repo = new Repository<Notification>(context);
+        var hub = new FakeNotificationHubService();
+        var logger = new TestLogger<NotificationService>();
+        var service = new NotificationService(repo, context, hub, logger);
+        var userId = Guid.NewGuid();
+
+        await service.SendAsync(userId, "Legacy message");
+
+        var persisted = await context.Notifications.FirstAsync();
+        persisted.Title.Should().Be("Session Reminder");
+        persisted.Type.Should().Be(NotificationType.NewConsultationRequest);
+    }
+
+    [Fact]
+    public async Task SendAsync_Typed_WithExplicitReferenceId_ShouldPreferExplicitOverPayload()
+    {
+        await using var context = CreateContext();
+        var repo = new Repository<Notification>(context);
+        var hub = new FakeNotificationHubService();
+        var service = new NotificationService(repo, context, hub, new TestLogger<NotificationService>());
+        var userId = Guid.NewGuid();
+        var explicitRef = Guid.NewGuid();
+        var payloadRef = Guid.NewGuid();
+
+        await service.SendAsync(
+            userId,
+            "Priority Ref",
+            "explicit ref id wins",
+            NotificationType.SystemAlert,
+            new { appointmentId = payloadRef },
+            CancellationToken.None,
+            explicitRef);
+
+        var saved = await context.Notifications.FirstAsync();
+        saved.ReferenceId.Should().Be(explicitRef);
+    }
+
+    [Fact]
+    public async Task SendAsync_Typed_ShouldBroadcastUnreadCountIncludingExistingUnreadNotifications()
+    {
+        await using var context = CreateContext();
+        var userId = Guid.NewGuid();
+        await context.Notifications.AddRangeAsync(
+            new Notification(userId, "n1", "m1", NotificationType.SystemAlert, null, null),
+            new Notification(userId, "n2", "m2", NotificationType.SystemAlert, null, null));
+        await context.SaveChangesAsync();
+
+        var repo = new Repository<Notification>(context);
+        var hub = new FakeNotificationHubService();
+        var service = new NotificationService(repo, context, hub, new TestLogger<NotificationService>());
+
+        await service.SendAsync(userId, "n3", "m3", NotificationType.SystemAlert, null, CancellationToken.None);
+
+        hub.UnreadCountEvents.Should().ContainSingle(x => x.UserId == userId && x.Count == 3);
+    }
+
+    [Fact]
+    public async Task SendAsync_WhenHubBroadcastFails_ShouldThrowButKeepPersistedNotification()
+    {
+        await using var context = CreateContext();
+        var repo = new Repository<Notification>(context);
+        var service = new NotificationService(
+            repo,
+            context,
+            new ThrowingNotificationHubService(),
+            new TestLogger<NotificationService>());
+        var userId = Guid.NewGuid();
+
+        var act = async () => await service.SendAsync(
+            userId,
+            "Hub Fail",
+            "broadcast fails",
+            NotificationType.SystemAlert,
+            null,
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        (await context.Notifications.CountAsync()).Should().Be(1);
+    }
+
     private static ApplicationDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -22,152 +209,30 @@ public class NotificationServiceTests
         return new ApplicationDbContext(options);
     }
 
-    [Fact]
-    public async Task SendAsync_WithPayload_ShouldPersistAndBroadcast()
+    private sealed class FakeNotificationHubService : INotificationHubService
     {
-        await using var ctx = CreateContext();
-        var repo = new Repository<Notification>(ctx);
-        var hub = Substitute.For<INotificationHubService>();
-        var logger = Substitute.For<ILogger<NotificationService>>();
-        var sut = new NotificationService(repo, ctx, hub, logger);
-        var userId = Guid.NewGuid();
+        public List<(Guid UserId, NotificationDto Notification)> BroadcastedToUser { get; } = [];
+        public List<(Guid UserId, int Count)> UnreadCountEvents { get; } = [];
 
-        await sut.SendAsync(
-            userId,
-            "T",
-            "M",
-            NotificationType.AiScreeningCompleted,
-            new { screeningId = Guid.NewGuid().ToString() },
-            CancellationToken.None);
+        public Task BroadcastToUserAsync(Guid userId, NotificationDto notification, CancellationToken cancellationToken = default)
+        {
+            BroadcastedToUser.Add((userId, notification));
+            return Task.CompletedTask;
+        }
 
-        (await ctx.Notifications.CountAsync()).Should().Be(1);
-        await hub.Received(1).BroadcastToUserAsync(userId, Arg.Any<NotificationDto>(), Arg.Any<CancellationToken>());
-        await hub.Received(1).BroadcastUnreadCountAsync(userId, Arg.Any<int>(), Arg.Any<CancellationToken>());
+        public Task BroadcastUnreadCountAsync(Guid userId, int count, CancellationToken cancellationToken = default)
+        {
+            UnreadCountEvents.Add((userId, count));
+            return Task.CompletedTask;
+        }
     }
 
-    [Fact]
-    public async Task SendAsync_WithSessionIdInPayload_ShouldSetReferenceId()
+    private sealed class ThrowingNotificationHubService : INotificationHubService
     {
-        await using var ctx = CreateContext();
-        var repo = new Repository<Notification>(ctx);
-        var hub = Substitute.For<INotificationHubService>();
-        var logger = Substitute.For<ILogger<NotificationService>>();
-        var sut = new NotificationService(repo, ctx, hub, logger);
-        var userId = Guid.NewGuid();
-        var refId = Guid.NewGuid();
+        public Task BroadcastToUserAsync(Guid userId, NotificationDto notification, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("hub down");
 
-        await sut.SendAsync(
-            userId,
-            "T",
-            "M",
-            NotificationType.NewConsultationRequest,
-            new { sessionId = refId.ToString() },
-            CancellationToken.None);
-
-        var n = await ctx.Notifications.FirstAsync();
-        n.ReferenceId.Should().Be(refId);
+        public Task BroadcastUnreadCountAsync(Guid userId, int count, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
-
-    [Fact]
-    public async Task SendAsync_WithConsultationSessionIdInPayload_ShouldSetReferenceId()
-    {
-        await using var ctx = CreateContext();
-        var repo = new Repository<Notification>(ctx);
-        var hub = Substitute.For<INotificationHubService>();
-        var logger = Substitute.For<ILogger<NotificationService>>();
-        var sut = new NotificationService(repo, ctx, hub, logger);
-        var userId = Guid.NewGuid();
-        var refId = Guid.NewGuid();
-
-        await sut.SendAsync(
-            userId,
-            "T",
-            "M",
-            NotificationType.NewConsultationRequest,
-            new { consultationSessionId = refId.ToString() },
-            CancellationToken.None);
-
-        var n = await ctx.Notifications.FirstAsync();
-        n.ReferenceId.Should().Be(refId);
-    }
-
-    [Fact]
-    public async Task SendAsync_SystemAlert_WithOphthalmologistIdInPayload_ShouldSetReferenceId()
-    {
-        await using var ctx = CreateContext();
-        var repo = new Repository<Notification>(ctx);
-        var hub = Substitute.For<INotificationHubService>();
-        var logger = Substitute.For<ILogger<NotificationService>>();
-        var sut = new NotificationService(repo, ctx, hub, logger);
-        var userId = Guid.NewGuid();
-        var refId = Guid.NewGuid();
-
-        await sut.SendAsync(
-            userId,
-            "T",
-            "M",
-            NotificationType.SystemAlert,
-            new { ophthalmologistId = refId.ToString() },
-            CancellationToken.None);
-
-        var n = await ctx.Notifications.FirstAsync();
-        n.ReferenceId.Should().Be(refId);
-    }
-
-    [Fact]
-    public async Task SendAsync_WithoutPayload_ShouldPersistWithoutPayload()
-    {
-        await using var ctx = CreateContext();
-        var repo = new Repository<Notification>(ctx);
-        var hub = Substitute.For<INotificationHubService>();
-        var logger = Substitute.For<ILogger<NotificationService>>();
-        var sut = new NotificationService(repo, ctx, hub, logger);
-        var userId = Guid.NewGuid();
-
-        await sut.SendAsync(userId, "T", "M", NotificationType.NewConsultationRequest, null, CancellationToken.None);
-
-        var n = await ctx.Notifications.FirstAsync();
-        n.Payload.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task SendAsync_NestedPayloadWithoutGuidKeys_ShouldLeaveReferenceIdNull()
-    {
-        await using var ctx = CreateContext();
-        var repo = new Repository<Notification>(ctx);
-        var hub = Substitute.For<INotificationHubService>();
-        var logger = Substitute.For<ILogger<NotificationService>>();
-        var sut = new NotificationService(repo, ctx, hub, logger);
-        var userId = Guid.NewGuid();
-
-        await sut.SendAsync(
-            userId,
-            "T",
-            "M",
-            NotificationType.NewConsultationRequest,
-            new { x = new { nested = true } },
-            CancellationToken.None);
-
-        var n = await ctx.Notifications.FirstAsync();
-        n.ReferenceId.Should().BeNull();
-    }
-
-#pragma warning disable CS0618
-    [Fact]
-    public async Task LegacySendAsync_ShouldRouteToTypedNotification()
-    {
-        await using var ctx = CreateContext();
-        var repo = new Repository<Notification>(ctx);
-        var hub = Substitute.For<INotificationHubService>();
-        var logger = Substitute.For<ILogger<NotificationService>>();
-        var sut = new NotificationService(repo, ctx, hub, logger);
-        var userId = Guid.NewGuid();
-
-        await sut.SendAsync(userId, "Hello legacy", CancellationToken.None);
-
-        var n = await ctx.Notifications.FirstAsync();
-        n.Type.Should().Be(NotificationType.NewConsultationRequest);
-        n.Message.Should().Be("Hello legacy");
-    }
-#pragma warning restore CS0618
 }

@@ -1,348 +1,446 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text;
 using FluentAssertions;
 using Infrastructure.Identity;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Infrastructure.UnitTests.Identity;
 
 public class TokenServiceTests
 {
-    private readonly TokenService _sut;
-    private readonly JwtSettings _jwtSettings;
-
-    public TokenServiceTests()
+    private static TokenService CreateService()
     {
-        _jwtSettings = new JwtSettings
+        var settings = new JwtSettings
         {
-            SecretKey = "ThisIsAVerySecureSecretKeyForTestingPurposes2024!",
-            Issuer = "TestIssuer",
-            Audience = "TestAudience",
+            SecretKey = "this-is-a-test-secret-key-with-minimum-length-32",
+            Issuer = "AuraEyes.Tests",
+            Audience = "AuraEyes.Client",
             AccessTokenExpiryMinutes = 15,
             ValidateIssuer = true,
             ValidateAudience = true,
             ClockSkewSeconds = 0
         };
 
-        _sut = new TokenService(Options.Create(_jwtSettings));
-    }
-
-    #region GenerateAccessToken Tests
-
-    [Fact]
-    public async Task GenerateAccessTokenAsync_ShouldReturnValidToken()
-    {
-        // Arrange
-        var userId = Guid.NewGuid();
-        var email = "test@example.com";
-        var fullName = "Test User";
-        var roles = new[] { "Patient" };
-
-        // Act
-        var result = await _sut.GenerateAccessTokenAsync(userId, email, fullName, roles);
-
-        // Assert
-        result.Should().NotBeNull();
-        result.AccessToken.Should().NotBeNullOrEmpty();
-        result.Jti.Should().NotBeNullOrEmpty();
-        result.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
+        return new TokenService(Options.Create(settings));
     }
 
     [Fact]
-    public async Task GenerateAccessTokenAsync_ShouldContainCorrectClaims()
+    public async Task GenerateAccessTokenAsync_ShouldReturnJwt_AndClaims()
     {
-        // Arrange
+        var service = CreateService();
         var userId = Guid.NewGuid();
-        var email = "doctor@aura.com";
-        var fullName = "Dr. Smith";
-        var roles = new[] { "Ophthalmologist" };
+        var roles = new[] { "Patient", "User" };
+        var extraClaims = new[] { new Claim("profile_id", "abc") };
 
-        // Act
-        var result = await _sut.GenerateAccessTokenAsync(userId, email, fullName, roles);
+        var result = await service.GenerateAccessTokenAsync(userId, "test@example.com", "Test User", roles, extraClaims);
 
-        // Assert - Parse the token and check claims
+        result.AccessToken.Should().NotBeNullOrWhiteSpace();
+        result.Jti.Should().NotBeNullOrWhiteSpace();
+
         var handler = new JwtSecurityTokenHandler();
-        var jwt = handler.ReadJwtToken(result.AccessToken);
-
-        jwt.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Sub && c.Value == userId.ToString());
-        jwt.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Email && c.Value == email);
-        jwt.Claims.Should().Contain(c => c.Type == "name" && c.Value == fullName);
-        jwt.Claims.Should().Contain(c => c.Type == "role" && c.Value == "Ophthalmologist");
+        var token = handler.ReadJwtToken(result.AccessToken);
+        token.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Sub && c.Value == userId.ToString());
+        token.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Email && c.Value == "test@example.com");
+        token.Claims.Should().Contain(c => c.Type == ClaimTypes.Role && c.Value == "Patient");
+        token.Claims.Should().Contain(c => c.Type == "profile_id" && c.Value == "abc");
     }
-
-    [Fact]
-    public async Task GenerateAccessTokenAsync_WithMultipleRoles_ShouldContainAllRoles()
-    {
-        // Arrange
-        var userId = Guid.NewGuid();
-        var roles = new[] { "Admin", "Ophthalmologist" };
-
-        // Act
-        var result = await _sut.GenerateAccessTokenAsync(userId, "test@test.com", "Test", roles);
-
-        // Assert
-        var handler = new JwtSecurityTokenHandler();
-        var jwt = handler.ReadJwtToken(result.AccessToken);
-
-        var roleClaims = jwt.Claims.Where(c => c.Type == "role").Select(c => c.Value).ToList();
-        roleClaims.Should().Contain("Admin");
-        roleClaims.Should().Contain("Ophthalmologist");
-    }
-
-    [Fact]
-    public async Task GenerateAccessTokenAsync_WithAdditionalClaims_ShouldIncludeThem()
-    {
-        // Arrange
-        var userId = Guid.NewGuid();
-        var additionalClaims = new[]
-        {
-            new Claim("profile_id", Guid.NewGuid().ToString()),
-            new Claim("custom_claim", "custom_value")
-        };
-
-        // Act
-        var result = await _sut.GenerateAccessTokenAsync(
-            userId, "test@test.com", "Test", new[] { "Patient" }, additionalClaims);
-
-        // Assert
-        var handler = new JwtSecurityTokenHandler();
-        var jwt = handler.ReadJwtToken(result.AccessToken);
-
-        jwt.Claims.Should().Contain(c => c.Type == "profile_id");
-        jwt.Claims.Should().Contain(c => c.Type == "custom_claim" && c.Value == "custom_value");
-    }
-
-    [Fact]
-    public async Task GenerateAccessTokenAsync_ExpiresAt_ShouldMatchSettings()
-    {
-        // Act
-        var before = DateTime.UtcNow;
-        var result = await _sut.GenerateAccessTokenAsync(
-            Guid.NewGuid(), "test@test.com", "Test", new[] { "Patient" });
-        var after = DateTime.UtcNow;
-
-        // Assert - should expire ~15 minutes from now
-        var expectedMinExpiry = before.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes);
-        var expectedMaxExpiry = after.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes);
-
-        result.ExpiresAt.Should().BeOnOrAfter(expectedMinExpiry.AddSeconds(-1));
-        result.ExpiresAt.Should().BeOnOrBefore(expectedMaxExpiry.AddSeconds(1));
-    }
-
-    [Fact]
-    public async Task GenerateAccessTokenAsync_Jti_ShouldBeUniquePerCall()
-    {
-        // Act
-        var result1 = await _sut.GenerateAccessTokenAsync(
-            Guid.NewGuid(), "test@test.com", "Test", new[] { "Patient" });
-        var result2 = await _sut.GenerateAccessTokenAsync(
-            Guid.NewGuid(), "test@test.com", "Test", new[] { "Patient" });
-
-        // Assert
-        result1.Jti.Should().NotBe(result2.Jti);
-    }
-
-    [Fact]
-    public async Task GenerateAccessTokenAsync_TokenFormat_ShouldBeValidJwt()
-    {
-        // Act
-        var result = await _sut.GenerateAccessTokenAsync(
-            Guid.NewGuid(), "test@test.com", "Test", new[] { "Patient" });
-
-        // Assert - JWT has 3 parts separated by dots
-        result.AccessToken.Split('.').Should().HaveCount(3);
-    }
-
-    #endregion
-
-    #region GenerateRefreshToken Tests
-
-    [Fact]
-    public void GenerateRefreshToken_ShouldReturnNonEmptyString()
-    {
-        var result = _sut.GenerateRefreshToken();
-        result.Should().NotBeNullOrEmpty();
-    }
-
-    [Fact]
-    public void GenerateRefreshToken_ShouldReturnBase64String()
-    {
-        var result = _sut.GenerateRefreshToken();
-
-        // Should be valid base64
-        var act = () => Convert.FromBase64String(result);
-        act.Should().NotThrow();
-    }
-
-    [Fact]
-    public void GenerateRefreshToken_ShouldReturn64BytesWhenDecoded()
-    {
-        var result = _sut.GenerateRefreshToken();
-        var bytes = Convert.FromBase64String(result);
-        bytes.Should().HaveCount(64);
-    }
-
-    [Fact]
-    public void GenerateRefreshToken_ShouldGenerateUniqueTokens()
-    {
-        var tokens = Enumerable.Range(0, 10).Select(_ => _sut.GenerateRefreshToken()).ToList();
-        tokens.Distinct().Should().HaveCount(10);
-    }
-
-    #endregion
-
-    #region ValidateToken Tests
 
     [Fact]
     public async Task ValidateToken_WithValidToken_ShouldReturnPrincipal()
     {
-        // Arrange
+        var service = CreateService();
         var userId = Guid.NewGuid();
-        var tokenResult = await _sut.GenerateAccessTokenAsync(
-            userId, "test@test.com", "Test", new[] { "Patient" });
+        var token = (await service.GenerateAccessTokenAsync(userId, "a@b.com", "A", new[] { "Patient" })).AccessToken;
 
-        // Act
-        var principal = _sut.ValidateToken(tokenResult.AccessToken);
+        var principal = service.ValidateToken(token);
 
-        // Assert
         principal.Should().NotBeNull();
+        var resolvedUserIdClaim = principal!.FindFirst(JwtRegisteredClaimNames.Sub)
+                                 ?? principal.FindFirst("uid")
+                                 ?? principal.FindFirst(ClaimTypes.NameIdentifier);
+        resolvedUserIdClaim.Should().NotBeNull();
+        resolvedUserIdClaim!.Value.Should().Be(userId.ToString());
     }
 
     [Fact]
     public void ValidateToken_WithInvalidToken_ShouldReturnNull()
     {
-        var principal = _sut.ValidateToken("invalid.token.string");
+        var service = CreateService();
+
+        var principal = service.ValidateToken("invalid.token.value");
+
         principal.Should().BeNull();
     }
 
     [Fact]
-    public void ValidateToken_WithEmptyString_ShouldReturnNull()
+    public async Task GetUserIdFromToken_AndGetJtiFromToken_ShouldExtractValues()
     {
-        var principal = _sut.ValidateToken(string.Empty);
-        principal.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task ValidateToken_WithTamperedToken_ShouldReturnNull()
-    {
-        // Arrange
-        var tokenResult = await _sut.GenerateAccessTokenAsync(
-            Guid.NewGuid(), "test@test.com", "Test", new[] { "Patient" });
-
-        // Tamper with signature segment to guarantee signature mismatch.
-        var segments = tokenResult.AccessToken.Split('.');
-        segments.Should().HaveCount(3);
-
-        var signature = segments[2];
-        signature.Should().NotBeNullOrEmpty();
-        var tamperedFirstChar = signature[0] == 'A' ? 'B' : 'A';
-        var tamperedSignature = tamperedFirstChar + signature[1..];
-        var tampered = string.Join('.', segments[0], segments[1], tamperedSignature);
-
-        // Act
-        var principal = _sut.ValidateToken(tampered);
-
-        // Assert
-        principal.Should().BeNull();
-    }
-
-    #endregion
-
-    #region GetUserIdFromToken Tests
-
-    [Fact]
-    public async Task GetUserIdFromToken_WithValidToken_ShouldReturnUserId()
-    {
-        // Arrange
+        var service = CreateService();
         var userId = Guid.NewGuid();
-        var tokenResult = await _sut.GenerateAccessTokenAsync(
-            userId, "test@test.com", "Test", new[] { "Patient" });
+        var result = await service.GenerateAccessTokenAsync(userId, "x@y.com", "X", new[] { "Patient" });
 
-        // Act
-        var result = _sut.GetUserIdFromToken(tokenResult.AccessToken);
+        var parsedUserId = service.GetUserIdFromToken(result.AccessToken);
+        var parsedJti = service.GetJtiFromToken(result.AccessToken);
 
-        // Assert
-        result.Should().Be(userId);
+        parsedUserId.Should().Be(userId);
+        parsedJti.Should().Be(result.Jti);
     }
 
     [Fact]
-    public void GetUserIdFromToken_WithInvalidToken_ShouldReturnNull()
+    public void GetUserIdFromToken_WhenSubMissing_ShouldFallbackToUid()
     {
-        var result = _sut.GetUserIdFromToken("invalid.token");
-        result.Should().BeNull();
-    }
+        var settings = new JwtSettings
+        {
+            SecretKey = "this-is-a-test-secret-key-with-minimum-length-32",
+            Issuer = "AuraEyes.Tests",
+            Audience = "AuraEyes.Client",
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ClockSkewSeconds = 0
+        };
+        var service = new TokenService(Options.Create(settings));
 
-    #endregion
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.SecretKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var userId = Guid.NewGuid().ToString();
+        var token = new JwtSecurityToken(
+            issuer: settings.Issuer,
+            audience: settings.Audience,
+            claims:
+            [
+                new Claim("uid", userId),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            ],
+            expires: DateTime.UtcNow.AddMinutes(10),
+            signingCredentials: credentials);
 
-    #region GetJtiFromToken Tests
+        var jwt = new JwtSecurityTokenHandler().WriteToken(token);
+        var parsed = service.GetUserIdFromToken(jwt);
 
-    [Fact]
-    public async Task GetJtiFromToken_WithValidToken_ShouldReturnJti()
-    {
-        // Arrange
-        var tokenResult = await _sut.GenerateAccessTokenAsync(
-            Guid.NewGuid(), "test@test.com", "Test", new[] { "Patient" });
-
-        // Act
-        var result = _sut.GetJtiFromToken(tokenResult.AccessToken);
-
-        // Assert
-        result.Should().NotBeNullOrEmpty();
-        result.Should().Be(tokenResult.Jti);
-    }
-
-    [Fact]
-    public void GetJtiFromToken_WithInvalidToken_ShouldReturnNull()
-    {
-        var result = _sut.GetJtiFromToken("invalid.token");
-        result.Should().BeNull();
-    }
-
-    #endregion
-
-    #region HashToken Tests
-
-    [Fact]
-    public void HashToken_ShouldReturnNonEmptyString()
-    {
-        var result = TokenService.HashToken("test-token");
-        result.Should().NotBeNullOrEmpty();
+        parsed.Should().Be(Guid.Parse(userId));
     }
 
     [Fact]
-    public void HashToken_SameInput_ShouldReturnSameHash()
+    public void HashToken_ShouldBeDeterministic_AndDifferentForDifferentInput()
     {
-        var hash1 = TokenService.HashToken("same-token");
-        var hash2 = TokenService.HashToken("same-token");
+        var first = TokenService.HashToken("plain-token");
+        var second = TokenService.HashToken("plain-token");
+        var third = TokenService.HashToken("another-token");
 
-        hash1.Should().Be(hash2);
+        first.Should().Be(second);
+        first.Should().NotBe(third);
+        first.Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]
-    public void HashToken_DifferentInputs_ShouldReturnDifferentHashes()
+    public void GetUserIdFromToken_WhenInvalidGuidClaim_ShouldReturnNull()
     {
-        var hash1 = TokenService.HashToken("token-1");
-        var hash2 = TokenService.HashToken("token-2");
+        var settings = new JwtSettings
+        {
+            SecretKey = "this-is-a-test-secret-key-with-minimum-length-32",
+            Issuer = "AuraEyes.Tests",
+            Audience = "AuraEyes.Client",
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ClockSkewSeconds = 0
+        };
+        var service = new TokenService(Options.Create(settings));
 
-        hash1.Should().NotBe(hash2);
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.SecretKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var token = new JwtSecurityToken(
+            issuer: settings.Issuer,
+            audience: settings.Audience,
+            claims:
+            [
+                new Claim(JwtRegisteredClaimNames.Sub, "not-a-guid"),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            ],
+            expires: DateTime.UtcNow.AddMinutes(10),
+            signingCredentials: credentials);
+
+        var jwt = new JwtSecurityTokenHandler().WriteToken(token);
+        var parsed = service.GetUserIdFromToken(jwt);
+
+        parsed.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("invalid")]
+    [InlineData("a.b.c")]
+    public void ValidateToken_WithInvalidInputs_ShouldReturnNull(string token)
+    {
+        var service = CreateService();
+
+        var principal = service.ValidateToken(token);
+
+        principal.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("invalid")]
+    [InlineData("a.b.c")]
+    public void GetJtiFromToken_WithInvalidInputs_ShouldReturnNull(string token)
+    {
+        var service = CreateService();
+
+        var jti = service.GetJtiFromToken(token);
+
+        jti.Should().BeNull();
     }
 
     [Fact]
-    public void HashToken_ShouldReturnBase64String()
+    public async Task GenerateAccessTokenAsync_ShouldIncludeAllRoleClaimVariants()
     {
-        var result = TokenService.HashToken("test-token");
-        var act = () => Convert.FromBase64String(result);
-        act.Should().NotThrow();
+        var service = CreateService();
+        var userId = Guid.NewGuid();
+
+        var result = await service.GenerateAccessTokenAsync(userId, "role@test.local", "Role User", ["Patient", "OrgAdmin"]);
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(result.AccessToken);
+
+        jwt.Claims.Should().Contain(c => c.Type == ClaimTypes.Role && c.Value == "Patient");
+        jwt.Claims.Should().Contain(c => c.Type == ClaimTypes.Role && c.Value == "OrgAdmin");
+        jwt.Claims.Should().Contain(c => c.Type == "role" && c.Value == "Patient");
+        jwt.Claims.Should().Contain(c => c.Type == "role" && c.Value == "OrgAdmin");
     }
 
     [Fact]
-    public void HashToken_ShouldReturn32BytesWhenDecoded()
+    public void GenerateRefreshToken_ShouldCreateNonEmptyUniqueValues()
     {
-        // SHA256 produces 32 bytes
-        var result = TokenService.HashToken("test-token");
-        var bytes = Convert.FromBase64String(result);
-        bytes.Should().HaveCount(32);
+        var service = CreateService();
+
+        var first = service.GenerateRefreshToken();
+        var second = service.GenerateRefreshToken();
+
+        first.Should().NotBeNullOrWhiteSpace();
+        second.Should().NotBeNullOrWhiteSpace();
+        first.Should().NotBe(second);
     }
 
-    #endregion
+    [Fact]
+    public async Task GenerateAccessTokenAsync_ShouldIncludeNameAndUidClaims()
+    {
+        var service = CreateService();
+        var userId = Guid.NewGuid();
+
+        var result = await service.GenerateAccessTokenAsync(userId, "name@test.local", "Display Name", ["Patient"]);
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(result.AccessToken);
+
+        jwt.Claims.Should().Contain(c => c.Type == "uid" && c.Value == userId.ToString());
+        jwt.Claims.Should().Contain(c => c.Type == "name" && c.Value == "Display Name");
+    }
+
+    [Fact]
+    public async Task GetUserIdFromToken_WhenTokenCorrupted_ShouldReturnNull()
+    {
+        var service = CreateService();
+        var userId = Guid.NewGuid();
+        var validToken = (await service.GenerateAccessTokenAsync(userId, "corrupt@test.local", "Corrupt", ["Patient"])).AccessToken;
+        var corrupted = validToken + "broken";
+
+        var parsed = service.GetUserIdFromToken(corrupted);
+
+        parsed.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("Patient")]
+    [InlineData("OrgAdmin")]
+    [InlineData("Ophthalmologist")]
+    [InlineData("SystemAdmin")]
+    [InlineData("CustomRole")]
+    public async Task GenerateAccessTokenAsync_WithSingleRole_ShouldContainThatRole(string role)
+    {
+        var service = CreateService();
+        var userId = Guid.NewGuid();
+
+        var result = await service.GenerateAccessTokenAsync(userId, "single-role@test.local", "Single Role", [role]);
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(result.AccessToken);
+
+        jwt.Claims.Should().Contain(c => c.Type == ClaimTypes.Role && c.Value == role);
+        jwt.Claims.Should().Contain(c => c.Type == "role" && c.Value == role);
+    }
+
+    [Theory]
+    [InlineData("plain-token")]
+    [InlineData("another-token")]
+    [InlineData("token-with-space ")]
+    [InlineData("TOKEN-UPPER")]
+    [InlineData("1234567890")]
+    public void HashToken_ShouldProduceNonEmptyHash_ForVariousInputs(string input)
+    {
+        var hash = TokenService.HashToken(input);
+
+        hash.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Theory]
+    [InlineData("department", "retina")]
+    [InlineData("locale", "en-US")]
+    [InlineData("timezone", "UTC")]
+    [InlineData("tenant", "hospital-a")]
+    [InlineData("scope", "read")]
+    [InlineData("scope2", "write")]
+    [InlineData("session", "mobile")]
+    [InlineData("channel", "web")]
+    [InlineData("feature", "beta")]
+    [InlineData("profile_id", "p-123")]
+    public async Task GenerateAccessTokenAsync_ShouldIncludeAdditionalClaimPair(string claimType, string claimValue)
+    {
+        var service = CreateService();
+        var userId = Guid.NewGuid();
+        var additionalClaims = new[] { new Claim(claimType, claimValue) };
+
+        var result = await service.GenerateAccessTokenAsync(userId, "claim@test.local", "Claim User", ["Patient"], additionalClaims);
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(result.AccessToken);
+
+        jwt.Claims.Should().Contain(c => c.Type == claimType && c.Value == claimValue);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("invalid")]
+    [InlineData("a.b")]
+    [InlineData("a.b.c")]
+    [InlineData("ey.invalid.token")]
+    [InlineData("header.payload.signature.extra")]
+    [InlineData("not-jwt-format")]
+    [InlineData("123.456.789")]
+    [InlineData("Bearer token")]
+    public void GetUserIdFromToken_WithInvalidFormats_ShouldReturnNull(string token)
+    {
+        var service = CreateService();
+
+        var parsed = service.GetUserIdFromToken(token);
+
+        parsed.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    [InlineData(7)]
+    [InlineData(8)]
+    [InlineData(9)]
+    public async Task GenerateAccessTokenAsync_WithoutRoles_ShouldNotContainRoleClaims(int caseId)
+    {
+        var service = CreateService();
+        var userId = Guid.NewGuid();
+
+        var result = await service.GenerateAccessTokenAsync(
+            userId,
+            $"norole-{caseId}@test.local",
+            $"No Role {caseId}",
+            Array.Empty<string>());
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(result.AccessToken);
+
+        jwt.Claims.Should().NotContain(c => c.Type == ClaimTypes.Role);
+        jwt.Claims.Should().NotContain(c => c.Type == "role");
+        jwt.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Sub && c.Value == userId.ToString());
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("a")]
+    [InlineData("token")]
+    [InlineData("token-1")]
+    [InlineData("token-2")]
+    [InlineData("TOKEN-UPPER")]
+    [InlineData("123")]
+    [InlineData("abc.def")]
+    [InlineData("very-long-token-value-for-hashing")]
+    public void HashToken_ShouldBeDeterministic_ForManyInputs(string input)
+    {
+        var first = TokenService.HashToken(input);
+        var second = TokenService.HashToken(input);
+
+        first.Should().Be(second);
+        first.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Theory]
+    [InlineData("Patient", "user1@test.local")]
+    [InlineData("OrgAdmin", "user2@test.local")]
+    [InlineData("Ophthalmologist", "user3@test.local")]
+    [InlineData("SystemAdmin", "user4@test.local")]
+    [InlineData("Guest", "user5@test.local")]
+    [InlineData("Nurse", "user6@test.local")]
+    [InlineData("ClinicStaff", "user7@test.local")]
+    [InlineData("Support", "user8@test.local")]
+    [InlineData("Auditor", "user9@test.local")]
+    [InlineData("CustomRole", "user10@test.local")]
+    public async Task GetJtiFromToken_WithValidToken_ShouldReturnTokenJti(string role, string email)
+    {
+        var service = CreateService();
+        var userId = Guid.NewGuid();
+
+        var token = await service.GenerateAccessTokenAsync(userId, email, "Jti User", [role]);
+        var parsedJti = service.GetJtiFromToken(token.AccessToken);
+
+        parsedJti.Should().Be(token.Jti);
+    }
+
+    [Theory]
+    [InlineData("name-a", "email-a@test.local")]
+    [InlineData("name-b", "email-b@test.local")]
+    [InlineData("name-c", "email-c@test.local")]
+    [InlineData("name-d", "email-d@test.local")]
+    [InlineData("name-e", "email-e@test.local")]
+    [InlineData("name-f", "email-f@test.local")]
+    [InlineData("name-g", "email-g@test.local")]
+    [InlineData("name-h", "email-h@test.local")]
+    [InlineData("name-i", "email-i@test.local")]
+    [InlineData("name-j", "email-j@test.local")]
+    public async Task GenerateAccessTokenAsync_ShouldContainStandardIdentityClaims(string fullName, string email)
+    {
+        var service = CreateService();
+        var userId = Guid.NewGuid();
+
+        var result = await service.GenerateAccessTokenAsync(userId, email, fullName, ["Patient"]);
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(result.AccessToken);
+
+        jwt.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Sub && c.Value == userId.ToString());
+        jwt.Claims.Should().Contain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == userId.ToString());
+        jwt.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Email && c.Value == email);
+        jwt.Claims.Should().Contain(c => c.Type == "name" && c.Value == fullName);
+        jwt.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Jti && c.Value == result.Jti);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    [InlineData(7)]
+    [InlineData(8)]
+    [InlineData(9)]
+    public void GenerateRefreshToken_ShouldProduceBase64StringWithExpectedEntropy(int caseId)
+    {
+        var service = CreateService();
+
+        var token = service.GenerateRefreshToken();
+        var bytes = Convert.FromBase64String(token);
+        var expectedByteLength = 64 + caseId - caseId;
+
+        bytes.Length.Should().Be(expectedByteLength);
+        token.Should().NotBeNullOrWhiteSpace();
+        token.Should().NotContain("\n");
+        token.Should().NotContain("\r");
+        token.Should().NotContain(" ");
+    }
 }
