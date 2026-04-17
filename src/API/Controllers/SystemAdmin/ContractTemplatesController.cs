@@ -10,6 +10,7 @@ using Application.SystemAdmin.ContractTemplates.Common;
 using Application.SystemAdmin.ContractTemplates.Queries.GetContractTemplateById;
 using Application.SystemAdmin.ContractTemplates.Queries.GetContractTemplates;
 using Domain.Enums;
+using Infrastructure.Identity.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

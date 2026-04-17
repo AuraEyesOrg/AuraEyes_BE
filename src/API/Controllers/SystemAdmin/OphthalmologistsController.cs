@@ -18,6 +18,7 @@ using Application.SystemAdmin.Ophthalmologists.Queries.GetLeaveRequests;
 using Application.SystemAdmin.Ophthalmologists.Queries.GetWithdrawalRequests;
 using Application.Wallets.Common;
 using Domain.Enums;
+using Infrastructure.Identity.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

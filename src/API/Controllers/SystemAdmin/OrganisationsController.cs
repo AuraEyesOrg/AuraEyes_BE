@@ -6,6 +6,7 @@ using Application.SystemAdmin.Organisations.Commands.UpdateMonthlyQuota;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisationById;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisationMetrics;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisations;
+using Infrastructure.Identity.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

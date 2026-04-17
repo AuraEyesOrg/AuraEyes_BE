@@ -41,7 +41,7 @@ public class ClinicAppointmentsController : BaseApiController
     }
 
     [HttpDelete("{appointmentId:guid}")]
-    [AuthorizePermission(Permissions.AppointmentsUpdate)]
+    [AuthorizePermission(Permissions.AppointmentsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> CancelClinicAppointment(
         Guid appointmentId,
@@ -58,7 +58,7 @@ public class ClinicAppointmentsController : BaseApiController
     }
 
     [HttpPut("{appointmentId:guid}/check-in")]
-    [AuthorizePermission(Permissions.AppointmentsUpdate)]
+    [AuthorizePermission(Permissions.AppointmentsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> CheckInClinicAppointment(Guid appointmentId)
     {
@@ -67,7 +67,7 @@ public class ClinicAppointmentsController : BaseApiController
     }
 
     [HttpPut("{appointmentId:guid}/start")]
-    [AuthorizePermission(Permissions.AppointmentsUpdate)]
+    [AuthorizePermission(Permissions.AppointmentsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> StartClinicAppointment(Guid appointmentId)
     {
@@ -76,7 +76,7 @@ public class ClinicAppointmentsController : BaseApiController
     }
 
     [HttpPut("{appointmentId:guid}/complete")]
-    [AuthorizePermission(Permissions.AppointmentsUpdate)]
+    [AuthorizePermission(Permissions.AppointmentsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> CompleteClinicAppointment(
         Guid appointmentId,
@@ -93,7 +93,7 @@ public class ClinicAppointmentsController : BaseApiController
     }
 
     [HttpPut("{appointmentId:guid}/no-show")]
-    [AuthorizePermission(Permissions.AppointmentsUpdate)]
+    [AuthorizePermission(Permissions.AppointmentsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> MarkClinicAppointmentNoShow(Guid appointmentId)
     {

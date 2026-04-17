@@ -5,7 +5,6 @@ using Application.SystemAdmin.Users.Queries.GetUsers;
 using MediatR;
 using Infrastructure.Identity;
 using Infrastructure.Identity.Authorization;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
