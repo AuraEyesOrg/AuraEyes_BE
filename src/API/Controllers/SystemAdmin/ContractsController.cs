@@ -21,7 +21,7 @@ namespace API.Controllers.SystemAdmin;
 /// All endpoints require SystemAdmin role.
 /// </summary>
 [Route("api/system-admin/contracts")]
-[Authorize(Policy = Policies.SystemAdminOnly)]
+[AuthorizePermission(Permissions.ContractsRead)]
 public class ContractsController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -72,6 +72,7 @@ public class ContractsController : BaseApiController
 
     /// <summary>Create a new contract in Draft status.</summary>
     [HttpPost]
+    [AuthorizePermission(Permissions.ContractsManage)]
     [ProducesResponseType(typeof(ApiResponse<ContractDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -84,6 +85,7 @@ public class ContractsController : BaseApiController
 
     /// <summary>Update commercial terms of a Draft contract.</summary>
     [HttpPut("{id:guid}")]
+    [AuthorizePermission(Permissions.ContractsManage)]
     [ProducesResponseType(typeof(ApiResponse<ContractDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -103,6 +105,7 @@ public class ContractsController : BaseApiController
 
     /// <summary>Send a Draft contract to the counterparty for signature.</summary>
     [HttpPost("{id:guid}/send-for-signature")]
+    [AuthorizePermission(Permissions.ContractsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -114,6 +117,7 @@ public class ContractsController : BaseApiController
 
     /// <summary>Mark a PendingSignature contract as signed and Activate it.</summary>
     [HttpPost("{id:guid}/sign")]
+    [AuthorizePermission(Permissions.ContractsManage)]
     [ProducesResponseType(typeof(ApiResponse<ContractDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -134,6 +138,7 @@ public class ContractsController : BaseApiController
 
     /// <summary>Terminate an Active contract.</summary>
     [HttpPost("{id:guid}/terminate")]
+    [AuthorizePermission(Permissions.ContractsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -145,6 +150,7 @@ public class ContractsController : BaseApiController
 
     /// <summary>Cancel a Draft or PendingSignature contract.</summary>
     [HttpPost("{id:guid}/cancel")]
+    [AuthorizePermission(Permissions.ContractsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]

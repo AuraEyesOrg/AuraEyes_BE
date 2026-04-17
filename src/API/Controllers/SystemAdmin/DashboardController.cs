@@ -13,6 +13,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
 using Infrastructure.Identity.Authorization;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers.SystemAdmin;
 
@@ -159,6 +161,7 @@ public class DashboardController : BaseApiController
     /// This endpoint runs the same job logic as Hangfire recurring execution.
     /// </summary>
     [HttpPost("jobs/fulltime-slot-rolling-window/trigger-once")]
+    [AuthorizePermission(Permissions.SchedulesManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> TriggerFullTimeRollingWindowJobOnce(CancellationToken cancellationToken)
