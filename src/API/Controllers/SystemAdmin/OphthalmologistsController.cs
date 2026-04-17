@@ -21,6 +21,7 @@ using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Infrastructure.Identity.Authorization;
 using Application.Ophthalmologists.Contracts.UploadSignedContract;
 using Application.Ophthalmologists.Common;
 using Application.Ophthalmologists.Queries.GetOphthalmologist;
@@ -41,7 +42,7 @@ namespace API.Controllers.SystemAdmin;
 /// Credential verification, search, and listing.
 /// </summary>
 [Route("api/system-admin/[controller]")]
-[Authorize(Policy = Policies.SystemAdminOnly)]
+[AuthorizePermission(Permissions.OphthalmologistsRead)]
 public class OphthalmologistsController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -106,7 +107,7 @@ public class OphthalmologistsController : BaseApiController
     /// <param name="command">Create ophthalmologist command.</param>
     /// <returns>Created ophthalmologist ID.</returns>
     [HttpPost]
-    [Authorize(Policy = Policies.AdminsOnly)]
+    [AuthorizePermission(Permissions.OphthalmologistsCreate)]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
@@ -132,7 +133,7 @@ public class OphthalmologistsController : BaseApiController
     /// <param name="command">Update ophthalmologist command.</param>
     /// <returns>Success response.</returns>
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = Policies.AdminsOnly)]
+    [AuthorizePermission(Permissions.OphthalmologistsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -151,7 +152,7 @@ public class OphthalmologistsController : BaseApiController
     /// Get current authenticated ophthalmologist profile.
     /// </summary>
     [HttpGet("profile")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [AuthorizePermission(Permissions.OphthalmologistsRead)]
     [ProducesResponseType(typeof(ApiResponse<OphthalmologistDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetMyProfile(CancellationToken cancellationToken)
@@ -170,7 +171,7 @@ public class OphthalmologistsController : BaseApiController
     /// Update current authenticated ophthalmologist profile information.
     /// </summary>
     [HttpPut("profile")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [AuthorizePermission(Permissions.OphthalmologistsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -211,7 +212,7 @@ public class OphthalmologistsController : BaseApiController
     /// Accepts multipart form data with an image file.
     /// </summary>
     [HttpPost("profile/avatar")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [AuthorizePermission(Permissions.OphthalmologistsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<UploadAvatarResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UploadMyAvatar(
@@ -251,7 +252,7 @@ public class OphthalmologistsController : BaseApiController
     /// <param name="id">Ophthalmologist ID.</param>
     /// <returns>Success response.</returns>
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = Policies.SystemAdminOnly)]
+    [AuthorizePermission(Permissions.OphthalmologistsDelete)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteOphthalmologist(Guid id)
@@ -266,7 +267,7 @@ public class OphthalmologistsController : BaseApiController
     /// <param name="id">Ophthalmologist ID.</param>
     /// <returns>Success response.</returns>
     [HttpPost("{id:guid}/verify")]
-    [Authorize(Policy = Policies.AdminsOnly)]
+    [AuthorizePermission(Permissions.OphthalmologistsVerify)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -282,7 +283,7 @@ public class OphthalmologistsController : BaseApiController
     /// <param name="id">Ophthalmologist ID.</param>
     /// <returns>Success response.</returns>
     [HttpPost("{id:guid}/unverify")]
-    [Authorize(Policy = Policies.AdminsOnly)]
+    [AuthorizePermission(Permissions.OphthalmologistsVerify)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -299,7 +300,7 @@ public class OphthalmologistsController : BaseApiController
     /// Get the current ophthalmologist's contract.
     /// </summary>
     [HttpGet("my-contract")]
-    [Authorize]
+    [AuthorizePermission(Permissions.ContractsRead)]
     [ProducesResponseType(typeof(ApiResponse<ContractDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetMyContract()
@@ -313,7 +314,7 @@ public class OphthalmologistsController : BaseApiController
     }
 
     [HttpGet("dashboard-metrics")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [AuthorizePermission(Permissions.DashboardRead)]
     [ProducesResponseType(typeof(ApiResponse<OphthalmologistDashboardMetricsDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDashboardMetrics()
     {
@@ -328,7 +329,7 @@ public class OphthalmologistsController : BaseApiController
     /// Upload a signed contract document (scanned image).
     /// </summary>
     [HttpPost("my-contract/upload")]
-    [Authorize]
+    [AuthorizePermission(Permissions.ContractsRead)]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -375,6 +376,7 @@ public class OphthalmologistsController : BaseApiController
     /// Pay monthly salary (or custom amount) into ophthalmologist wallet.
     /// </summary>
     [HttpPost("{id:guid}/salary-payout")]
+    [AuthorizePermission(Permissions.WalletsManage)]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -397,6 +399,7 @@ public class OphthalmologistsController : BaseApiController
     /// Get withdrawal requests from ophthalmologists.
     /// </summary>
     [HttpGet("withdrawal-requests")]
+    [AuthorizePermission(Permissions.PayoutsRead)]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<AdminWithdrawalRequestDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetWithdrawalRequests(
         [FromQuery] PaymentStatus? status = null,
@@ -418,6 +421,7 @@ public class OphthalmologistsController : BaseApiController
     /// Confirm that transfer for a withdrawal request has been completed.
     /// </summary>
     [HttpPost("withdrawal-requests/{requestId:guid}/confirm")]
+    [AuthorizePermission(Permissions.PayoutsManage)]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -447,6 +451,7 @@ public class OphthalmologistsController : BaseApiController
     /// Reject a withdrawal request.
     /// </summary>
     [HttpPost("withdrawal-requests/{requestId:guid}/reject")]
+    [AuthorizePermission(Permissions.PayoutsManage)]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -475,6 +480,7 @@ public class OphthalmologistsController : BaseApiController
     /// Get ophthalmologist leave requests for review.
     /// </summary>
     [HttpGet("leave-requests")]
+    [AuthorizePermission(Permissions.SchedulesManage)]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<AdminOphthalmologistLeaveRequestDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetLeaveRequests(
         [FromQuery] OphthalmologistLeaveRequestStatus? status = null,
@@ -498,6 +504,7 @@ public class OphthalmologistsController : BaseApiController
     /// Approve an ophthalmologist leave request.
     /// </summary>
     [HttpPost("leave-requests/{leaveRequestId:guid}/approve")]
+    [AuthorizePermission(Permissions.SchedulesManage)]
     [ProducesResponseType(typeof(ApiResponse<ApproveLeaveRequestResultDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -523,6 +530,7 @@ public class OphthalmologistsController : BaseApiController
     /// Reject an ophthalmologist leave request.
     /// </summary>
     [HttpPost("leave-requests/{leaveRequestId:guid}/reject")]
+    [AuthorizePermission(Permissions.SchedulesManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -548,6 +556,7 @@ public class OphthalmologistsController : BaseApiController
     /// Get ophthalmologist employment type change requests for review.
     /// </summary>
     [HttpGet("employment-type-change-requests")]
+    [AuthorizePermission(Permissions.OphthalmologistsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<AdminOphthalmologistEmploymentTypeChangeRequestDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetEmploymentTypeChangeRequests(
         [FromQuery] OphthalmologistEmploymentTypeChangeRequestStatus? status = null,
@@ -571,6 +580,7 @@ public class OphthalmologistsController : BaseApiController
     /// Approve an ophthalmologist employment type change request.
     /// </summary>
     [HttpPost("employment-type-change-requests/{requestId:guid}/approve")]
+    [AuthorizePermission(Permissions.OphthalmologistsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<ApproveEmploymentTypeChangeRequestResultDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -596,6 +606,7 @@ public class OphthalmologistsController : BaseApiController
     /// Reject an ophthalmologist employment type change request.
     /// </summary>
     [HttpPost("employment-type-change-requests/{requestId:guid}/reject")]
+    [AuthorizePermission(Permissions.OphthalmologistsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]

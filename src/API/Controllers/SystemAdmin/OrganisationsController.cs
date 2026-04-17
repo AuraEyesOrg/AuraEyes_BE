@@ -9,6 +9,7 @@ using Application.SystemAdmin.Organisations.Queries.GetOrganisations;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Infrastructure.Identity.Authorization;
 
 namespace API.Controllers.SystemAdmin;
 
@@ -18,7 +19,7 @@ namespace API.Controllers.SystemAdmin;
 /// Uses existing Organisation entity from Domain.
 /// </summary>
 [Route("api/system-admin/[controller]")]
-[Authorize(Policy = Policies.SystemAdminOnly)]
+[AuthorizePermission(Permissions.OrganisationsRead)]
 public class OrganisationsController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -97,6 +98,7 @@ public class OrganisationsController : BaseApiController
     /// Update monthly quota limit for an organisation.
     /// </summary>
     [HttpPut("{id:guid}/monthly-quota")]
+    [AuthorizePermission(Permissions.OrganisationsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -123,6 +125,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpPost("onboarding-requests/{id:guid}/approve")]
+    [AuthorizePermission(Permissions.OrganisationsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<ApproveOrganisationOnboardingResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
