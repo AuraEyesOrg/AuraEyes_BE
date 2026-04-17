@@ -10,6 +10,7 @@ using Application.Scheduling.Appointments.Common;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Infrastructure.Identity.Authorization;
 
 namespace API.Controllers;
 
@@ -24,7 +25,7 @@ public class ClinicAppointmentsController : BaseApiController
     }
 
     [HttpPost]
-    [Authorize(Policy = Policies.PatientOnly)]
+    [AuthorizePermission(Permissions.AppointmentsCreate)]
     [ProducesResponseType(typeof(ApiResponse<CreateClinicAppointmentResult>), StatusCodes.Status200OK)]
     public async Task<IActionResult> CreateClinicAppointment([FromBody] CreateClinicAppointmentRequest request)
     {
@@ -40,7 +41,7 @@ public class ClinicAppointmentsController : BaseApiController
     }
 
     [HttpDelete("{appointmentId:guid}")]
-    [Authorize(Policy = Policies.PatientOnly)]
+    [AuthorizePermission(Permissions.AppointmentsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> CancelClinicAppointment(
         Guid appointmentId,
@@ -57,7 +58,7 @@ public class ClinicAppointmentsController : BaseApiController
     }
 
     [HttpPut("{appointmentId:guid}/check-in")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.AppointmentsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> CheckInClinicAppointment(Guid appointmentId)
     {
@@ -66,7 +67,7 @@ public class ClinicAppointmentsController : BaseApiController
     }
 
     [HttpPut("{appointmentId:guid}/start")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.AppointmentsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> StartClinicAppointment(Guid appointmentId)
     {
@@ -75,7 +76,7 @@ public class ClinicAppointmentsController : BaseApiController
     }
 
     [HttpPut("{appointmentId:guid}/complete")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.AppointmentsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> CompleteClinicAppointment(
         Guid appointmentId,
@@ -92,7 +93,7 @@ public class ClinicAppointmentsController : BaseApiController
     }
 
     [HttpPut("{appointmentId:guid}/no-show")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.AppointmentsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> MarkClinicAppointmentNoShow(Guid appointmentId)
     {

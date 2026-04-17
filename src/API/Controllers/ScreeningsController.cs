@@ -14,6 +14,8 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Infrastructure.Identity.Authorization;
+using Application.Common.Constants;
 
 namespace API.Controllers;
 
@@ -22,7 +24,7 @@ namespace API.Controllers;
 /// Provides screening operations including saving AI analysis results.
 /// </summary>
 [Route("api/screenings")]
-[Authorize]
+[AuthorizePermission(Permissions.ScreeningRead)]
 public class ScreeningsController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -238,6 +240,7 @@ public class ScreeningsController : BaseApiController
     /// Should be called at the start of screening workflow.
     /// </summary>
     [HttpPost("create-session")]
+    [AuthorizePermission(Permissions.ScreeningCreate)]
     [ProducesResponseType(typeof(ApiResponse<CreateAiScreeningSessionResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -267,6 +270,7 @@ public class ScreeningsController : BaseApiController
     /// Images should already be uploaded to Cloudinary and URLs provided.
     /// </remarks>
     [HttpPost("{screeningId:guid}/save-results")]
+    [AuthorizePermission(Permissions.ScreeningCreate)]
     [ProducesResponseType(typeof(ApiResponse<SaveAiScreeningResultsResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -313,6 +317,7 @@ public class ScreeningsController : BaseApiController
     /// Returns public URLs. Images are persisted to database when creating screening session.
     /// </summary>
     [HttpPost]
+    [AuthorizePermission(Permissions.ScreeningCreate)]
     [Route("upload-images")]
     [ProducesResponseType(typeof(ApiResponse<UploadRetinalImagesResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]

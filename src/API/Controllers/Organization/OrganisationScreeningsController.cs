@@ -14,6 +14,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 using Infrastructure.Identity.Authorization;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers.Organization;
 
@@ -141,6 +143,7 @@ public class OrganisationScreeningsController : BaseApiController
     /// Walk-in patient requires recipient email; Aura patient can use prefilled account email.
     /// </summary>
     [HttpPost("{screeningId:guid}/share")]
+    [AuthorizePermission(Permissions.ScreeningCreate)]
     [ProducesResponseType(typeof(ApiResponse<ShareOrgScreeningResultResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]

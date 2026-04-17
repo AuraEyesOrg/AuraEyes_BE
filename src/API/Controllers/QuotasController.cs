@@ -2,10 +2,10 @@ using Application.AiQuota.Commands.BuyAiQuota;
 using Application.AiQuota.Queries.GetQuotaBalance;
 using Application.Common.Constants;
 using MediatR;
+using Infrastructure.Identity.Authorization;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
-using Infrastructure.Identity.Authorization;
 
 namespace API.Controllers;
 

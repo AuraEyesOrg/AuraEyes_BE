@@ -76,7 +76,7 @@ public class OphthalmologistsController : BaseApiController
     /// <param name="pageSize">Page size (default: 10).</param>
     /// <returns>Paginated list of ophthalmologists.</returns>
     [HttpGet]
-    [Authorize]
+    [AuthorizePermission(Permissions.OphthalmologistsRead)]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<OphthalmologistListDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetOphthalmologists(
@@ -103,7 +103,7 @@ public class OphthalmologistsController : BaseApiController
     /// <param name="id">Ophthalmologist ID.</param>
     /// <returns>Ophthalmologist details with certificates.</returns>
     [HttpGet("{id:guid}")]
-    [Authorize]
+    [AuthorizePermission(Permissions.OphthalmologistsRead)]
     [ProducesResponseType(typeof(ApiResponse<OphthalmologistDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetOphthalmologist(Guid id)
@@ -118,7 +118,7 @@ public class OphthalmologistsController : BaseApiController
     /// <param name="command">Create ophthalmologist command.</param>
     /// <returns>Created ophthalmologist ID.</returns>
     [HttpPost]
-    [Authorize(Policy = Policies.AdminsOnly)]
+    [AuthorizePermission(Permissions.OphthalmologistsCreate)]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
@@ -144,7 +144,7 @@ public class OphthalmologistsController : BaseApiController
     /// <param name="command">Update ophthalmologist command.</param>
     /// <returns>Success response.</returns>
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = Policies.AdminsOnly)]
+    [AuthorizePermission(Permissions.OphthalmologistsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -539,7 +539,7 @@ public class OphthalmologistsController : BaseApiController
     /// <param name="id">Ophthalmologist ID.</param>
     /// <returns>Success response.</returns>
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = Policies.SystemAdminOnly)]
+    [AuthorizePermission(Permissions.OphthalmologistsDelete)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteOphthalmologist(Guid id)
@@ -554,7 +554,7 @@ public class OphthalmologistsController : BaseApiController
     /// <param name="id">Ophthalmologist ID.</param>
     /// <returns>Success response.</returns>
     [HttpPost("{id:guid}/verify")]
-    [Authorize(Policy = Policies.AdminsOnly)]
+    [AuthorizePermission(Permissions.OphthalmologistsVerify)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -570,7 +570,7 @@ public class OphthalmologistsController : BaseApiController
     /// <param name="id">Ophthalmologist ID.</param>
     /// <returns>Success response.</returns>
     [HttpPost("{id:guid}/unverify")]
-    [Authorize(Policy = Policies.AdminsOnly)]
+    [AuthorizePermission(Permissions.OphthalmologistsVerify)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]

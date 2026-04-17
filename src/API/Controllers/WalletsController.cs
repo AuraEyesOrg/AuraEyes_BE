@@ -15,6 +15,9 @@ using Application.Wallets.Queries.GetWalletTransactions;
 using Application.Common.Constants;
 using Domain.Enums;
 using Infrastructure.Identity.Authorization;
+using MediatR;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers;
 
@@ -44,7 +47,7 @@ public class WalletsController : BaseApiController
     /// </summary>
     /// <returns>Wallet details including balance.</returns>
     [HttpGet]
-    [Authorize]
+    [AuthorizePermission(Permissions.WalletsRead)]
     [ProducesResponseType(typeof(ApiResponse<WalletDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetWallet()
@@ -97,7 +100,7 @@ public class WalletsController : BaseApiController
     /// <param name="pageSize">Page size (default: 20).</param>
     /// <returns>Paginated list of deposit requests.</returns>
     [HttpGet("deposits")]
-    [Authorize]
+    [AuthorizePermission(Permissions.WalletsHistory)]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<DepositRequestDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetDepositHistory(
@@ -127,7 +130,7 @@ public class WalletsController : BaseApiController
     /// <param name="id">Deposit request ID.</param>
     /// <returns>Deposit request details.</returns>
     [HttpGet("deposits/{id:guid}")]
-    [Authorize]
+    [AuthorizePermission(Permissions.WalletsHistory)]
     [ProducesResponseType(typeof(ApiResponse<DepositRequestDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
@@ -194,7 +197,7 @@ public class WalletsController : BaseApiController
     /// <param name="request">Verify payment request.</param>
     /// <returns>Payment verification result.</returns>
     [HttpPost("verify-payment")]
-    [Authorize]
+    [AuthorizePermission(Permissions.WalletsDeposit)]
     [ProducesResponseType(typeof(ApiResponse<VerifyPaymentResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
@@ -253,7 +256,7 @@ public class WalletsController : BaseApiController
     /// Get current ophthalmologist withdrawal requests.
     /// </summary>
     [HttpGet("withdraw-requests")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [AuthorizePermission(Permissions.WalletsWithdraw)]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<WithdrawalRequestDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetWithdrawalRequests(
@@ -280,7 +283,7 @@ public class WalletsController : BaseApiController
     /// [Ophthalmologist] Lấy trạng thái lệnh chi PayOS của một withdrawal request.
     /// </summary>
     [HttpGet("withdraw-requests/{id:guid}/payout-status")]
-    [Authorize]
+    [AuthorizePermission(Permissions.WalletsWithdraw)]
     [ProducesResponseType(typeof(ApiResponse<PayoutStatusResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]

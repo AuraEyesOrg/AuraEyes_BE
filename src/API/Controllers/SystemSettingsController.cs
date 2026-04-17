@@ -11,6 +11,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
 
 using Infrastructure.Identity.Authorization;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers;
 
@@ -57,7 +59,7 @@ public class SystemSettingsController : BaseApiController
     /// Restricted to System Admin role.
     /// </summary>
     [HttpGet("experience-pricing-rules")]
-    [Authorize(Policy = Policies.SystemAdminOnly)]
+    [AuthorizePermission(Permissions.SettingsRead)]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ExperiencePricingRuleDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetExperiencePricingRules(CancellationToken cancellationToken)
     {
