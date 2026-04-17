@@ -6,6 +6,8 @@ using MailKit.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
+using QRCoder;
+using MimeKit.Utils;
 
 namespace Infrastructure.Services;
 
@@ -64,13 +66,107 @@ public class EmailService : IEmailService
     }
 
     /// <inheritdoc />
+    public async Task SendClinicAppointmentConfirmationAsync(
+        string email,
+        ClinicAppointmentConfirmationEmailPayload payload,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(email, nameof(email));
+        ArgumentNullException.ThrowIfNull(payload);
+
+        var qrCodeBytes = CreateQrCodePngBytes(payload.QrPayload);
+        var qrContentId = MimeUtils.GenerateMessageId();
+
+        var subject = EmailTemplates.ClinicAppointmentConfirmationSubject;
+        var body = EmailTemplates.GetClinicAppointmentConfirmationBody(
+            payload.PatientName,
+            payload.OrganisationName,
+            payload.AppointmentDate,
+            payload.StartTime,
+            payload.EndTime,
+            payload.VisitReason,
+            payload.AppointmentId,
+            payload.CheckInCode,
+            $"cid:{qrContentId}");
+
+        var message = CreateMessageWithInlineImage(
+            email,
+            subject,
+            body,
+            qrCodeBytes,
+            qrContentId);
+
+        try
+        {
+            await SendMessageAsync(message, cancellationToken);
+
+            _logger.LogInformation(
+                "Clinic appointment confirmation email sent to {Email} for appointment {AppointmentId}",
+                MaskEmail(email),
+                payload.AppointmentId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to send clinic appointment confirmation email - To: {To}, AppointmentId: {AppointmentId}",
+                MaskEmail(email),
+                payload.AppointmentId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task SendOrganisationScreeningResultShareAsync(
+        string email,
+        OrganisationScreeningResultShareEmailPayload payload,
+        IReadOnlyCollection<EmailAttachment> attachments,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(email, nameof(email));
+        ArgumentNullException.ThrowIfNull(payload);
+        ArgumentNullException.ThrowIfNull(attachments);
+
+        var subject = EmailTemplates.GetOrganisationScreeningResultShareSubject(payload.ScreeningId);
+        var body = EmailTemplates.GetOrganisationScreeningResultShareBody(
+            payload.PatientName,
+            payload.ScreeningId,
+            payload.CreatedAtUtc,
+            payload.RiskLevel,
+            payload.Summary,
+            payload.IncludePdf,
+            payload.RetinalImageUrls);
+
+        var message = CreateMessage(email, subject, body, isHtml: true, attachments);
+
+        try
+        {
+            await SendMessageAsync(message, cancellationToken);
+
+            _logger.LogInformation(
+                "Organisation screening result share email sent to {Email} for screening {ScreeningId}",
+                MaskEmail(email),
+                payload.ScreeningId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to send organisation screening result share email - To: {To}, ScreeningId: {ScreeningId}",
+                MaskEmail(email),
+                payload.ScreeningId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
     public async Task SendAsync(string to, string subject, string body, bool isHtml = true, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(to, nameof(to));
         ArgumentException.ThrowIfNullOrWhiteSpace(subject, nameof(subject));
         ArgumentException.ThrowIfNullOrWhiteSpace(body, nameof(body));
 
-        var message = CreateMessage(to, subject, body, isHtml);
+        var message = CreateMessage(to, subject, body, isHtml, []);
 
         try
         {
@@ -93,9 +189,51 @@ public class EmailService : IEmailService
         }
     }
 
+    /// <inheritdoc />
+    public async Task SendWithAttachmentsAsync(
+        string to,
+        string subject,
+        string body,
+        IReadOnlyCollection<EmailAttachment> attachments,
+        bool isHtml = true,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(to, nameof(to));
+        ArgumentException.ThrowIfNullOrWhiteSpace(subject, nameof(subject));
+        ArgumentException.ThrowIfNullOrWhiteSpace(body, nameof(body));
+
+        var message = CreateMessage(to, subject, body, isHtml, attachments);
+
+        try
+        {
+            await SendMessageAsync(message, cancellationToken);
+
+            _logger.LogDebug(
+                "Email with attachments sent successfully - To: {To}, Subject: {Subject}, AttachmentCount: {AttachmentCount}",
+                MaskEmail(to),
+                subject,
+                attachments.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to send email with attachments - To: {To}, Subject: {Subject}, Error: {Error}",
+                MaskEmail(to),
+                subject,
+                ex.Message);
+            throw;
+        }
+    }
+
     #region Private Methods
 
-    private MimeMessage CreateMessage(string to, string subject, string body, bool isHtml)
+    private MimeMessage CreateMessage(
+        string to,
+        string subject,
+        string body,
+        bool isHtml,
+        IReadOnlyCollection<EmailAttachment> attachments)
     {
         var message = new MimeMessage();
 
@@ -118,8 +256,51 @@ public class EmailService : IEmailService
         {
             bodyBuilder.TextBody = body;
         }
+
+        foreach (var attachment in attachments)
+        {
+            if (attachment.Content.Length == 0 || string.IsNullOrWhiteSpace(attachment.FileName))
+            {
+                continue;
+            }
+
+            bodyBuilder.Attachments.Add(
+                attachment.FileName,
+                attachment.Content,
+                ContentType.Parse(attachment.ContentType));
+        }
+
         message.Body = bodyBuilder.ToMessageBody();
 
+        return message;
+    }
+
+    private MimeMessage CreateMessageWithInlineImage(
+        string to,
+        string subject,
+        string htmlBody,
+        byte[] imageContent,
+        string imageContentId)
+    {
+        var message = new MimeMessage();
+
+        message.From.Add(new MailboxAddress(_settings.FromName, _settings.FromEmail));
+        message.To.Add(MailboxAddress.Parse(to));
+        message.Subject = subject;
+
+        var bodyBuilder = new BodyBuilder
+        {
+            HtmlBody = htmlBody
+        };
+
+        var inlineImage = bodyBuilder.LinkedResources.Add(
+            $"clinic-appointment-qr-{Guid.NewGuid():N}.png",
+            imageContent,
+            ContentType.Parse("image/png"));
+        inlineImage.ContentId = imageContentId;
+        inlineImage.ContentDisposition = new ContentDisposition(ContentDisposition.Inline);
+
+        message.Body = bodyBuilder.ToMessageBody();
         return message;
     }
 
@@ -184,6 +365,17 @@ public class EmailService : IEmailService
 
         // Auto-detect (not recommended for production)
         return SecureSocketOptions.Auto;
+    }
+
+    private static byte[] CreateQrCodePngBytes(string payload)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(payload, nameof(payload));
+
+        using var qrGenerator = new QRCodeGenerator();
+        using var qrCodeData = qrGenerator.CreateQrCode(payload, QRCodeGenerator.ECCLevel.Q);
+
+        var qrCode = new PngByteQRCode(qrCodeData);
+        return qrCode.GetGraphic(8);
     }
 
     /// <summary>

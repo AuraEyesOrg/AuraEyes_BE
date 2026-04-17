@@ -22,6 +22,12 @@ public class OrganisationConfiguration : IEntityTypeConfiguration<Organisation>
         builder.Property(e => e.LicenseNumber)
             .HasMaxLength(100);
 
+        builder.Property(e => e.TaxCode)
+            .HasMaxLength(50);
+
+        builder.Property(e => e.Description)
+            .HasMaxLength(2000);
+
         builder.Property(e => e.RatingAverage)
             .HasPrecision(4, 2)
             .HasDefaultValue(0m);
@@ -32,8 +38,14 @@ public class OrganisationConfiguration : IEntityTypeConfiguration<Organisation>
         builder.Property(e => e.PurchasedAiQuota)
             .HasDefaultValue(0);
 
-        builder.Property(e => e.UsedAiQuota)
+        builder.Property(e => e.MonthlyQuotaLimit)
             .HasDefaultValue(0);
+
+        builder.Property(e => e.MonthlyQuotaUsed)
+            .HasDefaultValue(0);
+
+        builder.Property(e => e.MonthlyQuotaLastResetAt)
+            .IsRequired(false);
 
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);

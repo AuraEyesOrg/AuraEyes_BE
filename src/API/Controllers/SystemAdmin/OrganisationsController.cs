@@ -2,6 +2,7 @@ using Application.Common.Constants;
 using Application.Common.Models;
 using Application.Common.Interfaces;
 using Application.SystemAdmin.Organisations.Common;
+using Application.SystemAdmin.Organisations.Commands.UpdateMonthlyQuota;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisationById;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisationMetrics;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisations;
@@ -92,6 +93,27 @@ public class OrganisationsController : BaseApiController
         return HandleResult(result);
     }
 
+    /// <summary>
+    /// Update monthly quota limit for an organisation.
+    /// </summary>
+    [HttpPut("{id:guid}/monthly-quota")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateMonthlyQuota(
+        Guid id,
+        [FromBody] UpdateOrganisationMonthlyQuotaRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new UpdateOrganisationMonthlyQuotaCommand
+        {
+            OrganisationId = id,
+            MonthlyQuotaLimit = request.MonthlyQuotaLimit,
+        }, cancellationToken);
+
+        return HandleResult(result, "Organisation monthly quota updated successfully.");
+    }
+
     [HttpGet("onboarding-requests")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<OrganisationOnboardingRequestDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetOnboardingRequests(CancellationToken cancellationToken)
@@ -116,3 +138,5 @@ public class OrganisationsController : BaseApiController
         return HandleResult(result, "Organisation onboarding request approved successfully.");
     }
 }
+
+public record UpdateOrganisationMonthlyQuotaRequest(int MonthlyQuotaLimit);

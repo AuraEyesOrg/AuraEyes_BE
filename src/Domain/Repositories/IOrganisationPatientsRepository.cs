@@ -6,7 +6,14 @@ public sealed record OrganisationRecentPatientReadModel
     public string Name { get; init; } = string.Empty;
     public int Age { get; init; }
     public string Gender { get; init; } = string.Empty;
+    public DateTime? DateOfBirth { get; init; }
+    public string? CitizenId { get; init; }
+    public string? Address { get; init; }
+    public string Email { get; init; } = string.Empty;
     public string PhoneNumber { get; init; } = string.Empty;
+    public bool IsWalkIn { get; init; }
+    public decimal? Bmi { get; init; }
+    public string? DiseaseHistory { get; init; }
     public DateTime LastScreening { get; init; }
     public string AiPrediction { get; init; } = string.Empty;
     public decimal Confidence { get; init; }
@@ -78,5 +85,19 @@ public interface IOrganisationPatientsRepository
     Task<bool> IsPatientManagedByOrganisationAdminAsync(
         Guid orgAdminUserId,
         Guid patientId,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> IsScreeningManagedByOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        Guid screeningId,
+        CancellationToken cancellationToken = default);
+
+    Task<string?> GetPatientDisplayNameForOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        Guid patientId,
+        CancellationToken cancellationToken = default);
+
+    Task<string?> GetOrganisationNameForOrganisationAdminAsync(
+        Guid orgAdminUserId,
         CancellationToken cancellationToken = default);
 }

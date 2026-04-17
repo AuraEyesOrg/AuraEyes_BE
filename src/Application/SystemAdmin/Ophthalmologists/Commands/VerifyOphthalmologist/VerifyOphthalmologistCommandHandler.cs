@@ -1,6 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
-using Domain.Entities.Contracts;
+using Application.SystemAdmin.Ophthalmologists.Interfaces;
 using Domain.Enums;
 using Domain.Repositories;
 using MediatR;
@@ -17,7 +17,7 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
 {
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IContractRepository _contractRepository;
-    private readonly IContractTemplateRepository _templateRepository;
+    private readonly IOphthalmologistContractProvisioningService _contractProvisioningService;
     private readonly Domain.Common.IUnitOfWork _unitOfWork;
     private readonly IIdentityService _identityService;
     private readonly IEmailService _emailService;
@@ -27,7 +27,7 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
     public VerifyOphthalmologistCommandHandler(
         IOphthalmologistRepository ophthalmologistRepository,
         IContractRepository contractRepository,
-        IContractTemplateRepository templateRepository,
+        IOphthalmologistContractProvisioningService contractProvisioningService,
         Domain.Common.IUnitOfWork unitOfWork,
         IIdentityService identityService,
         IEmailService emailService,
@@ -36,7 +36,7 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
     {
         _ophthalmologistRepository = ophthalmologistRepository;
         _contractRepository = contractRepository;
-        _templateRepository = templateRepository;
+        _contractProvisioningService = contractProvisioningService;
         _unitOfWork = unitOfWork;
         _identityService = identityService;
         _emailService = emailService;
@@ -164,8 +164,6 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
 
     /// <summary>
     /// Creates a contract for the newly approved ophthalmologist.
-    /// Finds the active OphthalmologistContract template, creates a Draft contract,
-    /// then sends it for signature (→ PendingSignature).
     /// </summary>
     private async Task CreateContractForOphthalmologistAsync(
         Domain.Entities.Users.Ophthalmologist ophthalmologist,
@@ -181,67 +179,21 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
             return;
         }
 
-        // Find the active ophthalmologist contract template
-        var (templates, _) = await _templateRepository.GetPagedAsync(
-            type: ContractType.OphthalmologistContract,
-            isActive: true,
-            pageNumber: 1,
-            pageSize: 50,
-            cancellationToken: cancellationToken);
+        var contract = await _contractProvisioningService.CreatePendingContractForEmploymentTypeAsync(
+            ophthalmologist,
+            cancellationToken);
 
-        var template = SelectTemplateByEmploymentType(templates, ophthalmologist.EmploymentType);
-        if (template == null)
+        if (contract is null)
         {
             _logger.LogWarning("No active OphthalmologistContract template found. Cannot create contract for user {UserId}.", userId);
             return;
         }
 
-        // Generate contract number: AURA-OPH-{yyyyMMdd}-{random}
-        var contractNumber = $"AURA-OPH-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}";
-
-        var contract = new Contract(
-            userId,
-            template.Id,
-            contractNumber,
-            aiQuotaLimit: 0,
-            platformCommissionRate: 0m);
-
-        contract.SendForSignature(); // Draft → PendingSignature
-
         await _contractRepository.AddAsync(contract, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Contract {Number} created and sent for signature for user {UserId}.",
-            contractNumber, userId);
-    }
-
-    private static ContractTemplate? SelectTemplateByEmploymentType(
-        IReadOnlyList<ContractTemplate> templates,
-        OphthalmologistEmploymentType employmentType)
-    {
-        if (templates.Count == 0)
-            return null;
-
-        static string Normalize(string value) => value.ToLowerInvariant().Replace("-", string.Empty).Replace(" ", string.Empty);
-
-        var expectedKeyword = employmentType == OphthalmologistEmploymentType.PartTime
-            ? "parttime"
-            : "fulltime";
-
-        var matched = templates
-            .Where(t => t.EmploymentType == employmentType)
-            .OrderByDescending(t => t.EffectiveDate ?? DateTime.MinValue)
-            .ThenByDescending(t => t.CreatedAt)
-            .FirstOrDefault();
-
-        if (matched != null)
-            return matched;
-
-        // Fallback: legacy template may not have EmploymentType populated yet.
-        return templates
-            .Where(t => Normalize(t.Title).Contains(expectedKeyword))
-            .OrderByDescending(t => t.EffectiveDate ?? DateTime.MinValue)
-            .ThenByDescending(t => t.CreatedAt)
-            .FirstOrDefault();
+            contract.ContractNumber,
+            userId);
     }
 }

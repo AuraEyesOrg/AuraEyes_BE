@@ -1,4 +1,5 @@
 using Application.AiQuota.Interfaces;
+using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 
@@ -25,7 +26,7 @@ public class DeductQuotaCommandHandler : ICommandHandler<DeductQuotaCommand, Ded
             return Result<DeductQuotaResponse>.Failure("User is not authenticated.");
 
         var userId = _currentUser.UserId.Value;
-        var role = _currentUser.Roles.FirstOrDefault() ?? "Patient";
+        var role = _currentUser.Roles.FirstOrDefault() ?? Roles.Patient;
 
         var hasQuota = await _quotaService.HasAvailableQuotaAsync(userId, role, cancellationToken);
 

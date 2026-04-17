@@ -1,4 +1,5 @@
 using Domain.Entities.Scheduling;
+using Domain.Enums;
 using Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,7 +19,7 @@ public class ScheduleTemplateRepository : Repository<ScheduleTemplate>, ISchedul
         CancellationToken cancellationToken = default)
     {
         return await _dbSet
-            .Where(t => t.OphthalId == ophthalId)
+            .Where(t => t.OphthalId == ophthalId && t.IsActive)
             .OrderBy(t => t.DayOfWeek)
             .ThenBy(t => t.StartTime)
             .ToListAsync(cancellationToken);
@@ -29,7 +30,7 @@ public class ScheduleTemplateRepository : Repository<ScheduleTemplate>, ISchedul
         CancellationToken cancellationToken = default)
     {
         return await _dbSet
-            .Where(t => t.OrgId == orgId)
+            .Where(t => t.OrgId == orgId && t.IsActive)
             .OrderBy(t => t.DayOfWeek)
             .ThenBy(t => t.StartTime)
             .ToListAsync(cancellationToken);
@@ -41,7 +42,7 @@ public class ScheduleTemplateRepository : Repository<ScheduleTemplate>, ISchedul
         DayOfWeek dayOfWeek,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.Where(t => t.DayOfWeek == dayOfWeek);
+        var query = _dbSet.Where(t => t.DayOfWeek == dayOfWeek && t.IsActive);
 
         if (ophthalId.HasValue)
             query = query.Where(t => t.OphthalId == ophthalId.Value);
@@ -63,7 +64,7 @@ public class ScheduleTemplateRepository : Repository<ScheduleTemplate>, ISchedul
         Guid? excludeTemplateId = null,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.Where(t => t.DayOfWeek == dayOfWeek);
+        var query = _dbSet.Where(t => t.DayOfWeek == dayOfWeek && t.IsActive);
 
         if (ophthalId.HasValue)
             query = query.Where(t => t.OphthalId == ophthalId.Value);
@@ -88,7 +89,7 @@ public class ScheduleTemplateRepository : Repository<ScheduleTemplate>, ISchedul
         int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.AsQueryable();
+        var query = _dbSet.Where(t => t.IsActive);
 
         if (ophthalId.HasValue)
             query = query.Where(t => t.OphthalId == ophthalId.Value);
@@ -118,5 +119,31 @@ public class ScheduleTemplateRepository : Repository<ScheduleTemplate>, ISchedul
         return await _dbSet
             .Include(t => t.AppointmentSlots)
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ScheduleTemplate>> GetActiveSystemGeneratedByOphthalmologistIdAsync(
+        Guid ophthalId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Where(t => t.OphthalId == ophthalId
+                && t.IsActive
+                && t.Source == ScheduleTemplateSource.SystemGenerated)
+            .OrderBy(t => t.DayOfWeek)
+            .ThenBy(t => t.StartTime)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> ExistsActiveSystemGeneratedTemplateAsync(
+        Guid ophthalId,
+        DayOfWeek dayOfWeek,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbSet.AnyAsync(t =>
+            t.OphthalId == ophthalId
+            && t.DayOfWeek == dayOfWeek
+            && t.IsActive
+            && t.Source == ScheduleTemplateSource.SystemGenerated,
+            cancellationToken);
     }
 }

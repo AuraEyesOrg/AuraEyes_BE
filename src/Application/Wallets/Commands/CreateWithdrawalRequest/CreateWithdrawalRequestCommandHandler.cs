@@ -74,6 +74,7 @@ public class CreateWithdrawalRequestCommandHandler : ICommandHandler<CreateWithd
             request.BankName,
             request.BankAccountNumber,
             request.AccountHolderName,
+            request.BankBin,
             contractNumber,
             request.Note);
 
@@ -96,7 +97,14 @@ public class CreateWithdrawalRequestCommandHandler : ICommandHandler<CreateWithd
             TransferReference = withdrawalRequest.TransferReference,
             ProcessedByAdminId = withdrawalRequest.ProcessedByAdminId,
             ProcessedAt = withdrawalRequest.ProcessedAt,
-            CreatedAt = withdrawalRequest.CreatedAt
+            CreatedAt = withdrawalRequest.CreatedAt,
+            // PayOS Payout fields
+            BankBin = withdrawalRequest.BankBin,
+            ExternalPayoutId = withdrawalRequest.ExternalPayoutId,
+            PayOSReferenceId = withdrawalRequest.PayOSReferenceId,
+            PayOSTransactionId = withdrawalRequest.PayOSTransactionId,
+            PayOSApprovalState = withdrawalRequest.PayOSApprovalState,
+            Fee = withdrawalRequest.Fee
         };
 
         return Result<WithdrawalRequestDto>.Success(dto);

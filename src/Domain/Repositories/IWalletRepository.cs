@@ -58,4 +58,14 @@ public interface IWalletRepository : IRepository<Wallet>
         int year,
         int month,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get paginated wallet transactions across all wallets for system-admin cashflow views.
+    /// </summary>
+    Task<(IReadOnlyList<(WalletTransaction Transaction, Wallet Wallet)> Items, int TotalCount)> GetCashflowTransactionsPagedAsync(
+        string? ownerType = null,
+        string? searchTerm = null,
+        int pageNumber = 1,
+        int pageSize = 20,
+        CancellationToken cancellationToken = default);
 }

@@ -42,7 +42,7 @@ public class UpdateContractCommandHandler : ICommandHandler<UpdateContractComman
         if (template is null)
             return Result<ContractDto>.NotFound($"Contract template {request.TemplateId} not found.");
 
-        contract.Update(request.TemplateId, request.AiQuotaLimit, request.PlatformCommissionRate);
+        contract.Update(request.TemplateId, request.AiQuotaLimit, request.PlatformCommissionRate, request.MonthlyQuotaLimit);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         var user = await _identityService.GetUserByIdAsync(contract.UserId, cancellationToken);

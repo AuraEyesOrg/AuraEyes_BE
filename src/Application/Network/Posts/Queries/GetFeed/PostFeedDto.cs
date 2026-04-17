@@ -27,6 +27,11 @@ public class PostFeedDto
     public int RepostCount { get; set; }
     public int ViewCount { get; set; }
     public bool AllowComments { get; set; }
+    public bool IsInternalCase { get; set; }
+    public Guid? ConsultationSessionId { get; set; }
+    public Guid? AiScreeningId { get; set; }
+    public int? PatientAge { get; set; }
+    public string? PatientGender { get; set; }
     public List<AttachmentDto> Attachments { get; set; } = new();
     public ReactionType? CurrentUserReaction { get; set; }
     public bool IsBookmarked { get; set; }

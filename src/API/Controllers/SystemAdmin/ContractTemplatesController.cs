@@ -207,7 +207,7 @@ public partial class ContractTemplatesController
         var storagePath = await _fileStorageService.SaveFileAsync(
             stream,
             templateFile.FileName,
-            "contract-templates");
+            "admin/contract_templates");
 
         return new TemplateUploadResult(true, StoragePath: storagePath);
     }

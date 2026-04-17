@@ -157,9 +157,9 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
             if (session.Price > 0)
             {
                 var patient = await _patientRepository.GetByIdAsync(session.PatientId, cancellationToken);
-                if (patient is not null)
+                if (patient is not null && patient.UserId.HasValue)
                 {
-                    var wallet = await _walletRepository.GetByUserIdWithTransactionsAsync(patient.UserId, cancellationToken);
+                    var wallet = await _walletRepository.GetByUserIdWithTransactionsAsync(patient.UserId.Value, cancellationToken);
                     if (wallet is not null)
                     {
                         var hasBookingPayment = wallet.Transactions.Any(tx =>

@@ -15,6 +15,7 @@ public class PatientProfileDto
     public string? Gender { get; set; }
     public string? Address { get; set; }
     public string? AvatarUrl { get; set; }
+    public string? CitizenId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public bool IsEmailVerified { get; set; }

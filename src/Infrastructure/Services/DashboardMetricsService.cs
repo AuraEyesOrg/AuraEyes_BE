@@ -1,4 +1,5 @@
 using Application.AiQuota.Interfaces;
+using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Ophthalmologists.Queries.GetDashboardMetrics;
@@ -10,6 +11,7 @@ using Application.SystemAdmin.Dashboard.Queries.GetRecentScreenings;
 using Application.SystemAdmin.Dashboard.Queries.GetScreeningVolumeTrends;
 using Application.SystemAdmin.Dashboard.Queries.GetSystemHealth;
 using Domain.Enums;
+using Domain.Entities.Users;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
@@ -669,6 +671,11 @@ public class DashboardMetricsService : IDashboardMetricsService
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var appointmentsQuery = _context.Appointments.Where(appointment => appointment.OrganisationId == organisationId);
 
+        var totalPatients = await _context.Set<OrganisationPatientLink>().AsNoTracking()
+            .CountAsync(
+                p => p.OrganisationId == organisationId && !p.IsDeleted,
+                cancellationToken);
+
         var totalAppointments = await appointmentsQuery.CountAsync(cancellationToken);
         var pendingCount = await appointmentsQuery.CountAsync(
             appointment => appointment.Status == AppointmentStatus.Pending,
@@ -698,12 +705,13 @@ public class DashboardMetricsService : IDashboardMetricsService
             ? 0m
             : Math.Round((decimal)totalBooked / totalCapacity * 100m, 1);
 
-        var quota = await _aiQuotaService.GetQuotaAsync(userId, "OrgAdmin", cancellationToken);
+        var quota = await _aiQuotaService.GetQuotaAsync(userId, Roles.OrgAdmin, cancellationToken);
 
         return new OrganisationDashboardMetricsDto
         {
             UtilizationRatePercent = utilizationRate,
             RemainingAiQuota = quota.RemainingQuota,
+            TotalPatients = totalPatients,
             TotalAppointments = totalAppointments,
             AppointmentStatus = new OrganisationAppointmentStatusBreakdownDto
             {
@@ -724,7 +732,7 @@ public class DashboardMetricsService : IDashboardMetricsService
             return new PatientDashboardMetricsDto();
         }
 
-        var quota = await _aiQuotaService.GetQuotaAsync(userId, "Patient", cancellationToken);
+        var quota = await _aiQuotaService.GetQuotaAsync(userId, Roles.Patient, cancellationToken);
 
         return new PatientDashboardMetricsDto
         {

@@ -67,7 +67,7 @@ public class TestBackdoorController : ControllerBase
             .GetRequiredService<ILoggerFactory>()
             .CreateLogger("DatabaseSeeder");
 
-        await DatabaseSeeder.SeedAsync(_dbContext, _userManager, _roleManager, seederLogger);
+        await DatabaseSeeder.SeedAsync(_dbContext, _userManager, _roleManager, _configuration, seederLogger);
 
         _logger.LogInformation("[TEST BACKDOOR] Database reset and seed completed.");
 

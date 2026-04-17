@@ -46,10 +46,11 @@ namespace Infrastructure.Persistence.Migrations
                         onDelete: ReferentialAction.Restrict);
                 });
 
-            migrationBuilder.InsertData(
-                table: "SystemSettings",
-                columns: new[] { "Key", "Description", "Value" },
-                values: new object[] { "AI_QUOTA_UNIT_PRICE", "Price per 1 AI quota credit (VND)", "10000" });
+            migrationBuilder.Sql("""
+    INSERT INTO "SystemSettings" ("Key", "Description", "Value")
+    VALUES ('AI_QUOTA_UNIT_PRICE', 'Price per 1 AI quota credit (VND)', '10000')
+    ON CONFLICT ("Key") DO NOTHING;
+    """);
 
             migrationBuilder.CreateIndex(
                 name: "IX_WithdrawalRequests_CreatedAt",

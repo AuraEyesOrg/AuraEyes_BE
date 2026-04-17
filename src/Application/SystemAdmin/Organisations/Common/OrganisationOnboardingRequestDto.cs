@@ -10,6 +10,7 @@ public record OrganisationOnboardingRequestDto
     public string? ContactPhone { get; init; }
     public string? Address { get; init; }
     public string? LicenseNumber { get; init; }
+    public string? TaxCode { get; init; }
     public string? Notes { get; init; }
     public string Status { get; init; } = string.Empty;
     public DateTime CreatedAt { get; init; }

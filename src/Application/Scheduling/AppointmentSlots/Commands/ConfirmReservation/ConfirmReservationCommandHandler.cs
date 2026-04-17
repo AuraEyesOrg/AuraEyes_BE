@@ -234,12 +234,24 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                                     (request.ShareRetinalImages || request.ShareAiResults);
 
             var patient = await _patientRepository.GetByIdAsync(effectivePatientProfileId, cancellationToken);
-            var patientUser = patient is null
-                ? null
-                : await _identityService.GetUserByIdAsync(patient.UserId, cancellationToken);
-            var patientName = string.IsNullOrWhiteSpace(patientUser?.FullName)
-                ? "bệnh nhân"
-                : patientUser.FullName;
+            string patientName;
+            if (patient is not null && patient.IsWalkIn)
+            {
+                patientName = !string.IsNullOrWhiteSpace(patient.FullName)
+                    ? patient.FullName
+                    : "bệnh nhân";
+            }
+            else if (patient is not null && patient.UserId.HasValue)
+            {
+                var patientUser = await _identityService.GetUserByIdAsync(patient.UserId.Value, cancellationToken);
+                patientName = !string.IsNullOrWhiteSpace(patientUser?.FullName)
+                    ? patientUser.FullName
+                    : "bệnh nhân";
+            }
+            else
+            {
+                patientName = "bệnh nhân";
+            }
 
             if (patient?.UserId is Guid patientUserId)
             {
@@ -369,9 +381,9 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
         var emails = new List<string>();
 
         var patient = await _patientRepository.GetByIdAsync(patientProfileId, cancellationToken);
-        if (patient is not null)
+        if (patient is not null && !patient.IsWalkIn && patient.UserId.HasValue)
         {
-            var patientUser = await _identityService.GetUserByIdAsync(patient.UserId, cancellationToken);
+            var patientUser = await _identityService.GetUserByIdAsync(patient.UserId.Value, cancellationToken);
             if (patientUser is not null && !string.IsNullOrWhiteSpace(patientUser.Email))
                 emails.Add(patientUser.Email);
         }

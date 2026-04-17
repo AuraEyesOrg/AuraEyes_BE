@@ -42,7 +42,7 @@ public class GetSavedPostsQueryHandler : IQueryHandler<GetSavedPostsQuery, Paged
                 Id = authorId,
                 AuthorType = savedPosts.First(s => s.Post.AuthorId == authorId).Post.AuthorType,
                 FullName = user?.FullName ?? "Unknown",
-                AvatarUrl = null
+                AvatarUrl = user?.AvatarUrl
             };
         }
 
@@ -65,6 +65,13 @@ public class GetSavedPostsQueryHandler : IQueryHandler<GetSavedPostsQuery, Paged
                 RepostCount = s.Post.RepostCount,
                 ViewCount = s.Post.ViewCount,
                 AllowComments = s.Post.AllowComments,
+                IsInternalCase = s.Post.IsInternalCase,
+                ConsultationSessionId = s.Post.ConsultationSessionId,
+                AiScreeningId = s.Post.AuthorId == request.UserId
+                    ? s.Post.AiScreeningId
+                    : null,
+                PatientAge = s.Post.PatientAge,
+                PatientGender = s.Post.PatientGender,
                 Attachments = s.Post.Attachments.Select(a => new AttachmentDto
                 {
                     Id = a.Id,

@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Scheduling.Appointments.Common;
 using Domain.Common;
+using Domain.Entities.Financial;
 using Domain.Entities.Scheduling;
 using Domain.Entities.Users;
 using Domain.Enums;
@@ -18,8 +19,11 @@ public class CreateClinicAppointmentCommandHandler
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IRepository<Organisation> _organisationRepository;
     private readonly IRepository<Patient> _patientRepository;
+    private readonly IRepository<OrganisationPatientLink> _organisationPatientLinkRepository;
+    private readonly IWalletRepository _walletRepository;
     private readonly ICurrentUserService _currentUser;
     private readonly IIdentityService _identityService;
+    private readonly IEmailService _emailService;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CreateClinicAppointmentCommandHandler> _logger;
@@ -29,8 +33,11 @@ public class CreateClinicAppointmentCommandHandler
         IAppointmentRepository appointmentRepository,
         IRepository<Organisation> organisationRepository,
         IRepository<Patient> patientRepository,
+        IRepository<OrganisationPatientLink> organisationPatientLinkRepository,
+        IWalletRepository walletRepository,
         ICurrentUserService currentUser,
         IIdentityService identityService,
+        IEmailService emailService,
         INotificationService notificationService,
         IUnitOfWork unitOfWork,
         ILogger<CreateClinicAppointmentCommandHandler> logger)
@@ -39,8 +46,11 @@ public class CreateClinicAppointmentCommandHandler
         _appointmentRepository = appointmentRepository;
         _organisationRepository = organisationRepository;
         _patientRepository = patientRepository;
+        _organisationPatientLinkRepository = organisationPatientLinkRepository;
+        _walletRepository = walletRepository;
         _currentUser = currentUser;
         _identityService = identityService;
+        _emailService = emailService;
         _notificationService = notificationService;
         _unitOfWork = unitOfWork;
         _logger = logger;
@@ -105,6 +115,49 @@ public class CreateClinicAppointmentCommandHandler
                 return Result<CreateClinicAppointmentResult>.Conflict("You already have an appointment for this slot.");
             }
 
+            // ── Wallet deposit deduction (anti-spam) ──
+            var depositFee = slot.Cost ?? 0;
+
+            if (depositFee > 0)
+            {
+                if (!_currentUser.UserId.HasValue)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.Forbidden(
+                        "Unable to resolve user identity for wallet operation.");
+                }
+
+                var wallet = await _walletRepository.GetByUserIdAsync(
+                    _currentUser.UserId.Value, cancellationToken);
+
+                if (wallet is null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.Failure(
+                        "Wallet not found. Please top up your wallet first.");
+                }
+
+                if (wallet.Balance < depositFee)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.Failure(
+                        $"Insufficient wallet balance. Required: {depositFee:N0} VND, Available: {wallet.Balance:N0} VND.");
+                }
+
+                wallet.Withdraw(depositFee, $"Clinic booking deposit – Slot {slot.Id}");
+
+                var transaction = new WalletTransaction(
+                    wallet.Id,
+                    depositFee,
+                    TransactionType.Payment,
+                    $"Clinic visit deposit – {organisation.Name}",
+                    referenceType: "ClinicBooking",
+                    referenceId: slot.Id);
+
+                wallet.AddTransaction(transaction);
+                await _walletRepository.AddTransactionAsync(transaction, cancellationToken);
+            }
+
             slot.BookWithCapacity();
             if (slot.BookedCount >= slot.MaxCapacity)
             {
@@ -117,29 +170,64 @@ public class CreateClinicAppointmentCommandHandler
                 request.OrganisationId,
                 request.VisitReason);
 
+            var existingLink = (await _organisationPatientLinkRepository.FindAsync(
+                link => link.OrganisationId == request.OrganisationId
+                        && link.PatientId == patientId
+                        && !link.IsDeleted,
+                cancellationToken)).FirstOrDefault();
+
+            if (existingLink is null)
+            {
+                await _organisationPatientLinkRepository.AddAsync(
+                    new OrganisationPatientLink(request.OrganisationId, patientId, "clinic-booking"),
+                    cancellationToken);
+            }
+            else
+            {
+                existingLink.Touch("clinic-booking");
+                await _organisationPatientLinkRepository.UpdateAsync(existingLink, cancellationToken);
+            }
+
             await _appointmentRepository.AddAsync(appointment, cancellationToken);
             await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Created clinic appointment {AppointmentId} for patient {PatientId} at slot {SlotId} organisation {OrganisationId}",
+                "Created clinic appointment {AppointmentId} for patient {PatientId} at slot {SlotId} organisation {OrganisationId}, deposit {DepositFee} VND",
                 appointment.Id,
                 patientId,
                 request.SlotId,
-                request.OrganisationId);
+                request.OrganisationId,
+                depositFee);
 
             var appointmentTime = slot.StartTime.ToString("HH:mm");
             var appointmentDate = slot.Date.ToString("dd/MM/yyyy");
             var patientName = "bệnh nhân";
+            string? patientEmail = null;
 
             var patient = await _patientRepository.GetByIdAsync(patientId, cancellationToken);
             if (patient is not null)
             {
-                var patientUser = await _identityService.GetUserByIdAsync(patient.UserId, cancellationToken);
-                if (!string.IsNullOrWhiteSpace(patientUser?.FullName))
+                if (patient.IsWalkIn)
                 {
-                    patientName = patientUser.FullName;
+                    if (!string.IsNullOrWhiteSpace(patient.FullName))
+                    {
+                        patientName = patient.FullName;
+                    }
+                }
+                else if (patient.UserId.HasValue)
+                {
+                    var patientUser = await _identityService.GetUserByIdAsync(patient.UserId.Value, cancellationToken);
+                    if (!string.IsNullOrWhiteSpace(patientUser?.FullName))
+                    {
+                        patientName = patientUser.FullName;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(patientUser?.Email))
+                    {
+                        patientEmail = patientUser.Email;
+                    }
                 }
             }
 
@@ -188,6 +276,38 @@ public class CreateClinicAppointmentCommandHandler
                     _logger.LogError(
                         ex,
                         "Failed to send appointment booking notification for appointment {AppointmentId}",
+                        appointment.Id);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(patientEmail))
+            {
+                try
+                {
+                    var qrPayload =
+                        $"AURA-CLINIC-APPOINTMENT|{appointment.Id}|{patientId}|{request.OrganisationId}|{slot.Date:yyyy-MM-dd}|{slot.StartTime:HH:mm}|{slot.EndTime:HH:mm}";
+
+                    var checkInCode = appointment.Id.ToString("N")[..10].ToUpperInvariant();
+
+                    await _emailService.SendClinicAppointmentConfirmationAsync(
+                        patientEmail,
+                        new ClinicAppointmentConfirmationEmailPayload(
+                            appointment.Id,
+                            patientName,
+                            organisation.Name,
+                            slot.Date,
+                            slot.StartTime,
+                            slot.EndTime,
+                            request.VisitReason,
+                            checkInCode,
+                            qrPayload),
+                        cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Failed to send clinic appointment email for appointment {AppointmentId}",
                         appointment.Id);
                 }
             }

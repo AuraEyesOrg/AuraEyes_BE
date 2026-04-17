@@ -40,7 +40,14 @@ public class GetWithdrawalHistoryQueryHandler : IQueryHandler<GetWithdrawalHisto
             TransferReference = x.TransferReference,
             ProcessedByAdminId = x.ProcessedByAdminId,
             ProcessedAt = x.ProcessedAt,
-            CreatedAt = x.CreatedAt
+            CreatedAt = x.CreatedAt,
+            // PayOS Payout fields
+            BankBin = x.BankBin,
+            ExternalPayoutId = x.ExternalPayoutId,
+            PayOSReferenceId = x.PayOSReferenceId,
+            PayOSTransactionId = x.PayOSTransactionId,
+            PayOSApprovalState = x.PayOSApprovalState,
+            Fee = x.Fee
         }).ToList();
 
         var pagedResult = new PagedResult<WithdrawalRequestDto>(

@@ -10,6 +10,7 @@ namespace Application.Network.Posts.Commands.CreatePost;
 public class CreatePostCommand : ICommand<Guid>
 {
     public Guid AuthorId { get; set; }
+    public Guid? CurrentProfileId { get; set; }
     public AuthorType AuthorType { get; set; }
     public string Content { get; set; } = string.Empty;
     public PostCategory Category { get; set; }
@@ -19,6 +20,7 @@ public class CreatePostCommand : ICommand<Guid>
     public bool IsAnonymizationConfirmed { get; set; }
     public bool IsInternalCase { get; set; }
     public Guid? ConsultationSessionId { get; set; }
+    public Guid? AiScreeningId { get; set; }
     public int? PatientAge { get; set; }
     public string? PatientGender { get; set; }
 }

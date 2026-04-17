@@ -2,12 +2,18 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Screenings.Commands.CreateAiScreeningSession;
 using Application.Screenings.Commands.SaveAiScreeningResults;
+using Application.Screenings.Queries.ExportPatientScreeningReportPdf;
 using Application.Screenings.Queries.GetRecentScreeningSessions;
 using Application.Screenings.Queries.GetScreeningSessionDetail;
+using Domain.Common;
+using Domain.Entities.Screening;
+using Domain.Entities.Users;
 using Domain.Enums;
+using Domain.Repositories;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace API.Controllers;
 
@@ -21,18 +27,33 @@ public class ScreeningsController : BaseApiController
 {
     private readonly IMediator _mediator;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IRepository<AiScreening> _screeningRepository;
+    private readonly IRepository<MedicalDiagnosis> _medicalDiagnosisRepository;
+    private readonly IRepository<Patient> _patientRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IFileStorageService _fileStorageService;
+    private readonly IIdentityService _identityService;
     private readonly ILogger<ScreeningsController> _logger;
 
     public ScreeningsController(
         IMediator mediator,
         ICurrentUserService currentUserService,
+        IRepository<AiScreening> screeningRepository,
+        IRepository<MedicalDiagnosis> medicalDiagnosisRepository,
+        IRepository<Patient> patientRepository,
         IFileStorageService fileStorageService,
+        IOphthalmologistRepository ophthalmologistRepository,
+        IIdentityService identityService,
         ILogger<ScreeningsController> logger)
     {
         _mediator = mediator;
         _currentUserService = currentUserService;
+        _screeningRepository = screeningRepository;
+        _medicalDiagnosisRepository = medicalDiagnosisRepository;
+        _patientRepository = patientRepository;
         _fileStorageService = fileStorageService;
+        _ophthalmologistRepository = ophthalmologistRepository;
+        _identityService = identityService;
         _logger = logger;
     }
 
@@ -54,19 +75,163 @@ public class ScreeningsController : BaseApiController
     }
 
     [HttpGet("{screeningId:guid}")]
-    [ProducesResponseType(typeof(ApiResponse<ScreeningSessionDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<ScreeningSessionDetailResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSessionById(
         [FromRoute] Guid screeningId,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
-            new GetScreeningSessionDetailQuery(screeningId),
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
+
+        var patients = await _patientRepository.FindAsync(
+            p => p.UserId == _currentUserService.UserId.Value,
             cancellationToken);
 
-        return HandleResult(result, "Screening session loaded");
+        var patient = patients.FirstOrDefault();
+        if (patient is null)
+            return NotFound(ApiResponseFactory.NotFound("Patient profile not found"));
+
+        var session = await _screeningRepository
+            .Query()
+            .Where(s => s.Id == screeningId && s.PatientId == patient.Id && !s.IsDeleted)
+            .Select(s => new ScreeningSessionDetailResponse
+            {
+                ScreeningId = s.Id,
+                PatientId = s.PatientId,
+                ModelVersion = s.ModelVersion,
+                CreatedAt = s.CreatedAt,
+                ProcessedAt = s.ProcessedAt,
+                RawJsonOutput = s.RawJsonOutput,
+                IsActive = s.IsActive,
+                Images = s.RetinalImages
+                    .OrderBy(i => i.CreatedAt)
+                    .Select(i => new RetinalImageDto
+                    {
+                        Id = i.Id,
+                        ImageUrl = i.ImageUrl,
+                        EyeSide = i.EyeSide.ToString(),
+                        DeviceName = i.DeviceName,
+                        QualityScore = i.QualityScore,
+                        CapturedAt = i.CapturedAt,
+                    })
+                    .ToList(),
+                LatestResult = s.ScreeningResults
+                    .OrderByDescending(r => r.CreatedAt)
+                    .Select(r => new ScreeningResultDto
+                    {
+                        ScreeningResultId = r.Id,
+                        RiskLevel = r.RiskLevel.ToString(),
+                        ConfidenceScore = r.ConfidenceScore,
+                        Summary = r.Summary,
+                        Findings = r.Findings,
+                        AssessedAt = r.CreatedAt,
+                    })
+                    .FirstOrDefault(),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (session is null)
+            return NotFound(ApiResponseFactory.NotFound("Screening session not found"));
+
+        var latestDiagnosis = await _medicalDiagnosisRepository
+            .Query()
+            .Where(d => d.AiScreeningId == screeningId && !d.IsDeleted)
+            .OrderByDescending(d => d.FinalizedAt ?? d.CreatedAt)
+            .Select(d => new
+            {
+                d.DoctorId,
+                DiagnosisCode = d.DiagnosisCode,
+                CodingSystem = d.CodingSystem,
+                ClinicalFindings = d.ClinicalFindings,
+                SeverityLevel = d.SeverityLevel,
+                ConfidenceLevel = d.ConfidenceLevel,
+                TreatmentPlan = d.TreatmentPlan,
+                Recommendations = d.Recommendations,
+                LifestyleAdvice = d.LifestyleAdvice,
+                IsUrgent = d.IsUrgent,
+                Status = d.Status,
+                FollowUpDate = d.FollowUpDate,
+                IsReferralNeeded = d.IsReferralNeeded,
+                FinalizedAt = d.FinalizedAt,
+                ConfirmedAt = d.ConfirmedAt,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        MedicalDiagnosisDto? diagnosisDto = null;
+        if (latestDiagnosis is not null)
+        {
+            string? doctorName = null;
+            var doctor = await _ophthalmologistRepository.GetByIdAsync(latestDiagnosis.DoctorId, cancellationToken);
+            if (doctor is not null)
+            {
+                var doctorUser = await _identityService.GetUserByIdAsync(doctor.UserId, cancellationToken);
+                doctorName = doctorUser?.FullName;
+            }
+
+            diagnosisDto = new MedicalDiagnosisDto
+            {
+                DiagnosisCode = latestDiagnosis.DiagnosisCode,
+                CodingSystem = latestDiagnosis.CodingSystem,
+                ClinicalFindings = latestDiagnosis.ClinicalFindings,
+                SeverityLevel = latestDiagnosis.SeverityLevel,
+                ConfidenceLevel = latestDiagnosis.ConfidenceLevel,
+                TreatmentPlan = latestDiagnosis.TreatmentPlan,
+                Recommendations = latestDiagnosis.Recommendations,
+                LifestyleAdvice = latestDiagnosis.LifestyleAdvice,
+                IsUrgent = latestDiagnosis.IsUrgent,
+                Status = latestDiagnosis.Status,
+                FollowUpDate = latestDiagnosis.FollowUpDate,
+                IsReferralNeeded = latestDiagnosis.IsReferralNeeded,
+                FinalizedAt = latestDiagnosis.FinalizedAt,
+                ConfirmedAt = latestDiagnosis.ConfirmedAt,
+                ReportedByDoctorId = latestDiagnosis.DoctorId,
+                ReportedByDoctorName = string.IsNullOrWhiteSpace(doctorName) ? null : doctorName.Trim(),
+            };
+        }
+
+        session = session with
+        {
+            LatestDiagnosis = diagnosisDto
+        };
+
+        return Ok(ApiResponseFactory.Success(session, "Screening session loaded"));
     }
+
+    /// <summary>
+    /// Download screening report as PDF for current patient.
+    /// </summary>
+    [HttpGet("{screeningId:guid}/report-pdf")]
+    [Produces("application/pdf")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadScreeningReportPdf(
+        [FromRoute] Guid screeningId,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
+
+        var result = await _mediator.Send(
+            new ExportPatientScreeningReportPdfQuery(
+                _currentUserService.UserId.Value,
+                screeningId,
+                _currentUserService.ProfileId),
+            cancellationToken);
+
+        if (!result.IsSuccess || result.Data is null)
+            return HandleResult(result, "Screening report generated");
+
+        Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
+
+        return File(
+            result.Data.Content,
+            result.Data.ContentType,
+            result.Data.FileName);
+    }
+
 
     /// <summary>
     /// Create a new AI screening session with optional retinal images.
@@ -85,7 +250,7 @@ public class ScreeningsController : BaseApiController
 
         var command = new CreateAiScreeningSessionCommand
         {
-            ModelVersion = request.ModelVersion ?? "CFP_v1",
+            ModelVersion = request.ModelVersion ?? "AURA_v1.0",
             RetinalImages = request.RetinalImages ?? new List<RetinalImageData>()
         };
 
@@ -99,7 +264,7 @@ public class ScreeningsController : BaseApiController
     /// </summary>
     /// <remarks>
     /// This endpoint should be called after AI analysis finishes and results are ready.
-    /// Images should already be uploaded to Supabase and URLs provided.
+    /// Images should already be uploaded to Cloudinary and URLs provided.
     /// </remarks>
     [HttpPost("{screeningId:guid}/save-results")]
     [ProducesResponseType(typeof(ApiResponse<SaveAiScreeningResultsResponse>), StatusCodes.Status200OK)]
@@ -144,7 +309,7 @@ public class ScreeningsController : BaseApiController
     }
 
     /// <summary>
-    /// Upload retinal images to Supabase storage.
+    /// Upload retinal images to Cloudinary storage.
     /// Returns public URLs. Images are persisted to database when creating screening session.
     /// </summary>
     [HttpPost]
@@ -196,7 +361,7 @@ public class ScreeningsController : BaseApiController
                 var url = await _fileStorageService.SaveFileAsync(
                     stream,
                     image.FileName,
-                    $"screenings/{_currentUserService.UserId}/images",
+                    $"patients/screenings/{_currentUserService.UserId}",
                     cancellationToken);
 
                 uploadedUrls.Add(url);
@@ -264,7 +429,7 @@ public record CreateScreeningSessionRequest
     public string? ModelVersion { get; init; }
 
     /// <summary>
-    /// Optional: retinal images with URLs already uploaded to Supabase
+    /// Optional: retinal images with URLs already uploaded to Cloudinary
     /// </summary>
     public List<RetinalImageData>? RetinalImages { get; init; }
 }
@@ -308,6 +473,27 @@ public record ScreeningSessionDetailResponse
     public bool IsActive { get; init; }
     public List<RetinalImageDto> Images { get; init; } = new();
     public ScreeningResultDto? LatestResult { get; init; }
+    public MedicalDiagnosisDto? LatestDiagnosis { get; init; }
+}
+
+public record MedicalDiagnosisDto
+{
+    public string? DiagnosisCode { get; init; }
+    public string? CodingSystem { get; init; }
+    public string? ClinicalFindings { get; init; }
+    public string? SeverityLevel { get; init; }
+    public decimal? ConfidenceLevel { get; init; }
+    public string? TreatmentPlan { get; init; }
+    public string? Recommendations { get; init; }
+    public string? LifestyleAdvice { get; init; }
+    public bool IsUrgent { get; init; }
+    public string? Status { get; init; }
+    public DateTime? FollowUpDate { get; init; }
+    public bool IsReferralNeeded { get; init; }
+    public DateTime? FinalizedAt { get; init; }
+    public DateTime? ConfirmedAt { get; init; }
+    public Guid? ReportedByDoctorId { get; init; }
+    public string? ReportedByDoctorName { get; init; }
 }
 
 public record RetinalImageDto
