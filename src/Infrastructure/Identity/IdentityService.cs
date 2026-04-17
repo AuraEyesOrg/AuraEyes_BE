@@ -848,22 +848,33 @@ public class IdentityService : IIdentityService
 
         var userRoles = await _userManager.GetRolesAsync(user);
 
-        // Fetch permissions assigned to user roles
-        var rolePermissions = await _context.RolePermissions
-            .Where(rp => userRoles.Contains(rp.RoleName))
-            .Select(rp => rp.PermissionName)
-            .ToListAsync();
+        // 1. Get permissions assigned to user roles
+        var rolePermissions = await (from rp in _context.RolePermissions
+                                     join r in _roleManager.Roles on rp.RoleId equals r.Id
+                                     join p in _context.Permissions on rp.PermissionId equals p.Id
+                                     where userRoles.Contains(r.Name)
+                                     select p.Name).ToListAsync();
 
-        // Fetch direct user permissions
-        var directPermissions = await _context.UserPermissions
-            .Where(up => up.UserId == userId)
-            .Select(up => up.PermissionName)
-            .ToListAsync();
+        // 2. Get direct user overrides
+        var userOverrides = await (from up in _context.UserPermissions
+                                    join p in _context.Permissions on up.PermissionId equals p.Id
+                                    where up.UserId == userId && up.IsActive
+                                    where up.ExpiresAt == null || up.ExpiresAt > DateTime.UtcNow
+                                    select new { p.Name, up.IsGranted })
+                                    .ToListAsync();
 
-        return rolePermissions
-            .Union(directPermissions)
-            .Distinct()
-            .ToList();
+        // 3. Compute final set: (Role-based + Explicitly Granted) - Explicitly Revoked
+        var finalPermissions = new HashSet<string>(rolePermissions, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var over in userOverrides)
+        {
+            if (over.IsGranted)
+                finalPermissions.Add(over.Name);
+            else
+                finalPermissions.Remove(over.Name);
+        }
+
+        return finalPermissions.ToList();
     }
 
     public async Task<(bool Succeeded, string[] Errors)> ChangePasswordAsync(
