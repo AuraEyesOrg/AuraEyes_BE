@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
+using Infrastructure.Identity.Authorization;
+
 namespace API.Controllers;
 
 /// <summary>
@@ -155,6 +157,21 @@ public class SampleController : BaseApiController
         return OkResponse(new
         {
             message = "Welcome, System Administrator!",
+            userId = _currentUserService.UserId
+        });
+    }
+
+    /// <summary>
+    /// Permission-based endpoint - requires specific permission.
+    /// Uses AuthorizePermissionAttribute.
+    /// </summary>
+    [HttpGet("permission-based")]
+    [AuthorizePermission(Permissions.UsersRead)]
+    public IActionResult PermissionBasedEndpoint()
+    {
+        return OkResponse(new
+        {
+            message = "You have 'users:read' permission!",
             userId = _currentUserService.UserId
         });
     }

@@ -10,9 +10,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
 
+using Infrastructure.Identity.Authorization;
+
 namespace API.Controllers;
 
 [Route("api/system-settings")]
+[AuthorizePermission(Permissions.SettingsRead)]
 public class SystemSettingsController : BaseApiController
 {
     private readonly ISender _sender;
@@ -40,7 +43,7 @@ public class SystemSettingsController : BaseApiController
     /// Restricted to System Admin role.
     /// </summary>
     [HttpPut]
-    [Authorize(Policy = Policies.SystemAdminOnly)]
+    [AuthorizePermission(Permissions.SettingsManage)]
     public async Task<IActionResult> UpdateSystemSettings([FromBody] Dictionary<string, string> settings, CancellationToken cancellationToken)
     {
         var command = new UpdateSystemSettingsCommand { Settings = settings };
@@ -67,7 +70,7 @@ public class SystemSettingsController : BaseApiController
     /// Restricted to System Admin role.
     /// </summary>
     [HttpPut("experience-pricing-rules")]
-    [Authorize(Policy = Policies.SystemAdminOnly)]
+    [AuthorizePermission(Permissions.SettingsManage)]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ExperiencePricingRuleDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]

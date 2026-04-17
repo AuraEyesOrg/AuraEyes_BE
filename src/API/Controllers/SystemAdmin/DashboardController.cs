@@ -12,6 +12,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
+using Infrastructure.Identity.Authorization;
+
 namespace API.Controllers.SystemAdmin;
 
 /// <summary>
@@ -20,7 +22,7 @@ namespace API.Controllers.SystemAdmin;
 /// operational health, and population-level risk insights.
 /// </summary>
 [Route("api/system-admin/[controller]")]
-[Authorize(Policy = Policies.SystemAdminOnly)]
+[AuthorizePermission(Permissions.DashboardRead)]
 public class DashboardController : BaseApiController
 {
     private readonly IMediator _mediator;

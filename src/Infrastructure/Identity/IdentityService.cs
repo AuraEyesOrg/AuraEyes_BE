@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using Application.Common.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Infrastructure.Persistence;
 
 namespace Infrastructure.Identity;
 
@@ -16,6 +17,7 @@ public class IdentityService : IIdentityService
 
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<ApplicationRole> _roleManager;
+    private readonly ApplicationDbContext _context;
 
     // Number of recovery codes to generate
     private const int DefaultRecoveryCodesCount = 10;
@@ -25,10 +27,12 @@ public class IdentityService : IIdentityService
 
     public IdentityService(
         UserManager<ApplicationUser> userManager,
-        RoleManager<ApplicationRole> roleManager)
+        RoleManager<ApplicationRole> roleManager,
+        ApplicationDbContext context)
     {
         _userManager = userManager;
         _roleManager = roleManager;
+        _context = context;
     }
 
     public async Task<(bool Succeeded, string[] Errors)> CreateUserAsync(
@@ -835,6 +839,31 @@ public class IdentityService : IIdentityService
 
         var result = await _userManager.UpdateAsync(user);
         return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<IList<string>> GetUserPermissionsAsync(Guid userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null) return Array.Empty<string>();
+
+        var userRoles = await _userManager.GetRolesAsync(user);
+
+        // Fetch permissions assigned to user roles
+        var rolePermissions = await _context.RolePermissions
+            .Where(rp => userRoles.Contains(rp.RoleName))
+            .Select(rp => rp.PermissionName)
+            .ToListAsync();
+
+        // Fetch direct user permissions
+        var directPermissions = await _context.UserPermissions
+            .Where(up => up.UserId == userId)
+            .Select(up => up.PermissionName)
+            .ToListAsync();
+
+        return rolePermissions
+            .Union(directPermissions)
+            .Distinct()
+            .ToList();
     }
 
     public async Task<(bool Succeeded, string[] Errors)> ChangePasswordAsync(

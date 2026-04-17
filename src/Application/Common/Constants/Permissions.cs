@@ -52,11 +52,22 @@ public static class Permissions
     public const string ConsultationsCreate = "consultations:create";
     public const string ConsultationsUpdate = "consultations:update";
 
-    // ─── Audits ───────────────────────────────────────────────────────────────
-    public const string AuditLogsRead = "audit-logs:read";
+    // ─── Quotas ───────────────────────────────────────────────────────────────
+    public const string QuotasRead = "quotas:read";
+    public const string QuotasBuy = "quotas:buy";
 
-    // ─── Dashboard / Analytics ───────────────────────────────────────────────
-    public const string DashboardRead = "dashboard:read";
+    // ─── Wallets ──────────────────────────────────────────────────────────────
+    public const string WalletsRead = "wallets:read";
+    public const string WalletsDeposit = "wallets:deposit";
+    public const string WalletsWithdraw = "wallets:withdraw";
+    public const string WalletsHistory = "wallets:history";
+
+    // ─── Settings ─────────────────────────────────────────────────────────────
+    public const string SettingsRead = "settings:read";
+    public const string SettingsManage = "settings:manage";
+
+    // ─── Notifications ────────────────────────────────────────────────────────
+    public const string NotificationsManage = "notifications:manage";
 
     // ─────────────────────────────────────────────────────────────────────────
     // Grouped for seeding and UI display
@@ -104,6 +115,23 @@ public static class Permissions
         new(ConsultationsCreate, "Create Consultations", "Book new consultation sessions",      "Consultations"),
         new(ConsultationsUpdate, "Update Consultations", "Modify or cancel consultation sessions","Consultations"),
 
+        // Quotas
+        new(QuotasRead, "Read Quotas", "View AI quota balance",                           "Quotas"),
+        new(QuotasBuy,  "Buy Quotas",  "Purchase additional AI quota credits",          "Quotas"),
+
+        // Wallets
+        new(WalletsRead,     "Read Wallets",     "View wallet balance and account info",     "Wallets"),
+        new(WalletsDeposit,  "Deposit Funds",    "Deposit money into wallet via PayOS",      "Wallets"),
+        new(WalletsWithdraw, "Withdraw Funds",   "Request withdrawal of funds",              "Wallets"),
+        new(WalletsHistory,  "Wallet History",   "View transaction and deposit history",     "Wallets"),
+
+        // Settings
+        new(SettingsRead,   "Read Settings",   "View system and organization settings",    "Settings"),
+        new(SettingsManage, "Manage Settings", "Modify system-wide or org settings",       "Settings"),
+
+        // Notifications
+        new(NotificationsManage, "Manage Notifications", "Send system-wide broadcast notifications", "Notifications"),
+
         // Audit
         new(AuditLogsRead, "Read Audit Logs", "View system audit trail",                      "Audit"),
 
@@ -127,6 +155,10 @@ public static class Permissions
             OrganisationsRead, OrganisationsCreate, OrganisationsUpdate, OrganisationsDelete,
             ScreeningRead, ScreeningCreate, ScreeningApprove,
             ConsultationsRead, ConsultationsCreate, ConsultationsUpdate,
+            QuotasRead, QuotasBuy,
+            WalletsRead, WalletsDeposit, WalletsWithdraw, WalletsHistory,
+            SettingsRead, SettingsManage,
+            NotificationsManage,
             AuditLogsRead,
             DashboardRead,
         ],
@@ -139,6 +171,9 @@ public static class Permissions
             OrganisationsRead, OrganisationsUpdate,
             ScreeningRead,
             ConsultationsRead, ConsultationsUpdate,
+            QuotasRead, QuotasBuy,
+            WalletsRead, WalletsHistory,
+            SettingsRead, SettingsManage,
             DashboardRead,
         ],
 
@@ -147,12 +182,15 @@ public static class Permissions
             PatientsRead,
             ScreeningRead, ScreeningApprove,
             ConsultationsRead, ConsultationsUpdate,
+            WalletsRead, WalletsWithdraw, WalletsHistory,
         ],
 
         [Roles.Patient] =
         [
             ScreeningRead, ScreeningCreate,
             ConsultationsRead, ConsultationsCreate,
+            WalletsRead, WalletsDeposit, WalletsHistory,
+            QuotasRead,
         ],
     };
 }

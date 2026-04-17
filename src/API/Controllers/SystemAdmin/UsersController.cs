@@ -6,7 +6,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Infrastructure.Identity;
+using Infrastructure.Identity.Authorization;
 
 namespace API.Controllers.SystemAdmin;
 
@@ -15,7 +15,7 @@ namespace API.Controllers.SystemAdmin;
 /// Provides centralized interface to manage users, roles, permissions, and monitor user activity.
 /// </summary>
 [Route("api/system-admin/[controller]")]
-[Authorize(Policy = Policies.SystemAdminOnly)]
+[AuthorizePermission(Permissions.UsersRead)]
 public class UsersController : BaseApiController
 {
     private readonly IMediator _mediator;

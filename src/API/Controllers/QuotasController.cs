@@ -5,10 +5,12 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using Infrastructure.Identity.Authorization;
+
 namespace API.Controllers;
 
 [Route("api/quotas")]
-[Authorize(Policy = Policies.Authenticated)]
+[AuthorizePermission(Permissions.QuotasRead)]
 public class QuotasController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -34,6 +36,7 @@ public class QuotasController : BaseApiController
     /// Deducts money from wallet and adds quota credits.
     /// </summary>
     [HttpPost("buy")]
+    [AuthorizePermission(Permissions.QuotasBuy)]
     public async Task<IActionResult> BuyQuota(
         [FromBody] BuyAiQuotaRequest request,
         CancellationToken cancellationToken)
