@@ -10,6 +10,7 @@ namespace Domain.Entities.Screening;
 public class AiScreening : BaseEntity, IAggregateRoot
 {
     public Guid PatientId { get; private set; }
+    public Guid? OrganisationId { get; private set; }
     public string ModelVersion { get; private set; } = string.Empty;
     public DateTime? ProcessedAt { get; private set; }
 
@@ -32,12 +33,13 @@ public class AiScreening : BaseEntity, IAggregateRoot
 
     private AiScreening() { } // EF Core
 
-    public AiScreening(Guid patientId, string modelVersion)
+    public AiScreening(Guid patientId, string modelVersion, Guid? organisationId = null)
     {
         if (string.IsNullOrWhiteSpace(modelVersion))
             throw new ArgumentException("Model version cannot be empty", nameof(modelVersion));
 
         PatientId = patientId;
+        OrganisationId = organisationId;
         ModelVersion = modelVersion;
         IsActive = true;
     }
@@ -65,5 +67,48 @@ public class AiScreening : BaseEntity, IAggregateRoot
     {
         _screeningResults.Add(result);
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void RecordConsent(Guid patientId, string consentContent)
+    {
+        if (patientId == Guid.Empty)
+            throw new ArgumentException("PatientId cannot be empty", nameof(patientId));
+
+        if (patientId != PatientId)
+            throw new InvalidOperationException("Consent can only be recorded by the screening owner.");
+
+        if (string.IsNullOrWhiteSpace(consentContent))
+            throw new ArgumentException("Consent content cannot be empty", nameof(consentContent));
+
+        var normalizedContent = consentContent.Trim();
+
+        if (Consent is null)
+        {
+            Consent = new Consent(Id, patientId, normalizedContent);
+            Consent.Agree();
+            UpdatedAt = DateTime.UtcNow;
+            return;
+        }
+
+        if (Consent.PatientId != patientId)
+            throw new InvalidOperationException("Existing consent owner does not match screening owner.");
+
+        var mergedContent = Consent.Content;
+        if (!mergedContent.Contains(normalizedContent, StringComparison.Ordinal))
+        {
+            mergedContent = string.IsNullOrWhiteSpace(mergedContent)
+                ? normalizedContent
+                : $"{mergedContent}\n\n{normalizedContent}";
+        }
+
+        Consent.Agree(mergedContent);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public bool HasAgreedConsent(Guid patientId)
+    {
+        return Consent is not null
+               && Consent.IsAgreed
+               && Consent.PatientId == patientId;
     }
 }

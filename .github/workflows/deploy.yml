@@ -44,7 +44,17 @@ jobs:
           ASPNETCORE_ENVIRONMENT=Production
           ASPNETCORE_URLS=http://0.0.0.0:8080
 
-          ConnectionStrings__DefaultConnection=${{ secrets.SUPABASE_CONNECTION_STRING }}
+          # ── Database ──
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_NAME=${{ secrets.DB_NAME }}
+
+          # ── pgAdmin ──
+          PGADMIN_EMAIL=${{ secrets.PGADMIN_EMAIL }}
+          PGADMIN_PASSWORD=${{ secrets.PGADMIN_PASSWORD }}
+
+          # ── Connection String ──
+          ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=${{ secrets.DB_NAME }};Username=${{ secrets.DB_USER }};Password=${{ secrets.DB_PASSWORD }};Pooling=true;Minimum Pool Size=5;Maximum Pool Size=100;Connection Idle Lifetime=60;Connection Pruning Interval=10
 
           JwtSettings__SecretKey=${{ secrets.JWT_SECRET_KEY }}
           JwtSettings__Issuer=${{ secrets.JWT_ISSUER }}
@@ -72,10 +82,20 @@ jobs:
           PayOS__ChecksumKey=${{ secrets.PAYOS_CHECKSUM_KEY }}
           PayOS__DefaultReturnUrl=${{ secrets.PAYOS_DEFAULT_RETURN_URL }}
           PayOS__DefaultCancelUrl=${{ secrets.PAYOS_DEFAULT_CANCEL_URL }}
+          PayOS__PayoutClientId=${{ secrets.PAYOS_PAYOUT_CLIENT_ID }}
+          PayOS__PayoutApiKey=${{ secrets.PAYOS_PAYOUT_API_KEY }}
+          PayOS__PayoutChecksumKey=${{ secrets.PAYOS_PAYOUT_CHECKSUM_KEY }}
 
           SupabaseStorage__Url=${{ secrets.SUPABASE_STORAGE_URL }}
           SupabaseStorage__ServiceKey=${{ secrets.SUPABASE_STORAGE_KEY }}
           SupabaseStorage__BucketName=${{ secrets.SUPABASE_STORAGE_BUCKET }}
+
+          # ── Cloudinary ──
+          Cloudinary__CloudName=${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          Cloudinary__ApiKey=${{ secrets.CLOUDINARY_API_KEY }}
+          Cloudinary__ApiSecret=${{ secrets.CLOUDINARY_API_SECRET }}
+          Cloudinary__Folder=auraeyes_dev
+
 
           GoogleAuth__ClientId=${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GoogleMeet__ClientId=${{ secrets.GOOGLE_MEET_CLIENT_ID }}
@@ -90,7 +110,34 @@ jobs:
           SerpApi__ApiKey=${{ secrets.SERPAPI_KEY }}
           SerpApi__BaseUrl=https://serpapi.com/search.json
 
+          GoogleAiStudio__ApiKey=${{ secrets.GOOGLE_AI_STUDIO_API_KEY }}
+
+          BetterStack__Dashboard__EmbedUrl=https://status.auraeyes.site
+
+          BetterStack__Heartbeats__DailyQuotaReset__PingUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_DAILY_QUOTA_RESET_KEY_URL }}
+          BetterStack__Heartbeats__DailyQuotaReset__StartUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_DAILY_QUOTA_RESET_KEY_URL }}/start
+          BetterStack__Heartbeats__DailyQuotaReset__FailUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_DAILY_QUOTA_RESET_KEY_URL }}/fail
+
+          BetterStack__Heartbeats__SlotMaintenance__PingUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_SLOT_MAINTENANCE_KEY_URL }}
+          BetterStack__Heartbeats__SlotMaintenance__StartUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_SLOT_MAINTENANCE_KEY_URL }}/start
+          BetterStack__Heartbeats__SlotMaintenance__FailUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_SLOT_MAINTENANCE_KEY_URL }}/fail
+
+          BetterStack__Heartbeats__SessionReminderWorker__PingUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_SESSION_REMINDER_WORKER_KEY_URL }}
+          BetterStack__Heartbeats__SessionReminderWorker__StartUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_SESSION_REMINDER_WORKER_KEY_URL }}/start
+          BetterStack__Heartbeats__SessionReminderWorker__FailUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_SESSION_REMINDER_WORKER_KEY_URL }}/fail
+
+          BetterStack__Heartbeats__ReservationExpirationWorker__PingUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_RESERVATION_EXPIRATION_WORKER_KEY_URL }}
+          BetterStack__Heartbeats__ReservationExpirationWorker__StartUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_RESERVATION_EXPIRATION_WORKER_KEY_URL }}/start
+          BetterStack__Heartbeats__ReservationExpirationWorker__FailUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_RESERVATION_EXPIRATION_WORKER_KEY_URL }}/fail
+
+          BetterStack__Heartbeats__ConsultationStateWorker__PingUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_CONSULTATION_STATE_WORKER_KEY_URL }}
+          BetterStack__Heartbeats__ConsultationStateWorker__StartUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_CONSULTATION_STATE_WORKER_KEY_URL }}/start
+          BetterStack__Heartbeats__ConsultationStateWorker__FailUrl=https://uptime.betterstack.com/api/v1/heartbeat/${{ secrets.BETTERSTACK_HEARTBEATS_CONSULTATION_STATE_WORKER_KEY_URL }}/fail
+
           Hangfire__ServerEnabled=true
+          Hangfire__WorkerCount=1
+
+          AiAsset__BaseUrl=${{ secrets.AI_BASE_URL }}
 
           API_PORT=${API_PORT}
           BaseUrl=${{ secrets.FRONTEND_URL }}
@@ -100,12 +147,12 @@ jobs:
 
       - name: Pull & run containers
         run: |
-          docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" pull
+          docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" pull api
           docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" up -d
 
       - name: Health check
         run: |
-          for i in {1..60}; do
+          for i in {1..30}; do
             if curl -fs "http://localhost:${API_PORT}/health"; then
               echo "✅ API healthy"
               exit 0
@@ -117,6 +164,7 @@ jobs:
           docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" ps
           docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" logs --tail=200
           exit 1
+
 
       - name: Cleanup unused Docker images
         if: success()

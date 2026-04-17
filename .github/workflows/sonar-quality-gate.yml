@@ -1,0 +1,459 @@
+name: SonarQube Quality Gate & Jira Automation
+
+on:
+  push:
+    branches: [main, coverage]
+  pull_request:
+    branches: [main, coverage]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  sonar:
+    runs-on: ubuntu-latest
+    outputs:
+      severe_count: ${{ steps.evaluate.outputs.severe_count }}
+      quality_gate: ${{ steps.evaluate.outputs.quality_gate }}
+      report_url: ${{ steps.evaluate.outputs.report_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for SonarQube to analyze correctly
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install SonarScanner for .NET
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      - name: Restore dependencies
+        run: dotnet restore AuraEyes_BE.sln
+
+      - name: SonarQube - Begin
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          dotnet-sonarscanner begin \
+            /k:"${{ secrets.SONAR_PROJECT_KEY }}" \
+            /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}" \
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+            /o:"${{ secrets.SONAR_ORGANIZATION }}"
+
+      - name: Build solution
+        run: dotnet build AuraEyes_BE.sln --configuration Release --no-restore
+
+      - name: Run unit tests
+        run: dotnet test AuraEyes_BE.sln --configuration Release --no-build --logger trx --results-directory ./test-results
+
+      - name: SonarQube - End
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+
+      - name: Evaluate Sonar severity and quality gate
+        if: always()
+        id: evaluate
+        shell: bash
+        run: |
+          SONAR_HOST="${{ secrets.SONAR_HOST_URL }}"
+          SONAR_HOST="${SONAR_HOST%/}"
+
+          # Get severe issues count
+          SEVERE=$(curl -s -u "${{ secrets.SONAR_TOKEN }}": \
+            "$SONAR_HOST/api/issues/search?componentKeys=${{ secrets.SONAR_PROJECT_KEY }}&severities=BLOCKER,CRITICAL&resolved=false&ps=1" | jq -r '.total // 0')
+
+          # Get quality gate status (PR-specific for pull_request events)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            QG=$(curl -s -u "${{ secrets.SONAR_TOKEN }}": \
+              "$SONAR_HOST/api/qualitygates/project_status?projectKey=${{ secrets.SONAR_PROJECT_KEY }}&pullRequest=${{ github.event.pull_request.number }}" | jq -r '.projectStatus.status // "UNKNOWN"')
+            REPORT_URL="$SONAR_HOST/project/overview?id=${{ secrets.SONAR_PROJECT_KEY }}&pullRequest=${{ github.event.pull_request.number }}"
+          else
+            QG=$(curl -s -u "${{ secrets.SONAR_TOKEN }}": \
+              "$SONAR_HOST/api/qualitygates/project_status?projectKey=${{ secrets.SONAR_PROJECT_KEY }}&branch=${{ github.ref_name }}" | jq -r '.projectStatus.status // "UNKNOWN"')
+            REPORT_URL="$SONAR_HOST/project/overview?id=${{ secrets.SONAR_PROJECT_KEY }}&branch=${{ github.ref_name }}"
+          fi
+
+          echo "severe_count=$SEVERE" >> "$GITHUB_OUTPUT"
+          echo "quality_gate=$QG" >> "$GITHUB_OUTPUT"
+          echo "report_url=$REPORT_URL" >> "$GITHUB_OUTPUT"
+
+          echo "📊 **Sonar Quality Gate Report**"
+          echo "- Severe Issues: $SEVERE"
+          echo "- Quality Gate: $QG"
+          echo "- Report: $REPORT_URL"
+
+      - name: Comment PR with results
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const severeRaw = "${{ steps.evaluate.outputs.severe_count }}";
+            const severe = Number.parseInt(severeRaw || "0", 10) || 0;
+            const qg = "${{ steps.evaluate.outputs.quality_gate }}" || "UNKNOWN";
+            const reportUrl = "${{ steps.evaluate.outputs.report_url }}" || "";
+
+            let icon = qg === "OK" ? "✅" : "❌";
+            let bugBadge = severe > 0 ? `🐛 **${severe} Bugs Found**` : "✨ No Critical Issues";
+            const statusLine = qg === "OK"
+              ? "✨ All quality checks passed!"
+              : `⚠️ Quality Gate is ${qg}. ${severe} severe issues detected.`;
+            const comment = [
+              `## ${icon} SonarQube Quality Gate Results`,
+              "",
+              `**Quality Gate:** ${qg}`,
+              `**Severe Issues:** ${bugBadge}`,
+              `**Report:** [View in SonarQube](${reportUrl})`,
+              "",
+              statusLine
+            ].join("\n");
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  create_jira_ticket:
+    runs-on: ubuntu-latest
+    needs: sonar
+    if: ${{ always() && needs.sonar.result == 'success' }}
+    steps:
+      - name: Fetch Sonar issues and create Jira tickets
+        shell: bash
+        run: |
+          set -e
+
+          SONAR_HOST="${{ secrets.SONAR_HOST_URL }}"
+          SONAR_TOKEN="${{ secrets.SONAR_TOKEN }}"
+          SONAR_KEY="${{ secrets.SONAR_PROJECT_KEY }}"
+          JIRA_URL="${{ secrets.JIRA_BASE_URL }}"
+          JIRA_USER="${{ secrets.JIRA_EMAIL }}"
+          JIRA_TOKEN="${{ secrets.JIRA_API_TOKEN }}"
+          JIRA_PROJECT="${{ secrets.JIRA_PROJECT_KEY }}"
+          REPORT_URL="${{ needs.sonar.outputs.report_url }}"
+          QG="${{ needs.sonar.outputs.quality_gate }}"
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            SONAR_SCOPE="pullRequest=${{ github.event.pull_request.number }}"
+          else
+            SONAR_SCOPE="branch=${{ github.ref_name }}"
+          fi
+
+          if [ -z "$REPORT_URL" ]; then
+            REPORT_URL="$SONAR_HOST/project/overview?id=$SONAR_KEY&$SONAR_SCOPE"
+          fi
+
+          # Validate required secrets
+          if [ -z "$SONAR_HOST" ] || [ -z "$SONAR_TOKEN" ] || [ -z "$SONAR_KEY" ] || [ -z "$JIRA_TOKEN" ]; then
+            echo "❌ Missing required secrets. Please set SONAR_HOST_URL, SONAR_TOKEN, SONAR_PROJECT_KEY, JIRA_API_TOKEN."
+            exit 1
+          fi
+
+          # Normalize host URL to avoid accidental double slashes
+          SONAR_HOST="${SONAR_HOST%/}"
+
+          fetch_sonar_json() {
+            local endpoint="$1"
+            local response
+            response=$(curl -sS --fail-with-body -u "$SONAR_TOKEN:" "$SONAR_HOST$endpoint" 2>&1) || {
+              echo "❌ Sonar API call failed: $SONAR_HOST$endpoint"
+              echo "$response"
+              return 1
+            }
+            echo "$response"
+          }
+
+          # Validate Sonar token early
+          AUTH_CHECK=$(fetch_sonar_json "/api/authentication/validate") || exit 1
+          if [ "$(echo "$AUTH_CHECK" | jq -r '.valid // false')" != "true" ]; then
+            echo "❌ SONAR_TOKEN is invalid or lacks permissions."
+            echo "Response: $AUTH_CHECK"
+            exit 1
+          fi
+
+          # Discover valid Jira issue types for this project
+          CREATEMETA=$(curl -sS --fail-with-body -u "$JIRA_USER:$JIRA_TOKEN" \
+            "$JIRA_URL/rest/api/2/issue/createmeta?projectKeys=$JIRA_PROJECT&expand=projects.issuetypes" 2>&1) || {
+              echo "❌ Failed to load Jira create metadata."
+              echo "$CREATEMETA"
+              exit 1
+            }
+
+          PARENT_ISSUE_TYPE=$(echo "$CREATEMETA" | jq -r '
+            .projects[0].issuetypes as $types
+            | ($types[]? | select(.name=="Bug" and (.subtask|not)) | .name)
+              // ($types[]? | select(.name=="Task" and (.subtask|not)) | .name)
+              // ($types[]? | select(.subtask|not) | .name)
+              // empty
+          ')
+
+          SUBTASK_ISSUE_TYPE=$(echo "$CREATEMETA" | jq -r '
+            .projects[0].issuetypes as $types
+            | ($types[]? | select(.name=="Sub-task" and .subtask==true) | .name)
+              // ($types[]? | select(.subtask==true) | .name)
+              // empty
+          ')
+
+          if [ -z "$PARENT_ISSUE_TYPE" ]; then
+            echo "❌ Could not determine a valid parent issue type in Jira project $JIRA_PROJECT."
+            exit 1
+          fi
+
+          if [ -z "$SUBTASK_ISSUE_TYPE" ]; then
+            echo "⚠️ No Jira sub-task issue type found in project $JIRA_PROJECT. Subtasks will be skipped."
+          fi
+
+          echo "Jira parent issue type: $PARENT_ISSUE_TYPE"
+          echo "Jira subtask issue type: ${SUBTASK_ISSUE_TYPE:-<none>}"
+
+          # Fetch issues
+          echo "📊 Fetching issues..."
+          ISSUES=$(fetch_sonar_json "/api/issues/search?componentKeys=$SONAR_KEY&resolved=false&ps=500&$SONAR_SCOPE") || exit 1
+          HOTSPOTS=$(fetch_sonar_json "/api/hotspots/search?projectKey=$SONAR_KEY&status=TO_REVIEW&ps=500&$SONAR_SCOPE") || exit 1
+
+          if ! echo "$ISSUES" | jq -e '.issues' >/dev/null 2>&1; then
+            echo "⚠️ Sonar API did not return issues array. Response:"
+            echo "$ISSUES"
+            exit 1
+          else
+            BLOCKER=$(echo "$ISSUES" | jq -r '[.issues[]? | select(.severity=="BLOCKER")] | length')
+            CRITICAL=$(echo "$ISSUES" | jq -r '[.issues[]? | select(.severity=="CRITICAL")] | length')
+            MAJOR=$(echo "$ISSUES" | jq -r '[.issues[]? | select(.severity=="MAJOR")] | length')
+          fi
+
+          if ! echo "$HOTSPOTS" | jq -e '.hotspots' >/dev/null 2>&1; then
+            echo "⚠️ Sonar API did not return hotspots array. Response:"
+            echo "$HOTSPOTS"
+            exit 1
+          else
+            HOTSPOT_COUNT=$(echo "$HOTSPOTS" | jq -r '[.hotspots[]?] | length')
+          fi
+
+          BLOCKER=${BLOCKER:-0}
+          CRITICAL=${CRITICAL:-0}
+          MAJOR=${MAJOR:-0}
+          HOTSPOT_COUNT=${HOTSPOT_COUNT:-0}
+          TOTAL=$((BLOCKER + CRITICAL + MAJOR + HOTSPOT_COUNT))
+
+          echo "Issues: BLOCKER=$BLOCKER, CRITICAL=$CRITICAL, MAJOR=$MAJOR, HOTSPOTS=$HOTSPOT_COUNT (Total=$TOTAL)"
+
+          if [ "$TOTAL" -lt 1 ] && [ "$QG" = "OK" ]; then
+            echo "✨ No blocking issues. Skipping."
+            exit 0
+          fi
+
+          # Check existing parent
+          echo "🔍 Checking for existing parent ticket..."
+          parent_key=$(curl -s -u "$JIRA_USER:$JIRA_TOKEN" \
+            "$JIRA_URL/rest/api/2/search?jql=project%3D$JIRA_PROJECT%20AND%20summary~%22%5BSonar%5D%22%20AND%20statusCategory!=Done%20ORDER%20BY%20created%20DESC&maxResults=1" | jq -r '.issues[0].key // empty')
+
+          if [ ! -z "$parent_key" ]; then
+            echo "✓ Using existing parent: $parent_key"
+          else
+            # Create parent
+            echo "🎫 Creating new parent ticket..."
+            parent_desc=$(printf 'Quality Gate: %s\nBLOCKER: %s | CRITICAL: %s | MAJOR: %s | HOTSPOTS: %s\n\nReport: %s\nGitHub Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}' "$QG" "$BLOCKER" "$CRITICAL" "$MAJOR" "$HOTSPOT_COUNT" "$REPORT_URL")
+            parent_payload=$(jq -n \
+              --arg project "$JIRA_PROJECT" \
+              --arg issueType "$PARENT_ISSUE_TYPE" \
+              --arg summary "🐛 [Sonar] Quality Gate Failed - Multiple Issues Detected" \
+              --arg desc "$parent_desc" \
+              '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":$issueType},"priority":{"name":"High"}}}')
+            
+            parent_resp=$(curl -s -X POST -u "$JIRA_USER:$JIRA_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$parent_payload" \
+              "$JIRA_URL/rest/api/2/issue")
+            
+            parent_key=$(echo "$parent_resp" | jq -r '.key // empty')
+            if [ -z "$parent_key" ]; then
+              echo "❌ Failed to create parent: $parent_resp"
+              exit 1
+            fi
+            echo "✅ Created parent: $parent_key"
+          fi
+
+          # Create BLOCKER subtasks (top 5)
+          if [ "$BLOCKER" -gt 0 ] && [ -n "$SUBTASK_ISSUE_TYPE" ]; then
+            echo "🔴 Creating BLOCKER subtasks (max 5)..."
+            echo "$ISSUES" | jq -c '[.issues[] | select(.severity=="BLOCKER")][0:5][]' | while read -r issue; do
+              msg=$(echo "$issue" | jq -r '.message')
+              rule=$(echo "$issue" | jq -r '.rule // "Unknown"')
+              file=$(echo "$issue" | jq -r '.component // "Unknown"')
+              line=$(echo "$issue" | jq -r '.line // "N/A"')
+              issue_key=$(echo "$issue" | jq -r '.key // "N/A"')
+              issue_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&$SONAR_SCOPE&open=$issue_key"
+              rule_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&$SONAR_SCOPE&resolved=false&rules=$rule"
+              desc=$(printf 'Issue Name: %s\nSeverity: BLOCKER\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nOpen This Issue: %s\nAll Similar Issues: %s\nReport: %s\n\nSteps to fix:\n1) Open This Issue link and review the rule details.\n2) Update code at the file/line above to satisfy the rule.\n3) Push commit and verify this subtask issue disappears in next scan.' "$msg" "$rule" "$file" "$line" "$issue_key" "$issue_url" "$rule_url" "$REPORT_URL")
+              
+              payload=$(jq -n \
+                --arg project "$JIRA_PROJECT" \
+                --arg issueType "$SUBTASK_ISSUE_TYPE" \
+                --arg summary "🐛 BLOCKER: ${msg:0:50}" \
+                --arg desc "$desc" \
+                --arg parent "$parent_key" \
+                '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":$issueType},"priority":{"name":"Highest"},"parent":{"key":$parent}}}')
+              
+              sub_resp=$(curl -s -X POST -u "$JIRA_USER:$JIRA_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "$payload" \
+                "$JIRA_URL/rest/api/2/issue")
+              sub_key=$(echo "$sub_resp" | jq -r '.key // empty')
+              
+              if [ ! -z "$sub_key" ]; then
+                echo "  ✅ $sub_key - $msg"
+              else
+                echo "  ❌ Failed to create: $msg"
+                echo "     Jira response: $sub_resp"
+              fi
+            done
+          fi
+
+          # Create CRITICAL subtasks (top 5)
+          if [ "$CRITICAL" -gt 0 ] && [ -n "$SUBTASK_ISSUE_TYPE" ]; then
+            echo "🟠 Creating CRITICAL subtasks (max 5)..."
+            echo "$ISSUES" | jq -c '[.issues[] | select(.severity=="CRITICAL")][0:5][]' | while read -r issue; do
+              msg=$(echo "$issue" | jq -r '.message')
+              rule=$(echo "$issue" | jq -r '.rule // "Unknown"')
+              file=$(echo "$issue" | jq -r '.component // "Unknown"')
+              line=$(echo "$issue" | jq -r '.line // "N/A"')
+              issue_key=$(echo "$issue" | jq -r '.key // "N/A"')
+              issue_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&$SONAR_SCOPE&open=$issue_key"
+              rule_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&$SONAR_SCOPE&resolved=false&rules=$rule"
+              desc=$(printf 'Issue Name: %s\nSeverity: CRITICAL\nRule: %s\nFile: %s (Line %s)\nSonar Key: %s\nOpen This Issue: %s\nAll Similar Issues: %s\nReport: %s\n\nSteps to fix:\n1) Open This Issue link and review impact/risk.\n2) Patch the code to remove the rule violation.\n3) Run tests and verify issue is closed on next Sonar run.' "$msg" "$rule" "$file" "$line" "$issue_key" "$issue_url" "$rule_url" "$REPORT_URL")
+              
+              payload=$(jq -n \
+                --arg project "$JIRA_PROJECT" \
+                --arg issueType "$SUBTASK_ISSUE_TYPE" \
+                --arg summary "⚠️ CRITICAL: ${msg:0:50}" \
+                --arg desc "$desc" \
+                --arg parent "$parent_key" \
+                '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":$issueType},"priority":{"name":"High"},"parent":{"key":$parent}}}')
+              
+              sub_resp=$(curl -s -X POST -u "$JIRA_USER:$JIRA_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "$payload" \
+                "$JIRA_URL/rest/api/2/issue")
+              sub_key=$(echo "$sub_resp" | jq -r '.key // empty')
+              
+              if [ ! -z "$sub_key" ]; then
+                echo "  ✅ $sub_key - $msg"
+              else
+                echo "  ❌ Failed to create: $msg"
+                echo "     Jira response: $sub_resp"
+              fi
+            done
+          fi
+
+          # Create MAJOR subtasks (top 3 grouped by rule+message)
+          if [ "$MAJOR" -gt 0 ] && [ -n "$SUBTASK_ISSUE_TYPE" ]; then
+            echo "🟡 Creating MAJOR subtasks (max 3 groups)..."
+            echo "$ISSUES" | jq -c '
+              [.issues[] | select(.severity=="MAJOR")]
+              | group_by((.rule // "Unknown") + "|" + .message)
+              | map({
+                  message: .[0].message,
+                  rule: (.[0].rule // "Unknown"),
+                  count: length,
+                  samples: (.[0:5] | map({
+                    key: (.key // "N/A"),
+                    file: (.component // "Unknown"),
+                    line: ((.line // "N/A")|tostring)
+                  }))
+                })
+              | .[0:3][]
+            ' | while read -r group; do
+              msg=$(echo "$group" | jq -r '.message')
+              rule=$(echo "$group" | jq -r '.rule')
+              count=$(echo "$group" | jq -r '.count')
+              first_key=$(echo "$group" | jq -r '.samples[0].key')
+              issue_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&$SONAR_SCOPE&open=$first_key"
+              rule_url="$SONAR_HOST/project/issues?id=$SONAR_KEY&$SONAR_SCOPE&resolved=false&rules=$rule"
+              sample_list=$(echo "$group" | jq -r '.samples[] | "- " + .key + " | " + .file + ":" + .line')
+              desc=$(printf 'Issue Name: %s\nSeverity: MAJOR\nRule: %s\nOccurrences: %s\nOpen One Example: %s\nAll Similar Issues: %s\nReport: %s\n\nExamples (Sonar Key | File:Line):\n%s\n\nSteps to fix:\n1) Open one example or All Similar Issues.\n2) Fix all listed occurrences in Examples.\n3) Push commit and verify MAJOR count drops in next scan.' "$msg" "$rule" "$count" "$issue_url" "$rule_url" "$REPORT_URL" "$sample_list")
+              
+              payload=$(jq -n \
+                --arg project "$JIRA_PROJECT" \
+                --arg issueType "$SUBTASK_ISSUE_TYPE" \
+                --arg summary "📌 MAJOR x${count}: ${msg:0:40}" \
+                --arg desc "$desc" \
+                --arg parent "$parent_key" \
+                '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":$issueType},"priority":{"name":"Medium"},"parent":{"key":$parent}}}')
+              
+              sub_resp=$(curl -s -X POST -u "$JIRA_USER:$JIRA_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "$payload" \
+                "$JIRA_URL/rest/api/2/issue")
+              sub_key=$(echo "$sub_resp" | jq -r '.key // empty')
+              
+              if [ ! -z "$sub_key" ]; then
+                echo "  ✅ $sub_key - $msg"
+              else
+                echo "  ❌ Failed to create: $msg"
+                echo "     Jira response: $sub_resp"
+              fi
+            done
+          fi
+
+          # Create HOTSPOT subtasks (top 5 grouped by message)
+          if [ "$HOTSPOT_COUNT" -gt 0 ] && [ -n "$SUBTASK_ISSUE_TYPE" ]; then
+            echo "🛡️ Creating HOTSPOT subtasks (max 5 groups)..."
+            echo "$HOTSPOTS" | jq -c '
+              [.hotspots[]]
+              | group_by(.message)
+              | map({
+                  message: (.[0].message // "Security hotspot requires review"),
+                  risk: (.[0].vulnerabilityProbability // "MEDIUM"),
+                  count: length,
+                  samples: (.[0:5] | map({
+                    key: (.key // "N/A"),
+                    file: (.component // "Unknown"),
+                    line: ((.line // "N/A")|tostring)
+                  }))
+                })
+              | .[0:5][]
+            ' | while read -r group; do
+              msg=$(echo "$group" | jq -r '.message')
+              prob=$(echo "$group" | jq -r '.risk')
+              count=$(echo "$group" | jq -r '.count')
+              first_key=$(echo "$group" | jq -r '.samples[0].key')
+              hotspot_url="$SONAR_HOST/security_hotspots?id=$SONAR_KEY&$SONAR_SCOPE&hotspots=$first_key"
+              all_hotspots_url="$SONAR_HOST/security_hotspots?id=$SONAR_KEY&$SONAR_SCOPE"
+              sample_list=$(echo "$group" | jq -r '.samples[] | "- " + .key + " | " + .file + ":" + .line')
+              desc=$(printf 'Issue Name: %s\nType: SECURITY HOTSPOT\nRisk: %s\nOccurrences: %s\nOpen One Hotspot: %s\nAll Hotspots: %s\nReport: %s\n\nExamples (Hotspot Key | File:Line):\n%s\n\nSteps to fix:\n1) Open one hotspot or All Hotspots link.\n2) Fix all listed occurrences in Examples.\n3) Re-run scan and verify hotspot count decreases.' "$msg" "$prob" "$count" "$hotspot_url" "$all_hotspots_url" "$REPORT_URL" "$sample_list")
+
+              payload=$(jq -n \
+                --arg project "$JIRA_PROJECT" \
+                --arg issueType "$SUBTASK_ISSUE_TYPE" \
+                --arg summary "🐛 HOTSPOT x${count}: ${msg:0:35}" \
+                --arg desc "$desc" \
+                --arg parent "$parent_key" \
+                '{"fields":{"project":{"key":$project},"summary":$summary,"description":$desc,"issuetype":{"name":$issueType},"priority":{"name":"High"},"parent":{"key":$parent}}}')
+
+              sub_resp=$(curl -s -X POST -u "$JIRA_USER:$JIRA_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "$payload" \
+                "$JIRA_URL/rest/api/2/issue")
+              sub_key=$(echo "$sub_resp" | jq -r '.key // empty')
+
+              if [ ! -z "$sub_key" ]; then
+                echo "  ✅ $sub_key - $msg (x$count)"
+              else
+                echo "  ❌ Failed to create HOTSPOT: $msg"
+                echo "     Jira response: $sub_resp"
+              fi
+            done
+          fi
+
+          echo ""
+          echo "🎯 Done! Parent: $parent_key"
+          echo "URL: $JIRA_URL/browse/$parent_key"

@@ -94,6 +94,7 @@ public class ContractsController : BaseApiController
             Id = id,
             TemplateId = request.TemplateId,
             AiQuotaLimit = request.AiQuotaLimit,
+            MonthlyQuotaLimit = request.MonthlyQuotaLimit,
             PlatformCommissionRate = request.PlatformCommissionRate
         };
         var result = await _mediator.Send(command);
@@ -121,6 +122,9 @@ public class ContractsController : BaseApiController
         var command = new SignContractCommand
         {
             Id = id,
+            CommissionRate = request.CommissionRate,
+            ActualMonthlySalary = request.ActualMonthlySalary,
+            ConfirmedMonthlyQuotaLimit = request.ConfirmedMonthlyQuotaLimit,
             SignedContent = request.SignedContent,
             ScannedDocumentUrl = request.ScannedDocumentUrl
         };
@@ -155,5 +159,5 @@ public class ContractsController : BaseApiController
 // Request body types
 // =========================================================================
 
-public record UpdateContractRequest(Guid TemplateId, int AiQuotaLimit, decimal PlatformCommissionRate);
-public record SignContractRequest(string? SignedContent, string? ScannedDocumentUrl);
+public record UpdateContractRequest(Guid TemplateId, int AiQuotaLimit, int MonthlyQuotaLimit, decimal PlatformCommissionRate);
+public record SignContractRequest(decimal CommissionRate, decimal ActualMonthlySalary, int? ConfirmedMonthlyQuotaLimit, string? SignedContent, string? ScannedDocumentUrl);

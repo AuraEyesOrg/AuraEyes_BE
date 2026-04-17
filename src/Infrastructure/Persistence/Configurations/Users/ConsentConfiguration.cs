@@ -9,6 +9,9 @@ public class ConsentConfiguration : IEntityTypeConfiguration<Consent>
 {
     public void Configure(EntityTypeBuilder<Consent> builder)
     {
+        builder.Property(e => e.PatientId)
+            .IsRequired();
+
         builder.Property(e => e.IsAgreed)
             .HasDefaultValue(false);
 
@@ -24,5 +27,12 @@ public class ConsentConfiguration : IEntityTypeConfiguration<Consent>
             .WithOne(a => a.Consent)
             .HasForeignKey<Consent>(e => e.AiScreeningId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Patient>()
+            .WithMany()
+            .HasForeignKey(e => e.PatientId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(e => e.PatientId);
     }
 }

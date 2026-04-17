@@ -125,7 +125,9 @@ public class VerifyPaymentCommandHandler : ICommandHandler<VerifyPaymentCommand,
                     wallet.Id,
                     depositRequest.Amount,
                     TransactionType.Deposit,
-                    $"Deposit via PayOS - Order: {request.OrderCode}");
+                    $"Deposit via PayOS - Order: {request.OrderCode}",
+                    "DepositRequest",
+                    depositRequest.Id);
 
                 await _walletRepository.AddTransactionAsync(transaction, cancellationToken);
 

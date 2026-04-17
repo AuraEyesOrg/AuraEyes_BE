@@ -9,6 +9,7 @@ using Application.ConsultationSessions.Commands.SubmitVerificationReport;
 using Application.ConsultationSessions.Common;
 using Application.ConsultationSessions.Queries.GetConsultationSession;
 using Application.ConsultationSessions.Queries.GetConsultationSessions;
+using Application.Screenings.Queries.ExportPatientScreeningReportPdf;
 using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -26,13 +27,19 @@ public class ConsultationSessionsController : BaseApiController
 {
     private readonly IMediator _mediator;
     private readonly ICurrentUserService _currentUser;
+    private readonly IFileStorageService _fileStorageService;
+    private readonly ILogger<ConsultationSessionsController> _logger;
 
     public ConsultationSessionsController(
         IMediator mediator,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        IFileStorageService fileStorageService,
+        ILogger<ConsultationSessionsController> logger)
     {
         _mediator = mediator;
         _currentUser = currentUser;
+        _fileStorageService = fileStorageService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -44,6 +51,7 @@ public class ConsultationSessionsController : BaseApiController
     public async Task<IActionResult> GetSessions(
         [FromQuery] Guid? patientId = null,
         [FromQuery] Guid? ophthalmologistId = null,
+        [FromQuery] Guid? aiScreeningId = null,
         [FromQuery] ConsultationSessionType? type = null,
         [FromQuery] SessionStatus? status = null,
         [FromQuery] ChatStatus? chatStatus = null,
@@ -54,6 +62,7 @@ public class ConsultationSessionsController : BaseApiController
         {
             PatientId = patientId,
             OphthalmologistId = ophthalmologistId,
+            AiScreeningId = aiScreeningId,
             Type = type,
             Status = status,
             ChatStatus = chatStatus,
@@ -76,6 +85,45 @@ public class ConsultationSessionsController : BaseApiController
     {
         var result = await _mediator.Send(new GetConsultationSessionQuery(sessionId));
         return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Download screening report PDF for a consultation session.
+    /// Allows assigned ophthalmologist or patient to export the same report.
+    /// </summary>
+    [HttpGet("{sessionId:guid}/report-pdf")]
+    [Authorize]
+    [Produces("application/pdf")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadSessionReportPdf(
+        Guid sessionId,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUser.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
+
+        var sessionResult = await _mediator.Send(new GetConsultationSessionQuery(sessionId), cancellationToken);
+        if (!sessionResult.IsSuccess || sessionResult.Data is null)
+            return HandleResult(sessionResult);
+
+        var screeningId = sessionResult.Data.AiScreeningId;
+        if (!screeningId.HasValue)
+            return BadRequest(ApiResponseFactory.Error("Session has no linked AI screening."));
+
+        var pdfResult = await _mediator.Send(
+            new ExportPatientScreeningReportPdfQuery(
+                _currentUser.UserId.Value,
+                screeningId.Value,
+                _currentUser.ProfileId),
+            cancellationToken);
+
+        if (!pdfResult.IsSuccess || pdfResult.Data is null)
+            return HandleResult(pdfResult, "Screening report generated");
+
+        Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
+        return File(pdfResult.Data.Content, pdfResult.Data.ContentType, pdfResult.Data.FileName);
     }
 
     /// <summary>
@@ -157,9 +205,21 @@ public class ConsultationSessionsController : BaseApiController
         {
             SessionId = sessionId,
             DoctorId = request.DoctorId,
+            DiagnosisCode = request.DiagnosisCode,
+            CodingSystem = request.CodingSystem,
+            ClinicalFindings = request.ClinicalFindings,
+            SeverityLevel = request.SeverityLevel,
+            ConfidenceLevel = request.ConfidenceLevel,
+            TreatmentPlan = request.TreatmentPlan,
+            Recommendations = request.Recommendations,
+            LifestyleAdvice = request.LifestyleAdvice,
+            IsUrgent = request.IsUrgent,
+            Status = request.Status,
+            FollowUpDate = request.FollowUpDate,
+            IsReferralNeeded = request.IsReferralNeeded,
+            FinalizedAt = request.FinalizedAt,
             DiagnosesCode = request.DiagnosesCode,
-            DiagnosesText = request.DiagnosesText,
-            TreatmentPlan = request.TreatmentPlan
+            DiagnosesText = request.DiagnosesText
         };
 
         var result = await _mediator.Send(command);
@@ -192,6 +252,87 @@ public class ConsultationSessionsController : BaseApiController
 
         var result = await _mediator.Send(command);
         return HandleResult(result, "Message sent successfully.");
+    }
+
+    /// <summary>
+    /// Upload chat images for consultation conversations.
+    /// Uses a dedicated storage folder separate from AI screening uploads.
+    /// </summary>
+    [HttpPost("upload-images")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponse<UploadChatImagesResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> UploadChatImages(
+        [FromForm] List<IFormFile> images,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUser.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
+
+        if (images is null || images.Count == 0)
+            return BadRequest(ApiResponseFactory.Error("No images provided"));
+
+        if (images.Count > 10)
+            return BadRequest(ApiResponseFactory.Error("Maximum 10 images allowed"));
+
+        var allowedTypes = new[]
+        {
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/bmp",
+            "image/tiff",
+            "image/x-tiff",
+            "image/webp"
+        };
+
+        var uploadedUrls = new List<string>();
+
+        try
+        {
+            foreach (var image in images)
+            {
+                if (image.Length == 0)
+                    return BadRequest(ApiResponseFactory.Error($"File '{image.FileName}' is empty"));
+
+                if (image.Length > 50 * 1024 * 1024)
+                    return BadRequest(ApiResponseFactory.Error($"File '{image.FileName}' exceeds 50MB limit"));
+
+                if (!allowedTypes.Contains(image.ContentType?.ToLowerInvariant() ?? string.Empty))
+                    return BadRequest(ApiResponseFactory.Error(
+                        $"File '{image.FileName}' has unsupported format. Only JPG, JPEG, PNG, BMP, TIFF, and WebP are allowed"));
+
+                await using var stream = image.OpenReadStream();
+                var url = await _fileStorageService.SaveFileAsync(
+                    stream,
+                    image.FileName,
+                    $"consultations/chat_images/{_currentUser.UserId}",
+                    cancellationToken);
+
+                uploadedUrls.Add(url);
+
+                _logger.LogInformation(
+                    "Uploaded consultation chat image to storage: {Url}",
+                    url);
+            }
+
+            return Ok(ApiResponseFactory.Success(
+                new UploadChatImagesResponse
+                {
+                    UploadedUrls = uploadedUrls,
+                    Count = uploadedUrls.Count
+                },
+                "Chat images uploaded successfully"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error uploading consultation chat images");
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                ApiResponseFactory.Error($"Failed to upload chat images: {ex.Message}"));
+        }
     }
 
     /// <summary>
@@ -262,9 +403,25 @@ public record CreateVideoCallSessionRequest
 public record SubmitVerificationReportRequest
 {
     public Guid DoctorId { get; init; }
-    public string DiagnosesCode { get; init; } = string.Empty;
-    public string DiagnosesText { get; init; } = string.Empty;
+
+    // New contract fields.
+    public string? DiagnosisCode { get; init; }
+    public string? CodingSystem { get; init; }
+    public string? ClinicalFindings { get; init; }
+    public string? SeverityLevel { get; init; }
+    public decimal? ConfidenceLevel { get; init; }
     public string? TreatmentPlan { get; init; }
+    public string? Recommendations { get; init; }
+    public string? LifestyleAdvice { get; init; }
+    public bool IsUrgent { get; init; }
+    public string? Status { get; init; }
+    public DateTime? FollowUpDate { get; init; }
+    public bool IsReferralNeeded { get; init; }
+    public DateTime? FinalizedAt { get; init; }
+
+    // Backward-compatible aliases for older FE payloads.
+    public string? DiagnosesCode { get; init; }
+    public string? DiagnosesText { get; init; }
 }
 
 public record SendMessageRequest
@@ -281,6 +438,12 @@ public record CancelSessionRequest
 public record EndSessionRequest
 {
     public Guid DoctorId { get; init; }
+}
+
+public record UploadChatImagesResponse
+{
+    public List<string> UploadedUrls { get; init; } = new();
+    public int Count { get; init; }
 }
 
 #endregion

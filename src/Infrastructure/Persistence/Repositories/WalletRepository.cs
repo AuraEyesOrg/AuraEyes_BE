@@ -19,6 +19,12 @@ public class WalletRepository : Repository<Wallet>, IWalletRepository
             .FirstOrDefaultAsync(w => w.UserId == userId, cancellationToken);
     }
 
+    public async Task<Wallet?> GetSystemWalletAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .FirstOrDefaultAsync(w => w.OwnerType == "System", cancellationToken);
+    }
+
     public async Task<Wallet?> GetByIdWithTransactionsAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _dbSet
@@ -78,11 +84,12 @@ public class WalletRepository : Repository<Wallet>, IWalletRepository
 
         var transactionsCount = monthTransactions.Count;
 
-        // Deposits, Refunds, Bonuses are positive flow
+        // Deposits, refunds, bonuses, and transfers (e.g. consultation credit to doctor) are positive inflow
         var totalDeposits = monthTransactions
             .Where(t => t.TransactionType == Domain.Enums.TransactionType.Deposit ||
                         t.TransactionType == Domain.Enums.TransactionType.Refund ||
-                        t.TransactionType == Domain.Enums.TransactionType.Bonus)
+                        t.TransactionType == Domain.Enums.TransactionType.Bonus ||
+                        t.TransactionType == Domain.Enums.TransactionType.Transfer)
             .Sum(t => t.Amount);
 
         // Payments, Withdrawals are negative flow
@@ -92,5 +99,47 @@ public class WalletRepository : Repository<Wallet>, IWalletRepository
             .Sum(t => t.Amount);
 
         return (totalDeposits, totalSpent, transactionsCount);
+    }
+
+    public async Task<(IReadOnlyList<(WalletTransaction Transaction, Wallet Wallet)> Items, int TotalCount)> GetCashflowTransactionsPagedAsync(
+        string? ownerType = null,
+        string? searchTerm = null,
+        int pageNumber = 1,
+        int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var query =
+            from transaction in _context.WalletTransactions.AsNoTracking()
+            join wallet in _context.Wallets.AsNoTracking()
+                on transaction.WalletId equals wallet.Id
+            select new { transaction, wallet };
+
+        if (!string.IsNullOrWhiteSpace(ownerType))
+        {
+            query = query.Where(x => x.wallet.OwnerType == ownerType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var keyword = searchTerm.Trim().ToLower();
+            query = query.Where(x =>
+                (x.transaction.Description != null && x.transaction.Description.ToLower().Contains(keyword)) ||
+                (x.transaction.ReferenceType != null && x.transaction.ReferenceType.ToLower().Contains(keyword)) ||
+                x.wallet.OwnerType.ToLower().Contains(keyword));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var rows = await query
+            .OrderByDescending(x => x.transaction.CreatedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        var items = rows
+            .Select(x => (x.transaction, x.wallet))
+            .ToList();
+
+        return (items, totalCount);
     }
 }

@@ -32,27 +32,249 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         var organisationId = appUser.OrganizationId.Value;
         take = Math.Clamp(take, 1, 100);
 
+        var managedPatientIds = _context.Set<OrganisationPatientLink>()
+            .AsNoTracking()
+            .Where(link => link.OrganisationId == organisationId && !link.IsDeleted)
+            .Select(link => link.PatientId)
+            .Distinct();
+
         var organisationScreeningIds = _context.Set<ConsultationSession>()
             .AsNoTracking()
             .Where(cs => cs.OrganisationId == organisationId && cs.AiScreeningId != null)
             .Select(cs => cs.AiScreeningId!.Value)
             .Distinct();
 
-        var recentRows = await (
-            from scr in _context.Set<AiScreening>().AsNoTracking()
-            join p in _context.Set<Patient>().AsNoTracking() on scr.PatientId equals p.Id
-            join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
-            join screeningId in organisationScreeningIds on scr.Id equals screeningId
-            orderby scr.CreatedAt descending, scr.Id descending
-            select new { Screening = scr, PatientUser = u }
+        // LEFT JOIN: walk-in patients have UserId=null, so u will be null for them
+        var topPatients = await (
+            from p in _context.Set<Patient>().AsNoTracking()
+            join u in _context.Set<ApplicationUser>().AsNoTracking()
+                on p.UserId equals u.Id into userGroup
+            from u in userGroup.DefaultIfEmpty()
+            where managedPatientIds.Contains(p.Id) && !p.IsDeleted
+                  && (u == null || !u.IsDeleted)
+            let latestScreeningId = (
+                from scr in _context.Set<AiScreening>().AsNoTracking()
+                join screeningId in organisationScreeningIds on scr.Id equals screeningId
+                where scr.PatientId == p.Id
+                orderby scr.CreatedAt descending
+                select (Guid?)scr.Id
+            ).FirstOrDefault()
+            let latestScreeningCreatedAt = (
+                from scr in _context.Set<AiScreening>().AsNoTracking()
+                join screeningId in organisationScreeningIds on scr.Id equals screeningId
+                where scr.PatientId == p.Id
+                orderby scr.CreatedAt descending
+                select (DateTime?)scr.CreatedAt
+            ).FirstOrDefault()
+            orderby latestScreeningCreatedAt ?? p.CreatedAt descending
+            select new
+            {
+                PatientUser = u,
+                Patient = p,
+                LatestScreeningId = latestScreeningId
+            }
         )
         .Take(take)
         .ToListAsync(cancellationToken);
 
-        if (recentRows.Count == 0)
+        if (topPatients.Count == 0)
             return Array.Empty<OrganisationRecentPatientReadModel>();
 
-        var screeningIdSet = recentRows.Select(r => r.Screening.Id).ToHashSet();
+        var screeningIdSet = topPatients
+            .Where(x => x.LatestScreeningId.HasValue)
+            .Select(x => x.LatestScreeningId!.Value)
+            .ToHashSet();
+
+        var screeningById = screeningIdSet.Count == 0
+            ? new Dictionary<Guid, AiScreening>()
+            : await _context.Set<AiScreening>()
+                .AsNoTracking()
+                .Where(s => screeningIdSet.Contains(s.Id))
+                .ToDictionaryAsync(s => s.Id, cancellationToken);
+
+        var latestResults = screeningIdSet.Count == 0
+            ? new List<ScreeningResult>()
+            : await _context.Set<ScreeningResult>()
+                .AsNoTracking()
+                .Where(r => screeningIdSet.Contains(r.AiScreeningId))
+                .OrderByDescending(r => r.CreatedAt)
+                .ToListAsync(cancellationToken);
+
+        var resultByScreeningId = latestResults
+            .GroupBy(r => r.AiScreeningId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var latestDiagnoses = screeningIdSet.Count == 0
+            ? new List<MedicalDiagnosis>()
+            : await _context.Set<MedicalDiagnosis>()
+                .AsNoTracking()
+                .Where(d => screeningIdSet.Contains(d.AiScreeningId))
+                .OrderByDescending(d => d.CreatedAt)
+                .ToListAsync(cancellationToken);
+
+        var diagByScreeningId = latestDiagnoses
+            .GroupBy(d => d.AiScreeningId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var list = new List<OrganisationRecentPatientReadModel>(topPatients.Count);
+
+        foreach (var row in topPatients)
+        {
+            var p = row.Patient;
+            var u = row.PatientUser; // null for walk-in patients
+            AiScreening? scr = null;
+
+            if (row.LatestScreeningId is Guid screeningId)
+            {
+                screeningById.TryGetValue(screeningId, out scr);
+            }
+
+            ScreeningResult? latest = null;
+            MedicalDiagnosis? diag = null;
+
+            if (scr != null)
+            {
+                resultByScreeningId.TryGetValue(scr.Id, out latest);
+                diagByScreeningId.TryGetValue(scr.Id, out diag);
+            }
+
+            var status = scr == null ? "pending-review" : MapStatus(diag);
+            var priority = scr == null ? "low" : MapPriority(latest?.RiskLevel, diag);
+
+            // Resolve display fields: walk-in → Patient entity, registered → ApplicationUser
+            string name;
+            int age;
+            string gender;
+            DateTime? dateOfBirth;
+            string? citizenId;
+            string? address;
+            string email;
+            string phoneNumber;
+            DateTime fallbackDate;
+
+            if (p.IsWalkIn)
+            {
+                name = !string.IsNullOrWhiteSpace(p.FullName) ? p.FullName : "Patient";
+                age = ComputeAge(p.DateOfBirth);
+                gender = MapGenderFromId(p.GenderId);
+                dateOfBirth = p.DateOfBirth;
+                citizenId = p.CitizenId;
+                address = p.Address;
+                email = string.Empty;
+                phoneNumber = p.PhoneNumber ?? string.Empty;
+                fallbackDate = p.CreatedAt;
+            }
+            else
+            {
+                name = !string.IsNullOrWhiteSpace(u?.FullName) ? u.FullName : (u?.Email ?? "Patient");
+                age = ComputeAge(u?.DateOfBirth);
+                gender = MapGender(u?.Gender);
+                dateOfBirth = u?.DateOfBirth;
+                citizenId = u?.CitizenId;
+                address = u?.Address;
+                email = u?.Email ?? string.Empty;
+                phoneNumber = u?.PhoneNumber ?? string.Empty;
+                fallbackDate = u?.CreatedAt ?? p.CreatedAt;
+            }
+
+            list.Add(new OrganisationRecentPatientReadModel
+            {
+                Id = p.Id.ToString(),
+                Name = name,
+                Age = age,
+                Gender = gender,
+                DateOfBirth = dateOfBirth,
+                CitizenId = citizenId,
+                Address = address,
+                Email = email,
+                PhoneNumber = phoneNumber,
+                IsWalkIn = p.IsWalkIn,
+                Bmi = p.BMI,
+                DiseaseHistory = p.DiseaseHistory,
+                LastScreening = scr?.CreatedAt ?? fallbackDate,
+                AiPrediction = scr != null ? (TryGetPrimaryClassName(scr.RawJsonOutput) ?? "AI prediction") : "No screening yet",
+                Confidence = latest?.ConfidenceScore ?? 0,
+                Status = status,
+                Priority = priority
+            });
+        }
+
+        return list;
+    }
+
+    public async Task<IReadOnlyList<OrganisationScreeningHistoryReadModel>> GetScreeningHistoryForOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        var appUser = await _context.Set<ApplicationUser>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == orgAdminUserId, cancellationToken);
+
+        if (appUser?.OrganizationId is null)
+            return Array.Empty<OrganisationScreeningHistoryReadModel>();
+
+        var organisationId = appUser.OrganizationId.Value;
+        take = Math.Clamp(take, 1, 100);
+
+        var managedPatientIds = _context.Set<OrganisationPatientLink>()
+            .AsNoTracking()
+            .Where(link => link.OrganisationId == organisationId && !link.IsDeleted)
+            .Select(link => link.PatientId)
+            .Distinct();
+
+        var organisationScreeningIds = _context.Set<ConsultationSession>()
+            .AsNoTracking()
+            .Where(cs => cs.OrganisationId == organisationId && cs.AiScreeningId != null && !cs.IsDeleted)
+            .Select(cs => cs.AiScreeningId!.Value)
+            .Distinct();
+
+        var organisationCreatorIds = _context.Set<ApplicationUser>()
+            .AsNoTracking()
+            .Where(u => u.OrganizationId == organisationId && !u.IsDeleted)
+            .Select(u => u.Id.ToString());
+
+        // LEFT JOIN on ApplicationUser to include walk-in patients
+        var screenings = await (
+            from scr in _context.Set<AiScreening>().AsNoTracking()
+            join p in _context.Set<Patient>().AsNoTracking() on scr.PatientId equals p.Id
+            join u in _context.Set<ApplicationUser>().AsNoTracking()
+                on p.UserId equals u.Id into userGroup
+            from u in userGroup.DefaultIfEmpty()
+            where managedPatientIds.Contains(p.Id) && !scr.IsDeleted && !p.IsDeleted
+                  && (
+                      scr.OrganisationId == organisationId
+                      || organisationScreeningIds.Contains(scr.Id)
+                      || (
+                          scr.OrganisationId == null
+                          && !string.IsNullOrWhiteSpace(scr.CreatedBy)
+                          && organisationCreatorIds.Contains(scr.CreatedBy)
+                      )
+                  )
+                  && (u == null || !u.IsDeleted)
+            orderby scr.CreatedAt descending
+            select new
+            {
+                scr.Id,
+                scr.PatientId,
+                PatientName = p.UserId == null
+                    ? (p.FullName ?? "Patient")
+                    : (string.IsNullOrWhiteSpace(u!.FullName)
+                        ? (u.Email ?? "Patient")
+                        : u.FullName),
+                scr.CreatedAt,
+                scr.ProcessedAt,
+                ImagesCount = scr.RetinalImages.Count,
+                scr.RawJsonOutput
+            }
+        )
+        .Take(take)
+        .ToListAsync(cancellationToken);
+
+        if (screenings.Count == 0)
+            return Array.Empty<OrganisationScreeningHistoryReadModel>();
+
+        var screeningIdSet = screenings.Select(s => s.Id).ToHashSet();
 
         var latestResults = await _context.Set<ScreeningResult>()
             .AsNoTracking()
@@ -70,38 +292,323 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
             .OrderByDescending(d => d.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        var diagByScreeningId = latestDiagnoses
+        var diagnosisByScreeningId = latestDiagnoses
             .GroupBy(d => d.AiScreeningId)
             .ToDictionary(g => g.Key, g => g.First());
 
-        var list = new List<OrganisationRecentPatientReadModel>(recentRows.Count);
+        var history = new List<OrganisationScreeningHistoryReadModel>(screenings.Count);
 
-        foreach (var row in recentRows)
+        foreach (var item in screenings)
         {
-            var scr = row.Screening;
-            var u = row.PatientUser;
+            resultByScreeningId.TryGetValue(item.Id, out var latestResult);
+            diagnosisByScreeningId.TryGetValue(item.Id, out var latestDiagnosis);
 
-            resultByScreeningId.TryGetValue(scr.Id, out var latest);
-            diagByScreeningId.TryGetValue(scr.Id, out var diag);
-
-            var status = MapStatus(diag);
-            var priority = MapPriority(latest?.RiskLevel, diag);
-
-            list.Add(new OrganisationRecentPatientReadModel
+            history.Add(new OrganisationScreeningHistoryReadModel
             {
-                Id = scr.PatientId.ToString(),
-                Name = string.IsNullOrWhiteSpace(u.FullName) ? (u.Email ?? "Patient") : u.FullName,
-                Age = ComputeAge(u.DateOfBirth),
-                Gender = MapGender(u.Gender),
-                LastScreening = scr.CreatedAt,
-                AiPrediction = TryGetPrimaryClassName(scr.RawJsonOutput) ?? "AI prediction",
-                Confidence = latest?.ConfidenceScore ?? 0,
-                Status = status,
-                Priority = priority
+                ScreeningId = item.Id,
+                PatientId = item.PatientId,
+                PatientName = item.PatientName,
+                CreatedAt = item.CreatedAt,
+                ProcessedAt = item.ProcessedAt,
+                ImagesCount = item.ImagesCount,
+                LatestRiskLevel = latestResult?.RiskLevel.ToString(),
+                ConfidenceScore = latestResult?.ConfidenceScore,
+                AiPrimaryLabel = TryGetPrimaryClassName(item.RawJsonOutput),
+                Status = MapScreeningStatus(latestResult, latestDiagnosis)
             });
         }
 
-        return list;
+        return history;
+    }
+
+    public async Task<OrganisationScreeningCountsReadModel> GetScreeningCountsForOrganisationAsync(
+        Guid organisationId,
+        DateTime fromUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var organisationScreeningIds = _context.Set<ConsultationSession>()
+            .AsNoTracking()
+            .Where(cs => cs.OrganisationId == organisationId && cs.AiScreeningId != null)
+            .Select(cs => cs.AiScreeningId!.Value)
+            .Distinct();
+
+        var screeningsQuery = _context.Set<AiScreening>()
+            .AsNoTracking()
+            .Where(scr => organisationScreeningIds.Contains(scr.Id));
+
+        // Execute sequentially because EF Core DbContext does not support parallel operations.
+        var allTimeCount = await screeningsQuery.CountAsync(cancellationToken);
+        var fromDateCount = await screeningsQuery
+            .CountAsync(scr => scr.CreatedAt >= fromUtc, cancellationToken);
+
+        return new OrganisationScreeningCountsReadModel
+        {
+            TotalScreeningsAllTime = allTimeCount,
+            TotalScreeningsFromDate = fromDateCount
+        };
+    }
+
+    public async Task<OrganisationScreeningReportReadModel> GetScreeningReportForOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var appUser = await _context.Set<ApplicationUser>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == orgAdminUserId, cancellationToken);
+
+        if (appUser?.OrganizationId is null)
+            return new OrganisationScreeningReportReadModel();
+
+        var organisationId = appUser.OrganizationId.Value;
+
+        var managedPatientIds = _context.Set<OrganisationPatientLink>()
+            .AsNoTracking()
+            .Where(link => link.OrganisationId == organisationId && !link.IsDeleted)
+            .Select(link => link.PatientId)
+            .Distinct();
+
+        // No need to join ApplicationUser here — we only need screening stats, not patient names
+        var screeningEvents =
+            from scr in _context.Set<AiScreening>().AsNoTracking()
+            join p in _context.Set<Patient>().AsNoTracking() on scr.PatientId equals p.Id
+            where managedPatientIds.Contains(p.Id) && !p.IsDeleted && !scr.IsDeleted
+            select new
+            {
+                scr.CreatedAt,
+                LatestRiskLevel = _context.Set<ScreeningResult>()
+                    .AsNoTracking()
+                    .Where(r => r.AiScreeningId == scr.Id)
+                    .OrderByDescending(r => r.CreatedAt)
+                    .Select(r => (Domain.Enums.RiskLevel?)r.RiskLevel)
+                    .FirstOrDefault(),
+                LatestConfidence = _context.Set<ScreeningResult>()
+                    .AsNoTracking()
+                    .Where(r => r.AiScreeningId == scr.Id)
+                    .OrderByDescending(r => r.CreatedAt)
+                    .Select(r => (decimal?)r.ConfidenceScore)
+                    .FirstOrDefault(),
+                IsReferralNeeded = _context.Set<MedicalDiagnosis>()
+                    .AsNoTracking()
+                    .Where(d => d.AiScreeningId == scr.Id)
+                    .OrderByDescending(d => d.CreatedAt)
+                    .Select(d => (bool?)d.IsReferralNeeded)
+                    .FirstOrDefault() ?? false
+            };
+
+        var totals = await screeningEvents
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                HighRisk = g.Count(x =>
+                    x.IsReferralNeeded
+                    || x.LatestRiskLevel == Domain.Enums.RiskLevel.Critical
+                    || x.LatestRiskLevel == Domain.Enums.RiskLevel.High),
+                ModerateRisk = g.Count(x =>
+                    !x.IsReferralNeeded
+                    && x.LatestRiskLevel == Domain.Enums.RiskLevel.Moderate),
+                AverageConfidence = g.Average(x => x.LatestConfidence ?? 0m)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (totals is null)
+            return new OrganisationScreeningReportReadModel();
+
+        var monthlyRows = await screeningEvents
+            .GroupBy(x => new { x.CreatedAt.Year, x.CreatedAt.Month })
+            .Select(g => new
+            {
+                g.Key.Year,
+                g.Key.Month,
+                Count = g.Count(),
+                HighRisk = g.Count(x =>
+                    x.IsReferralNeeded
+                    || x.LatestRiskLevel == Domain.Enums.RiskLevel.Critical
+                    || x.LatestRiskLevel == Domain.Enums.RiskLevel.High),
+                ModerateRisk = g.Count(x =>
+                    !x.IsReferralNeeded
+                    && x.LatestRiskLevel == Domain.Enums.RiskLevel.Moderate)
+            })
+            .OrderByDescending(x => x.Year)
+            .ThenByDescending(x => x.Month)
+            .Take(6)
+            .ToListAsync(cancellationToken);
+
+        var monthly = monthlyRows
+            .Select(x => new OrganisationMonthlyScreeningCountReadModel
+            {
+                Month = $"{x.Year:D4}-{x.Month:D2}",
+                Count = x.Count,
+                HighRisk = x.HighRisk,
+                ModerateRisk = x.ModerateRisk,
+                LowRisk = x.Count - x.HighRisk - x.ModerateRisk
+            })
+            .OrderBy(x => x.Month)
+            .ToList();
+
+        return new OrganisationScreeningReportReadModel
+        {
+            TotalScreenings = totals.Total,
+            HighRiskCount = totals.HighRisk,
+            ModerateRiskCount = totals.ModerateRisk,
+            LowRiskCount = totals.Total - totals.HighRisk - totals.ModerateRisk,
+            AverageConfidence = totals.AverageConfidence,
+            MonthlyBreakdown = monthly
+        };
+    }
+
+    public async Task<bool> IsPatientManagedByOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        Guid patientId,
+        CancellationToken cancellationToken = default)
+    {
+        var organisationId = await _context.Set<ApplicationUser>()
+            .AsNoTracking()
+            .Where(u => u.Id == orgAdminUserId && !u.IsDeleted)
+            .Select(u => u.OrganizationId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!organisationId.HasValue)
+            return false;
+
+        return await _context.Set<OrganisationPatientLink>()
+            .AsNoTracking()
+            .AnyAsync(
+                link => link.OrganisationId == organisationId.Value
+                        && link.PatientId == patientId
+                        && !link.IsDeleted,
+                cancellationToken);
+    }
+
+    public async Task<bool> IsScreeningManagedByOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        Guid screeningId,
+        CancellationToken cancellationToken = default)
+    {
+        var organisationId = await _context.Set<ApplicationUser>()
+            .AsNoTracking()
+            .Where(u => u.Id == orgAdminUserId && !u.IsDeleted)
+            .Select(u => u.OrganizationId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!organisationId.HasValue)
+            return false;
+
+        var organisationIdValue = organisationId.Value;
+
+        var linkedByOrganisationSession = await _context.Set<ConsultationSession>()
+            .AsNoTracking()
+            .AnyAsync(
+                session => session.OrganisationId == organisationIdValue
+                           && session.AiScreeningId == screeningId
+                           && !session.IsDeleted,
+                cancellationToken);
+
+        if (linkedByOrganisationSession)
+            return true;
+
+        var screening = await _context.Set<AiScreening>()
+            .AsNoTracking()
+            .Where(s => s.Id == screeningId && !s.IsDeleted)
+            .Select(s => new { s.OrganisationId, s.CreatedBy })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (screening is null)
+            return false;
+
+        if (screening.OrganisationId == organisationIdValue)
+            return true;
+
+        if (screening.OrganisationId is not null)
+            return false;
+
+        if (string.IsNullOrWhiteSpace(screening.CreatedBy))
+            return false;
+
+        return await _context.Set<ApplicationUser>()
+            .AsNoTracking()
+            .AnyAsync(
+                user => user.OrganizationId == organisationIdValue
+                        && !user.IsDeleted
+                        && user.Id.ToString() == screening.CreatedBy,
+                cancellationToken);
+    }
+
+    public async Task<string?> GetPatientDisplayNameForOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        Guid patientId,
+        CancellationToken cancellationToken = default)
+    {
+        var organisationId = await _context.Set<ApplicationUser>()
+            .AsNoTracking()
+            .Where(u => u.Id == orgAdminUserId && !u.IsDeleted)
+            .Select(u => u.OrganizationId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!organisationId.HasValue)
+            return null;
+
+        // First try: check if the patient is linked to this organisation
+        var isLinked = await _context.Set<OrganisationPatientLink>()
+            .AsNoTracking()
+            .AnyAsync(
+                link => link.OrganisationId == organisationId.Value
+                        && link.PatientId == patientId
+                        && !link.IsDeleted,
+                cancellationToken);
+
+        if (!isLinked)
+            return null;
+
+        var patient = await _context.Set<Patient>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == patientId && !p.IsDeleted, cancellationToken);
+
+        if (patient is null)
+            return null;
+
+        // Walk-in → use Patient.FullName
+        if (patient.IsWalkIn)
+        {
+            return !string.IsNullOrWhiteSpace(patient.FullName)
+                ? patient.FullName
+                : "Patient";
+        }
+
+        // Registered → lookup from ApplicationUser
+        if (!patient.UserId.HasValue)
+            return "Patient";
+
+        var user = await _context.Set<ApplicationUser>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == patient.UserId.Value && !u.IsDeleted, cancellationToken);
+
+        if (user is null)
+            return "Patient";
+
+        return !string.IsNullOrWhiteSpace(user.FullName)
+            ? user.FullName
+            : (user.Email ?? "Patient");
+    }
+
+    public async Task<string?> GetOrganisationNameForOrganisationAdminAsync(
+        Guid orgAdminUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var organisationId = await _context.Set<ApplicationUser>()
+            .AsNoTracking()
+            .Where(u => u.Id == orgAdminUserId && !u.IsDeleted)
+            .Select(u => u.OrganizationId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!organisationId.HasValue)
+            return null;
+
+        return await _context.Set<Organisation>()
+            .AsNoTracking()
+            .Where(o => o.Id == organisationId.Value && !o.IsDeleted)
+            .Select(o => o.Name)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private static int ComputeAge(DateTime? dob)
@@ -124,6 +631,16 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         };
     }
 
+    private static string MapGenderFromId(int? genderId)
+    {
+        return genderId switch
+        {
+            1 => "M",
+            2 => "F",
+            _ => string.Empty
+        };
+    }
+
     private static string MapStatus(MedicalDiagnosis? d)
     {
         if (d is null)
@@ -136,6 +653,17 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
             return "archived";
 
         return "reviewed";
+    }
+
+    private static string MapScreeningStatus(ScreeningResult? result, MedicalDiagnosis? diagnosis)
+    {
+        if (diagnosis?.ConfirmedAt.HasValue == true || diagnosis?.IsReferralNeeded == true)
+            return "completed";
+
+        if (result is not null)
+            return "saved";
+
+        return "pending";
     }
 
     private static string MapPriority(Domain.Enums.RiskLevel? risk, MedicalDiagnosis? d)

@@ -22,6 +22,9 @@ public class ContractConfiguration : IEntityTypeConfiguration<Contract>
         builder.Property(e => e.AiQuotaLimit)
             .HasDefaultValue(0);
 
+        builder.Property(e => e.MonthlyQuotaLimit)
+            .HasDefaultValue(0);
+
         builder.Property(e => e.PlatformCommissionRate)
             .HasPrecision(5, 4)
             .HasDefaultValue(0m);

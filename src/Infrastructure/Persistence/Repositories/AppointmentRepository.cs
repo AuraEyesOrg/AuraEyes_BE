@@ -32,6 +32,7 @@ public class AppointmentRepository : Repository<Appointment>, IAppointmentReposi
             .Include(a => a.Patient)
             .Include(a => a.AppointmentSlot)
             .Include(a => a.Doctor)
+            .Include(a => a.Organisation)
             .Where(a => a.OrganisationId == organisationId);
 
         if (status.HasValue)
@@ -165,6 +166,7 @@ public class AppointmentRepository : Repository<Appointment>, IAppointmentReposi
             .Include(a => a.Patient)
             .Include(a => a.AppointmentSlot)
             .Include(a => a.Doctor)
+            .Include(a => a.Organisation)
             .Where(a => a.OrganisationId == organisationId)
             .Where(a => a.AppointmentSlot != null && a.AppointmentSlot.Date == date)
             .Where(a => a.Status != AppointmentStatus.Cancelled)

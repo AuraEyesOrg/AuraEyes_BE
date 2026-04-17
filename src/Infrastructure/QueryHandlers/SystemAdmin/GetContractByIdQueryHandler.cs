@@ -34,6 +34,9 @@ public class GetContractByIdQueryHandler : IQueryHandler<GetContractByIdQuery, C
             return Result<ContractDetailDto>.NotFound($"Contract {request.Id} not found.");
 
         var user = await _userManager.FindByIdAsync(contract.UserId.ToString());
+        var ophthalmologist = await _context.Ophthalmologists
+            .AsNoTracking()
+            .FirstOrDefaultAsync(o => o.UserId == contract.UserId, cancellationToken);
 
         var dto = new ContractDetailDto
         {
@@ -47,7 +50,10 @@ public class GetContractByIdQueryHandler : IQueryHandler<GetContractByIdQuery, C
             UserFullName = user?.FullName ?? string.Empty,
             UserEmail = user?.Email ?? string.Empty,
             AiQuotaLimit = contract.AiQuotaLimit,
+            MonthlyQuotaLimit = contract.MonthlyQuotaLimit,
             PlatformCommissionRate = contract.PlatformCommissionRate,
+            CommissionRate = ophthalmologist?.CommissionRate,
+            ActualMonthlySalary = ophthalmologist?.ActualMonthlySalary,
             SignedDate = contract.SignedDate,
             ScannedDocumentUrl = contract.ScannedDocumentUrl,
             SignedContent = contract.SignedContent,

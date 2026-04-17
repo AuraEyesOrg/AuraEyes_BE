@@ -2,10 +2,10 @@ using Application.Common.Constants;
 using Application.Common.Models;
 using Application.Common.Interfaces;
 using Application.SystemAdmin.Organisations.Common;
+using Application.SystemAdmin.Organisations.Commands.UpdateMonthlyQuota;
+using Application.SystemAdmin.Organisations.Queries.GetOrganisationById;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisationMetrics;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisations;
-using Domain.Common;
-using Domain.Entities.Users;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,18 +22,15 @@ namespace API.Controllers.SystemAdmin;
 public class OrganisationsController : BaseApiController
 {
     private readonly IMediator _mediator;
-    private readonly IRepository<Organisation> _organisationRepository;
     private readonly IOrganisationOnboardingService _organisationOnboardingService;
     private readonly ICurrentUserService _currentUserService;
 
     public OrganisationsController(
         IMediator mediator,
-        IRepository<Organisation> organisationRepository,
         IOrganisationOnboardingService organisationOnboardingService,
         ICurrentUserService currentUserService)
     {
         _mediator = mediator;
-        _organisationRepository = organisationRepository;
         _organisationOnboardingService = organisationOnboardingService;
         _currentUserService = currentUserService;
     }
@@ -92,25 +89,29 @@ public class OrganisationsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetOrganisation(Guid id)
     {
-        var org = await _organisationRepository.GetByIdAsync(id);
-        if (org == null)
-        {
-            return NotFound(ApiResponseFactory.NotFound("Organisation not found"));
-        }
+        var result = await _mediator.Send(new GetOrganisationByIdQuery(id));
+        return HandleResult(result);
+    }
 
-        var dto = new OrganisationListDto
+    /// <summary>
+    /// Update monthly quota limit for an organisation.
+    /// </summary>
+    [HttpPut("{id:guid}/monthly-quota")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateMonthlyQuota(
+        Guid id,
+        [FromBody] UpdateOrganisationMonthlyQuotaRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new UpdateOrganisationMonthlyQuotaCommand
         {
-            Id = org.Id,
-            Name = org.Name,
-            Address = org.Address,
-            LicenseNumber = org.LicenseNumber,
-            OrgType = org.OrgType.ToString(),
-            DeviceCount = 0,
-            IsActive = !org.IsDeleted,
-            CreatedAt = org.CreatedAt
-        };
+            OrganisationId = id,
+            MonthlyQuotaLimit = request.MonthlyQuotaLimit,
+        }, cancellationToken);
 
-        return Ok(ApiResponseFactory.Success(dto));
+        return HandleResult(result, "Organisation monthly quota updated successfully.");
     }
 
     [HttpGet("onboarding-requests")]
@@ -137,3 +138,5 @@ public class OrganisationsController : BaseApiController
         return HandleResult(result, "Organisation onboarding request approved successfully.");
     }
 }
+
+public record UpdateOrganisationMonthlyQuotaRequest(int MonthlyQuotaLimit);

@@ -3,6 +3,7 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Common.Models.Auth;
+using Application.Scheduling.ScheduleTemplates.Interfaces;
 using Domain.Common;
 using Domain.Entities.Users;
 using Domain.Enums;
@@ -24,6 +25,9 @@ namespace Infrastructure.Identity;
 /// </summary>
 public class AuthService : IAuthService
 {
+    private const string GoogleLoginProvider = "Google";
+    private const string ProviderAvatarClaimType = "provider_avatar_url";
+
     private readonly IIdentityService _identityService;
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenService _refreshTokenService;
@@ -34,8 +38,10 @@ public class AuthService : IAuthService
     private readonly IRepository<Patient> _patientRepository;
     private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
     private readonly IContractRepository _contractRepository;
+    private readonly IFullTimeTemplateProvisioningService _fullTimeTemplateProvisioningService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly GoogleAuthSettings _googleAuthSettings;
     private readonly ILogger<AuthService> _logger;
 
@@ -50,8 +56,10 @@ public class AuthService : IAuthService
         IRepository<Patient> patientRepository,
         IRepository<Ophthalmologist> ophthalmologistRepository,
         IContractRepository contractRepository,
+        IFullTimeTemplateProvisioningService fullTimeTemplateProvisioningService,
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager,
+        SignInManager<ApplicationUser> signInManager,
         IOptions<GoogleAuthSettings> googleAuthSettings,
         ILogger<AuthService> logger)
     {
@@ -65,8 +73,10 @@ public class AuthService : IAuthService
         _patientRepository = patientRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _contractRepository = contractRepository;
+        _fullTimeTemplateProvisioningService = fullTimeTemplateProvisioningService;
         _unitOfWork = unitOfWork;
         _userManager = userManager;
+        _signInManager = signInManager;
         _googleAuthSettings = googleAuthSettings.Value;
         _logger = logger;
     }
@@ -168,14 +178,58 @@ public class AuthService : IAuthService
 
         try
         {
-            if (request.Degrees.Count == 0)
+            var normalizedCredentials = NormalizeCredentials(request);
+
+            if (normalizedCredentials.Count == 0)
+            {
+                return Result<RegisterResponse>.Failure("At least one credential is required");
+            }
+
+            if (!normalizedCredentials.Any(c => c.Type == CertificateType.Degree))
             {
                 return Result<RegisterResponse>.Failure("At least one degree is required");
             }
 
-            if (request.Certificates.Count == 0)
+            if (!normalizedCredentials.Any(c => c.Type == CertificateType.License))
             {
-                return Result<RegisterResponse>.Failure("At least one certificate is required");
+                return Result<RegisterResponse>.Failure("At least one license/certificate is required");
+            }
+
+            foreach (var certificate in normalizedCredentials)
+            {
+                if (certificate.File is null || certificate.File.Length == 0)
+                {
+                    return Result<RegisterResponse>.Failure("Credential file is required");
+                }
+
+                var issuedDateUtc = EnsureUtc(certificate.IssuedDate);
+                var expiryDateUtc = EnsureUtc(certificate.ExpiryDate);
+
+                if (certificate.Type == CertificateType.Degree)
+                {
+                    if (!certificate.DegreeLevel.HasValue)
+                    {
+                        return Result<RegisterResponse>.Failure("Degree level is required for degree credentials");
+                    }
+
+                    if (expiryDateUtc.HasValue)
+                    {
+                        return Result<RegisterResponse>.Failure("Expiry date must be empty for degree credentials");
+                    }
+                }
+
+                if (certificate.Type == CertificateType.License)
+                {
+                    if (!expiryDateUtc.HasValue)
+                    {
+                        return Result<RegisterResponse>.Failure("Expiry date is required for license credentials");
+                    }
+
+                    if (expiryDateUtc.Value <= issuedDateUtc)
+                    {
+                        return Result<RegisterResponse>.Failure("Certificate expiry date must be later than issued date");
+                    }
+                }
             }
 
             var existingUser = await _identityService.GetUserByEmailAsync(request.Email, cancellationToken);
@@ -215,59 +269,43 @@ public class AuthService : IAuthService
                 request.WorkingHoursPerWeek,
                 request.ExpectedMonthlySalary);
 
-            foreach (var degree in request.Degrees)
+            foreach (var certificate in normalizedCredentials)
             {
-                if (degree.File is null || degree.File.Length == 0)
+                var file = certificate.File;
+                if (file is null || file.Length == 0)
                 {
-                    return Result<RegisterResponse>.Failure("Degree file is required");
+                    return Result<RegisterResponse>.Failure("Credential file is required");
                 }
 
-                await using var stream = degree.File.OpenReadStream();
+                await using var stream = file.OpenReadStream();
                 var uploadedUrl = await _fileStorageService.SaveFileAsync(
                     stream,
-                    degree.File.FileName,
-                    $"credentials/{user.Id}",
+                    file.FileName,
+                    $"ophthalmologists/credentials/{user.Id}",
                     cancellationToken);
 
                 uploadedFileUrls.Add(uploadedUrl);
 
-                degreeUrl ??= uploadedUrl;
-
-                ophthalmologist.AddCertificate(new Certificate(
-                    ophthalmologist.Id,
-                    CertificateType.Degree,
-                    degree.Name,
-                    degree.IssuingAuthority,
-                    degree.IssuedDate,
-                    degree.ExpiryDate,
-                    uploadedUrl));
-            }
-
-            foreach (var certificate in request.Certificates)
-            {
-                if (certificate.File is null || certificate.File.Length == 0)
+                if (certificate.Type == CertificateType.Degree)
                 {
-                    return Result<RegisterResponse>.Failure("Certificate file is required");
+                    degreeUrl ??= uploadedUrl;
+                }
+                else if (certificate.Type == CertificateType.License)
+                {
+                    licenseUrl ??= uploadedUrl;
                 }
 
-                await using var stream = certificate.File.OpenReadStream();
-                var uploadedUrl = await _fileStorageService.SaveFileAsync(
-                    stream,
-                    certificate.File.FileName,
-                    $"credentials/{user.Id}",
-                    cancellationToken);
-
-                uploadedFileUrls.Add(uploadedUrl);
-
-                licenseUrl ??= uploadedUrl;
+                var certificateIssuedDateUtc = EnsureUtc(certificate.IssuedDate);
+                var certificateExpiryDateUtc = EnsureUtc(certificate.ExpiryDate);
 
                 ophthalmologist.AddCertificate(new Certificate(
                     ophthalmologist.Id,
-                    CertificateType.License,
+                    certificate.Type,
                     certificate.Name,
+                    certificate.DegreeLevel,
                     certificate.IssuingAuthority,
-                    certificate.IssuedDate,
-                    certificate.ExpiryDate,
+                    certificateIssuedDateUtc,
+                    certificateExpiryDateUtc,
                     uploadedUrl));
             }
 
@@ -275,6 +313,17 @@ public class AuthService : IAuthService
 
             await _ophthalmologistRepository.AddAsync(ophthalmologist, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            if (ophthalmologist.EmploymentType == OphthalmologistEmploymentType.FullTime)
+            {
+                var createdTemplates = await _fullTimeTemplateProvisioningService
+                    .EnsureSystemGeneratedTemplatesAsync(ophthalmologist, cancellationToken);
+
+                _logger.LogInformation(
+                    "Provisioned {CreatedTemplates} system templates for newly registered full-time ophthalmologist {OphthalmologistId}",
+                    createdTemplates,
+                    ophthalmologist.Id);
+            }
 
             // All DB operations succeeded — commit transaction
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
@@ -364,6 +413,77 @@ public class AuthService : IAuthService
         }
     }
 
+    private static List<CredentialItemDto> NormalizeCredentials(RegisterOphthalmologistRequest request)
+    {
+        if (request.Degrees.Count > 0)
+        {
+            var merged = new List<CredentialItemDto>(request.Degrees.Count + request.Certificates.Count);
+
+            merged.AddRange(request.Degrees.Select(d => new CredentialItemDto
+            {
+                Type = CertificateType.Degree,
+                DegreeLevel = d.DegreeLevel,
+                Name = d.Name,
+                IssuingAuthority = d.IssuingAuthority,
+                IssuedDate = d.IssuedDate,
+                ExpiryDate = null,
+                File = d.File
+            }));
+
+            merged.AddRange(request.Certificates.Select(c => new CredentialItemDto
+            {
+                Type = CertificateType.License,
+                DegreeLevel = null,
+                Name = c.Name,
+                IssuingAuthority = c.IssuingAuthority,
+                IssuedDate = c.IssuedDate,
+                ExpiryDate = c.ExpiryDate,
+                File = c.File
+            }));
+
+            return merged;
+        }
+
+        // Fallback for partially-updated FE clients that send licenses without type.
+        return request.Certificates
+            .Select(c =>
+            {
+                var type = c.Type;
+                if (type == CertificateType.Degree && !c.DegreeLevel.HasValue && c.ExpiryDate.HasValue)
+                {
+                    type = CertificateType.License;
+                }
+
+                return new CredentialItemDto
+                {
+                    Type = type,
+                    DegreeLevel = type == CertificateType.Degree ? c.DegreeLevel : null,
+                    Name = c.Name,
+                    IssuingAuthority = c.IssuingAuthority,
+                    IssuedDate = c.IssuedDate,
+                    ExpiryDate = type == CertificateType.Degree ? null : c.ExpiryDate,
+                    File = c.File
+                };
+            })
+            .ToList();
+    }
+
+    private static DateTime EnsureUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            DateTimeKind.Unspecified => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
+    }
+
+    private static DateTime? EnsureUtc(DateTime? value)
+    {
+        return value.HasValue ? EnsureUtc(value.Value) : null;
+    }
+
     public Task<Result<OrganisationRegistrationResponse>> RegisterOrganisationAsync(
         RegisterOrganisationRequest request,
         CancellationToken cancellationToken = default)
@@ -398,7 +518,9 @@ public class AuthService : IAuthService
                 return Result<LoginResponse>.Failure("Google account does not have an email address");
             }
 
-            var user = await _userManager.FindByEmailAsync(payload.Email);
+            var normalizedEmail = payload.Email.Trim();
+            var user = await _userManager.FindByEmailAsync(normalizedEmail)
+                ?? await _userManager.FindByLoginAsync(GoogleLoginProvider, payload.Subject);
 
             if (user != null)
             {
@@ -420,6 +542,24 @@ public class AuthService : IAuthService
                     await _userManager.UpdateAsync(user);
                 }
 
+                var linkResult = await LinkGoogleLoginAsync(user, payload.Subject);
+                if (!linkResult.IsSuccess)
+                {
+                    return Result<LoginResponse>.Failure(
+                        string.IsNullOrWhiteSpace(linkResult.ErrorMessage)
+                            ? "Unable to link Google account"
+                            : linkResult.ErrorMessage);
+                }
+
+                var providerAvatarResult = await UpsertProviderAvatarClaimAsync(user, payload.Picture);
+                if (!providerAvatarResult.IsSuccess)
+                {
+                    _logger.LogWarning(
+                        "Failed to update provider avatar claim for user {UserId}: {Error}",
+                        user.Id,
+                        providerAvatarResult.ErrorMessage);
+                }
+
                 // Check if 2FA is enabled
                 if (await _userManager.GetTwoFactorEnabledAsync(user))
                 {
@@ -436,10 +576,10 @@ public class AuthService : IAuthService
 
             var newUser = new ApplicationUser
             {
-                UserName = payload.Email,
-                Email = payload.Email,
-                FullName = payload.Name ?? payload.Email,
-                AvatarUrl = payload.Picture,
+                UserName = normalizedEmail,
+                Email = normalizedEmail,
+                FullName = payload.Name ?? normalizedEmail,
+                AvatarUrl = null,
                 EmailConfirmed = true // Google already verified the email
             };
 
@@ -451,8 +591,25 @@ public class AuthService : IAuthService
             }
 
             // Add Google login provider info
-            var loginInfo = new UserLoginInfo("Google", payload.Subject, "Google");
-            await _userManager.AddLoginAsync(newUser, loginInfo);
+            var addLoginResult = await LinkGoogleLoginAsync(newUser, payload.Subject);
+            if (!addLoginResult.IsSuccess)
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                return Result<LoginResponse>.Failure(
+                    string.IsNullOrWhiteSpace(addLoginResult.ErrorMessage)
+                        ? "Unable to link Google account"
+                        : addLoginResult.ErrorMessage);
+            }
+
+            var newProviderAvatarResult = await UpsertProviderAvatarClaimAsync(newUser, payload.Picture);
+            if (!newProviderAvatarResult.IsSuccess)
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                return Result<LoginResponse>.Failure(
+                    string.IsNullOrWhiteSpace(newProviderAvatarResult.ErrorMessage)
+                        ? "Unable to persist provider avatar"
+                        : newProviderAvatarResult.ErrorMessage);
+            }
 
             await _identityService.AddToRoleAsync(newUser.Id, Roles.Patient);
 
@@ -496,14 +653,26 @@ public class AuthService : IAuthService
                 return Result<LoginResponse>.Unauthorized("Account is deactivated. Please contact support.");
             }
 
-            if (!await _userManager.CheckPasswordAsync(user, request.Password))
+            if (await _userManager.IsLockedOutAsync(user))
             {
-                return Result<LoginResponse>.Unauthorized("Invalid email or password");
+                return Result<LoginResponse>.Unauthorized("Account is temporarily locked due to multiple failed attempts. Please try again later.");
             }
 
-            if (!user.EmailConfirmed)
+            var signInResult = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
+
+            if (signInResult.IsLockedOut)
+            {
+                return Result<LoginResponse>.Unauthorized("Account is temporarily locked due to multiple failed attempts. Please try again later.");
+            }
+
+            if (signInResult.IsNotAllowed)
             {
                 return Result<LoginResponse>.Unauthorized("Please confirm your email before logging in.");
+            }
+
+            if (!signInResult.Succeeded && !signInResult.RequiresTwoFactor)
+            {
+                return Result<LoginResponse>.Unauthorized("Invalid email or password");
             }
 
             // Check ophthalmologist verification status — reject if credentials were denied
@@ -519,8 +688,8 @@ public class AuthService : IAuthService
                 }
             }
 
-            // Check if 2FA is enabled
-            if (await _userManager.GetTwoFactorEnabledAsync(user))
+            // 2FA may be requested by SignInManager pre-check or enabled at user level.
+            if (signInResult.RequiresTwoFactor || await _userManager.GetTwoFactorEnabledAsync(user))
             {
                 _logger.LogInformation("2FA required for user: {Email}", request.Email);
                 return Result<LoginResponse>.Success(LoginResponse.TwoFactorRequired(user.Id));
@@ -629,6 +798,7 @@ public class AuthService : IAuthService
         bool? isVerified = null;
         string? verificationStatus = null;
         string? contractStatus = null;
+        string? employmentType = null;
 
         if (roles.Contains(Roles.Patient))
         {
@@ -646,6 +816,7 @@ public class AuthService : IAuthService
                 roleId = doctors[0].Id;
                 isVerified = doctors[0].IsVerified;
                 verificationStatus = doctors[0].VerificationStatus.ToString();
+                employmentType = doctors[0].EmploymentType.ToString();
             }
 
             var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
@@ -654,6 +825,9 @@ public class AuthService : IAuthService
                 contractStatus = contract.Status.ToString();
             }
         }
+
+        var providerAvatarUrl = await GetProviderAvatarUrlAsync(user);
+        var uploadedAvatarUrl = user.AvatarUrl;
 
         return new AuthResponse
         {
@@ -666,7 +840,9 @@ public class AuthService : IAuthService
                 Id = user.Id,
                 Email = user.Email!,
                 FullName = user.FullName,
-                AvatarUrl = user.AvatarUrl,
+                AvatarUrl = uploadedAvatarUrl ?? providerAvatarUrl,
+                UploadedAvatarUrl = uploadedAvatarUrl,
+                ProviderAvatarUrl = providerAvatarUrl,
                 Roles = roles.ToArray(),
                 EmailConfirmed = user.EmailConfirmed,
                 OrganizationId = user.OrganizationId,
@@ -674,7 +850,9 @@ public class AuthService : IAuthService
                 TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
-                ContractStatus = contractStatus
+                ContractStatus = contractStatus,
+                MustChangePassword = user.MustChangePassword,
+                EmploymentType = employmentType
             }
         };
     }
@@ -751,6 +929,7 @@ public class AuthService : IAuthService
             bool? isVerified = null;
             string? verificationStatus = null;
             string? contractStatus = null;
+            string? employmentType = null;
 
             if (roles.Contains(Roles.Patient))
             {
@@ -768,6 +947,7 @@ public class AuthService : IAuthService
                     roleId = doctors[0].Id;
                     isVerified = doctors[0].IsVerified;
                     verificationStatus = doctors[0].VerificationStatus.ToString();
+                    employmentType = doctors[0].EmploymentType.ToString();
                 }
 
                 var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
@@ -776,6 +956,9 @@ public class AuthService : IAuthService
                     contractStatus = contract.Status.ToString();
                 }
             }
+
+            var providerAvatarUrl = await GetProviderAvatarUrlAsync(user);
+            var uploadedAvatarUrl = user.AvatarUrl;
 
             return Result<AuthResponse>.Success(new AuthResponse
             {
@@ -788,6 +971,9 @@ public class AuthService : IAuthService
                     Id = user.Id,
                     Email = user.Email!,
                     FullName = user.FullName,
+                    AvatarUrl = uploadedAvatarUrl ?? providerAvatarUrl,
+                    UploadedAvatarUrl = uploadedAvatarUrl,
+                    ProviderAvatarUrl = providerAvatarUrl,
                     Roles = roles.ToArray(),
                     EmailConfirmed = user.EmailConfirmed,
                     OrganizationId = user.OrganizationId,
@@ -795,7 +981,9 @@ public class AuthService : IAuthService
                     TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
                     IsVerified = isVerified,
                     VerificationStatus = verificationStatus,
-                    ContractStatus = contractStatus
+                    ContractStatus = contractStatus,
+                    MustChangePassword = user.MustChangePassword,
+                    EmploymentType = employmentType
                 }
             });
         }
@@ -878,12 +1066,14 @@ public class AuthService : IAuthService
                         "Bác sĩ đã xác thực email",
                         $"Bác sĩ {user.FullName} đã xác thực email. Vui lòng kiểm tra hợp đồng.",
                         NotificationType.SystemAlert,
-                        new
+                        payload: new
                         {
+                            action = "ophthalmologist_email_confirmed",
                             ophthalmologistUserId = user.Id,
                             emailConfirmed = true
                         },
-                        cancellationToken);
+                        cancellationToken: cancellationToken,
+                        referenceId: user.Id);
                 }
             }
 
@@ -975,6 +1165,7 @@ public class AuthService : IAuthService
             }
 
             var userDetails = await _identityService.GetUserDetailsAsync(userId, cancellationToken);
+            var identityUser = await _userManager.FindByIdAsync(userId.ToString());
             var roles = await _identityService.GetUserRolesAsync(userId);
             var twoFactorEnabled = await _identityService.IsTwoFactorEnabledAsync(userId);
 
@@ -983,6 +1174,7 @@ public class AuthService : IAuthService
             bool? isVerified = null;
             string? verificationStatus = null;
             string? contractStatus = null;
+            string? employmentType = null;
 
             if (roles.Contains(Roles.Patient))
             {
@@ -1000,6 +1192,7 @@ public class AuthService : IAuthService
                     roleId = doctors[0].Id;
                     isVerified = doctors[0].IsVerified;
                     verificationStatus = doctors[0].VerificationStatus.ToString();
+                    employmentType = doctors[0].EmploymentType.ToString();
                 }
 
                 var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
@@ -1014,7 +1207,9 @@ public class AuthService : IAuthService
                 Id = userDto.Id,
                 Email = userDto.Email,
                 FullName = userDto.FullName,
-                AvatarUrl = userDetails?.AvatarUrl,
+                AvatarUrl = userDetails?.AvatarUrl ?? await GetProviderAvatarUrlAsync(identityUser),
+                UploadedAvatarUrl = userDetails?.AvatarUrl,
+                ProviderAvatarUrl = await GetProviderAvatarUrlAsync(identityUser),
                 Roles = roles.ToArray(),
                 EmailConfirmed = userDto.EmailConfirmed,
                 OrganizationId = userDto.OrganizationId,
@@ -1022,7 +1217,9 @@ public class AuthService : IAuthService
                 TwoFactorEnabled = twoFactorEnabled,
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
-                ContractStatus = contractStatus
+                ContractStatus = contractStatus,
+                MustChangePassword = identityUser?.MustChangePassword ?? false,
+                EmploymentType = employmentType
             });
         }
         catch (Exception ex)
@@ -1082,5 +1279,135 @@ public class AuthService : IAuthService
         }
 
         return claims;
+    }
+
+    private async Task<(Guid? RoleId, bool? IsVerified, string? VerificationStatus, string? ContractStatus)>
+        ResolveRoleContextAsync(Guid userId, IList<string> roles, CancellationToken cancellationToken)
+    {
+        Guid? roleId = null;
+        bool? isVerified = null;
+        string? verificationStatus = null;
+        string? contractStatus = null;
+
+        if (roles.Contains(Roles.Patient))
+        {
+            var patients = await _patientRepository.FindAsync(
+                p => p.UserId == userId,
+                cancellationToken);
+
+            if (patients.Count > 0)
+            {
+                roleId = patients[0].Id;
+            }
+        }
+        else if (roles.Contains(Roles.Ophthalmologist))
+        {
+            var doctors = await _ophthalmologistRepository.FindAsync(
+                o => o.UserId == userId,
+                cancellationToken);
+
+            if (doctors.Count > 0)
+            {
+                roleId = doctors[0].Id;
+                isVerified = doctors[0].IsVerified;
+                verificationStatus = doctors[0].VerificationStatus.ToString();
+            }
+        }
+
+        if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+        {
+            var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
+            if (contract is not null)
+            {
+                contractStatus = contract.Status.ToString();
+            }
+        }
+
+        return (roleId, isVerified, verificationStatus, contractStatus);
+    }
+
+    private async Task<Result> LinkGoogleLoginAsync(ApplicationUser user, string providerKey)
+    {
+        var linkedLogins = await _userManager.GetLoginsAsync(user);
+        var existingGoogleLogin = linkedLogins.FirstOrDefault(login =>
+            string.Equals(login.LoginProvider, GoogleLoginProvider, StringComparison.OrdinalIgnoreCase));
+
+        if (existingGoogleLogin is not null &&
+            string.Equals(existingGoogleLogin.ProviderKey, providerKey, StringComparison.Ordinal))
+        {
+            return Result.Success();
+        }
+
+        if (existingGoogleLogin is not null)
+        {
+            var removeResult = await _userManager.RemoveLoginAsync(
+                user,
+                existingGoogleLogin.LoginProvider,
+                existingGoogleLogin.ProviderKey);
+
+            if (!removeResult.Succeeded)
+            {
+                return Result.Failure(removeResult.Errors.Select(error => error.Description));
+            }
+        }
+
+        var addResult = await _userManager.AddLoginAsync(
+            user,
+            new UserLoginInfo(GoogleLoginProvider, providerKey, GoogleLoginProvider));
+
+        return addResult.Succeeded
+            ? Result.Success()
+            : Result.Failure(addResult.Errors.Select(error => error.Description));
+    }
+
+    private async Task<Result> UpsertProviderAvatarClaimAsync(ApplicationUser user, string? providerAvatarUrl)
+    {
+        if (string.IsNullOrWhiteSpace(providerAvatarUrl))
+        {
+            return Result.Success();
+        }
+
+        var claims = await _userManager.GetClaimsAsync(user);
+        var existingClaim = claims.FirstOrDefault(claim =>
+            string.Equals(claim.Type, ProviderAvatarClaimType, StringComparison.Ordinal));
+
+        if (existingClaim is not null &&
+            string.Equals(existingClaim.Value, providerAvatarUrl, StringComparison.Ordinal))
+        {
+            return Result.Success();
+        }
+
+        if (existingClaim is not null)
+        {
+            var removeResult = await _userManager.RemoveClaimAsync(user, existingClaim);
+            if (!removeResult.Succeeded)
+            {
+                return Result.Failure(removeResult.Errors.Select(error => error.Description));
+            }
+        }
+
+        var addResult = await _userManager.AddClaimAsync(
+            user,
+            new Claim(ProviderAvatarClaimType, providerAvatarUrl));
+
+        return addResult.Succeeded
+            ? Result.Success()
+            : Result.Failure(addResult.Errors.Select(error => error.Description));
+    }
+
+    private async Task<string?> GetProviderAvatarUrlAsync(ApplicationUser? user)
+    {
+        if (user is null)
+        {
+            return null;
+        }
+
+        var claims = await _userManager.GetClaimsAsync(user);
+        var providerAvatarClaim = claims.FirstOrDefault(claim =>
+            string.Equals(claim.Type, ProviderAvatarClaimType, StringComparison.Ordinal));
+
+        return string.IsNullOrWhiteSpace(providerAvatarClaim?.Value)
+            ? null
+            : providerAvatarClaim.Value;
     }
 }

@@ -9,15 +9,18 @@ public class GetMyContractQueryHandler : IQueryHandler<GetMyContractQuery, Contr
 {
     private readonly IContractRepository _contractRepository;
     private readonly IContractTemplateRepository _templateRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IIdentityService _identityService;
 
     public GetMyContractQueryHandler(
         IContractRepository contractRepository,
         IContractTemplateRepository templateRepository,
+        IOphthalmologistRepository ophthalmologistRepository,
         IIdentityService identityService)
     {
         _contractRepository = contractRepository;
         _templateRepository = templateRepository;
+        _ophthalmologistRepository = ophthalmologistRepository;
         _identityService = identityService;
     }
 
@@ -31,6 +34,7 @@ public class GetMyContractQueryHandler : IQueryHandler<GetMyContractQuery, Contr
 
         var template = await _templateRepository.GetByIdAsync(contract.TemplateId, cancellationToken);
         var user = await _identityService.GetUserByIdAsync(contract.UserId, cancellationToken);
+        var ophthalmologist = await _ophthalmologistRepository.GetByUserIdAsync(contract.UserId, cancellationToken);
 
         var dto = new ContractDetailDto
         {
@@ -44,7 +48,10 @@ public class GetMyContractQueryHandler : IQueryHandler<GetMyContractQuery, Contr
             UserFullName = user?.FullName ?? string.Empty,
             UserEmail = user?.Email ?? string.Empty,
             AiQuotaLimit = contract.AiQuotaLimit,
+            MonthlyQuotaLimit = contract.MonthlyQuotaLimit,
             PlatformCommissionRate = contract.PlatformCommissionRate,
+            CommissionRate = ophthalmologist?.CommissionRate,
+            ActualMonthlySalary = ophthalmologist?.ActualMonthlySalary,
             SignedDate = contract.SignedDate,
             ScannedDocumentUrl = contract.ScannedDocumentUrl,
             SignedContent = template?.ContentTemplate,

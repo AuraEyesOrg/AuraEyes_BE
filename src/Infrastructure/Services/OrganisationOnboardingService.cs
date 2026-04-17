@@ -75,6 +75,7 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
             request.ContactPhone,
             request.Address,
             request.LicenseNumber,
+            request.TaxCode,
             request.Notes);
 
         await _requestRepository.AddAsync(onboardingRequest, cancellationToken);
@@ -104,6 +105,7 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
                 ContactPhone = r.ContactPhone,
                 Address = r.Address,
                 LicenseNumber = r.LicenseNumber,
+                TaxCode = r.TaxCode,
                 Notes = r.Notes,
                 Status = r.Status.ToString(),
                 CreatedAt = r.CreatedAt,
@@ -151,7 +153,8 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
                 FullName = request.ContactFullName,
                 Address = request.Address,
                 EmailConfirmed = true,
-                IsActive = true
+                IsActive = true,
+                MustChangePassword = true
             };
 
             var createResult = await _userManager.CreateAsync(orgAdmin, temporaryPassword);
@@ -169,7 +172,8 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
                 request.OrganisationName,
                 request.OrgType,
                 request.Address,
-                request.LicenseNumber);
+                request.LicenseNumber,
+                request.TaxCode);
 
             await _organisationRepository.AddAsync(organisation, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -243,6 +247,21 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
 
         foreach (var email in adminEmails.Distinct(StringComparer.OrdinalIgnoreCase))
         {
+            var businessCode = ExtractStructuredNoteValue(
+                request.Notes,
+                "business code",
+                "business registration code",
+                "mã số doanh nghiệp",
+                "ma so doanh nghiep");
+
+            var taxCode = request.TaxCode ?? ExtractStructuredNoteValue(
+                request.Notes,
+                "tax code",
+                "tax id",
+                "mã số thuế",
+                "ma so thue",
+                "mst");
+
             await _emailService.SendAsync(
                 email,
                 EmailTemplates.OrganisationOnboardingSubject,
@@ -254,10 +273,63 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
                     request.ContactPhone,
                     request.Address,
                     request.LicenseNumber,
-                    request.Notes),
+                    request.Notes,
+                    businessCode,
+                    taxCode),
                 isHtml: true,
                 cancellationToken);
         }
+    }
+
+    private static string? ExtractStructuredNoteValue(string? notes, params string[] keys)
+    {
+        if (string.IsNullOrWhiteSpace(notes) || keys.Length == 0)
+        {
+            return null;
+        }
+
+        var normalizedKeys = keys
+            .Where(k => !string.IsNullOrWhiteSpace(k))
+            .Select(k => k.Trim().ToLowerInvariant())
+            .ToList();
+
+        foreach (var line in notes.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmedLine = line.Trim();
+            if (trimmedLine.Length == 0)
+            {
+                continue;
+            }
+
+            var lowerLine = trimmedLine.ToLowerInvariant();
+
+            foreach (var key in normalizedKeys)
+            {
+                if (!lowerLine.StartsWith(key))
+                {
+                    continue;
+                }
+
+                var separatorIndex = trimmedLine.IndexOf(':');
+                if (separatorIndex < 0)
+                {
+                    separatorIndex = trimmedLine.IndexOf('=');
+                }
+
+                if (separatorIndex < 0 || separatorIndex + 1 >= trimmedLine.Length)
+                {
+                    continue;
+                }
+
+                var value = trimmedLine[(separatorIndex + 1)..].Trim();
+                if (value.Length > 0)
+                {
+                    return value;
+                }
+            }
+        }
+
+        return null;
     }
 
     private static string GenerateTemporaryPassword()

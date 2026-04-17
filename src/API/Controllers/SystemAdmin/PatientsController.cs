@@ -1,5 +1,6 @@
 using Application.Common.Constants;
 using Application.Common.Models;
+using Application.SystemAdmin.Patients.Queries.GetPatientMetrics;
 using Application.SystemAdmin.Patients.Queries.GetPatients;
 using Infrastructure.Identity;
 using MediatR;
@@ -24,6 +25,14 @@ public class PatientsController : BaseApiController
     {
         _mediator = mediator;
         _userManager = userManager;
+    }
+
+    [HttpGet("metrics")]
+    [ProducesResponseType(typeof(ApiResponse<PatientMetricsDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPatientMetrics()
+    {
+        var result = await _mediator.Send(new GetPatientMetricsQuery());
+        return HandleResult(result);
     }
 
     /// <summary>

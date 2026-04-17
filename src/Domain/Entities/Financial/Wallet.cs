@@ -59,4 +59,13 @@ public class Wallet : BaseEntity, IAggregateRoot
         _transactions.Add(transaction);
         UpdatedAt = DateTime.UtcNow;
     }
+
+    public void SetOwnerType(string ownerType)
+    {
+        if (string.IsNullOrWhiteSpace(ownerType))
+            throw new ArgumentException("OwnerType cannot be empty", nameof(ownerType));
+
+        OwnerType = ownerType;
+        UpdatedAt = DateTime.UtcNow;
+    }
 }

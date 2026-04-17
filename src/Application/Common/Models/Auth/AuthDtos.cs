@@ -93,22 +93,29 @@ public class RegisterOphthalmologistRequest
     public Guid? OrganizationId { get; set; }
 
     /// <summary>
-    /// Medical degree credentials. At least one degree is required.
-    /// </summary>
-    [Required]
-    [MinLength(1)]
-    public List<CredentialItemDto> Degrees { get; set; } = new();
-
-    /// <summary>
-    /// Medical license/certificate credentials. At least one certificate is required.
+    /// Unified credentials list for both degrees and licenses/certificates.
+    /// At least one degree and one license must be provided.
     /// </summary>
     [Required]
     [MinLength(1)]
     public List<CredentialItemDto> Certificates { get; set; } = new();
+
+    /// <summary>
+    /// Legacy degrees payload kept for backward compatibility with older FE clients.
+    /// </summary>
+    public List<LegacyDegreeCredentialItemDto> Degrees { get; set; } = new();
 }
 
 public class CredentialItemDto
 {
+    [Required]
+    public CertificateType Type { get; set; }
+
+    /// <summary>
+    /// Required when Type is Degree; must be null for non-degree credentials.
+    /// </summary>
+    public DegreeLevel? DegreeLevel { get; set; }
+
     [Required]
     [MaxLength(200)]
     public string Name { get; set; } = string.Empty;
@@ -119,7 +126,29 @@ public class CredentialItemDto
     [Required]
     public DateTime IssuedDate { get; set; }
 
+    /// <summary>
+    /// Optional at DTO level because degrees do not require it.
+    /// Business rule enforces it for certificates/licenses.
+    /// </summary>
     public DateTime? ExpiryDate { get; set; }
+
+    [Required]
+    public IFormFile? File { get; set; }
+}
+
+public class LegacyDegreeCredentialItemDto
+{
+    [Required]
+    [MaxLength(200)]
+    public string Name { get; set; } = string.Empty;
+
+    public DegreeLevel? DegreeLevel { get; set; }
+
+    [MaxLength(200)]
+    public string? IssuingAuthority { get; set; }
+
+    [Required]
+    public DateTime IssuedDate { get; set; }
 
     [Required]
     public IFormFile? File { get; set; }
@@ -148,6 +177,8 @@ public record RegisterOrganisationRequest
     public string? Address { get; init; }
 
     public string? LicenseNumber { get; init; }
+
+    public string? TaxCode { get; init; }
 
     public string? Notes { get; init; }
 }
@@ -198,7 +229,19 @@ public record UserInfoResponse
     public Guid Id { get; init; }
     public string Email { get; init; } = string.Empty;
     public string FullName { get; init; } = string.Empty;
+    /// <summary>
+    /// Backward-compatible effective avatar URL.
+    /// Prefer using UploadedAvatarUrl and ProviderAvatarUrl on the client.
+    /// </summary>
     public string? AvatarUrl { get; init; }
+    /// <summary>
+    /// Avatar uploaded directly by the user.
+    /// </summary>
+    public string? UploadedAvatarUrl { get; init; }
+    /// <summary>
+    /// Avatar from external provider (for example Google OAuth).
+    /// </summary>
+    public string? ProviderAvatarUrl { get; init; }
     public string[] Roles { get; init; } = Array.Empty<string>();
     public bool EmailConfirmed { get; init; }
     public Guid? OrganizationId { get; init; }
@@ -225,6 +268,18 @@ public record UserInfoResponse
     /// Null for non-ophthalmologist roles or if no contract exists.
     /// </summary>
     public string? ContractStatus { get; init; }
+
+    /// <summary>
+    /// Indicates whether the user must change password before accessing protected features.
+    /// Used for first login after temporary credentials are provisioned.
+    /// </summary>
+    public bool MustChangePassword { get; init; }
+
+    /// <summary>
+    /// Employment type for ophthalmologist users (FullTime/PartTime).
+    /// Null for non-ophthalmologist roles.
+    /// </summary>
+    public string? EmploymentType { get; init; }
 }
 
 /// <summary>

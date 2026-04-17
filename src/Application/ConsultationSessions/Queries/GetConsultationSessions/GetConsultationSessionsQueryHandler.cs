@@ -43,6 +43,7 @@ public class GetConsultationSessionsQueryHandler
         var (items, totalCount) = await _sessionRepository.GetPagedAsync(
             request.PatientId,
             request.OphthalmologistId,
+            request.AiScreeningId,
             request.Type,
             request.Status,
             request.ChatStatus,
@@ -55,6 +56,7 @@ public class GetConsultationSessionsQueryHandler
 
         // Security: admins + patients always can see; doctors only if patient shared AI results.
         baseDtos = await AttachCaseSnapshotsAsync(baseDtos, items, isAdmin, participantProfileId, cancellationToken);
+        baseDtos = await AttachLatestMessagePreviewsAsync(baseDtos, items, cancellationToken);
 
         var dtoList = await _participantEnrichmentService.EnrichListAsync(
             baseDtos,
@@ -65,6 +67,45 @@ public class GetConsultationSessionsQueryHandler
             dtoList.ToList(), totalCount, request.PageNumber, request.PageSize);
 
         return Result<PagedResult<ConsultationSessionListDto>>.Success(pagedResult);
+    }
+
+    private const int PreviewMaxLength = 120;
+
+    private async Task<List<ConsultationSessionListDto>> AttachLatestMessagePreviewsAsync(
+        List<ConsultationSessionListDto> dtos,
+        IReadOnlyList<Domain.Entities.Consultation.ConsultationSession> sessions,
+        CancellationToken cancellationToken)
+    {
+        if (dtos.Count == 0) return dtos;
+
+        var sessionIds = sessions.Select(s => s.Id).ToList();
+
+        var latestMessages = await _sessionRepository.Query()
+            .Where(s => sessionIds.Contains(s.Id))
+            .Select(s => new
+            {
+                SessionId = s.Id,
+                LatestMessage = s.Conversations
+                    .SelectMany(c => c.Messages)
+                    .OrderByDescending(m => m.SentAt)
+                    .Select(m => m.Message)
+                    .FirstOrDefault()
+            })
+            .ToDictionaryAsync(x => x.SessionId, x => x.LatestMessage, cancellationToken);
+
+        for (var i = 0; i < dtos.Count; i++)
+        {
+            if (!latestMessages.TryGetValue(dtos[i].Id, out var message) || string.IsNullOrWhiteSpace(message))
+                continue;
+
+            var preview = message.Length > PreviewMaxLength
+                ? string.Concat(message.AsSpan(0, PreviewMaxLength), "…")
+                : message;
+
+            dtos[i] = dtos[i] with { LatestMessagePreview = preview };
+        }
+
+        return dtos;
     }
 
     private async Task<List<ConsultationSessionListDto>> AttachCaseSnapshotsAsync(

@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <!-- EF Core -->
+	<PackageReference Include="CloudinaryDotNet" Version="1.28.0" />
 	<PackageReference Include="Google.Apis.Auth" Version="1.73.0" />
 	<PackageReference Include="Google.Apis.Calendar.v3" Version="1.73.0.4073" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
@@ -42,10 +43,14 @@
     <!-- Configuration -->
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+    <PackageReference Include="QuestPDF" Version="2026.2.4" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
     
     <!-- Email (MailKit + MimeKit) -->
     <PackageReference Include="MailKit" Version="4.15.1" />
     <PackageReference Include="MimeKit" Version="4.15.1" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
     
     <!-- Payment (PayOS) -->
     <PackageReference Include="payOS" Version="1.0.8" />
@@ -53,6 +58,10 @@
     <!-- Background Jobs (Hangfire) -->
     <PackageReference Include="Hangfire.Core" Version="1.8.17" />
     <PackageReference Include="Hangfire.PostgreSql" Version="1.20.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Infrastructure.UnitTests" />
   </ItemGroup>
 
   <!-- Contract Templates - Copy to output directory -->

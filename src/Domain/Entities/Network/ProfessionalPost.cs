@@ -13,78 +13,103 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
     /// Author ID - Ophthalmologist.Id or Organisation.Id (NO FK - just stores ID)
     /// </summary>
     public Guid AuthorId { get; private set; }
-
+    
     /// <summary>
     /// Type of author
     /// </summary>
     public AuthorType AuthorType { get; private set; }
-
+    
     /// <summary>
     /// Organisation context - if posting on behalf of organisation
     /// </summary>
     public Guid? OrganisationId { get; private set; }
-
+    
     /// <summary>
     /// Post content
     /// </summary>
     public string Content { get; private set; } = string.Empty;
-
+    
     /// <summary>
     /// Post category
     /// </summary>
     public PostCategory Category { get; private set; }
-
+    
     /// <summary>
     /// Original post ID for reposts (self-reference)
     /// </summary>
     public Guid? OriginalPostId { get; private set; }
-
+    
     /// <summary>
     /// Whether this is a repost
     /// </summary>
     public bool IsRepost { get; private set; }
-
+    
     /// <summary>
     /// Comment added when reposting
     /// </summary>
     public string? RepostComment { get; private set; }
-
+    
     /// <summary>
     /// Reaction count (denormalized for performance)
     /// </summary>
     public int ReactionCount { get; private set; }
-
+    
     /// <summary>
     /// Comment count (denormalized for performance)
     /// </summary>
     public int CommentCount { get; private set; }
-
+    
     /// <summary>
     /// Repost count (denormalized for performance)
     /// </summary>
     public int RepostCount { get; private set; }
-
+    
     /// <summary>
     /// View count (denormalized for performance)
     /// </summary>
     public int ViewCount { get; private set; }
-
+    
     /// <summary>
     /// Whether comments are allowed
     /// </summary>
     public bool AllowComments { get; private set; } = true;
 
     /// <summary>
-    /// Whether this post has been hidden by moderation.
+    /// Whether post is hidden by moderation.
     /// </summary>
     public bool IsHidden { get; private set; }
 
     /// <summary>
-    /// Optional moderation reason when the post is hidden.
+    /// Optional moderation reason when hidden.
     /// </summary>
     public string? HideReason { get; private set; }
-    
-    // Navigation properties (within network module only)
+
+    /// <summary>
+    /// True when post is shared from an internal consultation flow.
+    /// </summary>
+    public bool IsInternalCase { get; private set; }
+
+    /// <summary>
+    /// Source consultation session ID for internal case shares.
+    /// </summary>
+    public Guid? ConsultationSessionId { get; private set; }
+
+    /// <summary>
+    /// Source AI screening ID for case shares created from organisation screening flow.
+    /// </summary>
+    public Guid? AiScreeningId { get; private set; }
+
+    /// <summary>
+    /// Masked patient age used in clinical case post.
+    /// </summary>
+    public int? PatientAge { get; private set; }
+
+    /// <summary>
+    /// Masked patient gender used in clinical case post.
+    /// </summary>
+    public string? PatientGender { get; private set; }
+
+        // Navigation properties (within network module only)
     public virtual ProfessionalPost? OriginalPost { get; private set; }
 
     private readonly List<ProfessionalPost> _reposts = new();
@@ -170,16 +195,6 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
     }
 
     /// <summary>
-    /// Hide a post by moderation.
-    /// </summary>
-    public void Hide(string? reason)
-    {
-        IsHidden = true;
-        HideReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    /// <summary>
     /// Increment reaction count
     /// </summary>
     public void IncrementReactionCount()
@@ -236,5 +251,53 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
     {
         _attachments.Add(attachment);
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Hide post by moderation.
+    /// </summary>
+    public void Hide(string? hideReason)
+    {
+        IsHidden = true;
+        HideReason = string.IsNullOrWhiteSpace(hideReason) ? null : hideReason.Trim();
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Apply metadata for clinical case posts.
+    /// </summary>
+    public void SetClinicalCaseMetadata(
+        bool isInternalCase,
+        Guid? consultationSessionId,
+        Guid? aiScreeningId,
+        int? patientAge,
+        string? patientGender)
+    {
+        if (patientAge.HasValue && patientAge.Value < 0)
+            throw new ArgumentException("Patient age cannot be negative", nameof(patientAge));
+
+        if (isInternalCase && !consultationSessionId.HasValue)
+            throw new ArgumentException("ConsultationSessionId is required for internal case posts", nameof(consultationSessionId));
+
+        IsInternalCase = isInternalCase;
+        ConsultationSessionId = consultationSessionId;
+        AiScreeningId = aiScreeningId;
+        PatientAge = patientAge;
+        PatientGender = patientGender;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void SetClinicalCaseMetadata(
+        bool isInternalCase,
+        Guid? consultationSessionId,
+        int? patientAge,
+        string? patientGender)
+    {
+        SetClinicalCaseMetadata(
+            isInternalCase,
+            consultationSessionId,
+            aiScreeningId: null,
+            patientAge,
+            patientGender);
     }
 }

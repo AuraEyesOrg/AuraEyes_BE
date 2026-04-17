@@ -9,6 +9,7 @@ public record GetConsultationSessionsQuery : IQuery<PagedResult<ConsultationSess
 {
     public Guid? PatientId { get; init; }
     public Guid? OphthalmologistId { get; init; }
+    public Guid? AiScreeningId { get; init; }
     public ConsultationSessionType? Type { get; init; }
     public SessionStatus? Status { get; init; }
     public ChatStatus? ChatStatus { get; init; }

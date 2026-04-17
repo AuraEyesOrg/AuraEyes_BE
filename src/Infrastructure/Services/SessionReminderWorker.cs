@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Domain.Common;
+using Domain.Enums;
 using Domain.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -19,13 +20,16 @@ public class SessionReminderWorker : BackgroundService
     private static readonly TimeSpan ReminderCooldown = TimeSpan.FromHours(48);
 
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IBetterStackHeartbeatService _betterStackHeartbeat;
     private readonly ILogger<SessionReminderWorker> _logger;
 
     public SessionReminderWorker(
         IServiceScopeFactory scopeFactory,
+        IBetterStackHeartbeatService betterStackHeartbeat,
         ILogger<SessionReminderWorker> logger)
     {
         _scopeFactory = scopeFactory;
+        _betterStackHeartbeat = betterStackHeartbeat;
         _logger = logger;
     }
 
@@ -37,14 +41,28 @@ public class SessionReminderWorker : BackgroundService
         {
             try
             {
+                await _betterStackHeartbeat.NotifyStartedAsync(BetterStackMonitor.SessionReminderWorker, stoppingToken);
                 await CheckAndNotifyStaleSessionsAsync(stoppingToken);
+                await _betterStackHeartbeat.NotifySucceededAsync(BetterStackMonitor.SessionReminderWorker, stoppingToken);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
             {
+                _logger.LogWarning("SessionReminderWorker cycle was canceled by infrastructure timeout and will retry.");
+            }
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+            {
+                await _betterStackHeartbeat.NotifyFailedAsync(BetterStackMonitor.SessionReminderWorker, stoppingToken);
                 _logger.LogError(ex, "Error in SessionReminderWorker cycle");
             }
 
-            await Task.Delay(CheckInterval, stoppingToken);
+            try
+            {
+                await Task.Delay(CheckInterval, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
         }
 
         _logger.LogInformation("SessionReminderWorker stopped");
@@ -85,9 +103,18 @@ public class SessionReminderWorker : BackgroundService
 
             await notificationService.SendAsync(
                 session.OphthalmologistId.Value,
-                $"Reminder: Session #{session.Id} has been inactive for {daysSinceActivity} day(s). " +
-                "Please review or end the session.",
-                cancellationToken);
+                "Inactive consultation reminder",
+                $"Session #{session.Id} has been inactive for {daysSinceActivity} day(s). Please review or end the session.",
+                NotificationType.NewConsultationRequest,
+                new
+                {
+                    sessionId = session.Id,
+                    consultationId = session.Id,
+                    reminderType = "stale_session",
+                    daysSinceActivity
+                },
+                cancellationToken,
+                session.Id);
 
             session.RecordReminderSent();
             remindersSent++;

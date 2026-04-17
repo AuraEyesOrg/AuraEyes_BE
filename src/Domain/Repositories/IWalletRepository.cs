@@ -15,6 +15,11 @@ public interface IWalletRepository : IRepository<Wallet>
     Task<Wallet?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Platform treasury wallet (<c>OwnerType == "System"</c>).
+    /// </summary>
+    Task<Wallet?> GetSystemWalletAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get wallet with transactions included.
     /// </summary>
     Task<Wallet?> GetByIdWithTransactionsAsync(Guid id, CancellationToken cancellationToken = default);
@@ -52,5 +57,15 @@ public interface IWalletRepository : IRepository<Wallet>
         Guid walletId,
         int year,
         int month,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get paginated wallet transactions across all wallets for system-admin cashflow views.
+    /// </summary>
+    Task<(IReadOnlyList<(WalletTransaction Transaction, Wallet Wallet)> Items, int TotalCount)> GetCashflowTransactionsPagedAsync(
+        string? ownerType = null,
+        string? searchTerm = null,
+        int pageNumber = 1,
+        int pageSize = 20,
         CancellationToken cancellationToken = default);
 }

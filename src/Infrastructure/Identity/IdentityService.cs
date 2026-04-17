@@ -12,6 +12,8 @@ namespace Infrastructure.Identity;
 /// </summary>
 public class IdentityService : IIdentityService
 {
+    private const string ProviderAvatarClaimType = "provider_avatar_url";
+
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<ApplicationRole> _roleManager;
 
@@ -83,6 +85,62 @@ public class IdentityService : IIdentityService
         return (addRoleResult.Succeeded, addRoleResult.Errors.Select(e => e.Description).ToArray());
     }
 
+    public async Task<(bool Succeeded, Guid? UserId, string[] Errors)> CreateUserWalkInPatientAsync(
+        string email,
+        string password,
+        string fullName,
+        string role,
+        Guid? organizationId = null,
+        UserProfileWalkInDto? userProfile = null,
+        CancellationToken cancellationToken = default)
+    {
+        var user = new ApplicationUser
+        {
+            UserName = email,
+            Email = email,
+            FullName = fullName,
+            OrganizationId = organizationId
+        };
+
+        if (userProfile != null)
+        {
+            user.PhoneNumber = userProfile.PhoneNumber;
+            user.DateOfBirth = userProfile.DateOfBirth;
+            if (userProfile.Gender.HasValue)
+            {
+                user.Gender = (Domain.Enums.Gender)userProfile.Gender.Value;
+            }
+            user.Address = userProfile.Address;
+            user.AvatarUrl = userProfile.AvatarUrl;
+            user.CitizenId = userProfile.CitizenId;
+            if (!string.IsNullOrEmpty(userProfile.FullName))
+            {
+                user.FullName = userProfile.FullName;
+            }
+        }
+
+        var result = await _userManager.CreateAsync(user, password);
+
+        if (!result.Succeeded)
+        {
+            return (false, null, result.Errors.Select(e => e.Description).ToArray());
+        }
+
+        // Ensure role exists
+        if (!await _roleManager.RoleExistsAsync(role))
+        {
+            var roleResult = await _roleManager.CreateAsync(new ApplicationRole(role));
+            if (!roleResult.Succeeded)
+            {
+                return (false, null, roleResult.Errors.Select(e => e.Description).ToArray());
+            }
+        }
+
+        var addRoleResult = await _userManager.AddToRoleAsync(user, role);
+
+        return (addRoleResult.Succeeded, user.Id, addRoleResult.Errors.Select(e => e.Description).ToArray());
+    }
+
     public async Task<bool> CheckPasswordAsync(Guid userId, string password)
     {
         var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -96,7 +154,7 @@ public class IdentityService : IIdentityService
         var user = await _userManager.Users
             .FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted, cancellationToken);
 
-        return user == null ? null : MapToDto(user);
+        return user == null ? null : await MapToDtoAsync(user);
     }
 
     public async Task<UserDto?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -104,7 +162,57 @@ public class IdentityService : IIdentityService
         var user = await _userManager.Users
             .FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted, cancellationToken);
 
-        return user == null ? null : MapToDto(user);
+        return user == null ? null : await MapToDtoAsync(user);
+    }
+
+    public async Task<bool> IsPhoneNumberInUseByOrganizationAsync(
+        Guid organizationId,
+        string phoneNumber,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedPhoneNumber = NormalizePhone(phoneNumber);
+        if (string.IsNullOrWhiteSpace(normalizedPhoneNumber))
+        {
+            return false;
+        }
+
+        var candidateSuffix = GetCandidatePhoneSuffix(normalizedPhoneNumber);
+
+        var existingPhoneNumbers = await _userManager.Users
+            .Where(u =>
+                u.OrganizationId == organizationId &&
+                !u.IsDeleted &&
+                u.PhoneNumber != null &&
+                u.PhoneNumber != string.Empty)
+            .Where(u =>
+                u.PhoneNumber!
+                    .Replace(" ", string.Empty)
+                    .Replace("-", string.Empty)
+                    .Replace(".", string.Empty)
+                    .Replace("(", string.Empty)
+                    .Replace(")", string.Empty)
+                    .Replace("+", string.Empty)
+                    .EndsWith(candidateSuffix))
+            .Select(u => u.PhoneNumber!)
+            .ToListAsync(cancellationToken);
+
+        return existingPhoneNumbers
+            .Select(NormalizePhone)
+            .Any(p => p == normalizedPhoneNumber);
+    }
+
+    public async Task<bool> IsCitizenIdInUseByOrganizationAsync(
+        Guid organizationId,
+        string citizenId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(citizenId))
+        {
+            return false;
+        }
+
+        return await _userManager.Users
+            .AnyAsync(u => u.OrganizationId == organizationId && u.CitizenId == citizenId && !u.IsDeleted, cancellationToken);
     }
 
     public async Task<bool> IsEmailConfirmedAsync(Guid userId)
@@ -253,8 +361,10 @@ public class IdentityService : IIdentityService
         return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
     }
 
-    private static UserDto MapToDto(ApplicationUser user)
+    private async Task<UserDto> MapToDtoAsync(ApplicationUser user)
     {
+        var avatarUrl = await ResolveEffectiveAvatarUrlAsync(user);
+
         return new UserDto(
             user.Id,
             user.Email ?? string.Empty,
@@ -264,8 +374,40 @@ public class IdentityService : IIdentityService
             user.IsDeleted,
             user.OrganizationId,
             user.TwoFactorEnabled,
-            user.AvatarUrl
+            avatarUrl
         );
+    }
+
+    private async Task<string?> ResolveEffectiveAvatarUrlAsync(ApplicationUser user)
+    {
+        if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
+            return user.AvatarUrl;
+
+        var claims = await _userManager.GetClaimsAsync(user);
+        var providerAvatar = claims.FirstOrDefault(c =>
+            string.Equals(c.Type, ProviderAvatarClaimType, StringComparison.Ordinal));
+
+        return string.IsNullOrWhiteSpace(providerAvatar?.Value)
+            ? null
+            : providerAvatar.Value;
+    }
+
+    private static string NormalizePhone(string phoneNumber)
+    {
+        return new string(phoneNumber
+            .Where(char.IsDigit)
+            .ToArray());
+    }
+
+    private static string GetCandidatePhoneSuffix(string normalizedPhoneNumber)
+    {
+        const int CandidateSuffixLength = 8;
+        if (normalizedPhoneNumber.Length <= CandidateSuffixLength)
+        {
+            return normalizedPhoneNumber;
+        }
+
+        return normalizedPhoneNumber[^CandidateSuffixLength..];
     }
 
     #region Two-Factor Authentication (2FA)
@@ -592,6 +734,8 @@ public class IdentityService : IIdentityService
         if (user == null || user.IsDeleted)
             return null;
 
+        var avatarUrl = await ResolveEffectiveAvatarUrlAsync(user);
+
         return new UserDetailsDto
         {
             Id = user.Id,
@@ -601,11 +745,117 @@ public class IdentityService : IIdentityService
             DateOfBirth = user.DateOfBirth,
             Gender = user.Gender,
             Address = user.Address,
-            AvatarUrl = user.AvatarUrl,
+            AvatarUrl = avatarUrl,
+            CitizenId = user.CitizenId,
             EmailConfirmed = user.EmailConfirmed,
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt,
         };
+    }
+
+    public async Task<(bool Succeeded, string[] Errors)> UpdateUserProfileAsync(
+        Guid userId,
+        string fullName,
+        string? phone,
+        DateTime? dateOfBirth,
+        int? gender,
+        string? address,
+        string? citizenId,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null || user.IsDeleted)
+            return (false, new[] { "User not found" });
+
+        user.FullName = fullName;
+        user.PhoneNumber = phone;
+        user.DateOfBirth = dateOfBirth;
+        user.Gender = gender.HasValue ? (Domain.Enums.Gender)gender.Value : null;
+        user.Address = address;
+        user.CitizenId = citizenId;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var result = await _userManager.UpdateAsync(user);
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<(bool Succeeded, string[] Errors)> UpdateUserEmailAsync(
+        Guid userId,
+        string email,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null || user.IsDeleted)
+            return (false, new[] { "User not found" });
+            
+        if(!user.OrganizationId.HasValue)
+            return (false, new[] { "Only organization users can have their email updated" });
+
+        if (string.IsNullOrWhiteSpace(email))
+            return (false, new[] { "Email is required" });
+
+        var normalizedEmail = email.Trim();
+
+        user.Email = normalizedEmail;
+        user.UserName = normalizedEmail;
+        user.EmailConfirmed = false;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var result = await _userManager.UpdateAsync(user);
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<(bool Succeeded, string[] Errors)> UpdateAvatarUrlAsync(
+        Guid userId,
+        string avatarUrl,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null || user.IsDeleted)
+            return (false, new[] { "User not found" });
+
+        user.AvatarUrl = avatarUrl;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var result = await _userManager.UpdateAsync(user);
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<(bool Succeeded, string[] Errors)> UpdateUserOrganizationAsync(
+        Guid userId,
+        Guid? organizationId,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null || user.IsDeleted)
+            return (false, new[] { "User not found" });
+
+        user.OrganizationId = organizationId;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var result = await _userManager.UpdateAsync(user);
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<(bool Succeeded, string[] Errors)> ChangePasswordAsync(
+        Guid userId,
+        string currentPassword,
+        string newPassword,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null || user.IsDeleted)
+            return (false, new[] { "User not found" });
+
+        var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+        if (result.Succeeded)
+        {
+            user.UpdatedAt = DateTime.UtcNow;
+            user.MustChangePassword = false;
+            await _userManager.UpdateAsync(user);
+        }
+
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
     }
 
     public async Task<(bool Succeeded, string[] Errors)> UpdateUserProfileAsync(
@@ -629,42 +879,6 @@ public class IdentityService : IIdentityService
         user.UpdatedAt = DateTime.UtcNow;
 
         var result = await _userManager.UpdateAsync(user);
-        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
-    }
-
-    public async Task<(bool Succeeded, string[] Errors)> UpdateAvatarUrlAsync(
-        Guid userId,
-        string avatarUrl,
-        CancellationToken cancellationToken = default)
-    {
-        var user = await _userManager.FindByIdAsync(userId.ToString());
-        if (user == null || user.IsDeleted)
-            return (false, new[] { "User not found" });
-
-        user.AvatarUrl = avatarUrl;
-        user.UpdatedAt = DateTime.UtcNow;
-
-        var result = await _userManager.UpdateAsync(user);
-        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
-    }
-
-    public async Task<(bool Succeeded, string[] Errors)> ChangePasswordAsync(
-        Guid userId,
-        string currentPassword,
-        string newPassword,
-        CancellationToken cancellationToken = default)
-    {
-        var user = await _userManager.FindByIdAsync(userId.ToString());
-        if (user == null || user.IsDeleted)
-            return (false, new[] { "User not found" });
-
-        var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
-        if (result.Succeeded)
-        {
-            user.UpdatedAt = DateTime.UtcNow;
-            await _userManager.UpdateAsync(user);
-        }
-
         return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
     }
 }

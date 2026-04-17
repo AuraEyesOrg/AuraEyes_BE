@@ -1,11 +1,9 @@
 using System.Security.Claims;
+using Application.Auth.Queries.GetProfileClaimsByUserId;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Screenings.Commands.CompleteAiScreening;
 using Application.Wallets.Commands.VerifyPayment;
-using Domain.Common;
-using Domain.Entities.Users;
-using Domain.Repositories;
 using Infrastructure.Identity;
 using Infrastructure.Persistence;
 using Infrastructure.Services;
@@ -33,8 +31,6 @@ public class TestBackdoorController : ControllerBase
     private readonly IMediator _mediator;
     private readonly IPayOSService _payOSService;
     private readonly ITokenService _tokenService;
-    private readonly IRepository<Patient> _patientRepository;
-    private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
 
     public TestBackdoorController(
         IWebHostEnvironment environment,
@@ -45,9 +41,7 @@ public class TestBackdoorController : ControllerBase
         ILogger<TestBackdoorController> logger,
         IMediator mediator,
         IPayOSService payOSService,
-        ITokenService tokenService,
-        IRepository<Patient> patientRepository,
-        IRepository<Ophthalmologist> ophthalmologistRepository)
+        ITokenService tokenService)
     {
         _environment = environment;
         _configuration = configuration;
@@ -58,8 +52,6 @@ public class TestBackdoorController : ControllerBase
         _mediator = mediator;
         _payOSService = payOSService;
         _tokenService = tokenService;
-        _patientRepository = patientRepository;
-        _ophthalmologistRepository = ophthalmologistRepository;
     }
 
     [HttpPost("reset-and-seed")]
@@ -75,7 +67,7 @@ public class TestBackdoorController : ControllerBase
             .GetRequiredService<ILoggerFactory>()
             .CreateLogger("DatabaseSeeder");
 
-        await DatabaseSeeder.SeedAsync(_dbContext, _userManager, _roleManager, seederLogger);
+        await DatabaseSeeder.SeedAsync(_dbContext, _userManager, _roleManager, _configuration, seederLogger);
 
         _logger.LogInformation("[TEST BACKDOOR] Database reset and seed completed.");
 
@@ -265,27 +257,22 @@ public class TestBackdoorController : ControllerBase
     {
         var claims = new List<Claim>();
 
-        if (roles.Contains(Roles.Patient))
-        {
-            var patients = await _patientRepository.FindAsync(
-                p => p.UserId == userId,
-                cancellationToken);
+        var result = await _mediator.Send(
+            new GetProfileClaimsByUserIdQuery(userId, roles.ToArray()),
+            cancellationToken);
 
-            if (patients.Count > 0)
-                claims.Add(new Claim("profile_id", patients[0].Id.ToString()));
-        }
-        else if (roles.Contains(Roles.Ophthalmologist))
-        {
-            var doctors = await _ophthalmologistRepository.FindAsync(
-                o => o.UserId == userId,
-                cancellationToken);
+        if (!result.IsSuccess || result.Data is null || result.Data.ProfileId is null)
+            return claims;
 
-            if (doctors.Count > 0)
-            {
-                claims.Add(new Claim("profile_id", doctors[0].Id.ToString()));
-                claims.Add(new Claim("IsVerified", doctors[0].IsVerified.ToString()));
-                claims.Add(new Claim("verification_status", doctors[0].VerificationStatus.ToString()));
-            }
+        claims.Add(new Claim("profile_id", result.Data.ProfileId.Value.ToString()));
+
+        if (roles.Contains(Roles.Ophthalmologist))
+        {
+            if (result.Data.IsVerified.HasValue)
+                claims.Add(new Claim("IsVerified", result.Data.IsVerified.Value.ToString()));
+
+            if (!string.IsNullOrWhiteSpace(result.Data.VerificationStatus))
+                claims.Add(new Claim("verification_status", result.Data.VerificationStatus));
         }
 
         return claims;

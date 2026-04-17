@@ -70,7 +70,9 @@ public class CreateContractCommandHandler : ICommandHandler<CreateContractComman
         string templateTitle,
         string contractType,
         string userFullName,
-        string userEmail) => new()
+        string userEmail,
+        decimal? commissionRate = null,
+        decimal? actualMonthlySalary = null) => new()
         {
             Id = c.Id,
             ContractNumber = c.ContractNumber,
@@ -82,7 +84,10 @@ public class CreateContractCommandHandler : ICommandHandler<CreateContractComman
             UserFullName = userFullName,
             UserEmail = userEmail,
             AiQuotaLimit = c.AiQuotaLimit,
+            MonthlyQuotaLimit = c.MonthlyQuotaLimit,
             PlatformCommissionRate = c.PlatformCommissionRate,
+            CommissionRate = commissionRate,
+            ActualMonthlySalary = actualMonthlySalary,
             SignedDate = c.SignedDate,
             ScannedDocumentUrl = c.ScannedDocumentUrl,
             CreatedAt = c.CreatedAt,

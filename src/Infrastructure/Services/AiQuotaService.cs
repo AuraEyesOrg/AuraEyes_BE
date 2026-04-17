@@ -1,5 +1,6 @@
 using Application.AiQuota.Common;
 using Application.AiQuota.Interfaces;
+using Application.Common.Constants;
 using Application.SystemSettings.Interfaces;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -9,11 +10,14 @@ namespace Infrastructure.Services;
 
 /// <summary>
 /// AI Quota service — Stored State architecture.
-/// Reads PurchasedAiQuota / UsedAiQuota directly from Patient or Organisation.
+/// Reads quota balances from Patient and Organisation entities.
 /// No JOINs to AiScreenings or WalletTransactions.
 /// </summary>
 public class AiQuotaService : IAiQuotaService
 {
+    private const decimal DefaultUnitPrice = 10000m;
+    private const decimal OrganisationUnitPriceRatio = 0.60m;
+
     private readonly ApplicationDbContext _context;
     private readonly ILogger<AiQuotaService> _logger;
     private readonly ISystemSettingService _settingService;
@@ -32,7 +36,7 @@ public class AiQuotaService : IAiQuotaService
     {
         _logger.LogDebug("[AiQuotaService] GetQuotaAsync called — UserId: {UserId}, Role: {Role}", userId, role);
 
-        if (string.Equals(role, "Patient", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(role, Roles.Patient, StringComparison.OrdinalIgnoreCase))
             return await GetPatientQuotaAsync(userId, cancellationToken);
 
         if (IsOrganisationQuotaRole(role))
@@ -57,8 +61,8 @@ public class AiQuotaService : IAiQuotaService
     private async Task<AiQuotaDto> GetPatientQuotaAsync(Guid userId, CancellationToken cancellationToken)
     {
         var freeQuota = await GetSettingIntAsync("FREE_AI_QUOTA", 3, cancellationToken);
-        var bundleSize = await GetSettingIntAsync("AI_QUOTA_BUNDLE", 5, cancellationToken);
-        var bundlePrice = await GetSettingDecimalAsync("AI_QUOTA_PRICE", 50000m, cancellationToken);
+        var configuredUnitPrice = await GetSettingDecimalAsync("AI_QUOTA_UNIT_PRICE", DefaultUnitPrice, cancellationToken);
+        var unitPrice = NormalizeUnitPrice(configuredUnitPrice);
 
         // Also try with IgnoreQueryFilters to detect if record exists but is soft-deleted
         var patient = await _context.Patients
@@ -89,8 +93,11 @@ public class AiQuotaService : IAiQuotaService
                 UsedQuota = 0,
                 RemainingQuota = freeQuota,
                 QuotaSource = "Free",
-                BundlePrice = bundlePrice,
-                BundleSize = bundleSize
+                UnitPrice = unitPrice,
+                FreeQuotaLimit = freeQuota,
+                FreeQuotaUsed = 0,
+                FreeQuotaRemaining = freeQuota,
+                PurchasedQuota = 0
             };
         }
 
@@ -113,9 +120,17 @@ public class AiQuotaService : IAiQuotaService
             UsedQuota = patient.UsedAiQuota,
             RemainingQuota = remaining,
             QuotaSource = quotaSource,
-            BundlePrice = bundlePrice,
-            BundleSize = bundleSize
+            UnitPrice = unitPrice,
+            FreeQuotaLimit = freeQuota,
+            FreeQuotaUsed = patient.UsedAiQuota,
+            FreeQuotaRemaining = remainingFreeQuota,
+            PurchasedQuota = patient.PurchasedAiQuota
         };
+    }
+
+    private static decimal NormalizeUnitPrice(decimal unitPrice)
+    {
+        return unitPrice > 0m ? unitPrice : DefaultUnitPrice;
     }
 
     private async Task<AiQuotaDto> GetOrgQuotaAsync(Guid userId, CancellationToken cancellationToken)
@@ -126,27 +141,33 @@ public class AiQuotaService : IAiQuotaService
             .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
 
         if (user?.OrganizationId is null)
-            return new AiQuotaDto { TotalQuota = 0, UsedQuota = 0, RemainingQuota = 0, QuotaSource = "None" };
+            return new AiQuotaDto { TotalQuota = 0, UsedQuota = 0, RemainingQuota = 0, QuotaSource = "None", UnitPrice = ApplyOrganisationDiscount(DefaultUnitPrice) };
 
         var org = await _context.Organisations
             .AsNoTracking()
             .FirstOrDefaultAsync(o => o.Id == user.OrganizationId.Value, cancellationToken);
 
         if (org is null)
-            return new AiQuotaDto { TotalQuota = 0, UsedQuota = 0, RemainingQuota = 0, QuotaSource = "None" };
+            return new AiQuotaDto { TotalQuota = 0, UsedQuota = 0, RemainingQuota = 0, QuotaSource = "None", UnitPrice = ApplyOrganisationDiscount(DefaultUnitPrice) };
 
-        var freeQuota = await GetSettingIntAsync("FREE_AI_QUOTA", 3, cancellationToken);
-        var remainingFreeQuota = Math.Max(0, freeQuota - org.UsedAiQuota);
-        var totalQuota = freeQuota + org.PurchasedAiQuota;
-        var remaining = remainingFreeQuota + org.PurchasedAiQuota;
+        var configuredUnitPrice = await GetSettingDecimalAsync("AI_QUOTA_UNIT_PRICE", DefaultUnitPrice, cancellationToken);
+        var unitPrice = ApplyOrganisationDiscount(NormalizeUnitPrice(configuredUnitPrice));
+        var remainingMonthlyQuota = Math.Max(0, org.MonthlyQuotaLimit - org.MonthlyQuotaUsed);
+        var totalQuota = org.MonthlyQuotaLimit + org.PurchasedAiQuota;
+        var remaining = remainingMonthlyQuota + org.PurchasedAiQuota;
 
         return new AiQuotaDto
         {
             TotalQuota = totalQuota,
-            UsedQuota = org.UsedAiQuota,
+            UsedQuota = org.MonthlyQuotaUsed,
             RemainingQuota = remaining,
-            QuotaSource = remainingFreeQuota > 0
-                ? "Free"
+            UnitPrice = unitPrice,
+            MonthlyQuotaLimit = org.MonthlyQuotaLimit,
+            MonthlyQuotaUsed = org.MonthlyQuotaUsed,
+            MonthlyQuotaRemaining = remainingMonthlyQuota,
+            PurchasedQuota = org.PurchasedAiQuota,
+            QuotaSource = remainingMonthlyQuota > 0
+                ? "Contract"
                 : org.PurchasedAiQuota > 0
                     ? "Purchased"
                     : "None"
@@ -155,10 +176,9 @@ public class AiQuotaService : IAiQuotaService
 
     public async Task DeductQuotaAsync(Guid userId, string role, CancellationToken cancellationToken = default)
     {
-        var freeQuota = await GetSettingIntAsync("FREE_AI_QUOTA", 3, cancellationToken);
-
-        if (string.Equals(role, "Patient", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(role, Roles.Patient, StringComparison.OrdinalIgnoreCase))
         {
+            var freeQuota = await GetSettingIntAsync("FREE_AI_QUOTA", 3, cancellationToken);
             var patient = await _context.Patients
                 .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken)
                 ?? throw new InvalidOperationException("Patient not found.");
@@ -178,7 +198,7 @@ public class AiQuotaService : IAiQuotaService
                 .FirstOrDefaultAsync(o => o.Id == user.OrganizationId.Value, cancellationToken)
                 ?? throw new InvalidOperationException("Organisation not found.");
 
-            org.ConsumeQuota(freeQuota);
+            org.ConsumeQuota();
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -186,7 +206,7 @@ public class AiQuotaService : IAiQuotaService
 
     public async Task AddPurchasedQuotaAsync(Guid userId, string role, int amount, CancellationToken cancellationToken = default)
     {
-        if (string.Equals(role, "Patient", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(role, Roles.Patient, StringComparison.OrdinalIgnoreCase))
         {
             var patient = await _context.Patients
                 .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken)
@@ -227,7 +247,12 @@ public class AiQuotaService : IAiQuotaService
 
     private static bool IsOrganisationQuotaRole(string role)
     {
-        return string.Equals(role, "Ophthalmologist", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(role, "OrgAdmin", StringComparison.OrdinalIgnoreCase);
+        return string.Equals(role, Roles.OrgAdmin, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static decimal ApplyOrganisationDiscount(decimal patientUnitPrice)
+    {
+        var safePrice = NormalizeUnitPrice(patientUnitPrice);
+        return Math.Round(safePrice * OrganisationUnitPriceRatio, 0, MidpointRounding.AwayFromZero);
     }
 }

@@ -46,7 +46,7 @@ public class GetPostByIdQueryHandler : IQueryHandler<GetPostByIdQuery, PostDetai
             Id = post.AuthorId,
             AuthorType = post.AuthorType,
             FullName = user?.FullName ?? "Unknown",
-            AvatarUrl = null
+            AvatarUrl = user?.AvatarUrl
         };
 
         // Get user's reaction and bookmark status
@@ -69,6 +69,13 @@ public class GetPostByIdQueryHandler : IQueryHandler<GetPostByIdQuery, PostDetai
             RepostCount = post.RepostCount,
             ViewCount = post.ViewCount,
             AllowComments = post.AllowComments,
+            IsInternalCase = post.IsInternalCase,
+            ConsultationSessionId = post.ConsultationSessionId,
+            AiScreeningId = post.AuthorId == request.CurrentUserId || request.IsSystemAdmin
+                ? post.AiScreeningId
+                : null,
+            PatientAge = post.PatientAge,
+            PatientGender = post.PatientGender,
             Attachments = post.Attachments.Select(a => new AttachmentDto
             {
                 Id = a.Id,

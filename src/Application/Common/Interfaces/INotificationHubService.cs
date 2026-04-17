@@ -17,10 +17,10 @@ public interface INotificationHubService
     Task BroadcastToUserAsync(Guid userId, NotificationDto notification, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Broadcasts a notification to a group of users
+    /// Broadcasts unread notification count to a specific user
     /// </summary>
-    /// <param name="groupName">Group name</param>
-    /// <param name="notification">Notification DTO to broadcast</param>
+    /// <param name="userId">Target user ID</param>
+    /// <param name="count">Unread count value</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    Task BroadcastToGroupAsync(string groupName, NotificationDto notification, CancellationToken cancellationToken = default);
+    Task BroadcastUnreadCountAsync(Guid userId, int count, CancellationToken cancellationToken = default);
 }

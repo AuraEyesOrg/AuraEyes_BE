@@ -1,6 +1,10 @@
+using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Domain.Common;
+using Domain.Entities.Users;
 using Domain.Repositories;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.Network.Profile.Queries.GetUserProfile;
 
@@ -13,15 +17,18 @@ public class GetUserProfileQueryHandler : IQueryHandler<GetUserProfileQuery, Use
     private readonly IIdentityService _identityService;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IPostRepository _postRepository;
+    private readonly IRepository<Organisation> _organisationRepository;
 
     public GetUserProfileQueryHandler(
         IIdentityService identityService,
         IOphthalmologistRepository ophthalmologistRepository,
-        IPostRepository postRepository)
+        IPostRepository postRepository,
+        IRepository<Organisation> organisationRepository)
     {
         _identityService = identityService;
         _ophthalmologistRepository = ophthalmologistRepository;
         _postRepository = postRepository;
+        _organisationRepository = organisationRepository;
     }
 
     public async Task<Result<UserProfileDto>> Handle(
@@ -34,6 +41,15 @@ public class GetUserProfileQueryHandler : IQueryHandler<GetUserProfileQuery, Use
 
         // Ophthalmologist profile is optional (user may not have one yet)
         var ophthalmologist = await _ophthalmologistRepository.GetByUserIdAsync(request.UserId, cancellationToken);
+        var roles = await _identityService.GetUserRolesAsync(request.UserId);
+
+        string? bio = ophthalmologist?.Bio;
+        if (roles.Contains(Roles.OrgAdmin))
+        {
+            var organisation = await _organisationRepository.Query()
+                .FirstOrDefaultAsync(o => o.OwnerId == request.UserId, cancellationToken);
+            bio = organisation?.Description;
+        }
 
         var postCount = await _postRepository.GetPostCountByAuthorAsync(request.UserId, cancellationToken);
 
@@ -42,7 +58,7 @@ public class GetUserProfileQueryHandler : IQueryHandler<GetUserProfileQuery, Use
             UserId = user.Id,
             FullName = user.FullName,
             AvatarUrl = user.AvatarUrl,
-            Bio = ophthalmologist?.Bio,
+            Bio = bio,
             PostCount = postCount,
             YearsOfExperience = ophthalmologist?.YearsOfExperience ?? 0,
             IsVerified = ophthalmologist?.IsVerified ?? false,
@@ -51,6 +67,7 @@ public class GetUserProfileQueryHandler : IQueryHandler<GetUserProfileQuery, Use
                 {
                     Id = c.Id,
                     Type = c.Type.ToString(),
+                    DegreeLevel = c.DegreeLevel?.ToString(),
                     Name = c.Name,
                     IssuingAuthority = c.IssuingAuthority,
                     IssuedDate = c.IssuedDate,

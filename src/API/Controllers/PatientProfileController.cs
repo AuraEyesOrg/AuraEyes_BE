@@ -73,6 +73,7 @@ public class PatientProfileController : BaseApiController
             DateOfBirth = request.DateOfBirth,
             Gender = request.Gender,
             Address = request.Address,
+            CitizenId = request.CitizenId,
         };
 
         var result = await _mediator.Send(command, cancellationToken);
@@ -155,6 +156,7 @@ public record UpdateProfileRequest
     public string? DateOfBirth { get; init; }
     public string? Gender { get; init; }
     public string? Address { get; init; }
+    public string? CitizenId { get; init; }
 }
 
 /// <summary>

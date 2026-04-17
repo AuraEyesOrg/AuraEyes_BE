@@ -39,7 +39,9 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<Organisation> Organisations => Set<Organisation>();
     public DbSet<OrganisationOnboardingRequest> OrganisationOnboardingRequests => Set<OrganisationOnboardingRequest>();
     public DbSet<Ophthalmologist> Ophthalmologists => Set<Ophthalmologist>();
+    public DbSet<OphthalmologistEmploymentTypeChangeRequest> OphthalmologistEmploymentTypeChangeRequests => Set<OphthalmologistEmploymentTypeChangeRequest>();
     public DbSet<Patient> Patients => Set<Patient>();
+    public DbSet<OrganisationPatientLink> OrganisationPatientLinks => Set<OrganisationPatientLink>();
     public DbSet<Certificate> Certificates => Set<Certificate>();
     public DbSet<Consent> Consents => Set<Consent>();
 
@@ -48,6 +50,7 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<RetinalImage> RetinalImages => Set<RetinalImage>();
     public DbSet<ScreeningResult> ScreeningResults => Set<ScreeningResult>();
     public DbSet<MedicalDiagnosis> MedicalDiagnoses => Set<MedicalDiagnosis>();
+    public DbSet<PatientRoadmap> PatientRoadmaps => Set<PatientRoadmap>();
 
     // Consultation
     public DbSet<ConsultationSession> ConsultationSessions => Set<ConsultationSession>();
@@ -61,11 +64,14 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<ScheduleTemplate> ScheduleTemplates => Set<ScheduleTemplate>();
     public DbSet<AppointmentSlot> AppointmentSlots => Set<AppointmentSlot>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<OphthalmologistLeaveRequest> OphthalmologistLeaveRequests => Set<OphthalmologistLeaveRequest>();
+    public DbSet<ExperiencePricingRule> ExperiencePricingRules => Set<ExperiencePricingRule>();
 
     // Financial
     public DbSet<Wallet> Wallets => Set<Wallet>();
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
     public DbSet<DepositRequest> DepositRequests => Set<DepositRequest>();
+    public DbSet<WithdrawalRequest> WithdrawalRequests => Set<WithdrawalRequest>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<Payment> Payments => Set<Payment>();
 

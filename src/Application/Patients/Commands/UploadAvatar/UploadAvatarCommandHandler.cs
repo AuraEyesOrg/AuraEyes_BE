@@ -28,7 +28,7 @@ public class UploadAvatarCommandHandler : ICommandHandler<UploadAvatarCommand, U
         var avatarUrl = await _fileStorageService.SaveFileAsync(
             request.FileStream,
             request.FileName,
-            $"avatars/{request.UserId}",
+            $"patients/avatars/{request.UserId}",
             cancellationToken);
 
         var (succeeded, errors) = await _identityService.UpdateAvatarUrlAsync(

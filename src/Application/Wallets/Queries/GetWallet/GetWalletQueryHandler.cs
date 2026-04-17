@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.Common.Constants;
 using Application.Wallets.Common;
 using Domain.Entities.Financial;
 using Domain.Repositories;
@@ -13,11 +14,16 @@ namespace Application.Wallets.Queries.GetWallet;
 public class GetWalletQueryHandler : IQueryHandler<GetWalletQuery, WalletDto>
 {
     private readonly IWalletRepository _walletRepository;
+    private readonly IIdentityService _identityService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public GetWalletQueryHandler(IWalletRepository walletRepository, IUnitOfWork unitOfWork)
+    public GetWalletQueryHandler(
+        IWalletRepository walletRepository,
+        IIdentityService identityService,
+        IUnitOfWork unitOfWork)
     {
         _walletRepository = walletRepository;
+        _identityService = identityService;
         _unitOfWork = unitOfWork;
     }
 
@@ -28,7 +34,14 @@ public class GetWalletQueryHandler : IQueryHandler<GetWalletQuery, WalletDto>
         // If wallet doesn't exist, create one
         if (wallet is null)
         {
-            wallet = new Wallet(request.UserId, "Patient", 0);
+            var roles = await _identityService.GetUserRolesAsync(request.UserId);
+            var ownerType = roles.Contains(Roles.Ophthalmologist)
+                ? "Ophthalmologist"
+                : roles.Contains(Roles.OrgAdmin)
+                    ? "Organisation"
+                    : Roles.Patient;
+
+            wallet = new Wallet(request.UserId, ownerType, 0);
             await _walletRepository.AddAsync(wallet, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
         }

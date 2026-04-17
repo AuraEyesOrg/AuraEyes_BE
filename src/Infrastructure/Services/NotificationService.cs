@@ -4,6 +4,7 @@ using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Platform;
 using Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Services;
@@ -14,6 +15,22 @@ namespace Infrastructure.Services;
 /// </summary>
 public class NotificationService : INotificationService
 {
+    private static readonly string[] GenericReferenceKeys =
+    {
+        "consultationSessionId",
+        "consultationId",
+        "sessionId",
+        "appointmentId",
+        "appointmentSlotId",
+        "slotId",
+        "screeningId",
+        "aiScreeningId",
+        "transactionId",
+        "messageId",
+        "ophthalmologistId",
+        "ophthalmologistUserId"
+    };
+
     private readonly IRepository<Notification> _notificationRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationHubService _hubService;
@@ -38,7 +55,8 @@ public class NotificationService : INotificationService
         string message,
         NotificationType type,
         object? payload = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? referenceId = null)
     {
         try
         {
@@ -53,12 +71,23 @@ public class NotificationService : INotificationService
                 });
             }
 
+            referenceId ??= ExtractReferenceId(type, payloadJson);
+
+            if (referenceId is null && RequiresReferenceId(type))
+            {
+                _logger.LogWarning(
+                    "ReferenceId was not resolved for notification Type={Type}, UserId={UserId}",
+                    type,
+                    userId);
+            }
+
             // Step B: Create and persist notification entity
             var notification = new Notification(
                 userId,
                 title,
                 message,
                 type,
+                referenceId,
                 payloadJson);
 
             await _notificationRepository.AddAsync(notification, cancellationToken);
@@ -76,12 +105,20 @@ public class NotificationService : INotificationService
                 Title = title,
                 Message = message,
                 Type = type,
+                ReferenceId = referenceId,
                 IsRead = false,
                 Payload = payloadJson,
                 CreatedAt = notification.CreatedAt
             };
 
             await _hubService.BroadcastToUserAsync(userId, notificationDto, cancellationToken);
+
+            var unreadCount = await _notificationRepository
+                .Query()
+                .AsNoTracking()
+                .CountAsync(n => n.UserId == userId && !n.IsRead, cancellationToken);
+
+            await _hubService.BroadcastUnreadCountAsync(userId, unreadCount, cancellationToken);
 
             _logger.LogInformation(
                 "Notification broadcasted via SignalR to User {UserId}",
@@ -106,6 +143,101 @@ public class NotificationService : INotificationService
             message,
             NotificationType.NewConsultationRequest,
             null,
-            cancellationToken);
+            cancellationToken,
+            null);
+    }
+
+    private static Guid? ExtractReferenceId(NotificationType type, string? payloadJson)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson))
+            return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(payloadJson);
+            var root = document.RootElement;
+
+            if (root.ValueKind != JsonValueKind.Object)
+                return null;
+
+            var prioritizedKeys = GetReferenceKeysByType(type);
+            foreach (var key in prioritizedKeys)
+            {
+                if (TryReadGuid(root, key, out var parsed))
+                {
+                    return parsed;
+                }
+            }
+
+            foreach (var key in GenericReferenceKeys)
+            {
+                if (prioritizedKeys.Contains(key, StringComparer.Ordinal))
+                    continue;
+
+                if (TryReadGuid(root, key, out var parsed))
+                {
+                    return parsed;
+                }
+            }
+        }
+        catch
+        {
+            // Ignore malformed payload content and keep reference id unset.
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyCollection<string> GetReferenceKeysByType(NotificationType type)
+    {
+        return type switch
+        {
+            NotificationType.AiScreeningCompleted =>
+                new[] { "aiScreeningId", "screeningId" },
+
+            NotificationType.ConsultationAccepted or
+            NotificationType.ConsultationResultProvided or
+            NotificationType.NewConsultationRequest or
+            NotificationType.NewPatientMessage =>
+                new[] { "consultationSessionId", "consultationId", "sessionId" },
+
+            NotificationType.NewAppointmentBooked or
+            NotificationType.ScheduleChanged =>
+                new[]
+                {
+                    "appointmentId",
+                    "appointmentSlotId",
+                    "slotId",
+                    "consultationSessionId",
+                    "sessionId"
+                },
+
+            NotificationType.WalletDepositSuccess or
+            NotificationType.WalletPaymentProcessed =>
+                new[] { "transactionId" },
+
+            NotificationType.SystemAlert =>
+                new[] { "ophthalmologistId", "ophthalmologistUserId" },
+
+            _ => Array.Empty<string>()
+        };
+    }
+
+    private static bool TryReadGuid(JsonElement root, string key, out Guid value)
+    {
+        value = Guid.Empty;
+
+        if (!root.TryGetProperty(key, out var element))
+            return false;
+
+        if (element.ValueKind != JsonValueKind.String)
+            return false;
+
+        return Guid.TryParse(element.GetString(), out value);
+    }
+
+    private static bool RequiresReferenceId(NotificationType type)
+    {
+        return type != NotificationType.SystemAlert;
     }
 }

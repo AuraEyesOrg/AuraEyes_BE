@@ -35,14 +35,20 @@ public class ProfessionalPostConfiguration : IEntityTypeConfiguration<Profession
         builder.Property(e => e.AllowComments)
             .HasDefaultValue(true);
 
-        builder.Property(e => e.IsRepost)
-            .HasDefaultValue(false);
-
         builder.Property(e => e.IsHidden)
             .HasDefaultValue(false);
 
         builder.Property(e => e.HideReason)
             .HasMaxLength(1000);
+
+        builder.Property(e => e.IsInternalCase)
+            .HasDefaultValue(false);
+
+        builder.Property(e => e.PatientGender)
+            .HasMaxLength(32);
+
+        builder.Property(e => e.IsRepost)
+            .HasDefaultValue(false);
 
         builder.Property(e => e.ReactionCount)
             .HasDefaultValue(0);
@@ -86,7 +92,10 @@ public class ProfessionalPostConfiguration : IEntityTypeConfiguration<Profession
         builder.HasIndex(e => e.OrganisationId);
         builder.HasIndex(e => e.Category);
         builder.HasIndex(e => e.CreatedAt);
-        builder.HasIndex(e => e.IsHidden);
         builder.HasIndex(e => new { e.AuthorId, e.AuthorType });
+        builder.HasIndex(e => e.ConsultationSessionId);
+        builder.HasIndex(e => e.AiScreeningId);
+        builder.HasIndex(e => e.IsInternalCase);
+        builder.HasIndex(e => e.IsHidden);
     }
 }

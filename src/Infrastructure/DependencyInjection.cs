@@ -2,6 +2,10 @@ using System.Text;
 using Application.AiQuota.Interfaces;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
+using Application.OrganisationScreenings.Interfaces;
+using Application.Screenings.Interfaces;
+using Application.Scheduling.ScheduleTemplates.Interfaces;
+using Application.SystemAdmin.Ophthalmologists.Interfaces;
 using Application.SystemAdmin.Interfaces;
 using Application.SystemSettings.Interfaces;
 using Domain.Common;
@@ -58,14 +62,23 @@ public static class DependencyInjection
         // Admin notification settings
         services.Configure<AdminNotificationSettings>(configuration.GetSection(AdminNotificationSettings.SectionName));
 
-        // Supabase Storage Settings
+        // Cloudinary Settings
+        services.Configure<CloudinarySettings>(configuration.GetSection(CloudinarySettings.SectionName));
+
+        // Supabase Storage Settings (Keep for potential legacy needs)
         services.Configure<SupabaseStorageSettings>(configuration.GetSection(SupabaseStorageSettings.SectionName));
 
         // Google Meet Settings
         services.Configure<GoogleMeetSettings>(configuration.GetSection(GoogleMeetSettings.SectionName));
 
+        // Google AI Studio Settings
+        services.Configure<GoogleAiStudioSettings>(configuration.GetSection(GoogleAiStudioSettings.SectionName));
+
         // Google Auth Settings (for Google Login)
         services.Configure<GoogleAuthSettings>(configuration.GetSection(GoogleAuthSettings.SectionName));
+
+        // BetterStack settings
+        services.Configure<BetterStackSettings>(configuration.GetSection(BetterStackSettings.SectionName));
 
         // ASP.NET Core Identity configuration
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
@@ -166,8 +179,12 @@ public static class DependencyInjection
         services.AddScoped<IOphthalmologistRepository, OphthalmologistRepository>();
         services.AddScoped<IWalletRepository, WalletRepository>();
         services.AddScoped<IDepositRequestRepository, DepositRequestRepository>();
+        services.AddScoped<IWithdrawalRequestRepository, WithdrawalRequestRepository>();
+        services.AddScoped<IOphthalmologistLeaveRequestRepository, OphthalmologistLeaveRequestRepository>();
+        services.AddScoped<IOphthalmologistEmploymentTypeChangeRequestRepository, OphthalmologistEmploymentTypeChangeRequestRepository>();
         services.AddScoped<IScheduleTemplateRepository, ScheduleTemplateRepository>();
         services.AddScoped<IAppointmentSlotRepository, AppointmentSlotRepository>();
+        services.AddScoped<IExperiencePricingRuleRepository, ExperiencePricingRuleRepository>();
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
         services.AddScoped<IConsultationSessionRepository, ConsultationSessionRepository>();
         services.AddScoped<IOrganisationFeedbackRepository, OrganisationFeedbackRepository>();
@@ -190,13 +207,20 @@ public static class DependencyInjection
         services.AddTransient<IDateTime, DateTimeService>();
         services.AddTransient<IEmailService, EmailService>();
         services.AddScoped<IOrganisationOnboardingService, OrganisationOnboardingService>();
-        services.AddScoped<IFileStorageService, SupabaseStorageService>();
+        services.AddScoped<IFileStorageService, CloudinaryStorageService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IGoogleMeetService, GoogleMeetService>();
+        services.AddScoped<IPatientRoadmapGenerationService, PatientRoadmapGenerationService>();
         services.AddScoped<IAdminQueryService, AdminQueryService>();
         services.AddScoped<IAiQuotaService, AiQuotaService>();
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
         services.AddScoped<ISystemSettingService, SystemSettingService>();
+        services.AddScoped<IOrganisationScreeningPdfService, OrganisationScreeningPdfService>();
+        services.AddScoped<IPatientScreeningPdfService, PatientScreeningPdfService>();
+        services.AddScoped<IOphthalmologistContractProvisioningService, OphthalmologistContractProvisioningService>();
+        services.AddSingleton<IAiAssetBaseUrlProvider, AiAssetBaseUrlProvider>();
+        services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();
+        services.AddScoped<IFullTimeTemplateProvisioningService, FullTimeTemplateProvisioningService>();
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
@@ -205,11 +229,38 @@ public static class DependencyInjection
 
         // Register Hangfire daily job
         services.AddScoped<DailyQuotaResetJob>();
+        services.AddScoped<MonthlyQuotaResetJob>();
         services.AddScoped<SlotMaintenanceJob>();
+        services.AddScoped<FullTimeSlotGenerationJob>();
 
         // Configure PayOS Settings
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));
         services.AddScoped<IPayOSService, PayOSService>();
+
+        // Register PayOS Payout Service with IPv4-only SocketsHttpHandler
+        // to ensure requests go through the whitelisted IPv4 address (not IPv6).
+        services.AddHttpClient<IPayOSPayoutService, PayOSPayoutService>()
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                ConnectCallback = async (context, cancellationToken) =>
+                {
+                    // Force IPv4 by resolving DNS and picking only IPv4 addresses
+                    var addresses = await System.Net.Dns.GetHostAddressesAsync(
+                        context.DnsEndPoint.Host,
+                        System.Net.Sockets.AddressFamily.InterNetwork,
+                        cancellationToken);
+                    var ipv4 = addresses.FirstOrDefault()
+                        ?? throw new InvalidOperationException(
+                            $"No IPv4 address found for {context.DnsEndPoint.Host}");
+                    var socket = new System.Net.Sockets.Socket(
+                        System.Net.Sockets.AddressFamily.InterNetwork,
+                        System.Net.Sockets.SocketType.Stream,
+                        System.Net.Sockets.ProtocolType.Tcp);
+                    socket.NoDelay = true;
+                    await socket.ConnectAsync(ipv4, context.DnsEndPoint.Port, cancellationToken);
+                    return new System.Net.Sockets.NetworkStream(socket, ownsSocket: true);
+                }
+            });
 
         return services;
     }

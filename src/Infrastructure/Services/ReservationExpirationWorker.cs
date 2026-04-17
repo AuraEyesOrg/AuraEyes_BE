@@ -16,13 +16,16 @@ public class ReservationExpirationWorker : BackgroundService
     private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(1);
 
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IBetterStackHeartbeatService _betterStackHeartbeat;
     private readonly ILogger<ReservationExpirationWorker> _logger;
 
     public ReservationExpirationWorker(
         IServiceScopeFactory scopeFactory,
+        IBetterStackHeartbeatService betterStackHeartbeat,
         ILogger<ReservationExpirationWorker> logger)
     {
         _scopeFactory = scopeFactory;
+        _betterStackHeartbeat = betterStackHeartbeat;
         _logger = logger;
     }
 
@@ -34,14 +37,28 @@ public class ReservationExpirationWorker : BackgroundService
         {
             try
             {
+                await _betterStackHeartbeat.NotifyStartedAsync(BetterStackMonitor.ReservationExpirationWorker, stoppingToken);
                 await ReleaseExpiredReservationsAsync(stoppingToken);
+                await _betterStackHeartbeat.NotifySucceededAsync(BetterStackMonitor.ReservationExpirationWorker, stoppingToken);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
             {
+                _logger.LogWarning("ReservationExpirationWorker cycle was canceled by infrastructure timeout and will retry.");
+            }
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+            {
+                await _betterStackHeartbeat.NotifyFailedAsync(BetterStackMonitor.ReservationExpirationWorker, stoppingToken);
                 _logger.LogError(ex, "Error in ReservationExpirationWorker cycle");
             }
 
-            await Task.Delay(CheckInterval, stoppingToken);
+            try
+            {
+                await Task.Delay(CheckInterval, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
         }
 
         _logger.LogInformation("ReservationExpirationWorker stopped");

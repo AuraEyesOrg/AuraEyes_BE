@@ -18,6 +18,7 @@ public class PatientResourcesController : BaseApiController
 
     private const string DefaultTrustedDomains =
         "vinmec.com,vnio.vn,benhvienmat.com,matsaigon.com,matquocte.vn,medlatec.vn,hellobacsi.com";
+    private const string DefaultHealthKeyword = "suc khoe mat";
 
     public PatientResourcesController(
         IHttpClientFactory httpClientFactory,
@@ -46,142 +47,234 @@ public class PatientResourcesController : BaseApiController
         [FromQuery] int limit = 3,
         CancellationToken cancellationToken = default)
     {
-        var apiKey = _configuration["SerpApi:ApiKey"];
-        if (string.IsNullOrWhiteSpace(apiKey))
-        {
-            _logger.LogWarning("SerpApi key is missing. Returning empty educational resource list.");
-            return OkResponse<IReadOnlyList<PatientEducationalResourceDto>>(
-                Array.Empty<PatientEducationalResourceDto>(),
-                "SerpApi key is not configured.");
-        }
+        var maxItems = Math.Clamp(limit, 1, 10);
+        var diseaseTerms = ParseDiseaseTerms(diseases);
 
-        // Resolve trusted domains from DB settings; fall back to built-in defaults.
         var rawDomains = await _systemSettingService.GetSettingAsync(
             "TRUSTED_EYE_HEALTH_DOMAINS", cancellationToken);
         if (string.IsNullOrWhiteSpace(rawDomains))
             rawDomains = DefaultTrustedDomains;
+        var trustedDomains = ParseDomains(rawDomains);
+        var serpItems = await FetchSerpEducationalResourcesAsync(
+            diseaseTerms,
+            trustedDomains,
+            maxItems,
+            cancellationToken);
 
-        var siteFilter = BuildSiteFilter(rawDomains);
-        var searchQuery = BuildSearchQuery(diseases, siteFilter);
-        var maxItems = Math.Clamp(limit, 1, 10);
+        var fallbackItems = BuildMockResources(diseaseTerms, maxItems);
+        var merged = MergeWithFallback(serpItems, fallbackItems, maxItems);
 
-        _logger.LogInformation("SerpApi search query: {Query}", searchQuery);
+        return OkResponse<IReadOnlyList<PatientEducationalResourceDto>>(
+            merged,
+            serpItems.Count > 0
+                ? "Educational resources loaded."
+                : "Showing curated educational resources.");
+    }
 
+    private async Task<List<PatientEducationalResourceDto>> FetchSerpEducationalResourcesAsync(
+        IReadOnlyList<string> diseaseTerms,
+        IReadOnlyCollection<string> trustedDomains,
+        int maxItems,
+        CancellationToken cancellationToken)
+    {
+        var apiKey = _configuration["SerpApi:ApiKey"];
         var serpBaseUrl = _configuration["SerpApi:BaseUrl"];
-        var queryParams = new Dictionary<string, string?>
+        if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(serpBaseUrl))
         {
-            { "engine", "google" },
-            { "hl", "vi" },
-            { "gl", "vn" },
-            { "safe", "active" },
-            { "num", maxItems.ToString() },
-            { "q", searchQuery },
-            { "api_key", apiKey }
+            _logger.LogWarning("SerpApi credentials are missing, skip real fetch.");
+            return [];
+        }
+
+        var candidates = new List<PatientEducationalResourceDto>();
+        var seenLinks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var searchQueries = BuildSearchQueries(diseaseTerms, trustedDomains);
+        var client = _httpClientFactory.CreateClient();
+
+        foreach (var query in searchQueries.Take(4))
+        {
+            if (candidates.Count >= maxItems) break;
+
+            var queryParams = new Dictionary<string, string?>
+            {
+                { "engine", "google" },
+                { "hl", "vi" },
+                { "gl", "vn" },
+                { "safe", "active" },
+                { "num", Math.Max(maxItems * 2, 6).ToString() },
+                { "q", query },
+                { "api_key", apiKey }
+            };
+
+            var searchUrl = QueryHelpers.AddQueryString(serpBaseUrl, queryParams);
+
+            try
+            {
+                using var response = await client.GetAsync(searchUrl, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("SerpApi request failed for query {Query} with status {StatusCode}.", query, (int)response.StatusCode);
+                    continue;
+                }
+
+                var json = await response.Content.ReadAsStringAsync(cancellationToken);
+                using var doc = JsonDocument.Parse(json);
+                if (!doc.RootElement.TryGetProperty("organic_results", out var organicResults) ||
+                    organicResults.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                foreach (var result in organicResults.EnumerateArray())
+                {
+                    if (candidates.Count >= maxItems) break;
+
+                    var title = result.TryGetProperty("title", out var titleProp)
+                        ? titleProp.GetString()
+                        : null;
+                    var link = result.TryGetProperty("link", out var linkProp)
+                        ? linkProp.GetString()
+                        : null;
+
+                    if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(link))
+                        continue;
+                    if (!seenLinks.Add(link))
+                        continue;
+                    if (!IsAllowedDomain(link, trustedDomains))
+                        continue;
+
+                    var snippet = result.TryGetProperty("snippet", out var snippetProp)
+                        ? snippetProp.GetString()
+                        : string.Empty;
+
+                    string? image = null;
+                    if (result.TryGetProperty("thumbnail", out var thumbnailProp))
+                        image = thumbnailProp.GetString();
+                    else if (result.TryGetProperty("favicon", out var faviconProp))
+                        image = faviconProp.GetString();
+
+                    candidates.Add(new PatientEducationalResourceDto(
+                        Guid.NewGuid().ToString("N"),
+                        title,
+                        snippet ?? string.Empty,
+                        link,
+                        image));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed SerpApi request for query {Query}.", query);
+            }
+        }
+
+        return candidates;
+    }
+
+    private static bool IsAllowedDomain(string link, IReadOnlyCollection<string> trustedDomains)
+    {
+        if (trustedDomains.Count == 0) return true;
+        if (!Uri.TryCreate(link, UriKind.Absolute, out var uri)) return false;
+        var host = uri.Host.ToLowerInvariant();
+        return trustedDomains.Any(domain => host == domain || host.EndsWith("." + domain));
+    }
+
+    private static List<string> BuildSearchQueries(
+        IReadOnlyList<string> diseaseTerms,
+        IReadOnlyCollection<string> trustedDomains)
+    {
+        var primaryTerm = diseaseTerms.FirstOrDefault() ?? DefaultHealthKeyword;
+        var siteFilter = trustedDomains.Count > 0
+            ? $"({string.Join(" OR ", trustedDomains.Take(6).Select(d => $"site:{d}"))})"
+            : string.Empty;
+
+        var queries = new List<string>
+        {
+            string.IsNullOrWhiteSpace(siteFilter)
+                ? $"{primaryTerm} dieu tri va theo doi"
+                : $"{primaryTerm} {siteFilter}",
+            $"{primaryTerm} trieu chung va phong ngua",
+            $"{primaryTerm} patient education",
+            "suc khoe mat phong ngua benh vong mac"
         };
 
-        var searchUrl = QueryHelpers.AddQueryString(serpBaseUrl, queryParams);
-
-        try
-        {
-            var client = _httpClientFactory.CreateClient();
-            using var response = await client.GetAsync(searchUrl, cancellationToken);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogWarning(
-                    "SerpApi request failed with status {StatusCode}.",
-                    (int)response.StatusCode);
-                return OkResponse<IReadOnlyList<PatientEducationalResourceDto>>(
-                    Array.Empty<PatientEducationalResourceDto>(),
-                    "Unable to load educational resources at the moment.");
-            }
-
-            var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            using var doc = JsonDocument.Parse(json);
-
-            if (!doc.RootElement.TryGetProperty("organic_results", out var organicResults)
-                || organicResults.ValueKind != JsonValueKind.Array)
-            {
-                return OkResponse<IReadOnlyList<PatientEducationalResourceDto>>(
-                    Array.Empty<PatientEducationalResourceDto>(),
-                    "No educational resources found.");
-            }
-
-            var items = new List<PatientEducationalResourceDto>(maxItems);
-            foreach (var result in organicResults.EnumerateArray())
-            {
-                if (items.Count >= maxItems) break;
-
-                var title = result.TryGetProperty("title", out var titleProp)
-                    ? titleProp.GetString()
-                    : null;
-                var link = result.TryGetProperty("link", out var linkProp)
-                    ? linkProp.GetString()
-                    : null;
-
-                if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(link))
-                    continue;
-
-                var snippet = result.TryGetProperty("snippet", out var snippetProp)
-                    ? snippetProp.GetString()
-                    : string.Empty;
-
-                string? image = null;
-                if (result.TryGetProperty("thumbnail", out var thumbnailProp))
-                    image = thumbnailProp.GetString();
-                else if (result.TryGetProperty("favicon", out var faviconProp))
-                    image = faviconProp.GetString();
-
-                items.Add(new PatientEducationalResourceDto(
-                    Guid.NewGuid().ToString("N"),
-                    title,
-                    snippet ?? string.Empty,
-                    link,
-                    image));
-            }
-
-            return OkResponse<IReadOnlyList<PatientEducationalResourceDto>>(
-                items,
-                "Educational resources loaded.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to fetch educational resources from SerpApi.");
-            return OkResponse<IReadOnlyList<PatientEducationalResourceDto>>(
-                Array.Empty<PatientEducationalResourceDto>(),
-                "Unable to load educational resources at the moment.");
-        }
+        return queries.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    // Builds "(site:vinmec.com OR site:vnio.vn OR ...)" from a comma-separated domain list.
-    private static string BuildSiteFilter(string rawDomains)
+    private static List<string> ParseDiseaseTerms(string? diseases)
     {
-        var domains = rawDomains.Split(
-            ',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (domains.Length == 0) return string.Empty;
+        if (string.IsNullOrWhiteSpace(diseases))
+            return [];
 
-        var parts = domains.Select(d => $"site:{d.TrimStart('.')}");
-        return $"({string.Join(" OR ", parts)})";
+        return diseases
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(5)
+            .ToList();
     }
 
-    // Combines the primary disease keyword with the site filter.
-    private static string BuildSearchQuery(string? diseases, string siteFilter)
+    private static List<string> ParseDomains(string rawDomains)
     {
-        var primaryDisease = string.Empty;
+        return rawDomains
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(d => d.Trim().TrimStart('.').ToLowerInvariant())
+            .Where(d => !string.IsNullOrWhiteSpace(d))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 
-        if (!string.IsNullOrWhiteSpace(diseases))
+    private static List<PatientEducationalResourceDto> BuildMockResources(
+        IReadOnlyList<string> diseaseTerms,
+        int maxItems)
+    {
+        var primary = diseaseTerms.FirstOrDefault() ?? "suc khoe mat";
+        var templates = new List<PatientEducationalResourceDto>
         {
-            primaryDisease = diseases
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .FirstOrDefault()?.Trim() ?? string.Empty;
+            new(
+                $"mock-{Guid.NewGuid():N}",
+                $"Huong dan theo doi va cham soc khi co dau hieu {primary}",
+                "Tong hop cach theo doi trieu chung va khi nao can di kham chuyen khoa mat.",
+                "https://www.nei.nih.gov/learn-about-eye-health",
+                null),
+            new(
+                $"mock-{Guid.NewGuid():N}",
+                "Cach chuan bi buoi kham mat sau ket qua AI screening",
+                "Danh sach cau hoi nen hoi bac si va thong tin can mang theo khi tai kham.",
+                "https://medlineplus.gov/eyediseases.html",
+                null),
+            new(
+                $"mock-{Guid.NewGuid():N}",
+                "Tong quan cac benh mat pho bien va cach phong ngua",
+                "Tai lieu tong quan de hieu nguy co, trieu chung va huong phong ngua benh ly vong mac.",
+                "https://www.who.int/news-room/fact-sheets/detail/blindness-and-vision-impairment",
+                null)
+        };
+
+        return templates.Take(maxItems).ToList();
+    }
+
+    private static List<PatientEducationalResourceDto> MergeWithFallback(
+        IReadOnlyList<PatientEducationalResourceDto> serpItems,
+        IReadOnlyList<PatientEducationalResourceDto> fallbackItems,
+        int maxItems)
+    {
+        var merged = new List<PatientEducationalResourceDto>(maxItems);
+        var seenLinks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var item in serpItems)
+        {
+            if (merged.Count >= maxItems) break;
+            if (seenLinks.Add(item.Link))
+                merged.Add(item);
         }
 
-        if (string.IsNullOrWhiteSpace(primaryDisease))
-            primaryDisease = "sức khỏe mắt";
+        foreach (var item in fallbackItems)
+        {
+            if (merged.Count >= maxItems) break;
+            if (seenLinks.Add(item.Link))
+                merged.Add(item);
+        }
 
-        return string.IsNullOrWhiteSpace(siteFilter)
-            ? primaryDisease
-            : $"{primaryDisease} {siteFilter}";
+        return merged;
     }
 }
 

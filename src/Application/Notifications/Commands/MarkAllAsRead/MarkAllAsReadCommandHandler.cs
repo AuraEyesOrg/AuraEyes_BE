@@ -13,13 +13,16 @@ public class MarkAllAsReadCommandHandler : ICommandHandler<MarkAllAsReadCommand>
 {
     private readonly IRepository<Notification> _notificationRepository;
     private readonly ICurrentUserService _currentUser;
+    private readonly INotificationHubService _notificationHubService;
 
     public MarkAllAsReadCommandHandler(
         IRepository<Notification> notificationRepository,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        INotificationHubService notificationHubService)
     {
         _notificationRepository = notificationRepository;
         _currentUser = currentUser;
+        _notificationHubService = notificationHubService;
     }
 
     public async Task<Result> Handle(
@@ -39,6 +42,8 @@ public class MarkAllAsReadCommandHandler : ICommandHandler<MarkAllAsReadCommand>
                     .SetProperty(n => n.IsRead, true)
                     .SetProperty(n => n.UpdatedAt, DateTime.UtcNow),
                 cancellationToken);
+
+        await _notificationHubService.BroadcastUnreadCountAsync(userId, 0, cancellationToken);
 
         return Result.Success();
     }

@@ -1,5 +1,6 @@
 using Application.AiQuota.Common;
 using Application.AiQuota.Interfaces;
+using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 
@@ -21,7 +22,7 @@ public class GetQuotaBalanceQueryHandler : IQueryHandler<GetQuotaBalanceQuery, Q
         if (_currentUser.UserId is null)
             return Result<QuotaBalanceDto>.Unauthorized("User is not authenticated.");
 
-        var role = _currentUser.Roles.FirstOrDefault() ?? "Patient";
+        var role = _currentUser.Roles.FirstOrDefault() ?? Roles.Patient;
         var quota = await _quotaService.GetQuotaAsync(_currentUser.UserId.Value, role, cancellationToken);
 
         return Result<QuotaBalanceDto>.Success(new QuotaBalanceDto
@@ -30,8 +31,14 @@ public class GetQuotaBalanceQueryHandler : IQueryHandler<GetQuotaBalanceQuery, Q
             UsedAiQuota = quota.UsedQuota,
             RemainingQuota = quota.RemainingQuota,
             QuotaSource = quota.QuotaSource,
-            BundlePrice = quota.BundlePrice,
-            BundleSize = quota.BundleSize
+            UnitPrice = quota.UnitPrice,
+            FreeQuotaLimit = quota.FreeQuotaLimit,
+            FreeQuotaUsed = quota.FreeQuotaUsed,
+            FreeQuotaRemaining = quota.FreeQuotaRemaining,
+            MonthlyQuotaLimit = quota.MonthlyQuotaLimit,
+            MonthlyQuotaUsed = quota.MonthlyQuotaUsed,
+            MonthlyQuotaRemaining = quota.MonthlyQuotaRemaining,
+            PurchasedQuota = quota.PurchasedQuota
         });
     }
 }

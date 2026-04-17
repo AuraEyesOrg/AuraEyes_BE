@@ -72,6 +72,9 @@ public record ConsultationSessionListDto
 
     // Lightweight AI snapshot for listing/searching (populated in query handler).
     public ConsultationCaseSnapshotDto? CaseSnapshot { get; init; }
+
+    /// <summary>Truncated text of the most recent chat message (populated in query handler).</summary>
+    public string? LatestMessagePreview { get; init; }
 }
 
 public record ConsultationCaseSnapshotDto

@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Domain.Enums;
 
 namespace Application.Notifications.Queries.GetMyNotifications;
 
@@ -17,6 +18,11 @@ public record GetMyNotificationsQuery : IQuery<PaginatedNotificationsResponse>
     /// Number of items per page
     /// </summary>
     public int PageSize { get; init; } = 10;
+
+    /// <summary>
+    /// Optional notification type filters (OR condition)
+    /// </summary>
+    public IReadOnlyCollection<NotificationType>? Types { get; init; }
 }
 
 /// <summary>

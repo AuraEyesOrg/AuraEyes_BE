@@ -17,7 +17,10 @@ public class ContractDto
     public string UserEmail { get; set; } = string.Empty;
 
     public int AiQuotaLimit { get; set; }
+    public int MonthlyQuotaLimit { get; set; }
     public decimal PlatformCommissionRate { get; set; }
+    public decimal? CommissionRate { get; set; }
+    public decimal? ActualMonthlySalary { get; set; }
     public DateTime? SignedDate { get; set; }
     public string? ScannedDocumentUrl { get; set; }
     public DateTime CreatedAt { get; set; }

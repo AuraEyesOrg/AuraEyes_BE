@@ -19,6 +19,40 @@ using System.Security.Claims;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 
+static string ResolveHangfireSchema(string? configuredSchema, bool isDevelopment)
+{
+    var rawSchema = configuredSchema;
+
+    if (string.IsNullOrWhiteSpace(rawSchema) && isDevelopment)
+    {
+        rawSchema = $"hangfire_dev_{Environment.MachineName}";
+    }
+
+    if (string.IsNullOrWhiteSpace(rawSchema))
+    {
+        rawSchema = "hangfire";
+    }
+
+    var normalized = new string(
+        rawSchema
+            .Trim()
+            .ToLowerInvariant()
+            .Select(ch => char.IsLetterOrDigit(ch) ? ch : '_')
+            .ToArray());
+
+    if (string.IsNullOrWhiteSpace(normalized))
+    {
+        normalized = "hangfire";
+    }
+
+    if (char.IsDigit(normalized[0]))
+    {
+        normalized = $"h_{normalized}";
+    }
+
+    return normalized.Length > 63 ? normalized[..63] : normalized;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add Serilog
@@ -182,6 +216,11 @@ var hangfireConnectionBuilder = new NpgsqlConnectionStringBuilder(defaultConnect
     MinPoolSize = 0
 };
 
+var configuredHangfireSchema = builder.Configuration["Hangfire:Schema"]
+    ?? Environment.GetEnvironmentVariable("HANGFIRE_SCHEMA");
+var hangfireSchema = ResolveHangfireSchema(configuredHangfireSchema, builder.Environment.IsDevelopment());
+Log.Information("Using Hangfire schema '{HangfireSchema}'", hangfireSchema);
+
 var enableHangfireServer = builder.Configuration.GetValue<bool?>("Hangfire:ServerEnabled")
     ?? !builder.Environment.IsDevelopment();
 
@@ -192,8 +231,12 @@ builder.Services.AddHangfire(config => config
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
-    .UsePostgreSqlStorage(options =>
-        options.UseNpgsqlConnection(hangfireConnectionBuilder.ConnectionString)));
+    .UsePostgreSqlStorage(
+        options => options.UseNpgsqlConnection(hangfireConnectionBuilder.ConnectionString),
+        new PostgreSqlStorageOptions
+        {
+            SchemaName = hangfireSchema
+        }));
 
 if (enableHangfireServer)
 {
@@ -201,6 +244,7 @@ if (enableHangfireServer)
     {
         // Keep worker count very low when using Supabase pooled connection.
         options.WorkerCount = Math.Max(1, hangfireWorkerCount);
+        options.ServerName = $"{Environment.MachineName}:{Environment.ProcessId}:{hangfireSchema}";
     });
 }
 
@@ -353,12 +397,18 @@ using (var scope = app.Services.CreateScope())
         var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
         var seederLogger = loggerFactory.CreateLogger("DatabaseSeeder");
 
-        await Infrastructure.Services.DatabaseSeeder.SeedAsync(context, userManager, roleManager, seederLogger);
+        // await Infrastructure.Services.DatabaseSeeder.SeedAsync(
+        //     context,
+        //     userManager,
+        //     roleManager,
+        //     builder.Configuration,
+        //     seederLogger);
         Log.Information("Database seeding completed successfully");
     }
     catch (Exception ex)
     {
-        Log.Error(ex, "An error occurred while seeding the database");
+        Log.Fatal(ex, "An error occurred while seeding or migrating the database. Application startup aborted.");
+        throw;
     }
 }
 
@@ -426,20 +476,54 @@ if (string.IsNullOrWhiteSpace(quotaResetCron))
     quotaResetCron = defaultQuotaResetCron;
 }
 
+var monthlyQuotaResetCron = Environment.GetEnvironmentVariable("HANGFIRE_MONTHLY_QUOTA_RESET_CRON");
+if (string.IsNullOrWhiteSpace(monthlyQuotaResetCron))
+{
+    monthlyQuotaResetCron = "0 0 1 * *";
+}
+
 var slotMaintenanceCron = Environment.GetEnvironmentVariable("HANGFIRE_SLOT_MAINTENANCE_CRON");
 if (string.IsNullOrWhiteSpace(slotMaintenanceCron))
 {
     slotMaintenanceCron = "*/5 * * * *";
 }
 
+var fullTimeSlotGenerationCron = Environment.GetEnvironmentVariable("HANGFIRE_FULLTIME_SLOT_GENERATION_CRON");
+if (string.IsNullOrWhiteSpace(fullTimeSlotGenerationCron))
+{
+    // Default: run weekly at 01:00 UTC (every 7 days cadence).
+    fullTimeSlotGenerationCron = "0 1 * * 1";
+}
+
 if (enableHangfireServer)
 {
     // Register recurring jobs
     var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+    var legacyRecurringJobIds = new[]
+    {
+        "monthly-quota-reset",
+        "fulltime-slot-generation",
+        "full-time-slot-generation",
+        "fulltime-slot-generation-job",
+        // Remove the current id first to force a clean re-registration payload.
+        "fulltime-slot-rolling-window"
+    };
+
+    foreach (var recurringJobId in legacyRecurringJobIds)
+    {
+        recurringJobManager.RemoveIfExists(recurringJobId);
+    }
+
     recurringJobManager.AddOrUpdate<DailyQuotaResetJob>(
         "daily-quota-reset",
         job => job.ExecuteAsync(),
         quotaResetCron,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+    recurringJobManager.AddOrUpdate<MonthlyQuotaResetJob>(
+        "monthly-quota-reset",
+        job => job.ExecuteAsync(),
+        monthlyQuotaResetCron,
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
     recurringJobManager.AddOrUpdate<SlotMaintenanceJob>(
@@ -447,6 +531,68 @@ if (enableHangfireServer)
         job => job.ExpireUnusedSlotsAsync(CancellationToken.None),
         slotMaintenanceCron,
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+    recurringJobManager.AddOrUpdate<FullTimeSlotGenerationJob>(
+        "fulltime-slot-rolling-window",
+        job => job.ExecuteAsync(CancellationToken.None),
+        fullTimeSlotGenerationCron,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+    try
+    {
+        var monitoringApi = JobStorage.Current.GetMonitoringApi();
+        const int pageSize = 100;
+        var from = 0;
+        var deletedCount = 0;
+
+        while (true)
+        {
+            var failedJobs = monitoringApi.FailedJobs(from, pageSize);
+            if (failedJobs.Count == 0)
+            {
+                break;
+            }
+
+            foreach (var failed in failedJobs)
+            {
+                var jobId = failed.Key;
+                var details = failed.Value;
+
+                var errorText = string.Join(
+                    " | ",
+                    new[]
+                    {
+                        details.ExceptionType,
+                        details.ExceptionMessage,
+                        details.ExceptionDetails
+                    }.Where(text => !string.IsNullOrWhiteSpace(text)));
+
+                var isIncompatibleLegacyJob =
+                    errorText.Contains("Could not load type 'Infrastructure.Services.FullTimeSlotGenerationJob'", StringComparison.OrdinalIgnoreCase)
+                    || errorText.Contains("target method was not found", StringComparison.OrdinalIgnoreCase)
+                    || errorText.Contains("Hangfire.Common.JobLoadException", StringComparison.OrdinalIgnoreCase)
+                    || errorText.Contains("System.TypeLoadException", StringComparison.OrdinalIgnoreCase);
+
+                if (isIncompatibleLegacyJob && BackgroundJob.Delete(jobId))
+                {
+                    deletedCount++;
+                }
+            }
+
+            from += pageSize;
+        }
+
+        if (deletedCount > 0)
+        {
+            Log.Warning(
+                "Deleted {DeletedCount} incompatible legacy Hangfire failed jobs during startup cleanup.",
+                deletedCount);
+        }
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Failed to cleanup incompatible legacy Hangfire jobs during startup.");
+    }
 }
 else
 {

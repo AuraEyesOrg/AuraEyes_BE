@@ -61,10 +61,16 @@ public class GetContractsQueryHandler : IQueryHandler<GetContractsQuery, PagedRe
             .ToListAsync(cancellationToken);
 
         var userMap = users.ToDictionary(u => u.Id);
+        var ophthalmologistMap = await _context.Ophthalmologists
+            .AsNoTracking()
+            .Where(o => userIds.Contains(o.UserId))
+            .Select(o => new { o.UserId, o.CommissionRate, o.ActualMonthlySalary })
+            .ToDictionaryAsync(o => o.UserId, cancellationToken);
 
         var items = contracts.Select(c =>
         {
             var user = userMap.TryGetValue(c.UserId, out var u) ? u : null;
+            var ophthalmologist = ophthalmologistMap.TryGetValue(c.UserId, out var o) ? o : null;
             return new ContractDto
             {
                 Id = c.Id,
@@ -77,7 +83,10 @@ public class GetContractsQueryHandler : IQueryHandler<GetContractsQuery, PagedRe
                 UserFullName = user?.FullName ?? string.Empty,
                 UserEmail = user?.Email ?? string.Empty,
                 AiQuotaLimit = c.AiQuotaLimit,
+                MonthlyQuotaLimit = c.MonthlyQuotaLimit,
                 PlatformCommissionRate = c.PlatformCommissionRate,
+                CommissionRate = ophthalmologist?.CommissionRate,
+                ActualMonthlySalary = ophthalmologist?.ActualMonthlySalary,
                 SignedDate = c.SignedDate,
                 ScannedDocumentUrl = c.ScannedDocumentUrl,
                 CreatedAt = c.CreatedAt,

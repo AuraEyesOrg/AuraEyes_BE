@@ -1,6 +1,7 @@
 using Application.Notifications.Commands.MarkAllAsRead;
 using Application.Notifications.Commands.MarkAsRead;
 using Application.Notifications.Queries.GetMyNotifications;
+using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -26,6 +27,7 @@ public class NotificationsController : BaseApiController
     /// </summary>
     /// <param name="pageNumber">Page number (1-indexed, default: 1)</param>
     /// <param name="pageSize">Number of items per page (default: 10)</param>
+    /// <param name="types">Optional CSV notification type filters (example: 1,2,3)</param>
     /// <returns>Paginated list of notifications with unread count</returns>
     [HttpGet]
     [SwaggerOperation(
@@ -35,12 +37,28 @@ public class NotificationsController : BaseApiController
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetMyNotifications(
         [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 10)
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? types = null)
     {
+        IReadOnlyCollection<NotificationType>? parsedTypes = null;
+        if (!string.IsNullOrWhiteSpace(types))
+        {
+            parsedTypes = types
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(value => Enum.TryParse<NotificationType>(value, out var parsed)
+                    ? (NotificationType?)parsed
+                    : null)
+                .Where(value => value.HasValue)
+                .Select(value => value!.Value)
+                .Distinct()
+                .ToArray();
+        }
+
         var query = new GetMyNotificationsQuery
         {
             PageNumber = pageNumber,
-            PageSize = pageSize
+            PageSize = pageSize,
+            Types = parsedTypes
         };
 
         var result = await _mediator.Send(query);
@@ -70,7 +88,7 @@ public class NotificationsController : BaseApiController
         if (!result.IsSuccess)
             return HandleResult(result);
 
-        return Ok(new { UnreadCount = result.Data!.UnreadCount });
+        return Ok(new { Count = result.Data!.UnreadCount, UnreadCount = result.Data!.UnreadCount });
     }
 
     /// <summary>

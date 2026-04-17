@@ -1,9 +1,11 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.Common.Constants;
 using Domain.Common;
 using Domain.Entities.Screening;
 using Domain.Entities.Users;
 using Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Application.Screenings.Commands.SaveAiScreeningResults;
@@ -17,6 +19,8 @@ public class SaveAiScreeningResultsCommandHandler : ICommandHandler<SaveAiScreen
 {
     private readonly IRepository<AiScreening> _screeningRepository;
     private readonly IRepository<Patient> _patientRepository;
+    private readonly INotificationService _notificationService;
+    private readonly IIdentityService _identityService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAiScreeningQuery _screeningQuery;
     private readonly ILogger<SaveAiScreeningResultsCommandHandler> _logger;
@@ -24,12 +28,16 @@ public class SaveAiScreeningResultsCommandHandler : ICommandHandler<SaveAiScreen
     public SaveAiScreeningResultsCommandHandler(
         IRepository<AiScreening> screeningRepository,
         IRepository<Patient> patientRepository,
+        INotificationService notificationService,
+        IIdentityService identityService,
         IUnitOfWork unitOfWork,
         IAiScreeningQuery screeningQuery,
         ILogger<SaveAiScreeningResultsCommandHandler> logger)
     {
         _screeningRepository = screeningRepository;
         _patientRepository = patientRepository;
+        _notificationService = notificationService;
+        _identityService = identityService;
         _unitOfWork = unitOfWork;
         _screeningQuery = screeningQuery;
         _logger = logger;
@@ -48,7 +56,10 @@ public class SaveAiScreeningResultsCommandHandler : ICommandHandler<SaveAiScreen
         }
 
         // Get the screening session
-        var screening = await _screeningRepository.GetByIdAsync(request.ScreeningId, cancellationToken);
+        var screening = await _screeningRepository
+            .Query()
+            .Include(s => s.Consent)
+            .FirstOrDefaultAsync(s => s.Id == request.ScreeningId, cancellationToken);
         if (screening is null)
         {
             _logger.LogWarning("AI Screening {ScreeningId} not found", request.ScreeningId);
@@ -63,6 +74,18 @@ public class SaveAiScreeningResultsCommandHandler : ICommandHandler<SaveAiScreen
                 screening.PatientId, request.ScreeningId);
             return Result<SaveAiScreeningResultsResponse>.NotFound("Patient not found");
         }
+
+        if (!screening.HasAgreedConsent(screening.PatientId))
+        {
+            _logger.LogWarning(
+                "Consent missing or not agreed for screening {ScreeningId}, patient {PatientId}",
+                request.ScreeningId,
+                screening.PatientId);
+            return Result<SaveAiScreeningResultsResponse>.Failure(
+                "Patient consent is required before saving AI screening results.");
+        }
+
+            var wasProcessedBefore = screening.ProcessedAt.HasValue;
 
         // Store raw JSON output in the screening
         screening.Process(request.RawJsonOutput);
@@ -94,22 +117,6 @@ public class SaveAiScreeningResultsCommandHandler : ICommandHandler<SaveAiScreen
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
-            _logger.LogInformation(
-                "AI Screening results saved for screening {ScreeningId}, " +
-                "patient {PatientId}, risk level {RiskLevel}, confidence {ConfidenceScore}%",
-                request.ScreeningId,
-                screening.PatientId,
-                request.RiskLevel,
-                request.ConfidenceScore);
-
-            return Result<SaveAiScreeningResultsResponse>.Success(new SaveAiScreeningResultsResponse
-            {
-                ScreeningId = request.ScreeningId,
-                ScreeningResultId = screeningResult.Id,
-                ImagesCount = imagesCount,
-                SavedAt = DateTime.UtcNow,
-                RiskLevel = request.RiskLevel.ToString()
-            });
         }
         catch (Exception ex)
         {
@@ -117,6 +124,101 @@ public class SaveAiScreeningResultsCommandHandler : ICommandHandler<SaveAiScreen
             _logger.LogError(ex, "Error saving AI screening results for screening {ScreeningId}",
                 request.ScreeningId);
             return Result<SaveAiScreeningResultsResponse>.Failure($"Failed to save screening results: {ex.Message}");
+        }
+
+        _logger.LogInformation(
+            "AI Screening results saved for screening {ScreeningId}, " +
+            "patient {PatientId}, risk level {RiskLevel}, confidence {ConfidenceScore}%",
+            request.ScreeningId,
+            screening.PatientId,
+            request.RiskLevel,
+            request.ConfidenceScore);
+
+        if (!wasProcessedBefore)
+        {
+            try
+            {
+                await SendCompletionNotificationsAsync(screening, patient, request, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to send screening completion notifications for screening {ScreeningId}",
+                    screening.Id);
+            }
+        }
+
+        return Result<SaveAiScreeningResultsResponse>.Success(new SaveAiScreeningResultsResponse
+        {
+            ScreeningId = request.ScreeningId,
+            ScreeningResultId = screeningResult.Id,
+            ImagesCount = imagesCount,
+            SavedAt = DateTime.UtcNow,
+            RiskLevel = request.RiskLevel.ToString()
+        });
+    }
+
+    private async Task SendCompletionNotificationsAsync(
+        AiScreening screening,
+        Patient patient,
+        SaveAiScreeningResultsCommand request,
+        CancellationToken cancellationToken)
+    {
+        var payload = new
+        {
+            ScreeningId = screening.Id,
+            ResultStatus = request.RiskLevel.ToString()
+        };
+
+        if (patient.UserId.HasValue)
+        {
+            await _notificationService.SendAsync(
+                patient.UserId.Value,
+                "Kết quả sàng lọc AI đã sẵn sàng",
+                "Kết quả sàng lọc đáy mắt AI của bạn đã có. Vui lòng xem chi tiết trong ứng dụng.",
+                NotificationType.AiScreeningCompleted,
+                payload,
+                cancellationToken);
+
+            _logger.LogInformation(
+                "AI completion notification sent to patient user {UserId} for screening {ScreeningId}",
+                patient.UserId.Value,
+                screening.Id);
+        }
+        else
+        {
+            _logger.LogInformation(
+                "Skipping patient notification for walk-in patient {PatientId} on screening {ScreeningId}",
+                screening.PatientId,
+                screening.Id);
+        }
+
+        if (screening.OrganisationId is not Guid organisationId)
+            return;
+
+        var organisationAdminUserIds = await _identityService.GetUserIdsByRoleAndOrganizationAsync(
+            Roles.OrgAdmin,
+            organisationId,
+            cancellationToken);
+
+        foreach (var organisationAdminUserId in organisationAdminUserIds)
+        {
+            await _notificationService.SendAsync(
+                organisationAdminUserId,
+                "Kết quả AI ca sàng lọc đã sẵn sàng",
+                "Kết quả phân tích AI cho bệnh nhân đã hoàn tất. Mở danh sách bệnh nhân để xem chi tiết.",
+                NotificationType.AiScreeningCompleted,
+                payload,
+                cancellationToken);
+        }
+
+        if (organisationAdminUserIds.Count > 0)
+        {
+            _logger.LogInformation(
+                "AI completion notification sent to {Count} organisation admins for screening {ScreeningId}",
+                organisationAdminUserIds.Count,
+                screening.Id);
         }
     }
 }

@@ -110,150 +110,107 @@ Khong duoc dung:
 - assert UI state (toast, badge, status)
 - assert notification realtime
 
-## 6. Test Plan theo 5 luong cot loi
+## 6. Test Plan theo 7 luong cot loi
 
-## 6.1 Doctor Onboarding
-
-Flow:
-
-- Register doctor -> Upload credentials -> Email confirm bypass -> Admin verify credentials -> Doctor upload signed contract -> Admin approve contract -> Doctor login
-
-Steps:
-
-1. Arrange
-
-- reset-and-seed
-- seed admin account + contract template
-
-2. Act UI
-
-- Doctor dang ky va upload license/degree
-
-3. Arrange
-
-- email/confirm cho doctor
-
-4. Act UI
-
-- Admin verify doctor
-- Doctor upload signed contract
-- Admin approve/sign contract
-- Doctor login
-
-5. Assert
-
-- VerificationStatus=Approved
-- Contract status active/pending-signature dung voi business rule
-- Doctor vao duoc dashboard
-
-## 6.2 AI Quota and Screening
+## 6.1 Flow 01 - Ophthalmologist Onboarding and Verification
 
 Flow:
 
-- Upload retinal image -> Mock AI response -> Quota deduct -> Notification
+- Register doctor -> Upload credentials -> Email confirm bypass -> Admin approve/reject verification -> Doctor access control check
 
-Steps:
+Pham vi kiem thu:
 
-1. Arrange
+- Happy Path: submit onboarding thanh cong, admin approve
+- Negative Path: missing required fields, invalid file upload
+- Alternative Path: admin reject onboarding va hien ly do tu choi
+- Security Boundary: doctor chua duoc verify truy cap /ophthalmologist/dashboard bi chan
 
-- reset-and-seed
-- seed patient co quota
-
-2. Act UI
-
-- Upload screening
-
-3. Arrange
-
-- screenings/complete-mock-ai
-
-4. Act UI
-
-- mo notifications/reports
-
-5. Assert
-
-- Screening processed
-- Quota giam
-- Notification AiScreeningCompleted xuat hien
-
-## 6.3 Appointment Booking
+## 6.2 Flow 02 - Organisation Onboarding and Contract Activation
 
 Flow:
 
-- Patient chon slot -> Dat lich -> DB status doi -> SignalR notification
+- Approve organisation onboarding -> Upload signed contract -> Admin verify/reject contract -> Gate contract truoc khi vao core route
 
-Steps:
+Pham vi kiem thu:
 
-1. Arrange
+- Happy Path: onboarding approved + contract verified
+- Negative Path: contract file khong hop le/empty
+- Alternative Path: admin reject contract, org admin phai upload lai
+- Security Boundary: contract chua active truy cap /organisation/dashboard, /organisation/patients, /organisation/settings bi redirect ve /organisation/contract
 
-- reset-and-seed
-- tao slot available
-
-2. Act UI
-
-- chon slot va confirm booking
-
-3. Assert
-
-- Slot status doi dung
-- Appointment record duoc tao
-- Notification NewAppointmentBooked xuat hien
-
-## 6.4 Top-up Quota
+## 6.3 Flow 03 - AI Screening, Appointment Booking, and Consultation Session
 
 Flow:
 
-- Top-up wallet -> Mock payment success -> Verify payment -> Buy quota -> Quota tang
+- Patient dashboard -> New screening -> AI analysis -> Review/Roadmap -> Request specialist -> Booking -> Consultation session
 
-Steps:
+Pham vi kiem thu:
 
-1. Arrange
+- Happy Path: full route screening -> booking -> consultation
+- Negative Path: wallet khong du, booking bi chan
+- Alternative Path: user huy payment tren gateway test va quay lai booking
+- Security Boundary: role khong hop le khong duoc vao route consultation cua role khac
 
-- reset-and-seed
-- patient wallet balance ban dau
-
-2. Act UI
-
-- tao deposit tu wallet page
-
-3. Arrange
-
-- payments/mark-success
-- payments/verify
-
-4. Act UI
-
-- mua quota bundles
-
-5. Assert
-
-- wallet tang roi giam dung theo business
-- quota tang
-- notification wallet payment xuat hien
-
-## 6.5 Consultation Result
+## 6.4 Flow 04 - Organisation Slot Booking and Offline Appointment
 
 Flow:
 
-- Doctor submit consultation result -> Patient thay report -> Download PDF
+- Patient mo /patient/clinics -> Chon organisation slot -> Dat lich offline -> Xac minh trong /patient/appointments
 
-Steps:
+Pham vi kiem thu:
 
-1. Arrange
+- Happy Path: dat lich offline thanh cong
+- Negative Path: slot het cho, reason bi bo trong
+- Alternative Path: huy lich hen va cap nhat suc chua slot
+- Security Boundary: chi patient role moi thao tac booking o clinics route
 
-- reset-and-seed
-- seed consultation session + ai screening linked
+## 6.5 Flow 05 - AI Quota Purchase for Screening Service
 
-2. Act UI
+Flow:
 
-- doctor submit report
+- Out-of-quota gate -> Top-up wallet -> Mock payment -> Verify payment -> Buy quota -> Re-screening
 
-3. Assert
+Pham vi kiem thu:
 
-- medical diagnosis duoc tao
-- patient nhan notification ConsultationResultProvided
-- patient thay report va tai duoc PDF
+- Happy Path: nap tien va mua quota thanh cong
+- Negative Path: payment fail/cancel khong cong wallet
+- Alternative Path: tiep tuc mua goi quota khac sau top-up
+- Security Boundary: test-backdoor API bat buoc X-Test-Key, request sai key tra 401/403
+
+## 6.6 Flow 06 - Profile Management
+
+Flow:
+
+- Patient login -> vao /patient/profile -> cap nhat thong tin ca nhan/avatar -> doi mat khau
+
+Pham vi kiem thu:
+
+- Happy Path: cap nhat profile thanh cong (name/phone/avatar)
+- Negative Path: doi mat khau voi current password sai hoac du lieu khong hop le
+
+Route chinh:
+
+- /patient/profile
+- /patient/settings
+
+## 6.7 Flow 07 - Professional Network Collaboration
+
+Flow:
+
+- Doctor/Organisation vao /network/feed -> tao bai theo category -> like/comment -> notification
+
+Pham vi kiem thu:
+
+- Happy Path: tao bai CasePresentation/Announcement/KnowledgeShare thanh cong
+- Negative Path: submit bai voi content rong bi chan
+- Alternative Path: tuong tac like/comment va xac minh cap nhat notification/feed
+- Security Boundary: Patient co gang vao /network/feed bi redirect ve trang home
+
+Route chinh:
+
+- /network
+- /network/feed
+- /network/post/:id
 
 ## 7. Goi y skeleton Playwright suite
 

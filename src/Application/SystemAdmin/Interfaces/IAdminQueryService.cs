@@ -1,6 +1,7 @@
 using Application.Common.Models;
 using Application.SystemAdmin.AuditLogs.Queries.GetAuditLogs;
 using Application.SystemAdmin.Ophthalmologists.Queries.GetOphthalmologists;
+using Application.SystemAdmin.Patients.Queries.GetPatientMetrics;
 using Application.SystemAdmin.Patients.Queries.GetPatients;
 
 namespace Application.SystemAdmin.Interfaces;
@@ -24,6 +25,9 @@ public interface IAdminQueryService
         string? status,
         int pageNumber,
         int pageSize,
+        CancellationToken cancellationToken = default);
+
+    Task<PatientMetricsDto> GetPatientMetricsAsync(
         CancellationToken cancellationToken = default);
 
     Task<PagedResult<AuditLogDto>> GetAuditLogsAsync(

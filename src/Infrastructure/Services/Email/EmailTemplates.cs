@@ -1,11 +1,15 @@
+using System.Net;
+
 namespace Infrastructure.Services.Email;
 
 /// <summary>
 /// Email template provider for Aura healthcare system.
 /// Generates minimalist, card-based HTML emails in Vietnamese.
 /// </summary>
-internal static class EmailTemplates
+public static class EmailTemplates
 {
+    private const string AuraLogoUrl = "https://rjtkpvqrjnbthcicyaza.supabase.co/storage/v1/object/public/aura-uploads/logo.png";
+
     #region Color Palette
 
     // Brand
@@ -32,12 +36,7 @@ internal static class EmailTemplates
 
     private static string ResolveLogoUrl(string baseLink)
     {
-        if (!Uri.TryCreate(baseLink, UriKind.Absolute, out var uri))
-        {
-            return "http://localhost:3000/logo.png";
-        }
-
-        return $"{uri.Scheme}://{uri.Authority}/logo.png";
+        return AuraLogoUrl;
     }
 
     #region Email Subjects
@@ -45,14 +44,20 @@ internal static class EmailTemplates
     public const string EmailConfirmationSubject = "Xác nhận địa chỉ email - Hệ thống Aura";
     public const string PasswordResetSubject = "Yêu cầu đặt lại mật khẩu - Hệ thống Aura";
     public const string WelcomeSubject = "Chào mừng bạn đến với Hệ thống Aura";
+    public const string ClinicAppointmentConfirmationSubject = "Xác nhận lịch khám tại cơ sở - Hệ thống Aura";
     public const string OrganisationOnboardingSubject = "[AURA] Yêu cầu đăng ký tổ chức mới";
     public const string OrganisationAccountProvisionedSubject = "[AURA] Tài khoản tổ chức đã được cấp";
+    public const string OrganisationScreeningResultShareSubjectPrefix = "[AURA] Kết quả sàng lọc võng mạc";
 
     #endregion
 
     #region Base Template
 
-    private static string WrapInBaseTemplate(string content, string? logoUrl = null) => $@"
+    private static string WrapInBaseTemplate(string content, string? logoUrl = null)
+    {
+        var resolvedLogoUrl = string.IsNullOrWhiteSpace(logoUrl) ? AuraLogoUrl : logoUrl;
+
+        return $@"
 <!DOCTYPE html>
 <html lang=""vi"">
 <head>
@@ -86,10 +91,16 @@ internal static class EmailTemplates
                     
                     <tr>
                         <td style=""padding: 32px 40px 16px 40px; text-align: center; border-bottom: 1px solid #F1F3F4;"">
-                            {(string.IsNullOrWhiteSpace(logoUrl) ? string.Empty : $"<img src=\"{logoUrl}\" alt=\"AURA Logo\" style=\"display:block; margin:0 auto 16px auto; width:72px; height:72px; object-fit:contain;\" />")}
-                            <h1 style=""margin: 0; color: {BrandPrimary}; font-size: 26px; font-weight: 700; letter-spacing: 1px;"">
-                                ❖ AURA
-                            </h1>
+                            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" style=""margin: 0 auto 8px auto;"">
+                                <tr>
+                                    <td style=""vertical-align: middle; padding-right: 10px;"">
+                                        <img src=""{resolvedLogoUrl}"" alt=""AURA Logo"" width=""40"" height=""40"" style=""display:block; width:40px; height:40px; object-fit:contain;"" />
+                                    </td>
+                                    <td style=""vertical-align: middle;"">
+                                        <h1 style=""margin: 0; color: {BrandPrimary}; font-size: 26px; font-weight: 700; letter-spacing: 1px; line-height: 1;"">AURA</h1>
+                                    </td>
+                                </tr>
+                            </table>
                             <p style=""margin: 6px 0 0 0; color: {TextMuted}; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;"">
                                 Hệ thống quản lý khám sàng lọc mắt
                             </p>
@@ -109,7 +120,7 @@ internal static class EmailTemplates
                             </p>
                             <p style=""margin: 0 0 0 0; color: {TextMuted}; font-size: 12px; line-height: 1.5;"">
                                 Email này được tạo tự động, vui lòng không trả lời.<br>
-                                Cần hỗ trợ? Liên hệ <a href=""mailto:support@auraeyes.vn"" style=""color: {BrandDarkText}; text-decoration: underline;"">support@auraeyes.vn</a>
+                                Cần hỗ trợ? Liên hệ <a href=""mailto:auraeyes4se@gmail.com"" style=""color: {BrandDarkText}; text-decoration: underline;"">auraeyes4se@gmail.com</a>
                             </p>
                         </td>
                     </tr>
@@ -119,6 +130,7 @@ internal static class EmailTemplates
     </table>
 </body>
 </html>";
+    }
 
     #endregion
 
@@ -295,6 +307,187 @@ internal static class EmailTemplates
         return WrapInBaseTemplate(content);
     }
 
+    public static string GetClinicAppointmentConfirmationBody(
+        string patientName,
+        string organisationName,
+        DateOnly appointmentDate,
+        TimeOnly startTime,
+        TimeOnly endTime,
+        string? visitReason,
+        Guid appointmentId,
+        string checkInCode,
+        string qrImageSrc)
+    {
+        var displayName = string.IsNullOrWhiteSpace(patientName) ? "bạn" : patientName;
+        var displayOrganisation = string.IsNullOrWhiteSpace(organisationName)
+            ? "cơ sở y tế"
+            : organisationName;
+        var displayVisitReason = string.IsNullOrWhiteSpace(visitReason)
+            ? "Không có"
+            : visitReason;
+
+        var content = $@"
+            <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 22px; font-weight: 600;"">
+                Xác nhận lịch khám tại cơ sở
+            </h2>
+
+            <p style=""margin: 0 0 16px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Xin chào <strong>{displayName}</strong>,
+            </p>
+
+            <p style=""margin: 0 0 24px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Bạn đã đặt lịch khám thành công. Vui lòng mang email này (hoặc ảnh QR) đến <strong>{displayOrganisation}</strong> để nhân viên check-in.
+            </p>
+
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""border: 1px solid {BorderColor}; border-radius: 8px; margin-bottom: 24px;"">
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor}; width: 180px;"">Ngày khám</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{appointmentDate:dd/MM/yyyy}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Khung giờ</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{startTime:HH:mm} - {endTime:HH:mm}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Lý do khám</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{displayVisitReason}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã check-in</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};""><strong>{checkInCode}</strong></td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600;"">Mã lịch hẹn</td><td style=""padding: 12px 16px;"">{appointmentId}</td></tr>
+            </table>
+
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BrandSoft}; border: 1px solid {BrandSoftBorder}; border-radius: 8px; margin: 0 0 24px 0;"">
+                <tr>
+                    <td align=""center"" style=""padding: 20px 16px;"">
+                        <p style=""margin: 0 0 12px 0; color: {BrandDarkText}; font-size: 14px; font-weight: 600;"">
+                            QR check-in
+                        </p>
+                        <img
+                            src=""{qrImageSrc}""
+                            alt=""QR check-in appointment""
+                            width=""200""
+                            height=""200""
+                            style=""display:block; margin: 0 auto; width: 200px; height: 200px; border: 1px solid {BorderColor}; border-radius: 8px; background: #FFFFFF;"" />
+                    </td>
+                </tr>
+            </table>
+
+            <div style=""border-left: 3px solid {BorderWarning}; padding-left: 16px; margin-top: 8px;"">
+                <p style=""margin: 0; color: {AlertWarningText}; font-size: 13px; line-height: 1.5;"">
+                    Vui lòng đến sớm 10-15 phút trước giờ hẹn để hoàn tất check-in.
+                </p>
+            </div>";
+
+        return WrapInBaseTemplate(content);
+    }
+
+    public static string GetOrganisationScreeningResultShareSubject(Guid screeningId)
+        => $"{OrganisationScreeningResultShareSubjectPrefix} - {screeningId.ToString("N")[..8].ToUpperInvariant()}";
+
+    public static string GetOrganisationScreeningResultShareBody(
+        string patientName,
+        Guid screeningId,
+        DateTime createdAtUtc,
+        string riskLevel,
+        string? summary,
+        bool includePdf,
+        IReadOnlyCollection<string> retinalImageUrls)
+    {
+        var displayPatientName = string.IsNullOrWhiteSpace(patientName) ? "Bệnh nhân" : patientName.Trim();
+        var displayRiskLevel = string.IsNullOrWhiteSpace(riskLevel) ? "N/A" : riskLevel.Trim();
+
+        var riskColor = displayRiskLevel.ToLowerInvariant() switch
+        {
+            "high" or "critical" => (Background: "#FEE2E2", Text: "#B91C1C"),
+            "moderate" or "medium" => (Background: "#FEF3C7", Text: "#92400E"),
+            "low" => (Background: "#DCFCE7", Text: "#166534"),
+            _ => (Background: "#E2E8F0", Text: "#334155")
+        };
+
+        var encodedSummary = string.IsNullOrWhiteSpace(summary)
+            ? string.Empty
+            : $@"
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BgPrimary}; border: 1px solid {BorderColor}; border-radius: 8px; margin: 0 0 24px 0;"">
+                <tr>
+                    <td style=""padding: 16px;"">
+                        <p style=""margin: 0 0 8px 0; color: {TextMain}; font-size: 14px; font-weight: 600;"">Tóm tắt kết quả</p>
+                        <p style=""margin: 0; color: {TextMain}; font-size: 14px; line-height: 1.6;"">{WebUtility.HtmlEncode(summary.Trim())}</p>
+                    </td>
+                </tr>
+            </table>";
+
+        var pdfSection = includePdf
+            ? $@"
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BrandSoft}; border: 1px solid {BrandSoftBorder}; border-radius: 8px; margin: 0 0 24px 0;"">
+                <tr>
+                    <td style=""padding: 16px;"">
+                        <p style=""margin: 0; color: {BrandDarkText}; font-size: 14px; line-height: 1.6;"">
+                            Báo cáo PDF chi tiết đã được đính kèm trong email này.
+                        </p>
+                    </td>
+                </tr>
+            </table>"
+            : string.Empty;
+
+        var imageLinks = retinalImageUrls
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .Select(url => url.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(6)
+            .Select((url, index) =>
+            {
+                var encodedUrl = WebUtility.HtmlEncode(url);
+                return $@"
+                <tr>
+                    <td style=""padding: 10px 0; border-bottom: 1px solid {BorderColor};"">
+                        <a href=""{encodedUrl}"" style=""font-size: 13px; color: #009CA6; text-decoration: underline;"">Xem ảnh võng mạc #{index + 1}</a>
+                    </td>
+                </tr>";
+            })
+            .ToList();
+
+        var imageSection = imageLinks.Count > 0
+            ? $@"
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""border: 1px solid {BorderColor}; border-radius: 8px; margin: 0 0 24px 0;"">
+                <tr>
+                    <td style=""padding: 14px 16px; border-bottom: 1px solid {BorderColor};"">
+                        <p style=""margin: 0; color: {TextMain}; font-size: 14px; font-weight: 600;"">Hình ảnh võng mạc</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style=""padding: 0 16px 4px 16px;"">
+                        <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"">
+                            {string.Join(string.Empty, imageLinks)}
+                        </table>
+                    </td>
+                </tr>
+            </table>"
+            : string.Empty;
+
+        var content = $@"
+            <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 22px; font-weight: 600;"">
+                Kết quả sàng lọc võng mạc
+            </h2>
+
+            <p style=""margin: 0 0 16px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Xin chào,
+            </p>
+
+            <p style=""margin: 0 0 24px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Tổ chức của bạn đã chia sẻ kết quả sàng lọc từ hệ thống <strong>AURA</strong>. Vui lòng xem thông tin chi tiết bên dưới.
+            </p>
+
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""border: 1px solid {BorderColor}; border-radius: 8px; margin-bottom: 24px;"">
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor}; width: 180px;"">Bệnh nhân</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{WebUtility.HtmlEncode(displayPatientName)}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã phiên sàng lọc</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor}; font-family: 'Courier New', Courier, monospace; font-size: 13px;"">{screeningId}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Thời gian tạo (UTC)</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{createdAtUtc:yyyy-MM-dd HH:mm:ss}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mức rủi ro</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};""><span style=""display: inline-block; padding: 4px 10px; border-radius: 999px; background: {riskColor.Background}; color: {riskColor.Text}; font-size: 12px; font-weight: 600;"">{WebUtility.HtmlEncode(displayRiskLevel)}</span></td></tr>
+            </table>
+
+            {encodedSummary}
+            {pdfSection}
+            {imageSection}
+
+            <div style=""border-left: 3px solid {BorderWarning}; padding-left: 16px; margin-top: 8px;"">
+                <p style=""margin: 0; color: {AlertWarningText}; font-size: 13px; line-height: 1.5;"">
+                    Nội dung email này chỉ phục vụ mục đích tham khảo. Vui lòng liên hệ bác sĩ chuyên khoa để được tư vấn chẩn đoán chính xác.
+                </p>
+            </div>";
+
+        return WrapInBaseTemplate(content);
+    }
+
     public static string GetOrganisationOnboardingAdminBody(
         string organisationName,
         string orgType,
@@ -303,7 +496,9 @@ internal static class EmailTemplates
         string? contactPhone,
         string? address,
         string? licenseNumber,
-        string? notes)
+        string? notes,
+        string? businessCode = null,
+        string? taxCode = null)
     {
         var content = $@"
             <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 22px; font-weight: 600;"">
@@ -320,6 +515,8 @@ internal static class EmailTemplates
                 <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Số điện thoại</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{contactPhone ?? "—"}</td></tr>
                 <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Địa chỉ</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{address ?? "—"}</td></tr>
                 <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã giấy phép</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{licenseNumber ?? "—"}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã số doanh nghiệp</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{businessCode ?? "—"}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã số thuế</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{taxCode ?? "—"}</td></tr>
                 <tr><td style=""padding: 12px 16px; font-weight: 600;"">Ghi chú</td><td style=""padding: 12px 16px;"">{notes ?? "—"}</td></tr>
             </table>
             <div style=""border-left: 3px solid {BorderWarning}; padding-left: 16px; color: {AlertWarningText};"">
