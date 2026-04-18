@@ -62,6 +62,9 @@ public static class DependencyInjection
         // SMTP Settings
         services.Configure<SmtpSettings>(configuration.GetSection(SmtpSettings.SectionName));
 
+        // Rate Limiting Settings
+        services.Configure<RateLimitingSettings>(configuration.GetSection(RateLimitingSettings.SectionName));
+
         // Admin notification settings
         services.Configure<AdminNotificationSettings>(configuration.GetSection(AdminNotificationSettings.SectionName));
 

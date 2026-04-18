@@ -279,36 +279,9 @@ builder.Services.AddOutputCache(options =>
                .SetVaryByQuery("*")); // Vary cache by query parameters
 });
 
-var rateLimitingSection = builder.Configuration.GetSection("RateLimiting");
-var readPermitLimit = rateLimitingSection.GetValue<int?>("ReadPermitLimit")
-    ?? rateLimitingSection.GetValue<int?>("GlobalPermitLimit")
-    ?? 240;
-var readWindowSeconds = rateLimitingSection.GetValue<int?>("ReadWindowSeconds")
-    ?? rateLimitingSection.GetValue<int?>("GlobalWindowSeconds")
-    ?? 60;
-var readQueueLimit = rateLimitingSection.GetValue<int?>("ReadQueueLimit")
-    ?? rateLimitingSection.GetValue<int?>("GlobalQueueLimit")
-    ?? 0;
-
-var writePermitLimit = rateLimitingSection.GetValue<int?>("WritePermitLimit")
-    ?? rateLimitingSection.GetValue<int?>("GlobalPermitLimit")
-    ?? 80;
-var writeWindowSeconds = rateLimitingSection.GetValue<int?>("WriteWindowSeconds")
-    ?? rateLimitingSection.GetValue<int?>("GlobalWindowSeconds")
-    ?? 60;
-var writeQueueLimit = rateLimitingSection.GetValue<int?>("WriteQueueLimit")
-    ?? rateLimitingSection.GetValue<int?>("GlobalQueueLimit")
-    ?? 0;
-
-var sensitivePermitLimit = rateLimitingSection.GetValue<int?>("SensitivePermitLimit")
-    ?? rateLimitingSection.GetValue<int?>("AuthPermitLimit")
-    ?? 8;
-var sensitiveWindowSeconds = rateLimitingSection.GetValue<int?>("SensitiveWindowSeconds")
-    ?? rateLimitingSection.GetValue<int?>("AuthWindowSeconds")
-    ?? 60;
-var sensitiveQueueLimit = rateLimitingSection.GetValue<int?>("SensitiveQueueLimit")
-    ?? rateLimitingSection.GetValue<int?>("AuthQueueLimit")
-    ?? 0;
+var rateLimitingSettings = builder.Configuration
+    .GetSection(Infrastructure.Settings.RateLimitingSettings.SectionName)
+    .Get<Infrastructure.Settings.RateLimitingSettings>() ?? new Infrastructure.Settings.RateLimitingSettings();
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -354,22 +327,22 @@ builder.Services.AddRateLimiter(options =>
         partitionKey = $"{policyKey}:{partitionKey}";
 
         var permitLimit = isSensitiveEndpoint
-            ? sensitivePermitLimit
+            ? rateLimitingSettings.ActualSensitivePermitLimit
             : isReadRequest
-                ? readPermitLimit
-                : writePermitLimit;
+                ? rateLimitingSettings.ActualReadPermitLimit
+                : rateLimitingSettings.ActualWritePermitLimit;
 
         var windowSeconds = isSensitiveEndpoint
-            ? sensitiveWindowSeconds
+            ? rateLimitingSettings.ActualSensitiveWindowSeconds
             : isReadRequest
-                ? readWindowSeconds
-                : writeWindowSeconds;
+                ? rateLimitingSettings.ActualReadWindowSeconds
+                : rateLimitingSettings.ActualWriteWindowSeconds;
 
         var queueLimit = isSensitiveEndpoint
-            ? sensitiveQueueLimit
+            ? rateLimitingSettings.ActualSensitiveQueueLimit
             : isReadRequest
-                ? readQueueLimit
-                : writeQueueLimit;
+                ? rateLimitingSettings.ActualReadQueueLimit
+                : rateLimitingSettings.ActualWriteQueueLimit;
 
         return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
         {
