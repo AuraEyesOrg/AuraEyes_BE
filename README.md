@@ -1,31 +1,31 @@
 # AuraEyes Backend — ASP.NET Core 8 · Clean Architecture · DDD · CQRS
 
-> **AuraEyes** là nền tảng chăm sóc sức khoẻ nhãn khoa trực tuyến, kết nối bệnh nhân với bác sĩ nhãn khoa và các tổ chức y tế. Backend được xây dựng theo Clean Architecture + Domain-Driven Design + CQRS.
+> **AuraEyes** is an online ophthalmology healthcare platform connecting patients with ophthalmologists and medical organisations. The backend is built with Clean Architecture, Domain-Driven Design (DDD), and the CQRS pattern.
 
 ---
 
-## 📋 Mục lục
+## 📋 Table of Contents
 
-- [Tổng quan kiến trúc](#-tổng-quan-kiến-trúc)
+- [Architecture Overview](#-architecture-overview)
 - [Tech Stack](#-tech-stack)
-- [Cấu trúc thư mục](#-cấu-trúc-thư-mục)
+- [Project Structure](#-project-structure)
 - [Domain Model](#-domain-model)
 - [Request Flow](#-request-flow)
 - [Authentication & Authorization](#-authentication--authorization)
 - [Background Jobs & Workers](#-background-jobs--workers)
-- [Tích hợp bên thứ ba](#-tích-hợp-bên-thứ-ba)
-- [Cấu hình môi trường](#-cấu-hình-môi-trường)
-- [Chạy với Docker](#-chạy-với-docker)
-- [Chạy local (Development)](#-chạy-local-development)
+- [Third-party Integrations](#-third-party-integrations)
+- [Environment Configuration](#-environment-configuration)
+- [Running with Docker](#-running-with-docker)
+- [Running Locally (Development)](#-running-locally-development)
 - [API Endpoints](#-api-endpoints)
 - [Database & Migrations](#-database--migrations)
 - [Testing](#-testing)
 
 ---
 
-## 🏛 Tổng quan kiến trúc
+## 🏛 Architecture Overview
 
-Hệ thống bao gồm 4 layer theo Clean Architecture, với quy tắc phụ thuộc hướng vào trong:
+The system consists of 4 layers following Clean Architecture, with dependencies pointing inward:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -59,36 +59,38 @@ Hệ thống bao gồm 4 layer theo Clean Architecture, với quy tắc phụ th
 ## 🛠 Tech Stack
 
 ### Core Framework
-| Thành phần | Công nghệ |
-|---|---|
-| Runtime | .NET 8.0 / ASP.NET Core 8 |
-| ORM | Entity Framework Core 8 + Npgsql |
-| Database | PostgreSQL 16 (Production: VPS · Dev: Supabase) |
-| Mediator / CQRS | MediatR |
-| Validation | FluentValidation |
-| Mapping | AutoMapper |
-| Logging | Serilog (Console + File sink) |
-| API Docs | Swagger / OpenAPI (Basic Auth protected) |
-| Auth | ASP.NET Core Identity + JWT Bearer |
-| Real-time | SignalR (`ChatHub`, `NotificationHub`) |
+
+| Component       | Technology                                               |
+| --------------- | -------------------------------------------------------- |
+| Runtime         | .NET 8.0 / ASP.NET Core 8                                |
+| ORM             | Entity Framework Core 8 + Npgsql                         |
+| Database        | PostgreSQL 16 (Production: VPS · Dev: Supabase)          |
+| Mediator / CQRS | MediatR                                                  |
+| Validation      | FluentValidation                                         |
+| Mapping         | AutoMapper                                               |
+| Logging         | Serilog (Console + File sink)                            |
+| API Docs        | Swagger / OpenAPI (Basic Auth protected)                 |
+| Auth            | ASP.NET Core Identity + JWT Bearer                       |
+| Real-time       | SignalR (`ChatHub`, `NotificationHub`)                   |
 
 ### Infrastructure & DevOps
-| Thành phần | Công nghệ |
-|---|---|
-| Background Jobs | Hangfire (Dashboard, Workers) |
+
+| Component          | Technology                                                          |
+| ------------------ | ------------------------------------------------------------------- |
+| Background Jobs    | Hangfire (Dashboard, Workers)                                       |
 | Background Workers | `IHostedService` (Session Reminder, Reservation Expiration, Consultation State) |
-| File Storage | Cloudinary (primary) · Supabase Storage (legacy) |
-| Email | SMTP (Gmail) via MailKit |
-| Payment | PayOS (Checkout + Payout via IPv4-forced HttpClient) |
-| Google Meet | Google Calendar API v3 (OAuth2 Refresh Token) |
-| AI | Google AI Studio (Gemini) · SerpApi |
-| Uptime Monitor | BetterStack Heartbeat |
-| Containerization | Docker · Docker Compose (multi-service) |
-| CI/CD | GitHub Actions |
+| File Storage       | Cloudinary (primary) · Supabase Storage (legacy)                    |
+| Email              | SMTP (Gmail) via MailKit                                            |
+| Payment            | PayOS (Checkout + Payout via IPv4-forced HttpClient)                |
+| Google Meet        | Google Calendar API v3 (OAuth2 Refresh Token)                       |
+| AI                 | Google AI Studio (Gemini) · SerpApi                                 |
+| Uptime Monitor     | BetterStack Heartbeat                                               |
+| Containerisation   | Docker · Docker Compose (multi-service)                             |
+| CI/CD              | GitHub Actions                                                      |
 
 ---
 
-## 📁 Cấu trúc thư mục
+## 📁 Project Structure
 
 ```
 AuraEyes_BE/
@@ -129,9 +131,9 @@ AuraEyes_BE/
 │   │   ├── Consents/                   # Patient consents (PDPA)
 │   │   ├── AiQuota/                    # AI usage quota management
 │   │   ├── SystemAdmin/                # System admin operations
-│   │   └── SystemSettings/             # Dynamic system config
+│   │   └── SystemSettings/             # Dynamic system configuration
 │   │
-│   ├── Domain/                         # Core business model (no external deps)
+│   ├── Domain/                         # Core business model (no external dependencies)
 │   │   ├── Common/                     # BaseEntity, IAggregateRoot, IDomainEvent
 │   │   ├── Entities/
 │   │   │   ├── Users/                  # Ophthalmologist, Patient, Organisation, …
@@ -152,7 +154,7 @@ AuraEyes_BE/
 │       │   └── Authorization/          # Permission-based Handler & Requirement
 │       ├── Persistence/                # EF Core
 │       │   ├── ApplicationDbContext.cs
-│       │   ├── Configurations/         # Fluent API entity configs
+│       │   ├── Configurations/         # Fluent API entity configurations
 │       │   ├── Interceptors/           # AuditInterceptor (auto CreatedAt/UpdatedAt)
 │       │   ├── Migrations/
 │       │   ├── Queries/                # Raw read-optimised query handlers
@@ -189,60 +191,66 @@ AuraEyes_BE/
 
 ## 🗂 Domain Model
 
-### Nhóm thực thể chính
+### Entity Groups
 
 #### 👤 Users
-| Entity | Mô tả |
-|---|---|
-| `Ophthalmologist` | Bác sĩ nhãn khoa với profile, certification, employment type |
-| `Patient` | Bệnh nhân với thông tin cá nhân, CitizenId |
-| `Organisation` | Tổ chức / phòng khám |
-| `OrganisationPatientLink` | Liên kết Many-to-Many tổ chức ↔ bệnh nhân |
-| `Consent` | Chấp thuận chia sẻ dữ liệu (PDPA) |
-| `Certificate` | Chứng chỉ hành nghề của bác sĩ |
-| `OphthalmologistEmploymentTypeChangeRequest` | Yêu cầu đổi loại hình hợp đồng |
-| `OrganisationOnboardingRequest` | Yêu cầu onboarding tổ chức |
+
+| Entity                                       | Description                                                |
+| -------------------------------------------- | ---------------------------------------------------------- |
+| `Ophthalmologist`                            | Ophthalmologist with profile, certification, employment type |
+| `Patient`                                    | Patient with personal information and CitizenId            |
+| `Organisation`                               | Organisation / clinic                                      |
+| `OrganisationPatientLink`                    | Many-to-Many link between organisation and patient         |
+| `Consent`                                    | Data sharing consent (PDPA)                                |
+| `Certificate`                                | Doctor's practice certificate                              |
+| `OphthalmologistEmploymentTypeChangeRequest` | Request to change employment contract type                 |
+| `OrganisationOnboardingRequest`              | Organisation onboarding request                            |
 
 #### 📅 Scheduling
-| Entity | Mô tả |
-|---|---|
-| `ScheduleTemplate` | Lịch làm việc mẫu của bác sĩ |
-| `AppointmentSlot` | Slot giờ hẹn được tạo từ template |
-| `Appointment` | Lịch hẹn đã được đặt bởi bệnh nhân |
-| `OphthalmologistLeaveRequest` | Yêu cầu nghỉ phép |
-| `ExperiencePricingRule` | Quy tắc định giá theo kinh nghiệm |
+
+| Entity                         | Description                                      |
+| ------------------------------ | ------------------------------------------------ |
+| `ScheduleTemplate`             | Doctor's work schedule template                  |
+| `AppointmentSlot`              | Time slot generated from a schedule template     |
+| `Appointment`                  | Appointment booked by a patient                  |
+| `OphthalmologistLeaveRequest`  | Leave request                                    |
+| `ExperiencePricingRule`        | Pricing rule based on doctor experience          |
 
 #### 🔬 Screening (AI Retinal)
-| Entity | Mô tả |
-|---|---|
-| `AiScreening` | Phiên sàng lọc AI (chứa ảnh võng mạc) |
-| `RetinalImage` | Ảnh võng mạc được upload |
-| `ScreeningResult` | Kết quả AI trả về |
-| `MedicalDiagnosis` | Chẩn đoán của bác sĩ |
-| `PatientRoadmap` | Lộ trình điều trị do AI sinh |
+
+| Entity            | Description                              |
+| ----------------- | ---------------------------------------- |
+| `AiScreening`     | AI screening session (contains retinal images) |
+| `RetinalImage`    | Uploaded retinal image                   |
+| `ScreeningResult` | AI-generated result                      |
+| `MedicalDiagnosis`| Doctor's clinical diagnosis              |
+| `PatientRoadmap`  | AI-generated treatment roadmap           |
 
 #### 💊 Consultation
-| Entity | Mô tả |
-|---|---|
-| `ConsultationSession` | Phiên tư vấn trực tuyến qua Google Meet |
+
+| Entity                | Description                                      |
+| --------------------- | ------------------------------------------------ |
+| `ConsultationSession` | Online consultation session via Google Meet      |
 
 #### 💰 Financial
-| Entity | Mô tả |
-|---|---|
-| `Wallet` | Ví điện tử của bác sĩ / tổ chức |
-| `WalletTransaction` | Lịch sử giao dịch ví |
-| `DepositRequest` | Yêu cầu nạp tiền (PayOS) |
-| `WithdrawalRequest` | Yêu cầu rút tiền |
-| `Order` | Đơn hàng |
-| `Payment` | Thanh toán |
+
+| Entity               | Description                          |
+| -------------------- | ------------------------------------ |
+| `Wallet`             | Doctor / organisation digital wallet |
+| `WalletTransaction`  | Wallet transaction history           |
+| `DepositRequest`     | Deposit request (PayOS)              |
+| `WithdrawalRequest`  | Withdrawal request                   |
+| `Order`              | Order                                |
+| `Payment`            | Payment record                       |
 
 #### 🌐 Network & Platform
-| Entity | Mô tả |
-|---|---|
-| `Post` | Bài đăng của bác sĩ trên mạng lưới |
-| `Permission` | Phân quyền RBAC |
-| `ContractTemplate` | Mẫu hợp đồng |
-| `Contract` | Hợp đồng đã ký |
+
+| Entity             | Description                         |
+| ------------------ | ----------------------------------- |
+| `Post`             | Doctor's post on the network feed   |
+| `Permission`       | RBAC permission                     |
+| `ContractTemplate` | Contract template                   |
+| `Contract`         | Signed contract                     |
 
 ---
 
@@ -260,7 +268,7 @@ Controller (API Layer)
 MediatR Pipeline
     ├── ValidationBehavior     ← FluentValidation
     ├── LoggingBehavior        ← Serilog
-    └── PerformanceBehavior    ← cảnh báo query > 500ms
+    └── PerformanceBehavior    ← warns on queries > 500ms
          │
          ▼
     CommandHandler (Application)
@@ -268,7 +276,7 @@ MediatR Pipeline
          ├── Entity.BusinessMethod()   ← Domain logic & invariants
          ├── Repository.AddAsync() / Update()
          └── UnitOfWork.SaveChangesAsync()
-              └── AuditInterceptor     ← tự gán CreatedAt / UpdatedAt
+              └── AuditInterceptor     ← auto-sets CreatedAt / UpdatedAt
               └── Dispatch Domain Events
          │
          ▼
@@ -289,8 +297,8 @@ Controller (API Layer)
     ▼
 MediatR Pipeline
     ├── LoggingBehavior
-    └── QueryHandler  (Application hoặc Infrastructure/QueryHandlers)
-         ├── Repository / Raw Query / Dapper-style LINQ
+    └── QueryHandler  (Application or Infrastructure/QueryHandlers)
+         ├── Repository / Raw Query / LINQ
          └── Map Entity → DTO
          │
          ▼
@@ -304,7 +312,7 @@ HTTP Response (200 OK)
 
 ```
 Client (WS/SSE)
-    │  connect với JWT ?access_token=...
+    │  connect with JWT ?access_token=...
     ▼
 NotificationHub / ChatHub
     │
@@ -317,78 +325,83 @@ NotificationService.SendAsync()
 
 ## 🔐 Authentication & Authorization
 
-### Cơ chế
-- **ASP.NET Core Identity** lưu user/role trong PostgreSQL (`AspNetUsers`, `AspNetRoles`, …)
-- **JWT Bearer** — Access Token (60 phút) + Refresh Token (7 ngày)
-- **Google OAuth2** — Đăng nhập bằng Google
+### Mechanisms
 
-### Roles hệ thống
-| Role | Mô tả |
-|---|---|
-| `Patient` | Bệnh nhân |
-| `Ophthalmologist` | Bác sĩ nhãn khoa |
-| `OrgAdmin` | Quản trị tổ chức |
-| `SystemAdmin` | Quản trị hệ thống |
+- **ASP.NET Core Identity** stores users/roles in PostgreSQL (`AspNetUsers`, `AspNetRoles`, …)
+- **JWT Bearer** — Access Token (60 minutes) + Refresh Token (7 days)
+- **Google OAuth2** — Sign in with Google
+
+### System Roles
+
+| Role              | Description               |
+| ----------------- | ------------------------- |
+| `Patient`         | Patient                   |
+| `Ophthalmologist` | Ophthalmologist           |
+| `OrgAdmin`        | Organisation administrator |
+| `SystemAdmin`     | System administrator      |
 
 ### Authorization Policies
-| Policy | Điều kiện |
-|---|---|
-| `Authenticated` | Đã đăng nhập |
-| `PatientOnly` | Role = Patient |
-| `OphthalmologistOnly` | Role = Ophthalmologist |
-| `OrgAdminOnly` | Role = OrgAdmin |
-| `SystemAdminOnly` | Role = SystemAdmin |
-| `MedicalStaff` | Ophthalmologist hoặc OrgAdmin |
-| `VerifiedOphthalmologist` | Ophthalmologist + Claim `IsVerified=True` |
-| `OrganizationMember` | Claim `org_id` tồn tại |
-| Dynamic Permission Policies | Từ class `Permissions` (RBAC granular) |
+
+| Policy                        | Condition                                          |
+| ----------------------------- | -------------------------------------------------- |
+| `Authenticated`               | User is authenticated                              |
+| `PatientOnly`                 | Role = Patient                                     |
+| `OphthalmologistOnly`         | Role = Ophthalmologist                             |
+| `OrgAdminOnly`                | Role = OrgAdmin                                    |
+| `SystemAdminOnly`             | Role = SystemAdmin                                 |
+| `MedicalStaff`                | Ophthalmologist or OrgAdmin                        |
+| `VerifiedOphthalmologist`     | Ophthalmologist + Claim `IsVerified=True`          |
+| `OrganizationMember`          | Claim `org_id` exists                              |
+| Dynamic Permission Policies   | From `Permissions` class (granular RBAC)           |
 
 ---
 
 ## ⏱ Background Jobs & Workers
 
-### IHostedService (chạy liên tục)
-| Worker | Chức năng |
-|---|---|
-| `SessionReminderWorker` | Gửi email nhắc nhở trước phiên tư vấn |
-| `ReservationExpirationWorker` | Huỷ slot đặt chỗ hết hạn |
-| `ConsultationStateWorker` | Cập nhật trạng thái phiên tư vấn |
+### IHostedService (always-running)
 
-### Hangfire Jobs (định kỳ)
-| Job | Tần suất | Chức năng |
-|---|---|---|
-| `DailyQuotaResetJob` | Hằng ngày | Reset quota AI hằng ngày |
-| `MonthlyQuotaResetJob` | Hằng tháng | Reset quota AI hằng tháng |
-| `SlotMaintenanceJob` | Định kỳ | Dọn slot rác |
-| `FullTimeSlotGenerationJob` | Định kỳ | Sinh slot từ schedule template |
+| Worker                        | Function                                         |
+| ----------------------------- | ------------------------------------------------ |
+| `SessionReminderWorker`       | Sends reminder emails before consultation sessions |
+| `ReservationExpirationWorker` | Cancels expired slot reservations                |
+| `ConsultationStateWorker`     | Updates consultation session state               |
 
----
+### Hangfire Jobs (scheduled)
 
-## 🔌 Tích hợp bên thứ ba
-
-| Service | Mục đích |
-|---|---|
-| **PayOS** | Cổng thanh toán (checkout link + payout) |
-| **Cloudinary** | Lưu trữ ảnh võng mạc, avatar, tài liệu |
-| **Google Meet (Calendar API v3)** | Tạo link họp cho phiên tư vấn |
-| **Google AI Studio (Gemini)** | Sinh lộ trình điều trị, phân tích bệnh nhân |
-| **Google OAuth2** | Đăng nhập bằng Google |
-| **SerpApi** | Tìm kiếm tài nguyên y tế |
-| **SMTP (Gmail)** | Gửi email xác thực OTP, nhắc nhở, thông báo |
-| **BetterStack** | Uptime monitoring & heartbeat |
-| **Supabase Storage** | Legacy file storage |
+| Job                         | Frequency | Function                            |
+| --------------------------- | --------- | ----------------------------------- |
+| `DailyQuotaResetJob`        | Daily     | Resets daily AI quota               |
+| `MonthlyQuotaResetJob`      | Monthly   | Resets monthly AI quota             |
+| `SlotMaintenanceJob`        | Periodic  | Cleans up stale slots               |
+| `FullTimeSlotGenerationJob` | Periodic  | Generates slots from schedule templates |
 
 ---
 
-## ⚙️ Cấu hình môi trường
+## 🔌 Third-party Integrations
 
-Copy `.env.example` → `.env` và điền giá trị:
+| Service                       | Purpose                                              |
+| ----------------------------- | ---------------------------------------------------- |
+| **PayOS**                     | Payment gateway (checkout link + payout)             |
+| **Cloudinary**                | Storage for retinal images, avatars, documents       |
+| **Google Meet (Calendar API v3)** | Creates meeting links for consultation sessions  |
+| **Google AI Studio (Gemini)** | Generates treatment roadmaps, patient analysis       |
+| **Google OAuth2**             | Sign in with Google                                  |
+| **SerpApi**                   | Medical resource search                              |
+| **SMTP (Gmail)**              | OTP verification emails, reminders, notifications    |
+| **BetterStack**               | Uptime monitoring & heartbeat                        |
+| **Supabase Storage**          | Legacy file storage                                  |
+
+---
+
+## ⚙️ Environment Configuration
+
+Copy `.env.example` → `.env` and fill in the values:
 
 ```bash
 cp .env.example .env
 ```
 
-### Các nhóm cấu hình chính
+### Key Configuration Groups
 
 ```env
 # Database
@@ -443,39 +456,41 @@ Hangfire__WorkerCount=1
 BaseUrl=https://auraeyes.site
 ```
 
-> 📌 Xem file `.env.example` để biết đầy đủ tất cả các biến.
+> 📌 See `.env.example` for the full list of all available variables.
 
 ---
 
-## 🐳 Chạy với Docker
+## 🐳 Running with Docker
 
-### Services trong docker-compose
-| Service | Image | Port |
-|---|---|---|
-| `db` | `postgres:16-alpine` | Internal only |
-| `api` | `{DOCKER_IMAGE_NAME}:latest` | `${API_PORT}:8080` |
-| `pgadmin` | `dpage/pgadmin4` | `127.0.0.1:5050:80` |
+### Docker Compose Services
+
+| Service   | Image                        | Port                 |
+| --------- | ---------------------------- | -------------------- |
+| `db`      | `postgres:16-alpine`         | Internal only        |
+| `api`     | `{DOCKER_IMAGE_NAME}:latest` | `${API_PORT}:8080`   |
+| `pgadmin` | `dpage/pgadmin4`             | `127.0.0.1:5050:80`  |
 
 ```bash
-# 1. Tạo file .env từ example
+# 1. Create .env from example
 cp .env.example .env
 
-# 2. Khởi động toàn bộ stack
+# 2. Start the full stack
 docker compose up -d
 
-# 3. Kiểm tra health
+# 3. Check health
 docker compose ps
 curl http://localhost:5060/health
 
-# 4. Truy cập pgAdmin qua SSH tunnel
+# 4. Access pgAdmin via SSH tunnel
 ssh -L 5050:localhost:5050 user@vps
-# Mở trình duyệt: http://localhost:5050
+# Open in browser: http://localhost:5050
 
-# 5. Xem logs API
+# 5. View API logs
 docker compose logs -f api
 ```
 
-### PostgreSQL được tối ưu với:
+### PostgreSQL tuned with:
+
 - `max_connections=300`
 - `shared_buffers=512MB`
 - `statement_timeout=60s`
@@ -483,30 +498,31 @@ docker compose logs -f api
 
 ---
 
-## 💻 Chạy local (Development)
+## 💻 Running Locally (Development)
 
-### Yêu cầu
+### Requirements
+
 - .NET 8 SDK
-- PostgreSQL 16 (hoặc kết nối Supabase)
+- PostgreSQL 16 (or a Supabase connection)
 - Visual Studio 2022 / Rider / VS Code
 
-### Thiết lập
+### Setup
 
 ```bash
-# 1. Clone repo
+# 1. Clone the repository
 git clone https://github.com/AuraEyesOrg/AuraEyes_BE.git
 cd AuraEyes_BE
 
-# 2. Cấu hình Development
-# Sửa src/API/appsettings.Development.json
-# hoặc copy .env.example → .env (nếu dùng docker dev)
+# 2. Configure Development settings
+# Edit src/API/appsettings.Development.json
+# or copy .env.example → .env (if using docker for dev)
 
-# 3. Chạy migrations
+# 3. Run migrations
 cd src/Infrastructure
 dotnet ef migrations add InitialCreate --startup-project ../API
 dotnet ef database update --startup-project ../API
 
-# 4. Chạy ứng dụng
+# 4. Run the application
 cd ../API
 dotnet run
 
@@ -518,74 +534,75 @@ dotnet run
 
 ## 🌐 API Endpoints
 
-| Controller | Base Route | Chức năng |
-|---|---|---|
-| `AuthController` | `/api/auth` | Đăng ký, đăng nhập, refresh, OTP, Google login |
-| `TwoFactorController` | `/api/2fa` | Quản lý 2FA |
-| `PatientsController` | `/api/patients` | CRUD bệnh nhân |
-| `PatientProfileController` | `/api/patient-profile` | Thông tin cá nhân bệnh nhân |
-| `PatientSearchController` | `/api/patient-search` | Tìm kiếm bệnh nhân |
-| `PatientResourcesController` | `/api/patient-resources` | Tài nguyên y tế AI |
-| `PatientRoadmapsController` | `/api/patient-roadmaps` | Lộ trình điều trị AI |
-| `OphthalmologistsController` | `/api/ophthalmologists` | Quản lý bác sĩ, profile, chứng chỉ |
-| `OphthalmologistScreeningsController` | `/api/ophthalmologist-screenings` | Bác sĩ duyệt screening |
-| `ScreeningsController` | `/api/screenings` | Sàng lọc AI võng mạc |
-| `ConsultationSessionsController` | `/api/consultation-sessions` | Phiên tư vấn (Google Meet) |
-| `AppointmentSlotsController` | `/api/appointment-slots` | Quản lý slot giờ hẹn |
-| `ScheduleTemplatesController` | `/api/schedule-templates` | Lịch làm việc mẫu |
-| `WalletsController` | `/api/wallets` | Ví, nạp rút, lịch sử giao dịch |
-| `NetworkController` | `/api/network` | Bài đăng mạng lưới Y tế |
-| `NotificationsController` | `/api/notifications` | Thông báo |
-| `FeedbackController` | `/api/feedback` | Đánh giá & nhận xét |
-| `ConsentsController` | `/api/consents` | Đồng ý chia sẻ dữ liệu |
-| `SystemSettingsController` | `/api/system-settings` | Cấu hình hệ thống |
-| `QuotasController` | `/api/quotas` | Quản lý quota AI |
-| Organization controllers | `/api/org/…` | Tổ chức, onboarding, screening report PDF |
-| SystemAdmin controllers | `/api/admin/…` | Dashboard, quản trị toàn hệ thống |
-| `GET /health` | — | Health check |
-| `GET /hangfire` | — | Hangfire Dashboard (Admin) |
+| Controller                            | Base Route                        | Function                                        |
+| ------------------------------------- | --------------------------------- | ----------------------------------------------- |
+| `AuthController`                      | `/api/auth`                       | Register, login, refresh, OTP, Google login     |
+| `TwoFactorController`                 | `/api/2fa`                        | 2FA management                                  |
+| `PatientsController`                  | `/api/patients`                   | Patient CRUD                                    |
+| `PatientProfileController`            | `/api/patient-profile`            | Patient personal profile                        |
+| `PatientSearchController`             | `/api/patient-search`             | Patient search                                  |
+| `PatientResourcesController`          | `/api/patient-resources`          | AI medical resources                            |
+| `PatientRoadmapsController`           | `/api/patient-roadmaps`           | AI treatment roadmaps                           |
+| `OphthalmologistsController`          | `/api/ophthalmologists`           | Doctor management, profile, certifications      |
+| `OphthalmologistScreeningsController` | `/api/ophthalmologist-screenings` | Doctor screening review                         |
+| `ScreeningsController`                | `/api/screenings`                 | AI retinal screening                            |
+| `ConsultationSessionsController`      | `/api/consultation-sessions`      | Consultation sessions (Google Meet)             |
+| `AppointmentSlotsController`          | `/api/appointment-slots`          | Appointment slot management                     |
+| `ScheduleTemplatesController`         | `/api/schedule-templates`         | Work schedule templates                         |
+| `WalletsController`                   | `/api/wallets`                    | Wallet, deposits, withdrawals, history          |
+| `NetworkController`                   | `/api/network`                    | Medical network posts                           |
+| `NotificationsController`             | `/api/notifications`              | Notifications                                   |
+| `FeedbackController`                  | `/api/feedback`                   | Ratings & reviews                               |
+| `ConsentsController`                  | `/api/consents`                   | Data sharing consents                           |
+| `SystemSettingsController`            | `/api/system-settings`            | System configuration                            |
+| `QuotasController`                    | `/api/quotas`                     | AI quota management                             |
+| Organisation controllers              | `/api/org/…`                      | Organisation, onboarding, screening PDF reports |
+| SystemAdmin controllers               | `/api/admin/…`                    | Dashboard, full system administration           |
+| `GET /health`                         | —                                 | Health check                                    |
+| `GET /hangfire`                       | —                                 | Hangfire Dashboard (Admin)                      |
 
 ---
 
 ## 🗄 Database & Migrations
 
-Sử dụng **Entity Framework Core** với **PostgreSQL 16** và **Fluent API**.
+Uses **Entity Framework Core** with **PostgreSQL 16** and **Fluent API**.
 
 ```bash
-# Thêm migration mới
+# Add a new migration
 cd src/Infrastructure
 dotnet ef migrations add <MigrationName> --startup-project ../API
 
-# Apply migration lên DB
+# Apply migrations to the database
 dotnet ef database update --startup-project ../API
 
-# Rollback migration
+# Roll back a migration
 dotnet ef database update <PreviousMigrationName> --startup-project ../API
 
-# Xem migration history
+# List migration history
 dotnet ef migrations list --startup-project ../API
 ```
 
-### Audit tự động
-`AuditInterceptor` tự động gán `CreatedAt` và `UpdatedAt` cho mọi entity kế thừa `BaseEntity`, không cần set thủ công trong handler.
+### Automatic Auditing
+
+`AuditInterceptor` automatically sets `CreatedAt` and `UpdatedAt` on all entities inheriting from `BaseEntity`, with no need for manual assignment in handlers.
 
 ---
 
 ## 🧪 Testing
 
 ```bash
-# Chạy toàn bộ unit tests
+# Run all unit tests
 dotnet test tests/
 
-# Chạy với coverage
+# Run with coverage
 dotnet test tests/ --collect:"XPlat Code Coverage"
 ```
 
-Test project nằm trong thư mục `tests/`. Sử dụng **xUnit** theo chuẩn dự án.
+Test projects are located in the `tests/` directory. Uses **xUnit** as per project standards.
 
 ---
 
-## 🏗 Kiến trúc tóm tắt — Luồng xử lý tích hợp
+## 🏗 Architecture Summary — End-to-End Request Flow
 
 ```mermaid
 sequenceDiagram
