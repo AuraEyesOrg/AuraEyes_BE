@@ -250,11 +250,13 @@ public static class Permissions
 
         [Roles.Patient] =
         [
+            DashboardRead,
             ScreeningRead, ScreeningCreate,
             ConsultationsRead, ConsultationsCreate,
             AppointmentsRead, AppointmentsCreate,
             WalletsRead, WalletsDeposit, WalletsHistory,
             QuotasRead,
+            PatientsRead, PatientsUpdate,
         ],
     };
 }
