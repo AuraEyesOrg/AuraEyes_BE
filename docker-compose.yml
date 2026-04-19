@@ -111,6 +111,15 @@ services:
           memory: 1G
           cpus: "1.00"
 
+  web:
+    image: ${WEB_IMAGE:-nginx:alpine}
+    container_name: auraeye_web
+    restart: unless-stopped
+    networks:
+      - internal
+      - external
+    logging: *logging
+
   proxy:
     image: nginx:alpine
     container_name: auraeye_proxy

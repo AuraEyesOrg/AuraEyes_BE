@@ -150,6 +150,7 @@ jobs:
           BaseUrl=${{ secrets.FRONTEND_URL }}
 
           DOCKER_IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/auraeyes-api
+          WEB_IMAGE=${{ secrets.FE_DOCKER_USERNAME || secrets.DOCKER_USERNAME }}/auraeyes-web:latest
           EOF
 
       - name: Pull & run containers
