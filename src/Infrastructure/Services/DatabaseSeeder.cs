@@ -464,8 +464,9 @@ public static class DatabaseSeeder
                 continue;
             }
 
-            // Only fetch assignments for this role to avoid N+1
+            // Use IgnoreQueryFilters to catch soft-deleted records and avoid unique constraint violations
             var existingRolePermissionIds = await context.RolePermissions
+                .IgnoreQueryFilters()
                 .Where(rp => rp.RoleId == role.Id)
                 .Select(rp => rp.PermissionId)
                 .ToListAsync();
