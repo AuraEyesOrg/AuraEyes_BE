@@ -111,6 +111,24 @@ services:
           memory: 1G
           cpus: "1.00"
 
+  proxy:
+    image: nginx:alpine
+    container_name: auraeye_proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx:/etc/nginx/conf.d:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro # Mount SSL từ Host
+      - ./deploy/certbot/www:/var/www/certbot:ro # Thư mục xác thực
+    depends_on:
+      - api
+    networks:
+      - internal
+      - external
+    logging: *logging
+
   # ── pgAdmin (internal only — access via SSH tunnel) ────────────────
   # Access: ssh -L 5050:localhost:5050 user@vps
   # Then open http://localhost:5050 in your browser

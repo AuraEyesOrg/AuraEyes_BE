@@ -37,6 +37,13 @@ jobs:
         run: |
           mkdir -p "$DEPLOY_DIR"
           cp docker-compose.yml "$DEPLOY_DIR/docker-compose.yml"
+          
+          # Copy Nginx configs for Docker Proxy
+          mkdir -p "$DEPLOY_DIR/deploy/nginx"
+          cp -r deploy/nginx/* "$DEPLOY_DIR/deploy/nginx/"
+          
+          # Create certbot challenge directory
+          mkdir -p "$DEPLOY_DIR/deploy/certbot/www"
       
       - name: Create .env file
         run: |
