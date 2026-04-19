@@ -280,6 +280,11 @@ public record UserInfoResponse
     /// Null for non-ophthalmologist roles.
     /// </summary>
     public string? EmploymentType { get; init; }
+    
+    /// <summary>
+    /// Granular permissions for the user based on their roles.
+    /// </summary>
+    public string[] Permissions { get; init; } = Array.Empty<string>();
 }
 
 /// <summary>
