@@ -3,8 +3,11 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Ophthalmologists.Contracts.GetMyContract;
 using Application.Ophthalmologists.Contracts.UploadSignedContract;
+using Application.Organisations.Commands.UpdateOrganisationSettings;
+using Application.Organisations.Common;
 using Application.Organisations.Queries.GetBillingSummary;
 using Application.Organisations.Queries.GetDashboardMetrics;
+using Application.Organisations.Queries.GetOrganisationSettings;
 using Application.Organisations.Queries.GetScreeningReports;
 using Application.OrganisationScreenings;
 using Application.Scheduling.Appointments.Common;
@@ -15,6 +18,7 @@ using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Infrastructure.Identity.Authorization;
 
 namespace API.Controllers.Organization;
 
@@ -36,7 +40,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpGet("dashboard-metrics")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.DashboardRead)]
     [ProducesResponseType(typeof(ApiResponse<OrganisationDashboardMetricsDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDashboardMetrics()
     {
@@ -70,7 +74,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpGet("{orgId:guid}/appointments")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.AppointmentsRead)]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ClinicAppointmentDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetOrganisationAppointments(
         Guid orgId,
@@ -93,7 +97,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpGet("my-contract")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.ContractsRead)]
     [ProducesResponseType(typeof(ApiResponse<ContractDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetMyContract()
@@ -107,7 +111,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpPost("my-contract/upload")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.ContractsRead)]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -134,7 +138,7 @@ public class OrganisationsController : BaseApiController
             scannedUrl = await _fileStorageService.SaveFileAsync(
                 stream,
                 contractImage.FileName,
-                $"contracts/{userId.Value}");
+                $"organisations/contracts/{userId.Value}");
         }
 
         var result = await _mediator.Send(new UploadSignedContractCommand
@@ -147,7 +151,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpGet("billing/summary")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.WalletsRead)]
     [ProducesResponseType(typeof(ApiResponse<OrgBillingSummaryDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetBillingSummary(CancellationToken cancellationToken)
     {
@@ -162,7 +166,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpGet("screening-reports")]
-    [Authorize(Policy = Policies.OrgAdminOnly)]
+    [AuthorizePermission(Permissions.ScreeningRead)]
     [ProducesResponseType(typeof(ApiResponse<OrgScreeningReportDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetScreeningReports(CancellationToken cancellationToken)
     {
@@ -175,4 +179,63 @@ public class OrganisationsController : BaseApiController
 
         return HandleResult(result, "Screening reports loaded");
     }
+
+    [HttpGet("settings")]
+    [AuthorizePermission(Permissions.OrganisationsRead)]
+    [ProducesResponseType(typeof(ApiResponse<OrganisationSettingsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetSettings(CancellationToken cancellationToken)
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
+
+        var result = await _mediator.Send(
+            new GetOrganisationSettingsQuery(_currentUserService.UserId.Value),
+            cancellationToken);
+
+        return HandleResult(result, "Organisation settings loaded.");
+    }
+
+    [HttpPut("settings")]
+    [AuthorizePermission(Permissions.OrganisationsUpdate)]
+    [ProducesResponseType(typeof(ApiResponse<OrganisationSettingsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateSettings(
+        [FromBody] UpdateOrganisationSettingsRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
+
+        var command = new UpdateOrganisationSettingsCommand
+        {
+            OrgAdminUserId = _currentUserService.UserId.Value,
+            Name = request.Name,
+            Address = request.Address,
+            LicenseNumber = request.LicenseNumber,
+            TaxCode = request.TaxCode,
+            Description = request.Description,
+            ContactFullName = request.ContactFullName,
+            ContactEmail = request.ContactEmail,
+            ContactPhone = request.ContactPhone,
+            AvatarUrl = request.AvatarUrl
+        };
+
+        var result = await _mediator.Send(command, cancellationToken);
+        return HandleResult(result, "Organisation settings updated successfully.");
+    }
+}
+
+public record UpdateOrganisationSettingsRequest
+{
+    public string Name { get; init; } = string.Empty;
+    public string? Address { get; init; }
+    public string? LicenseNumber { get; init; }
+    public string? TaxCode { get; init; }
+    public string? Description { get; init; }
+    public string? ContactFullName { get; init; }
+    public string? ContactEmail { get; init; }
+    public string? ContactPhone { get; init; }
+    public string? AvatarUrl { get; init; }
 }

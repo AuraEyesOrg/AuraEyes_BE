@@ -2,12 +2,15 @@ using Application.Common.Constants;
 using Application.Common.Models;
 using Application.Common.Interfaces;
 using Application.SystemAdmin.Organisations.Common;
+using Application.SystemAdmin.Organisations.Commands.UpdateMonthlyQuota;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisationById;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisationMetrics;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisations;
+using Infrastructure.Identity.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Infrastructure.Identity.Authorization;
 
 namespace API.Controllers.SystemAdmin;
 
@@ -17,7 +20,7 @@ namespace API.Controllers.SystemAdmin;
 /// Uses existing Organisation entity from Domain.
 /// </summary>
 [Route("api/system-admin/[controller]")]
-[Authorize(Policy = Policies.SystemAdminOnly)]
+[AuthorizePermission(Permissions.OrganisationsRead)]
 public class OrganisationsController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -92,6 +95,28 @@ public class OrganisationsController : BaseApiController
         return HandleResult(result);
     }
 
+    /// <summary>
+    /// Update monthly quota limit for an organisation.
+    /// </summary>
+    [HttpPut("{id:guid}/monthly-quota")]
+    [AuthorizePermission(Permissions.OrganisationsUpdate)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateMonthlyQuota(
+        Guid id,
+        [FromBody] UpdateOrganisationMonthlyQuotaRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new UpdateOrganisationMonthlyQuotaCommand
+        {
+            OrganisationId = id,
+            MonthlyQuotaLimit = request.MonthlyQuotaLimit,
+        }, cancellationToken);
+
+        return HandleResult(result, "Organisation monthly quota updated successfully.");
+    }
+
     [HttpGet("onboarding-requests")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<OrganisationOnboardingRequestDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetOnboardingRequests(CancellationToken cancellationToken)
@@ -101,6 +126,7 @@ public class OrganisationsController : BaseApiController
     }
 
     [HttpPost("onboarding-requests/{id:guid}/approve")]
+    [AuthorizePermission(Permissions.OrganisationsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<ApproveOrganisationOnboardingResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
@@ -116,3 +142,5 @@ public class OrganisationsController : BaseApiController
         return HandleResult(result, "Organisation onboarding request approved successfully.");
     }
 }
+
+public record UpdateOrganisationMonthlyQuotaRequest(int MonthlyQuotaLimit);

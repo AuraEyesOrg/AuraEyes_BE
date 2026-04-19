@@ -10,6 +10,7 @@ using Application.SystemAdmin.ContractTemplates.Common;
 using Application.SystemAdmin.ContractTemplates.Queries.GetContractTemplateById;
 using Application.SystemAdmin.ContractTemplates.Queries.GetContractTemplates;
 using Domain.Enums;
+using Infrastructure.Identity.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,7 +22,7 @@ namespace API.Controllers.SystemAdmin;
 /// All endpoints require SystemAdmin role.
 /// </summary>
 [Route("api/system-admin/contract-templates")]
-[Authorize(Policy = Policies.SystemAdminOnly)]
+[AuthorizePermission(Permissions.ContractsRead)]
 public partial class ContractTemplatesController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -75,6 +76,7 @@ public partial class ContractTemplatesController : BaseApiController
 
     /// <summary>Create a new contract template from an uploaded DOCX file.</summary>
     [HttpPost]
+    [AuthorizePermission(Permissions.ContractTemplatesManage)]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(ApiResponse<ContractTemplateDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -101,6 +103,7 @@ public partial class ContractTemplatesController : BaseApiController
 
     /// <summary>Update a contract template metadata and optionally replace its DOCX file.</summary>
     [HttpPut("{id:guid}")]
+    [AuthorizePermission(Permissions.ContractTemplatesManage)]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(ApiResponse<ContractTemplateDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -142,6 +145,7 @@ public partial class ContractTemplatesController : BaseApiController
 
     /// <summary>Delete a contract template permanently.</summary>
     [HttpDelete("{id:guid}")]
+    [AuthorizePermission(Permissions.ContractTemplatesManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteContractTemplate(Guid id)
@@ -152,6 +156,7 @@ public partial class ContractTemplatesController : BaseApiController
 
     /// <summary>Duplicate a contract template.</summary>
     [HttpPost("{id:guid}/duplicate")]
+    [AuthorizePermission(Permissions.ContractTemplatesManage)]
     [ProducesResponseType(typeof(ApiResponse<ContractTemplateDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DuplicateContractTemplate(Guid id)
@@ -162,6 +167,7 @@ public partial class ContractTemplatesController : BaseApiController
 
     /// <summary>Activate or deactivate a contract template.</summary>
     [HttpPatch("{id:guid}/status")]
+    [AuthorizePermission(Permissions.ContractTemplatesManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SetContractTemplateStatus(Guid id, [FromBody] SetStatusRequest request)
@@ -207,7 +213,7 @@ public partial class ContractTemplatesController
         var storagePath = await _fileStorageService.SaveFileAsync(
             stream,
             templateFile.FileName,
-            "contract-templates");
+            "admin/contract_templates");
 
         return new TemplateUploadResult(true, StoragePath: storagePath);
     }

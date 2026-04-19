@@ -7,6 +7,7 @@ using Application.Wallets.Common;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Infrastructure.Identity.Authorization;
 
 namespace API.Controllers.SystemAdmin;
 
@@ -15,7 +16,7 @@ namespace API.Controllers.SystemAdmin;
 /// Cho phép admin trigger lệnh chi tự động và đồng bộ trạng thái từ PayOS.
 /// </summary>
 [Route("api/admin/payouts")]
-[Authorize(Policy = Policies.SystemAdminOnly)]
+[AuthorizePermission(Permissions.PayoutsManage)]
 public class PayoutsController : BaseApiController
 {
     private readonly IMediator _mediator;

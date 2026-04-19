@@ -12,6 +12,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
+using Infrastructure.Identity.Authorization;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
 namespace API.Controllers.SystemAdmin;
 
 /// <summary>
@@ -20,7 +24,7 @@ namespace API.Controllers.SystemAdmin;
 /// operational health, and population-level risk insights.
 /// </summary>
 [Route("api/system-admin/[controller]")]
-[Authorize(Policy = Policies.SystemAdminOnly)]
+[AuthorizePermission(Permissions.DashboardRead)]
 public class DashboardController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -157,6 +161,7 @@ public class DashboardController : BaseApiController
     /// This endpoint runs the same job logic as Hangfire recurring execution.
     /// </summary>
     [HttpPost("jobs/fulltime-slot-rolling-window/trigger-once")]
+    [AuthorizePermission(Permissions.SchedulesManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> TriggerFullTimeRollingWindowJobOnce(CancellationToken cancellationToken)

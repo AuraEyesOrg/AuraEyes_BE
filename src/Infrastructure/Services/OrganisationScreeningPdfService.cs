@@ -40,7 +40,10 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
         // Prefer rendering from persisted localization boxes (includes manual edits).
         var generatedAnnotatedImageData = TryBuildBoxedImage(originalImageData, model.LocalizationBoxes);
         var annotatedImageData = generatedAnnotatedImageData ?? imageAssets.AnnotatedImageData;
-        var heatmapImageData = imageAssets.HeatmapImageData;
+        // Prefer doctor-edited heatmap matrix over the original AI static URL.
+        var heatmapImageData = model.HeatmapMatrix is { Length: > 0 }
+            ? TryRenderHeatmapMatrixToPng(model.HeatmapMatrix)
+            : imageAssets.HeatmapImageData;
 
         return Document.Create(container =>
         {
@@ -470,6 +473,62 @@ public sealed class OrganisationScreeningPdfService : IOrganisationScreeningPdfS
         try
         {
             return Convert.FromBase64String(payload);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Renders a heatmap_data matrix (rows × cols, values 0–1) to a PNG using the JET colormap,
+    /// matching the canvas rendering used by the ophthalmologist review UI.
+    /// </summary>
+    private static byte[]? TryRenderHeatmapMatrixToPng(float[][] matrix)
+    {
+        if (matrix.Length == 0)
+            return null;
+
+        const float Threshold = 0.15f;
+
+        try
+        {
+            var rows = matrix.Length;
+            var cols = matrix[0].Length;
+            if (cols == 0) return null;
+
+            using var image = new SixLabors.ImageSharp.Image<Rgba32>(cols, rows);
+            for (var r = 0; r < rows; r++)
+            {
+                var row = matrix[r];
+                for (var c = 0; c < Math.Min(cols, row.Length); c++)
+                {
+                    var v = Math.Clamp(row[c], 0f, 1f);
+                    if (v <= Threshold)
+                    {
+                        image[c, r] = new Rgba32(0, 0, 0, 0);
+                        continue;
+                    }
+
+                    var nv = (v - Threshold) / (1f - Threshold);
+
+                    // JET colormap (matches FE canvas algorithm exactly)
+                    var r4 = Math.Clamp(1.5f - Math.Abs(4f * nv - 3f), 0f, 1f);
+                    var g4 = Math.Clamp(1.5f - Math.Abs(4f * nv - 2f), 0f, 1f);
+                    var b4 = Math.Clamp(1.5f - Math.Abs(4f * nv - 1f), 0f, 1f);
+                    var alpha = (byte)Math.Clamp((int)MathF.Round((0.3f + 0.7f * nv) * 255f), 0, 255);
+
+                    image[c, r] = new Rgba32(
+                        (byte)MathF.Round(r4 * 255f),
+                        (byte)MathF.Round(g4 * 255f),
+                        (byte)MathF.Round(b4 * 255f),
+                        alpha);
+                }
+            }
+
+            using var output = new MemoryStream();
+            image.Save(output, PngFormat.Instance);
+            return output.ToArray();
         }
         catch
         {

@@ -13,13 +13,16 @@ public class GetPatientRoadmapByIdQueryHandler : IQueryHandler<GetPatientRoadmap
 {
     private readonly IRepository<Patient> _patientRepository;
     private readonly IRepository<PatientRoadmap> _roadmapRepository;
+    private readonly IRepository<MedicalDiagnosis> _medicalDiagnosisRepository;
 
     public GetPatientRoadmapByIdQueryHandler(
         IRepository<Patient> patientRepository,
-        IRepository<PatientRoadmap> roadmapRepository)
+        IRepository<PatientRoadmap> roadmapRepository,
+        IRepository<MedicalDiagnosis> medicalDiagnosisRepository)
     {
         _patientRepository = patientRepository;
         _roadmapRepository = roadmapRepository;
+        _medicalDiagnosisRepository = medicalDiagnosisRepository;
     }
 
     public async Task<Result<PatientRoadmapDto>> Handle(
@@ -44,11 +47,18 @@ public class GetPatientRoadmapByIdQueryHandler : IQueryHandler<GetPatientRoadmap
         if (roadmap is null)
             return Result<PatientRoadmapDto>.NotFound("Roadmap not found.");
 
+        var screeningId = await _medicalDiagnosisRepository
+            .Query()
+            .Where(d => d.Id == roadmap.MedicalDiagnosisId)
+            .Select(d => (Guid?)d.AiScreeningId)
+            .FirstOrDefaultAsync(cancellationToken);
+
         var data = new PatientRoadmapDto
         {
             Id = roadmap.Id,
             PatientId = roadmap.PatientId,
             MedicalDiagnosisId = roadmap.MedicalDiagnosisId,
+            ScreeningId = screeningId,
             RiskLevel = roadmap.RiskLevel,
             Summary = roadmap.Summary,
             NextSteps = DeserializeArray(roadmap.NextStepsJson),

@@ -65,7 +65,7 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
                     ? matchingPost.AuthorType
                     : matchingPost!.OriginalPost!.AuthorType,
                 FullName = user?.FullName ?? "Unknown",
-                AvatarUrl = null
+                AvatarUrl = user?.AvatarUrl
             };
         }
 

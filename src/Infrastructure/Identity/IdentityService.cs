@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using Application.Common.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Infrastructure.Persistence;
 
 namespace Infrastructure.Identity;
 
@@ -12,8 +13,11 @@ namespace Infrastructure.Identity;
 /// </summary>
 public class IdentityService : IIdentityService
 {
+    private const string ProviderAvatarClaimType = "provider_avatar_url";
+
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<ApplicationRole> _roleManager;
+    private readonly ApplicationDbContext _context;
 
     // Number of recovery codes to generate
     private const int DefaultRecoveryCodesCount = 10;
@@ -23,10 +27,12 @@ public class IdentityService : IIdentityService
 
     public IdentityService(
         UserManager<ApplicationUser> userManager,
-        RoleManager<ApplicationRole> roleManager)
+        RoleManager<ApplicationRole> roleManager,
+        ApplicationDbContext context)
     {
         _userManager = userManager;
         _roleManager = roleManager;
+        _context = context;
     }
 
     public async Task<(bool Succeeded, string[] Errors)> CreateUserAsync(
@@ -152,7 +158,7 @@ public class IdentityService : IIdentityService
         var user = await _userManager.Users
             .FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted, cancellationToken);
 
-        return user == null ? null : MapToDto(user);
+        return user == null ? null : await MapToDtoAsync(user);
     }
 
     public async Task<UserDto?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -160,7 +166,7 @@ public class IdentityService : IIdentityService
         var user = await _userManager.Users
             .FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted, cancellationToken);
 
-        return user == null ? null : MapToDto(user);
+        return user == null ? null : await MapToDtoAsync(user);
     }
 
     public async Task<bool> IsPhoneNumberInUseByOrganizationAsync(
@@ -359,8 +365,10 @@ public class IdentityService : IIdentityService
         return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
     }
 
-    private static UserDto MapToDto(ApplicationUser user)
+    private async Task<UserDto> MapToDtoAsync(ApplicationUser user)
     {
+        var avatarUrl = await ResolveEffectiveAvatarUrlAsync(user);
+
         return new UserDto(
             user.Id,
             user.Email ?? string.Empty,
@@ -370,8 +378,22 @@ public class IdentityService : IIdentityService
             user.IsDeleted,
             user.OrganizationId,
             user.TwoFactorEnabled,
-            user.AvatarUrl
+            avatarUrl
         );
+    }
+
+    private async Task<string?> ResolveEffectiveAvatarUrlAsync(ApplicationUser user)
+    {
+        if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
+            return user.AvatarUrl;
+
+        var claims = await _userManager.GetClaimsAsync(user);
+        var providerAvatar = claims.FirstOrDefault(c =>
+            string.Equals(c.Type, ProviderAvatarClaimType, StringComparison.Ordinal));
+
+        return string.IsNullOrWhiteSpace(providerAvatar?.Value)
+            ? null
+            : providerAvatar.Value;
     }
 
     private static string NormalizePhone(string phoneNumber)
@@ -716,6 +738,8 @@ public class IdentityService : IIdentityService
         if (user == null || user.IsDeleted)
             return null;
 
+        var avatarUrl = await ResolveEffectiveAvatarUrlAsync(user);
+
         return new UserDetailsDto
         {
             Id = user.Id,
@@ -725,7 +749,7 @@ public class IdentityService : IIdentityService
             DateOfBirth = user.DateOfBirth,
             Gender = user.Gender,
             Address = user.Address,
-            AvatarUrl = user.AvatarUrl,
+            AvatarUrl = avatarUrl,
             CitizenId = user.CitizenId,
             EmailConfirmed = user.EmailConfirmed,
             CreatedAt = user.CreatedAt,
@@ -817,6 +841,42 @@ public class IdentityService : IIdentityService
         return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
     }
 
+    public async Task<IList<string>> GetUserPermissionsAsync(Guid userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null) return Array.Empty<string>();
+
+        var userRoles = await _userManager.GetRolesAsync(user);
+
+        // 1. Get permissions assigned to user roles
+        var rolePermissions = await (from rp in _context.RolePermissions
+                                     join r in _roleManager.Roles on rp.RoleId equals r.Id
+                                     join p in _context.Permissions on rp.PermissionId equals p.Id
+                                     where userRoles.Contains(r.Name)
+                                     select p.Name).ToListAsync();
+
+        // 2. Get direct user overrides
+        var userOverrides = await (from up in _context.UserPermissions
+                                    join p in _context.Permissions on up.PermissionId equals p.Id
+                                    where up.UserId == userId && up.IsActive
+                                    where up.ExpiresAt == null || up.ExpiresAt > DateTime.UtcNow
+                                    select new { p.Name, up.IsGranted })
+                                    .ToListAsync();
+
+        // 3. Compute final set: (Role-based + Explicitly Granted) - Explicitly Revoked
+        var finalPermissions = new HashSet<string>(rolePermissions, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var over in userOverrides)
+        {
+            if (over.IsGranted)
+                finalPermissions.Add(over.Name);
+            else
+                finalPermissions.Remove(over.Name);
+        }
+
+        return finalPermissions.ToList();
+    }
+
     public async Task<(bool Succeeded, string[] Errors)> ChangePasswordAsync(
         Guid userId,
         string currentPassword,
@@ -831,6 +891,7 @@ public class IdentityService : IIdentityService
         if (result.Succeeded)
         {
             user.UpdatedAt = DateTime.UtcNow;
+            user.MustChangePassword = false;
             await _userManager.UpdateAsync(user);
         }
 

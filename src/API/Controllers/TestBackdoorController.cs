@@ -27,6 +27,7 @@ public class TestBackdoorController : ControllerBase
     private readonly ApplicationDbContext _dbContext;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<ApplicationRole> _roleManager;
+    private readonly IIdentityService _identityService;
     private readonly ILogger<TestBackdoorController> _logger;
     private readonly IMediator _mediator;
     private readonly IPayOSService _payOSService;
@@ -38,6 +39,7 @@ public class TestBackdoorController : ControllerBase
         ApplicationDbContext dbContext,
         UserManager<ApplicationUser> userManager,
         RoleManager<ApplicationRole> roleManager,
+        IIdentityService identityService,
         ILogger<TestBackdoorController> logger,
         IMediator mediator,
         IPayOSService payOSService,
@@ -48,6 +50,7 @@ public class TestBackdoorController : ControllerBase
         _dbContext = dbContext;
         _userManager = userManager;
         _roleManager = roleManager;
+        _identityService = identityService;
         _logger = logger;
         _mediator = mediator;
         _payOSService = payOSService;
@@ -273,6 +276,13 @@ public class TestBackdoorController : ControllerBase
 
             if (!string.IsNullOrWhiteSpace(result.Data.VerificationStatus))
                 claims.Add(new Claim("verification_status", result.Data.VerificationStatus));
+        }
+
+        // Add granular permissions
+        var permissions = await _identityService.GetUserPermissionsAsync(userId);
+        foreach (var permission in permissions)
+        {
+            claims.Add(new Claim("permission", permission));
         }
 
         return claims;

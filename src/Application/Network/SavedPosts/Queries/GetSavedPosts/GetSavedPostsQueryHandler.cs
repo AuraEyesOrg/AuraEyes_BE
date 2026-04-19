@@ -42,7 +42,7 @@ public class GetSavedPostsQueryHandler : IQueryHandler<GetSavedPostsQuery, Paged
                 Id = authorId,
                 AuthorType = savedPosts.First(s => s.Post.AuthorId == authorId).Post.AuthorType,
                 FullName = user?.FullName ?? "Unknown",
-                AvatarUrl = null
+                AvatarUrl = user?.AvatarUrl
             };
         }
 

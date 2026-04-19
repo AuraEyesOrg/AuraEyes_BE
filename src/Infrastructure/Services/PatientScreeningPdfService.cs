@@ -1,0 +1,617 @@
+using Application.Common.Helpers;
+using Application.Screenings.Interfaces;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Drawing.Processing;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using ImgSharpColor = SixLabors.ImageSharp.Color;
+using ImgSharpImage = SixLabors.ImageSharp.Image;
+
+namespace Infrastructure.Services;
+
+public sealed class PatientScreeningPdfService : IPatientScreeningPdfService
+{
+    private const string BrandBlue = "#0B4A8B";
+    private const string BrandSky = "#1C7ED6";
+    private const string Surface = "#F8FAFC";
+    private const string Border = "#D0D5DD";
+    private const string TextStrong = "#101828";
+    private const string TextMuted = "#475467";
+    private static readonly TimeZoneInfo ReportTimeZone = VietnamTimeZoneResolver.TimeZone;
+    private static readonly HttpClient ImageHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(8)
+    };
+
+    static PatientScreeningPdfService()
+    {
+        QuestPDF.Settings.License = LicenseType.Community;
+    }
+
+    public byte[] GenerateScreeningReportPdf(PatientScreeningReportPdfModel model)
+    {
+        var originalImageUrl = model.OriginalImageUrls.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+        var imageAssets = FetchImageAssets(originalImageUrl, model.AnnotatedImageUrl, model.HeatmapImageUrl);
+        var originalImageData = imageAssets.OriginalImageData;
+        var generatedAnnotatedImageData = TryBuildBoxedImage(originalImageData, model.LocalizationBoxes);
+        var annotatedImageData = generatedAnnotatedImageData ?? imageAssets.AnnotatedImageData;
+        // Prefer doctor-edited heatmap matrix over the original AI static URL.
+        var heatmapImageData = model.HeatmapMatrix is { Length: > 0 }
+            ? TryRenderHeatmapMatrixToPng(model.HeatmapMatrix)
+            : imageAssets.HeatmapImageData;
+
+        return Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(28);
+                page.PageColor(Colors.White);
+                page.DefaultTextStyle(x => x.FontSize(10).FontFamily(Fonts.Arial));
+
+                page.Header().Element(c => ComposeHeader(c, model));
+
+                page.Content().PaddingVertical(14).Column(column =>
+                {
+                    column.Spacing(12);
+
+                    column.Item().Row(row =>
+                    {
+                        row.RelativeItem().Element(c => ComposePatientInfo(c, model));
+                        row.ConstantItem(10);
+                        row.RelativeItem().Element(c => ComposeSessionInfo(c, model));
+                    });
+
+                    column.Item().Element(c => ComposeHeroResult(c, model));
+                    column.Item().Element(c => ComposeClinicalDiagnosisSection(c, model));
+                    column.Item().Element(c => ComposeRetinalImagesSection(
+                        c,
+                        originalImageData,
+                        annotatedImageData,
+                        heatmapImageData,
+                        originalImageUrl,
+                        model.AnnotatedImageUrl,
+                        model.HeatmapImageUrl));
+                    column.Item().Element(c => ComposeAiFindingsTable(c, model));
+                });
+
+                page.Footer().Element(ComposeFooter);
+            });
+        }).GeneratePdf();
+    }
+
+    private static (byte[]? OriginalImageData, byte[]? AnnotatedImageData, byte[]? HeatmapImageData) FetchImageAssets(
+        string? originalImageUrl,
+        string? annotatedImageUrl,
+        string? heatmapImageUrl)
+    {
+        var originalTask = TryDownloadImageDataAsync(originalImageUrl);
+        var annotatedTask = TryDownloadImageDataAsync(annotatedImageUrl);
+        var heatmapTask = TryDownloadImageDataAsync(heatmapImageUrl);
+
+        Task.WhenAll(originalTask, annotatedTask, heatmapTask).GetAwaiter().GetResult();
+        return (originalTask.Result, annotatedTask.Result, heatmapTask.Result);
+    }
+
+    private void ComposeHeader(IContainer container, PatientScreeningReportPdfModel model)
+    {
+        container.Border(1).BorderColor(Border).Padding(12).Column(column =>
+        {
+            column.Item().Row(row =>
+            {
+                row.RelativeItem().Column(left =>
+                {
+                    left.Item().Text("AURA EYES").FontSize(22).SemiBold().FontColor(BrandBlue);
+                    left.Item().Text("Retinal AI Screening Report")
+                        .FontSize(12)
+                        .SemiBold()
+                        .FontColor(TextMuted);
+                });
+
+                row.RelativeItem().AlignRight().Column(right =>
+                {
+                    right.Spacing(2);
+                    right.Item().Text("Patient Copy")
+                        .FontSize(9)
+                        .SemiBold()
+                        .FontColor(BrandSky);
+                    right.Item().Text(text =>
+                    {
+                        text.DefaultTextStyle(x => x.FontSize(9).FontColor(TextMuted));
+                        text.Span("Generated: ").SemiBold();
+                        text.Span(FormatReportDateTime(DateTime.UtcNow, "dd MMM yyyy HH:mm"));
+                    });
+                });
+            });
+            column.Item().PaddingTop(8).LineHorizontal(1).LineColor(Border);
+        });
+    }
+
+    private void ComposePatientInfo(IContainer container, PatientScreeningReportPdfModel model)
+    {
+        Card(container).Column(column =>
+        {
+            column.Spacing(4);
+            column.Item().Text("Patient Information")
+                .SemiBold()
+                .FontSize(12)
+                .FontColor(BrandBlue);
+            column.Item().PaddingBottom(4).LineHorizontal(1).LineColor(Border);
+
+            ComposeInfoRow(column, "Patient Name", model.PatientName);
+            ComposeInfoRow(column, "Patient ID", model.PatientId.ToString());
+        });
+    }
+
+    private void ComposeSessionInfo(IContainer container, PatientScreeningReportPdfModel model)
+    {
+        Card(container).Column(column =>
+        {
+            column.Spacing(4);
+            column.Item().Text("Session Information")
+                .SemiBold()
+                .FontSize(12)
+                .FontColor(BrandBlue);
+            column.Item().PaddingBottom(4).LineHorizontal(1).LineColor(Border);
+
+            ComposeInfoRow(column, "Screening ID", model.ScreeningId.ToString());
+            ComposeInfoRow(column, "Model Version", string.IsNullOrWhiteSpace(model.ModelVersion) ? "N/A" : model.ModelVersion);
+            ComposeInfoRow(column, "Session Created", FormatReportDateTime(model.CreatedAt));
+            ComposeInfoRow(column, "Reported By", string.IsNullOrWhiteSpace(model.ReportedByDoctorName) ? "N/A" : model.ReportedByDoctorName);
+        });
+    }
+
+    private void ComposeHeroResult(IContainer container, PatientScreeningReportPdfModel model)
+    {
+        var riskColor = ResolveRiskColor(model.RiskLevel);
+
+        container.BorderLeft(4).BorderColor(riskColor).Background(Surface).Padding(12).Column(column =>
+        {
+            column.Spacing(6);
+            column.Item().Text(text =>
+            {
+                text.Span("Risk Level: ").SemiBold().FontSize(12).FontColor(TextStrong);
+                text.Span(string.IsNullOrWhiteSpace(model.RiskLevel) ? "N/A" : model.RiskLevel.ToUpperInvariant())
+                    .SemiBold()
+                    .FontSize(12)
+                    .FontColor(riskColor);
+            });
+            column.Item().LineHorizontal(1).LineColor(Border);
+            column.Item().PaddingVertical(2).Text(text =>
+            {
+                text.Span("AI Summary: ").SemiBold().FontColor(BrandBlue);
+                text.Span(string.IsNullOrWhiteSpace(model.Summary) ? "No summary available." : " " + model.Summary).FontColor(TextStrong);
+            });
+            column.Item().Text(text =>
+            {
+                text.DefaultTextStyle(x => x.FontSize(8).FontColor(TextMuted));
+                text.Span("Assessed At: ");
+                text.Span(model.AssessedAt.HasValue ? FormatReportDateTime(model.AssessedAt.Value) : "N/A");
+            });
+        });
+    }
+
+    private void ComposeAiFindingsTable(IContainer container, PatientScreeningReportPdfModel model)
+    {
+        container.Border(1).BorderColor(Border).Padding(10).Column(column =>
+        {
+            column.Spacing(6);
+            column.Item().Text("AI Detailed Findings")
+                .SemiBold()
+                .FontSize(12)
+                .FontColor(BrandBlue);
+
+            if (model.AiFindingDetails.Count == 0)
+            {
+                column.Item().Background(Surface).Padding(10).Text(
+                        "No structured finding percentages are available for this screening session.")
+                    .FontColor(TextMuted);
+                return;
+            }
+
+            column.Item().Table(table =>
+            {
+                table.ColumnsDefinition(columns =>
+                {
+                    columns.ConstantColumn(30);
+                    columns.RelativeColumn(3);
+                    columns.ConstantColumn(110);
+                });
+
+                table.Header(header =>
+                {
+                    header.Cell().Element(TableHeaderCell).AlignCenter().Text("#").FontColor(Colors.White).SemiBold();
+                    header.Cell().Element(TableHeaderCell).Text("Finding").FontColor(Colors.White).SemiBold();
+                    header.Cell().Element(TableHeaderCell).AlignCenter().Text("Status").FontColor(Colors.White).SemiBold();
+                });
+
+                foreach (var finding in model.AiFindingDetails.OrderBy(x => x.Rank))
+                {
+                    table.Cell().Element(TableBodyCell).AlignCenter().Text(finding.Rank.ToString()).FontColor(TextStrong);
+                    table.Cell().Element(TableBodyCell).Text(finding.DiseaseName).FontColor(TextStrong);
+
+                    var status = string.IsNullOrWhiteSpace(finding.Status) ? "Detected" : finding.Status.Replace("_", " ");
+                    if (status.Length > 0)
+                    {
+                        status = char.ToUpperInvariant(status[0]) + status[1..].ToLowerInvariant();
+                    }
+
+                    table.Cell().Element(TableBodyCell).AlignCenter().Text(status).FontColor(TextMuted);
+                }
+            });
+        });
+    }
+
+    private void ComposeClinicalDiagnosisSection(IContainer container, PatientScreeningReportPdfModel model)
+    {
+        container.Border(1).BorderColor(Border).Padding(10).Column(column =>
+        {
+            column.Spacing(6);
+            column.Item().Text("Ophthamologist Diagnosis Summary")
+                .SemiBold()
+                .FontSize(12)
+                .FontColor(BrandBlue);
+
+            column.Item().Row(row =>
+            {
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(c, "Diagnosis Code", model.DiagnosisCode));
+                row.ConstantItem(8);
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(c, "Coding System", model.CodingSystem));
+                row.ConstantItem(8);
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(c, "Severity", model.SeverityLevel));
+            });
+
+            column.Item().Row(row =>
+            {
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(
+                    c,
+                    "Confidence",
+                    model.ConfidenceLevel.HasValue ? $"{model.ConfidenceLevel.Value:0.#}%" : null));
+                row.ConstantItem(8);
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(
+                    c,
+                    "Urgent",
+                    model.IsUrgent ? "Yes" : "No"));
+                row.ConstantItem(8);
+                row.RelativeItem().Element(c => ComposeImageCardlessInfo(
+                    c,
+                    "Referral Needed",
+                    model.IsReferralNeeded ? "Yes" : "No"));
+            });
+
+            column.Item().Element(c => ComposeLongFormText(c, "Ophthamologist Findings", model.OphthamologistFindings));
+            column.Item().Element(c => ComposeLongFormText(c, "Treatment Plan", model.TreatmentPlan));
+            column.Item().Element(c => ComposeLongFormText(c, "Recommendations", model.Recommendations));
+
+            if (!string.IsNullOrWhiteSpace(model.LifestyleAdvice))
+                column.Item().Element(c => ComposeLongFormText(c, "Lifestyle Advice", model.LifestyleAdvice));
+        });
+    }
+
+    private void ComposeRetinalImagesSection(
+        IContainer container,
+        byte[]? originalImageData,
+        byte[]? annotatedImageData,
+        byte[]? heatmapImageData,
+        string? originalImageUrl,
+        string? annotatedImageUrl,
+        string? heatmapImageUrl)
+    {
+        container.Border(1).BorderColor(Border).Padding(10).Column(column =>
+        {
+            column.Spacing(8);
+            column.Item().Text("Retinal Imagery")
+                .SemiBold()
+                .FontSize(12)
+                .FontColor(BrandBlue);
+
+            column.Item().Row(row =>
+            {
+                row.RelativeItem().Element(c => ComposeImageCard(c, "Original Scan", originalImageData, originalImageUrl));
+                row.ConstantItem(8);
+                row.RelativeItem().Element(c => ComposeImageCard(
+                    c,
+                    "AI Localization",
+                    annotatedImageData,
+                    annotatedImageData is null ? annotatedImageUrl : "generated"));
+                row.ConstantItem(8);
+                row.RelativeItem().Element(c => ComposeImageCard(c, "Attention Heatmap", heatmapImageData, heatmapImageUrl));
+            });
+        });
+    }
+
+    private void ComposeImageCard(IContainer container, string title, byte[]? imageData, string? sourceUrl)
+    {
+        container.Border(1).BorderColor(Border).Background(Surface).Padding(8).Column(column =>
+        {
+            column.Spacing(5);
+            column.Item().Text(title).SemiBold().FontSize(10).FontColor(TextStrong).AlignCenter();
+
+            if (imageData is { Length: > 0 })
+            {
+                column.Item()
+                    .Height(150)
+                    .Border(1)
+                    .BorderColor(Border)
+                    .Padding(2)
+                    .AlignCenter()
+                    .AlignMiddle()
+                    .Image(imageData)
+                    .FitArea();
+            }
+            else
+            {
+                column.Item()
+                    .Height(150)
+                    .Border(1)
+                    .BorderColor(Border)
+                    .AlignCenter()
+                    .AlignMiddle()
+                    .Text("Image unavailable")
+                    .FontSize(9)
+                    .FontColor(TextMuted);
+            }
+        });
+    }
+
+    private void ComposeImageCardlessInfo(IContainer container, string label, string? value)
+    {
+        container.Border(1).BorderColor(Border).Background(Surface).Padding(8).Column(column =>
+        {
+            column.Spacing(3);
+            column.Item().Text(label).SemiBold().FontSize(9).FontColor(TextMuted);
+            column.Item().Text(string.IsNullOrWhiteSpace(value) ? "N/A" : value).FontSize(10).FontColor(TextStrong);
+        });
+    }
+
+    private void ComposeLongFormText(IContainer container, string label, string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return;
+
+        container.Border(1).BorderColor(Border).Background(Surface).Padding(8).Column(column =>
+        {
+            column.Spacing(3);
+            column.Item().Text(label).SemiBold().FontSize(9).FontColor(TextMuted);
+            column.Item().Text(content.Trim()).FontSize(10).FontColor(TextStrong);
+        });
+    }
+
+    private void ComposeFooter(IContainer container)
+    {
+        container.Column(column =>
+        {
+            column.Item().LineHorizontal(1).LineColor(Border);
+            column.Item().PaddingTop(4).Row(row =>
+            {
+                row.RelativeItem().Text(
+                        "This report is generated by AuraEyes AI to support medical evaluation and does not replace definitive clinical diagnosis.")
+                    .FontSize(8)
+                    .FontColor(TextMuted);
+
+                row.ConstantItem(120).AlignRight().Text(text =>
+                {
+                    text.DefaultTextStyle(x => x.FontSize(8).FontColor(TextMuted));
+                    text.Span("Page ");
+                    text.CurrentPageNumber();
+                    text.Span(" of ");
+                    text.TotalPages();
+                });
+            });
+        });
+    }
+
+    private static IContainer Card(IContainer container)
+    {
+        return container
+            .Background(Surface)
+            .Border(1)
+            .BorderColor(Border)
+            .Padding(10);
+    }
+
+    private static IContainer TableHeaderCell(IContainer container)
+    {
+        return container
+            .Background(BrandBlue)
+            .BorderBottom(1)
+            .BorderColor(BrandBlue)
+            .PaddingVertical(6)
+            .PaddingHorizontal(8);
+    }
+
+    private static IContainer TableBodyCell(IContainer container)
+    {
+        return container
+            .BorderBottom(1)
+            .BorderColor(Border)
+            .PaddingVertical(6)
+            .PaddingHorizontal(8);
+    }
+
+    private static void ComposeInfoRow(ColumnDescriptor column, string label, string value)
+    {
+        column.Item().Text(text =>
+        {
+            text.Span($"{label}: ").SemiBold().FontColor(TextStrong);
+            text.Span(string.IsNullOrWhiteSpace(value) ? "N/A" : value).FontColor(TextMuted);
+        });
+    }
+
+    private static string ResolveRiskColor(string? riskLevel)
+    {
+        return riskLevel?.Trim().ToLowerInvariant() switch
+        {
+            "critical" or "high" => "#B42318",
+            "moderate" or "medium" => "#B54708",
+            "low" => "#027A48",
+            _ => BrandBlue
+        };
+    }
+
+    private static string FormatReportDateTime(DateTime value, string format = "yyyy-MM-dd HH:mm:ss")
+    {
+        var utcValue = value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
+
+        var localValue = TimeZoneInfo.ConvertTimeFromUtc(utcValue, ReportTimeZone);
+        return localValue.ToString(format);
+    }
+
+    private static async Task<byte[]?> TryDownloadImageDataAsync(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+        if (url.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)) return TryDecodeDataImage(url);
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return null;
+        if (uri.Scheme is not ("http" or "https")) return null;
+
+        try
+        {
+            using var response = await ImageHttpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
+            if (!response.IsSuccessStatusCode) return null;
+
+            var mediaType = response.Content.Headers.ContentType?.MediaType;
+            if (string.IsNullOrWhiteSpace(mediaType) || !mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            await using var contentStream = await response.Content.ReadAsStreamAsync();
+            using var buffer = new MemoryStream();
+            await contentStream.CopyToAsync(buffer);
+
+            var data = buffer.ToArray();
+            return data.Length == 0 ? null : data;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static byte[]? TryDecodeDataImage(string dataUrl)
+    {
+        var commaIndex = dataUrl.IndexOf(',');
+        if (commaIndex <= 0 || commaIndex >= dataUrl.Length - 1) return null;
+
+        var metadata = dataUrl[..commaIndex];
+        var payload = dataUrl[(commaIndex + 1)..];
+        if (!metadata.Contains(";base64", StringComparison.OrdinalIgnoreCase)) return null;
+
+        try
+        {
+            return Convert.FromBase64String(payload);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Renders a heatmap_data matrix (rows × cols, values 0–1) to a PNG using the JET colormap,
+    /// matching the canvas rendering used by the ophthalmologist review UI.
+    /// </summary>
+    private static byte[]? TryRenderHeatmapMatrixToPng(float[][] matrix)
+    {
+        if (matrix.Length == 0)
+            return null;
+
+        const float Threshold = 0.15f;
+
+        try
+        {
+            var rows = matrix.Length;
+            var cols = matrix[0].Length;
+            if (cols == 0) return null;
+
+            using var image = new SixLabors.ImageSharp.Image<Rgba32>(cols, rows);
+            for (var r = 0; r < rows; r++)
+            {
+                var row = matrix[r];
+                for (var c = 0; c < Math.Min(cols, row.Length); c++)
+                {
+                    var v = Math.Clamp(row[c], 0f, 1f);
+                    if (v <= Threshold)
+                    {
+                        image[c, r] = new Rgba32(0, 0, 0, 0);
+                        continue;
+                    }
+
+                    var nv = (v - Threshold) / (1f - Threshold);
+
+                    // JET colormap (matches FE canvas algorithm exactly)
+                    var r4 = Math.Clamp(1.5f - Math.Abs(4f * nv - 3f), 0f, 1f);
+                    var g4 = Math.Clamp(1.5f - Math.Abs(4f * nv - 2f), 0f, 1f);
+                    var b4 = Math.Clamp(1.5f - Math.Abs(4f * nv - 1f), 0f, 1f);
+                    var alpha = (byte)Math.Clamp((int)MathF.Round((0.3f + 0.7f * nv) * 255f), 0, 255);
+
+                    image[c, r] = new Rgba32(
+                        (byte)MathF.Round(r4 * 255f),
+                        (byte)MathF.Round(g4 * 255f),
+                        (byte)MathF.Round(b4 * 255f),
+                        alpha);
+                }
+            }
+
+            using var output = new MemoryStream();
+            image.Save(output, PngFormat.Instance);
+            return output.ToArray();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static byte[]? TryBuildBoxedImage(byte[]? originalImageData, IReadOnlyCollection<PatientAiLocalizationBox> boxes)
+    {
+        if (originalImageData is not { Length: > 0 } || boxes.Count == 0)
+            return null;
+
+        try
+        {
+            using var image = ImgSharpImage.Load<Rgba32>(originalImageData);
+            var lineThickness = Math.Max(2f, Math.Min(image.Width, image.Height) / 250f);
+            var strokeColor = ImgSharpColor.FromRgba(59, 130, 246, 255);
+            var fillColor = ImgSharpColor.FromRgba(59, 130, 246, 45);
+
+            image.Mutate(ctx =>
+            {
+                foreach (var box in boxes)
+                {
+                    var isPercentLocation = box.X <= 100m && box.Y <= 100m && box.Width <= 100m && box.Height <= 100m;
+                    var rawX = isPercentLocation ? (box.X / 100m) * image.Width : box.X;
+                    var rawY = isPercentLocation ? (box.Y / 100m) * image.Height : box.Y;
+                    var rawWidth = isPercentLocation ? (box.Width / 100m) * image.Width : box.Width;
+                    var rawHeight = isPercentLocation ? (box.Height / 100m) * image.Height : box.Height;
+
+                    var x = Math.Clamp((int)Math.Round(rawX), 0, image.Width - 1);
+                    var y = Math.Clamp((int)Math.Round(rawY), 0, image.Height - 1);
+                    var maxWidth = image.Width - x;
+                    var maxHeight = image.Height - y;
+                    var width = Math.Clamp((int)Math.Round(rawWidth), 1, maxWidth);
+                    var height = Math.Clamp((int)Math.Round(rawHeight), 1, maxHeight);
+
+                    var rectangle = new RectangleF(x, y, width, height);
+                    ctx.Fill(fillColor, rectangle);
+                    ctx.Draw(strokeColor, lineThickness, rectangle);
+                }
+            });
+
+            using var output = new MemoryStream();
+            image.Save(output, PngFormat.Instance);
+            return output.ToArray();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+}

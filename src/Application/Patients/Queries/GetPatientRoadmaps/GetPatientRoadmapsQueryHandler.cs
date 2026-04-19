@@ -13,13 +13,16 @@ public class GetPatientRoadmapsQueryHandler : IQueryHandler<GetPatientRoadmapsQu
 {
     private readonly IRepository<Patient> _patientRepository;
     private readonly IRepository<PatientRoadmap> _roadmapRepository;
+    private readonly IRepository<MedicalDiagnosis> _medicalDiagnosisRepository;
 
     public GetPatientRoadmapsQueryHandler(
         IRepository<Patient> patientRepository,
-        IRepository<PatientRoadmap> roadmapRepository)
+        IRepository<PatientRoadmap> roadmapRepository,
+        IRepository<MedicalDiagnosis> medicalDiagnosisRepository)
     {
         _patientRepository = patientRepository;
         _roadmapRepository = roadmapRepository;
+        _medicalDiagnosisRepository = medicalDiagnosisRepository;
     }
 
     public async Task<Result<IReadOnlyList<PatientRoadmapDto>>> Handle(
@@ -41,20 +44,30 @@ public class GetPatientRoadmapsQueryHandler : IQueryHandler<GetPatientRoadmapsQu
             .OrderByDescending(r => r.GeneratedAt)
             .ToListAsync(cancellationToken);
 
+        var diagnosisLookup = await _medicalDiagnosisRepository
+            .Query()
+            .Where(d => roadmaps.Select(r => r.MedicalDiagnosisId).Contains(d.Id))
+            .ToDictionaryAsync(d => d.Id, d => d.AiScreeningId, cancellationToken);
+
         var data = roadmaps
-            .Select(Map)
+            .Select(roadmap => Map(
+                roadmap,
+                diagnosisLookup.TryGetValue(roadmap.MedicalDiagnosisId, out var screeningId)
+                    ? screeningId
+                    : null))
             .ToList();
 
         return Result<IReadOnlyList<PatientRoadmapDto>>.Success(data);
     }
 
-    private static PatientRoadmapDto Map(PatientRoadmap roadmap)
+    private static PatientRoadmapDto Map(PatientRoadmap roadmap, Guid? screeningId)
     {
         return new PatientRoadmapDto
         {
             Id = roadmap.Id,
             PatientId = roadmap.PatientId,
             MedicalDiagnosisId = roadmap.MedicalDiagnosisId,
+            ScreeningId = screeningId,
             RiskLevel = roadmap.RiskLevel,
             Summary = roadmap.Summary,
             NextSteps = DeserializeArray(roadmap.NextStepsJson),

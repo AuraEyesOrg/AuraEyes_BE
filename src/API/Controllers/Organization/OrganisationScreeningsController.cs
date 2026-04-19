@@ -13,6 +13,10 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using Infrastructure.Identity.Authorization;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
 namespace API.Controllers.Organization;
 
 /// <summary>
@@ -20,7 +24,7 @@ namespace API.Controllers.Organization;
 /// Allows OrgAdmin to perform screenings on behalf of patients.
 /// </summary>
 [Route("api/organisations/screenings")]
-[Authorize(Policy = Policies.OrgAdminOnly)]
+[AuthorizePermission(Permissions.ScreeningRead)]
 public class OrganisationScreeningsController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -38,6 +42,7 @@ public class OrganisationScreeningsController : BaseApiController
     /// Create an AI screening session on behalf of a patient.
     /// </summary>
     [HttpPost("create-session")]
+    [AuthorizePermission(Permissions.ScreeningCreate)]
     [ProducesResponseType(typeof(ApiResponse<CreateOrgScreeningSessionResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -138,6 +143,7 @@ public class OrganisationScreeningsController : BaseApiController
     /// Walk-in patient requires recipient email; Aura patient can use prefilled account email.
     /// </summary>
     [HttpPost("{screeningId:guid}/share")]
+    [AuthorizePermission(Permissions.ScreeningCreate)]
     [ProducesResponseType(typeof(ApiResponse<ShareOrgScreeningResultResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]

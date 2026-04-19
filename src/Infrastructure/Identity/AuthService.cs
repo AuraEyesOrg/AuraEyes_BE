@@ -25,6 +25,9 @@ namespace Infrastructure.Identity;
 /// </summary>
 public class AuthService : IAuthService
 {
+    private const string GoogleLoginProvider = "Google";
+    private const string ProviderAvatarClaimType = "provider_avatar_url";
+
     private readonly IIdentityService _identityService;
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenService _refreshTokenService;
@@ -278,7 +281,7 @@ public class AuthService : IAuthService
                 var uploadedUrl = await _fileStorageService.SaveFileAsync(
                     stream,
                     file.FileName,
-                    $"credentials/{user.Id}",
+                    $"ophthalmologists/credentials/{user.Id}",
                     cancellationToken);
 
                 uploadedFileUrls.Add(uploadedUrl);
@@ -515,7 +518,9 @@ public class AuthService : IAuthService
                 return Result<LoginResponse>.Failure("Google account does not have an email address");
             }
 
-            var user = await _userManager.FindByEmailAsync(payload.Email);
+            var normalizedEmail = payload.Email.Trim();
+            var user = await _userManager.FindByEmailAsync(normalizedEmail)
+                ?? await _userManager.FindByLoginAsync(GoogleLoginProvider, payload.Subject);
 
             if (user != null)
             {
@@ -537,6 +542,24 @@ public class AuthService : IAuthService
                     await _userManager.UpdateAsync(user);
                 }
 
+                var linkResult = await LinkGoogleLoginAsync(user, payload.Subject);
+                if (!linkResult.IsSuccess)
+                {
+                    return Result<LoginResponse>.Failure(
+                        string.IsNullOrWhiteSpace(linkResult.ErrorMessage)
+                            ? "Unable to link Google account"
+                            : linkResult.ErrorMessage);
+                }
+
+                var providerAvatarResult = await UpsertProviderAvatarClaimAsync(user, payload.Picture);
+                if (!providerAvatarResult.IsSuccess)
+                {
+                    _logger.LogWarning(
+                        "Failed to update provider avatar claim for user {UserId}: {Error}",
+                        user.Id,
+                        providerAvatarResult.ErrorMessage);
+                }
+
                 // Check if 2FA is enabled
                 if (await _userManager.GetTwoFactorEnabledAsync(user))
                 {
@@ -553,10 +576,10 @@ public class AuthService : IAuthService
 
             var newUser = new ApplicationUser
             {
-                UserName = payload.Email,
-                Email = payload.Email,
-                FullName = payload.Name ?? payload.Email,
-                AvatarUrl = payload.Picture,
+                UserName = normalizedEmail,
+                Email = normalizedEmail,
+                FullName = payload.Name ?? normalizedEmail,
+                AvatarUrl = null,
                 EmailConfirmed = true // Google already verified the email
             };
 
@@ -568,8 +591,25 @@ public class AuthService : IAuthService
             }
 
             // Add Google login provider info
-            var loginInfo = new UserLoginInfo("Google", payload.Subject, "Google");
-            await _userManager.AddLoginAsync(newUser, loginInfo);
+            var addLoginResult = await LinkGoogleLoginAsync(newUser, payload.Subject);
+            if (!addLoginResult.IsSuccess)
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                return Result<LoginResponse>.Failure(
+                    string.IsNullOrWhiteSpace(addLoginResult.ErrorMessage)
+                        ? "Unable to link Google account"
+                        : addLoginResult.ErrorMessage);
+            }
+
+            var newProviderAvatarResult = await UpsertProviderAvatarClaimAsync(newUser, payload.Picture);
+            if (!newProviderAvatarResult.IsSuccess)
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                return Result<LoginResponse>.Failure(
+                    string.IsNullOrWhiteSpace(newProviderAvatarResult.ErrorMessage)
+                        ? "Unable to persist provider avatar"
+                        : newProviderAvatarResult.ErrorMessage);
+            }
 
             await _identityService.AddToRoleAsync(newUser.Id, Roles.Patient);
 
@@ -786,6 +826,9 @@ public class AuthService : IAuthService
             }
         }
 
+        var providerAvatarUrl = await GetProviderAvatarUrlAsync(user);
+        var uploadedAvatarUrl = user.AvatarUrl;
+
         return new AuthResponse
         {
             Succeeded = true,
@@ -797,7 +840,9 @@ public class AuthService : IAuthService
                 Id = user.Id,
                 Email = user.Email!,
                 FullName = user.FullName,
-                AvatarUrl = user.AvatarUrl,
+                AvatarUrl = uploadedAvatarUrl ?? providerAvatarUrl,
+                UploadedAvatarUrl = uploadedAvatarUrl,
+                ProviderAvatarUrl = providerAvatarUrl,
                 Roles = roles.ToArray(),
                 EmailConfirmed = user.EmailConfirmed,
                 OrganizationId = user.OrganizationId,
@@ -806,6 +851,7 @@ public class AuthService : IAuthService
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
                 ContractStatus = contractStatus,
+                MustChangePassword = user.MustChangePassword,
                 EmploymentType = employmentType
             }
         };
@@ -911,6 +957,9 @@ public class AuthService : IAuthService
                 }
             }
 
+            var providerAvatarUrl = await GetProviderAvatarUrlAsync(user);
+            var uploadedAvatarUrl = user.AvatarUrl;
+
             return Result<AuthResponse>.Success(new AuthResponse
             {
                 Succeeded = true,
@@ -922,6 +971,9 @@ public class AuthService : IAuthService
                     Id = user.Id,
                     Email = user.Email!,
                     FullName = user.FullName,
+                    AvatarUrl = uploadedAvatarUrl ?? providerAvatarUrl,
+                    UploadedAvatarUrl = uploadedAvatarUrl,
+                    ProviderAvatarUrl = providerAvatarUrl,
                     Roles = roles.ToArray(),
                     EmailConfirmed = user.EmailConfirmed,
                     OrganizationId = user.OrganizationId,
@@ -930,6 +982,7 @@ public class AuthService : IAuthService
                     IsVerified = isVerified,
                     VerificationStatus = verificationStatus,
                     ContractStatus = contractStatus,
+                    MustChangePassword = user.MustChangePassword,
                     EmploymentType = employmentType
                 }
             });
@@ -1112,6 +1165,7 @@ public class AuthService : IAuthService
             }
 
             var userDetails = await _identityService.GetUserDetailsAsync(userId, cancellationToken);
+            var identityUser = await _userManager.FindByIdAsync(userId.ToString());
             var roles = await _identityService.GetUserRolesAsync(userId);
             var twoFactorEnabled = await _identityService.IsTwoFactorEnabledAsync(userId);
 
@@ -1153,7 +1207,9 @@ public class AuthService : IAuthService
                 Id = userDto.Id,
                 Email = userDto.Email,
                 FullName = userDto.FullName,
-                AvatarUrl = userDetails?.AvatarUrl,
+                AvatarUrl = userDetails?.AvatarUrl ?? await GetProviderAvatarUrlAsync(identityUser),
+                UploadedAvatarUrl = userDetails?.AvatarUrl,
+                ProviderAvatarUrl = await GetProviderAvatarUrlAsync(identityUser),
                 Roles = roles.ToArray(),
                 EmailConfirmed = userDto.EmailConfirmed,
                 OrganizationId = userDto.OrganizationId,
@@ -1162,6 +1218,7 @@ public class AuthService : IAuthService
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
                 ContractStatus = contractStatus,
+                MustChangePassword = identityUser?.MustChangePassword ?? false,
                 EmploymentType = employmentType
             });
         }
@@ -1221,6 +1278,13 @@ public class AuthService : IAuthService
             }
         }
 
+        // Add permissions as claims
+        var permissions = await _identityService.GetUserPermissionsAsync(userId);
+        foreach (var permission in permissions)
+        {
+            claims.Add(new Claim("permission", permission));
+        }
+
         return claims;
     }
 
@@ -1267,5 +1331,90 @@ public class AuthService : IAuthService
         }
 
         return (roleId, isVerified, verificationStatus, contractStatus);
+    }
+
+    private async Task<Result> LinkGoogleLoginAsync(ApplicationUser user, string providerKey)
+    {
+        var linkedLogins = await _userManager.GetLoginsAsync(user);
+        var existingGoogleLogin = linkedLogins.FirstOrDefault(login =>
+            string.Equals(login.LoginProvider, GoogleLoginProvider, StringComparison.OrdinalIgnoreCase));
+
+        if (existingGoogleLogin is not null &&
+            string.Equals(existingGoogleLogin.ProviderKey, providerKey, StringComparison.Ordinal))
+        {
+            return Result.Success();
+        }
+
+        if (existingGoogleLogin is not null)
+        {
+            var removeResult = await _userManager.RemoveLoginAsync(
+                user,
+                existingGoogleLogin.LoginProvider,
+                existingGoogleLogin.ProviderKey);
+
+            if (!removeResult.Succeeded)
+            {
+                return Result.Failure(removeResult.Errors.Select(error => error.Description));
+            }
+        }
+
+        var addResult = await _userManager.AddLoginAsync(
+            user,
+            new UserLoginInfo(GoogleLoginProvider, providerKey, GoogleLoginProvider));
+
+        return addResult.Succeeded
+            ? Result.Success()
+            : Result.Failure(addResult.Errors.Select(error => error.Description));
+    }
+
+    private async Task<Result> UpsertProviderAvatarClaimAsync(ApplicationUser user, string? providerAvatarUrl)
+    {
+        if (string.IsNullOrWhiteSpace(providerAvatarUrl))
+        {
+            return Result.Success();
+        }
+
+        var claims = await _userManager.GetClaimsAsync(user);
+        var existingClaim = claims.FirstOrDefault(claim =>
+            string.Equals(claim.Type, ProviderAvatarClaimType, StringComparison.Ordinal));
+
+        if (existingClaim is not null &&
+            string.Equals(existingClaim.Value, providerAvatarUrl, StringComparison.Ordinal))
+        {
+            return Result.Success();
+        }
+
+        if (existingClaim is not null)
+        {
+            var removeResult = await _userManager.RemoveClaimAsync(user, existingClaim);
+            if (!removeResult.Succeeded)
+            {
+                return Result.Failure(removeResult.Errors.Select(error => error.Description));
+            }
+        }
+
+        var addResult = await _userManager.AddClaimAsync(
+            user,
+            new Claim(ProviderAvatarClaimType, providerAvatarUrl));
+
+        return addResult.Succeeded
+            ? Result.Success()
+            : Result.Failure(addResult.Errors.Select(error => error.Description));
+    }
+
+    private async Task<string?> GetProviderAvatarUrlAsync(ApplicationUser? user)
+    {
+        if (user is null)
+        {
+            return null;
+        }
+
+        var claims = await _userManager.GetClaimsAsync(user);
+        var providerAvatarClaim = claims.FirstOrDefault(claim =>
+            string.Equals(claim.Type, ProviderAvatarClaimType, StringComparison.Ordinal));
+
+        return string.IsNullOrWhiteSpace(providerAvatarClaim?.Value)
+            ? null
+            : providerAvatarClaim.Value;
     }
 }

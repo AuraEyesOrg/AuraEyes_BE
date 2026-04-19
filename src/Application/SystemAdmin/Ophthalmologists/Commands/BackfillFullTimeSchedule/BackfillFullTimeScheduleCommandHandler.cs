@@ -23,6 +23,7 @@ public class BackfillFullTimeScheduleCommandHandler : IRequestHandler<BackfillFu
     private readonly IFullTimeTemplateProvisioningService _fullTimeTemplateProvisioningService;
     private readonly IScheduleTemplateRepository _scheduleTemplateRepository;
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
+    private readonly IOphthalmologistLeaveRequestRepository _leaveRequestRepository;
     private readonly ISystemSettingService _settingService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<BackfillFullTimeScheduleCommandHandler> _logger;
@@ -32,6 +33,7 @@ public class BackfillFullTimeScheduleCommandHandler : IRequestHandler<BackfillFu
         IFullTimeTemplateProvisioningService fullTimeTemplateProvisioningService,
         IScheduleTemplateRepository scheduleTemplateRepository,
         IAppointmentSlotRepository appointmentSlotRepository,
+        IOphthalmologistLeaveRequestRepository leaveRequestRepository,
         ISystemSettingService settingService,
         IUnitOfWork unitOfWork,
         ILogger<BackfillFullTimeScheduleCommandHandler> logger)
@@ -40,6 +42,7 @@ public class BackfillFullTimeScheduleCommandHandler : IRequestHandler<BackfillFu
         _fullTimeTemplateProvisioningService = fullTimeTemplateProvisioningService;
         _scheduleTemplateRepository = scheduleTemplateRepository;
         _appointmentSlotRepository = appointmentSlotRepository;
+        _leaveRequestRepository = leaveRequestRepository;
         _settingService = settingService;
         _unitOfWork = unitOfWork;
         _logger = logger;
@@ -70,6 +73,12 @@ public class BackfillFullTimeScheduleCommandHandler : IRequestHandler<BackfillFu
         var windowDays = await ResolveWindowDaysAsync(request.WindowDays, cancellationToken);
         var fromDate = DateOnly.FromDateTime(DateTime.UtcNow);
         var toDate = fromDate.AddDays(windowDays - 1);
+
+        var approvedLeaveRanges = await _leaveRequestRepository.GetApprovedOverlappingAsync(
+            ophthalmologist.Id,
+            fromDate,
+            toDate,
+            cancellationToken);
 
         var templatesEnsured = await _fullTimeTemplateProvisioningService.EnsureSystemGeneratedTemplatesAsync(
             ophthalmologist,
@@ -109,6 +118,12 @@ public class BackfillFullTimeScheduleCommandHandler : IRequestHandler<BackfillFu
             var currentDate = fromDate;
             while (currentDate <= toDate)
             {
+                if (approvedLeaveRanges.Any(leave => leave.Overlaps(currentDate, currentDate)))
+                {
+                    currentDate = currentDate.AddDays(1);
+                    continue;
+                }
+
                 if (currentDate.DayOfWeek == template.DayOfWeek && !existingDates.Contains(currentDate))
                 {
                     for (var slotStart = startSpan; slotStart + slotDuration <= endSpan; slotStart += slotDuration)
