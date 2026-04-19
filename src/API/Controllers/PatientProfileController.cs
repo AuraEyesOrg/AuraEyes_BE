@@ -8,6 +8,8 @@ using Application.Patients.Queries.GetPatientProfile;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Infrastructure.Identity.Authorization;
+using Application.Common.Constants;
 
 namespace API.Controllers;
 
@@ -16,7 +18,7 @@ namespace API.Controllers;
 /// Provides profile CRUD, avatar upload, and password change.
 /// </summary>
 [Route("api/patient/profile")]
-[Authorize]
+[AuthorizePermission(Permissions.PatientsRead)]
 public class PatientProfileController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -55,6 +57,7 @@ public class PatientProfileController : BaseApiController
     /// Update current patient's profile information.
     /// </summary>
     [HttpPut]
+    [AuthorizePermission(Permissions.PatientsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<PatientProfileDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -85,6 +88,7 @@ public class PatientProfileController : BaseApiController
     /// Accepts multipart form data with an image file.
     /// </summary>
     [HttpPost("avatar")]
+    [AuthorizePermission(Permissions.PatientsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<UploadAvatarResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UploadAvatar(

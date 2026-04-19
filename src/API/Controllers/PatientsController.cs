@@ -7,6 +7,7 @@ using Application.Scheduling.Appointments.Queries.GetPatientClinicAppointments;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Infrastructure.Identity.Authorization;
 
 namespace API.Controllers;
 
@@ -23,7 +24,7 @@ public class PatientsController : BaseApiController
     }
 
     [HttpGet("dashboard-metrics")]
-    [Authorize(Policy = Policies.PatientOnly)]
+    [AuthorizePermission(Permissions.DashboardRead)]
     [ProducesResponseType(typeof(ApiResponse<PatientDashboardMetricsDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDashboardMetrics()
     {
@@ -35,7 +36,7 @@ public class PatientsController : BaseApiController
     }
 
     [HttpGet("{patientId:guid}/clinic-appointments")]
-    [Authorize(Policy = Policies.PatientOnly)]
+    [AuthorizePermission(Permissions.AppointmentsRead)]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ClinicAppointmentDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPatientClinicAppointments(Guid patientId)
     {

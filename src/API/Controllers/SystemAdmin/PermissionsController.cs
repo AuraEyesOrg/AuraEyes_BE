@@ -13,6 +13,7 @@ using Application.SystemAdmin.Permissions.Queries.GetPermissionById;
 using Application.SystemAdmin.Permissions.Queries.GetPermissions;
 using Application.SystemAdmin.Permissions.Queries.GetRolePermissions;
 using Application.SystemAdmin.Permissions.Queries.GetUserPermissions;
+using Application.SystemAdmin.Permissions.Commands.SynchronizeRolePermissions;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -187,6 +188,19 @@ public class PermissionsController : BaseApiController
     {
         var result = await _mediator.Send(new RemovePermissionFromRoleCommand(rolePermissionId));
         return HandleResult(result, "Permission removed from role successfully.");
+    }
+
+    /// <summary>
+    /// Synchronize all roles with their default permissions defined in code.
+    /// This will add missing permissions and remove unauthorized ones for each role.
+    /// </summary>
+    [HttpPost("sync-roles")]
+    [AuthorizePermission(Permissions.PermissionsManage)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SynchronizeRolePermissions()
+    {
+        var result = await _mediator.Send(new SynchronizeRolePermissionsCommand());
+        return HandleResult(result, "Roles synchronized with default permissions successfully.");
     }
 
     // =========================================================================
