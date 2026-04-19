@@ -767,8 +767,9 @@ public class AuthService : IAuthService
         CancellationToken cancellationToken)
     {
         var roles = await _userManager.GetRolesAsync(user);
+        var permissions = await _identityService.GetUserPermissionsAsync(user.Id);
 
-        var additionalClaims = await BuildProfileClaimsAsync(user.Id, roles, cancellationToken);
+        var additionalClaims = await BuildProfileClaimsAsync(user.Id, roles, permissions, cancellationToken);
 
         var tokenResult = await _tokenService.GenerateAccessTokenAsync(
             user.Id,
@@ -852,7 +853,8 @@ public class AuthService : IAuthService
                 VerificationStatus = verificationStatus,
                 ContractStatus = contractStatus,
                 MustChangePassword = user.MustChangePassword,
-                EmploymentType = employmentType
+                EmploymentType = employmentType,
+                Permissions = permissions.ToArray()
             }
         };
     }
@@ -901,7 +903,8 @@ public class AuthService : IAuthService
             }
 
             var roles = await _userManager.GetRolesAsync(user);
-            var additionalClaims = await BuildProfileClaimsAsync(user.Id, roles, cancellationToken);
+            var permissions = await _identityService.GetUserPermissionsAsync(user.Id);
+            var additionalClaims = await BuildProfileClaimsAsync(user.Id, roles, permissions, cancellationToken);
 
             var tokenResult = await _tokenService.GenerateAccessTokenAsync(
                 user.Id,
@@ -983,7 +986,8 @@ public class AuthService : IAuthService
                     VerificationStatus = verificationStatus,
                     ContractStatus = contractStatus,
                     MustChangePassword = user.MustChangePassword,
-                    EmploymentType = employmentType
+                    EmploymentType = employmentType,
+                    Permissions = permissions.ToArray()
                 }
             });
         }
@@ -1167,6 +1171,7 @@ public class AuthService : IAuthService
             var userDetails = await _identityService.GetUserDetailsAsync(userId, cancellationToken);
             var identityUser = await _userManager.FindByIdAsync(userId.ToString());
             var roles = await _identityService.GetUserRolesAsync(userId);
+            var permissions = await _identityService.GetUserPermissionsAsync(userId);
             var twoFactorEnabled = await _identityService.IsTwoFactorEnabledAsync(userId);
 
             // Resolve role-specific profile entity (PatientId / OphthalmologistId)
@@ -1219,7 +1224,8 @@ public class AuthService : IAuthService
                 VerificationStatus = verificationStatus,
                 ContractStatus = contractStatus,
                 MustChangePassword = identityUser?.MustChangePassword ?? false,
-                EmploymentType = employmentType
+                EmploymentType = employmentType,
+                Permissions = permissions.ToArray()
             });
         }
         catch (Exception ex)
@@ -1255,7 +1261,7 @@ public class AuthService : IAuthService
         }
     }
     private async Task<List<Claim>> BuildProfileClaimsAsync(
-        Guid userId, IList<string> roles, CancellationToken cancellationToken)
+        Guid userId, IList<string> roles, IEnumerable<string> permissions, CancellationToken cancellationToken)
     {
         var claims = new List<Claim>();
 
@@ -1279,7 +1285,6 @@ public class AuthService : IAuthService
         }
 
         // Add permissions as claims
-        var permissions = await _identityService.GetUserPermissionsAsync(userId);
         foreach (var permission in permissions)
         {
             claims.Add(new Claim("permission", permission));

@@ -197,6 +197,11 @@ public interface IIdentityService
         string currentPassword,
         string newPassword,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Synchronize all roles with their default permissions defined in code.
+    /// </summary>
+    Task SynchronizeRolesWithDefaultsAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>
