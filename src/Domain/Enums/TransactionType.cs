@@ -7,5 +7,6 @@ public enum TransactionType
     Payment = 3,
     Refund = 4,
     Transfer = 5,
-    Bonus = 6
+    Bonus = 6,
+    Salary = 7
 }

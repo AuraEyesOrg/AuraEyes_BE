@@ -34,17 +34,20 @@ public class NotificationService : INotificationService
     private readonly IRepository<Notification> _notificationRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationHubService _hubService;
+    private readonly IIdentityService _identityService;
     private readonly ILogger<NotificationService> _logger;
 
     public NotificationService(
         IRepository<Notification> notificationRepository,
         IUnitOfWork unitOfWork,
         INotificationHubService hubService,
+        IIdentityService identityService,
         ILogger<NotificationService> logger)
     {
         _notificationRepository = notificationRepository;
         _unitOfWork = unitOfWork;
         _hubService = hubService;
+        _identityService = identityService;
         _logger = logger;
     }
 
@@ -145,6 +148,33 @@ public class NotificationService : INotificationService
             null,
             cancellationToken,
             null);
+    }
+
+    /// <inheritdoc />
+    public async Task SendToRoleAsync(
+        string roleName,
+        string title,
+        string message,
+        NotificationType type = NotificationType.SystemAlert,
+        object? payload = null,
+        CancellationToken cancellationToken = default,
+        Guid? referenceId = null)
+    {
+        var (users, _) = await _identityService.GetUsersAsync(
+            roleFilter: roleName,
+            pageSize: 1000,
+            cancellationToken: cancellationToken);
+
+        if (users == null || users.Count == 0)
+        {
+            _logger.LogWarning("No users found in role {RoleName} to send notification.", roleName);
+            return;
+        }
+
+        foreach (var user in users)
+        {
+            await SendAsync(user.Id, title, message, type, payload, cancellationToken, referenceId);
+        }
     }
 
     private static Guid? ExtractReferenceId(NotificationType type, string? payloadJson)
