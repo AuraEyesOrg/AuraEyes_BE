@@ -471,7 +471,7 @@ if (string.IsNullOrWhiteSpace(fullTimeSlotGenerationCron))
 var monthlySalaryCron = Environment.GetEnvironmentVariable("HANGFIRE_MONTHLY_SALARY_CRON");
 if (string.IsNullOrWhiteSpace(monthlySalaryCron))
 {
-    monthlySalaryCron = "*/1 * * * *";
+    monthlySalaryCron = "0 0 5 * *";
 }
 
 if (enableHangfireServer)
