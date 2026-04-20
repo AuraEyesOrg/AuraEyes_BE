@@ -10,6 +10,14 @@ public interface IOrganisationFeedbackRepository : IRepository<OrganisationFeedb
         Guid appointmentId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Given a set of appointment IDs, return the subset the patient has already rated.
+    /// </summary>
+    Task<IReadOnlySet<Guid>> GetAppointmentIdsWithFeedbackAsync(
+        Guid patientId,
+        IReadOnlyCollection<Guid> appointmentIds,
+        CancellationToken cancellationToken = default);
+
     Task<OrganisationFeedback?> GetByIdForOrganisationAsync(
         Guid organisationId,
         Guid feedbackId,

@@ -86,6 +86,25 @@ public interface IAppointmentRepository : IRepository<Appointment>
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Paginated appointments for a patient, filterable by a set of statuses (e.g. "upcoming" tab).
+    /// </summary>
+    Task<(IReadOnlyList<Appointment> Items, int TotalCount)> GetPagedByPatientAsync(
+        Guid patientId,
+        AppointmentType? type = null,
+        IReadOnlyCollection<AppointmentStatus>? statuses = null,
+        int pageNumber = 1,
+        int pageSize = 10,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Status counts for a single patient (used for tab badges).
+    /// </summary>
+    Task<Dictionary<AppointmentStatus, int>> GetPatientStatusCountsAsync(
+        Guid patientId,
+        AppointmentType? type = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get status counts for reporting.
     /// </summary>
     Task<Dictionary<AppointmentStatus, int>> GetStatusCountsAsync(
