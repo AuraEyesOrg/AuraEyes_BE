@@ -2,6 +2,8 @@ using FluentAssertions;
 using Infrastructure.Services;
 using Infrastructure.Settings;
 using Infrastructure.UnitTests.Common;
+using System.Net;
+using System.Text;
 using Microsoft.Extensions.Options;
 
 namespace Infrastructure.UnitTests.Services;
@@ -73,5 +75,22 @@ public class PayOSServiceTests
     }
 
     private static PayOSService CreateService(PayOSSettings settings)
-        => new(Options.Create(settings), new TestLogger<PayOSService>());
+        => new(
+            Options.Create(settings),
+            new StubHttpClientFactory(new HttpClient(new StubHandler("{}", HttpStatusCode.OK))),
+            new TestLogger<PayOSService>());
+
+    private sealed class StubHttpClientFactory(HttpClient client) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => client;
+    }
+
+    private sealed class StubHandler(string body, HttpStatusCode statusCode) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(new HttpResponseMessage(statusCode)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
+            });
+    }
 }
