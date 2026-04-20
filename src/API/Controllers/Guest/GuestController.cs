@@ -1,11 +1,12 @@
 using Application.Common.Models;
+using Application.Guest.Queries.GetOverviewMetrics;
 using Infrastructure.Identity;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.OutputCaching;
-using Infrastructure.Persistence;
 
 namespace API.Controllers.Guest;
 
@@ -16,10 +17,12 @@ namespace API.Controllers.Guest;
 [AllowAnonymous]
 public class GuestController : BaseApiController
 {
+    private readonly IMediator _mediator;
     private readonly UserManager<ApplicationUser> _userManager;
 
-    public GuestController(UserManager<ApplicationUser> userManager)
+    public GuestController(IMediator mediator, UserManager<ApplicationUser> userManager)
     {
+        _mediator = mediator;
         _userManager = userManager;
     }
 
@@ -59,29 +62,10 @@ public class GuestController : BaseApiController
     [HttpGet("overview-metrics")]
     [AllowAnonymous]
     [OutputCache(PolicyName = "PublicData")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetOverviewMetrics([FromServices] ApplicationDbContext dbContext)
+    [ProducesResponseType(typeof(ApiResponse<GuestOverviewMetricsDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOverviewMetrics()
     {
-        var ophthalmologistCount = await dbContext.Ophthalmologists
-            .Where(o => o.IsVerified == true)
-            .CountAsync();
-
-        var organisationCount = await dbContext.Organisations.CountAsync();
-
-        var screeningCount = await dbContext.AiScreenings.CountAsync();
-
-        var websiteFeedbackCount = await dbContext.WebsiteFeedbacks.CountAsync();
-        var orgFeedbackCount = await dbContext.OrganisationFeedbacks.CountAsync();
-        var ophthaFeedbackCount = await dbContext.OphthalmologistFeedbacks.CountAsync();
-        
-        var totalFeedbackCount = websiteFeedbackCount + orgFeedbackCount + ophthaFeedbackCount;
-
-        return OkResponse(new
-        {
-            ophthalmologistCount = ophthalmologistCount,
-            organisationCount = organisationCount,
-            screeningCount = screeningCount,
-            feedbackCount = totalFeedbackCount
-        });
+        var result = await _mediator.Send(new GetOverviewMetricsQuery());
+        return HandleResult(result);
     }
 }
