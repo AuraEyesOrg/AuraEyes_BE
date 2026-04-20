@@ -22,17 +22,23 @@ public class PayOSService : IPayOSService
         _logger = logger;
         _settings = settings.Value;
 
-        if (string.IsNullOrEmpty(_settings.ClientId))
-            throw new ArgumentNullException(nameof(_settings.ClientId), "PayOS:ClientId is required");
-        if (string.IsNullOrEmpty(_settings.ApiKey))
-            throw new ArgumentNullException(nameof(_settings.ApiKey), "PayOS:ApiKey is required");
-        if (string.IsNullOrEmpty(_settings.ChecksumKey))
-            throw new ArgumentNullException(nameof(_settings.ChecksumKey), "PayOS:ChecksumKey is required");
+        NormalizeSettings(_settings);
+
+        if (string.IsNullOrWhiteSpace(_settings.ClientId))
+            throw new ArgumentNullException(nameof(settings), "PayOS:ClientId is required");
+        if (string.IsNullOrWhiteSpace(_settings.ApiKey))
+            throw new ArgumentNullException(nameof(settings), "PayOS:ApiKey is required");
+        if (string.IsNullOrWhiteSpace(_settings.ChecksumKey))
+            throw new ArgumentNullException(nameof(settings), "PayOS:ChecksumKey is required");
 
         // Initialize PayOS SDK
         _payOS = new PayOS(_settings.ClientId, _settings.ApiKey, _settings.ChecksumKey);
 
-        _logger.LogInformation("PayOS Service initialized with ClientId: {ClientId}", _settings.ClientId);
+        _logger.LogInformation(
+            "PayOS Service initialized. ClientId={ClientIdMasked}, ApiKeyLength={ApiKeyLength}, ChecksumKeyLength={ChecksumKeyLength}",
+            MaskForLog(_settings.ClientId),
+            _settings.ApiKey.Length,
+            _settings.ChecksumKey.Length);
     }
 
     public async Task<(string PaymentUrl, string OrderCode)> CreatePaymentLinkAsync(
@@ -130,6 +136,17 @@ public class PayOSService : IPayOSService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to query PayOS payment status for OrderCode={OrderCode}", orderCode);
+
+            if (ex.Message.Contains("signature of the response does not match", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogError(
+                    "PayOS signature mismatch while querying payment. This often indicates a wrong PayOS__ChecksumKey for Payment API or credentials containing extra quotes/whitespace.");
+
+                throw new Exception(
+                    "Failed to query PayOS payment: signature mismatch from PayOS response. Verify PayOS__ClientId, PayOS__ApiKey, and PayOS__ChecksumKey (Payment API) in production.",
+                    ex);
+            }
+
             throw new Exception($"Failed to query PayOS payment: {ex.Message}", ex);
         }
     }
@@ -196,5 +213,28 @@ public class PayOSService : IPayOSService
             return "Nap tien AuraEyes";
 
         return description.Length > 25 ? description[..25] : description;
+    }
+
+    private static void NormalizeSettings(PayOSSettings settings)
+    {
+        settings.ClientId = CleanSecret(settings.ClientId);
+        settings.ApiKey = CleanSecret(settings.ApiKey);
+        settings.ChecksumKey = CleanSecret(settings.ChecksumKey);
+        settings.DefaultReturnUrl = settings.DefaultReturnUrl?.Trim() ?? string.Empty;
+        settings.DefaultCancelUrl = settings.DefaultCancelUrl?.Trim() ?? string.Empty;
+    }
+
+    private static string CleanSecret(string? value)
+        => (value ?? string.Empty).Trim().Trim('"').Trim('\'').Trim();
+
+    private static string MaskForLog(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return "<empty>";
+
+        if (value.Length <= 8)
+            return "****";
+
+        return $"{value[..4]}...{value[^4..]}";
     }
 }

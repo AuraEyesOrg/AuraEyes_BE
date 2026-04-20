@@ -10,8 +10,11 @@ public class PayOSServiceTests
 {
     [Theory]
     [InlineData("", "api", "chk", "ClientId")]
+    [InlineData("   ", "api", "chk", "ClientId")]
     [InlineData("cid", "", "chk", "ApiKey")]
+    [InlineData("cid", "   ", "chk", "ApiKey")]
     [InlineData("cid", "api", "", "ChecksumKey")]
+    [InlineData("cid", "api", "   ", "ChecksumKey")]
     [InlineData("", "", "chk", "ClientId")]
     [InlineData("", "api", "", "ClientId")]
     public void Constructor_WhenRequiredSettingMissing_ShouldThrow(string clientId, string apiKey, string checksumKey, string expectedMessagePart)
