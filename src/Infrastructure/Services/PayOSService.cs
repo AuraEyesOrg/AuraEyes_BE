@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Net.payOS;
 using Net.payOS.Types;
+using System.Net.Http.Headers;
+using System.Text.Json;
 
 namespace Infrastructure.Services;
 
@@ -14,12 +16,18 @@ namespace Infrastructure.Services;
 public class PayOSService : IPayOSService
 {
     private readonly PayOS _payOS;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<PayOSService> _logger;
     private readonly PayOSSettings _settings;
+    private static readonly Uri PayOSBaseAddress = new("https://api-merchant.payos.vn");
 
-    public PayOSService(IOptions<PayOSSettings> settings, ILogger<PayOSService> logger)
+    public PayOSService(
+        IOptions<PayOSSettings> settings,
+        IHttpClientFactory httpClientFactory,
+        ILogger<PayOSService> logger)
     {
         _logger = logger;
+        _httpClientFactory = httpClientFactory;
         _settings = settings.Value;
 
         NormalizeSettings(_settings);
@@ -140,10 +148,22 @@ public class PayOSService : IPayOSService
             if (ex.Message.Contains("signature of the response does not match", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogError(
-                    "PayOS signature mismatch while querying payment. This often indicates a wrong PayOS__ChecksumKey for Payment API or credentials containing extra quotes/whitespace.");
+                    "PayOS signature mismatch while querying payment via SDK. Attempting REST fallback with x-client-id/x-api-key.");
+
+                var fallback = await TryGetPaymentStatusViaRestAsync(orderCode);
+                if (fallback.HasValue)
+                {
+                    _logger.LogInformation(
+                        "PayOS REST fallback succeeded for OrderCode={OrderCode}. Status={Status}, Amount={Amount}",
+                        orderCode,
+                        fallback.Value.Status,
+                        fallback.Value.Amount);
+
+                    return fallback.Value;
+                }
 
                 throw new Exception(
-                    "Failed to query PayOS payment: signature mismatch from PayOS response. Verify PayOS__ClientId, PayOS__ApiKey, and PayOS__ChecksumKey (Payment API) in production.",
+                    "Failed to query PayOS payment: signature mismatch from PayOS response and REST fallback failed. Verify PayOS__ClientId, PayOS__ApiKey, and PayOS__ChecksumKey (Payment API) in production.",
                     ex);
             }
 
@@ -236,5 +256,63 @@ public class PayOSService : IPayOSService
             return "****";
 
         return $"{value[..4]}...{value[^4..]}";
+    }
+
+    private async Task<(string Status, decimal Amount, string TxnRef)?> TryGetPaymentStatusViaRestAsync(string orderCode)
+    {
+        try
+        {
+            using var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = PayOSBaseAddress;
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"/v2/payment-requests/{orderCode}");
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            request.Headers.Add("x-client-id", _settings.ClientId);
+            request.Headers.Add("x-api-key", _settings.ApiKey);
+
+            using var response = await client.SendAsync(request);
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError(
+                    "PayOS REST fallback failed: StatusCode={StatusCode}, Body={Body}",
+                    (int)response.StatusCode,
+                    content);
+                return null;
+            }
+
+            using var jsonDoc = JsonDocument.Parse(content);
+            if (!jsonDoc.RootElement.TryGetProperty("data", out var data))
+            {
+                _logger.LogError("PayOS REST fallback response does not contain data node. Body={Body}", content);
+                return null;
+            }
+
+            var status = data.TryGetProperty("status", out var statusNode)
+                ? (statusNode.GetString() ?? "UNKNOWN")
+                : "UNKNOWN";
+
+            var amount = data.TryGetProperty("amount", out var amountNode)
+                ? amountNode.GetDecimal()
+                : 0m;
+
+            var txnRef = string.Empty;
+            if (data.TryGetProperty("transactions", out var transactionsNode)
+                && transactionsNode.ValueKind == JsonValueKind.Array
+                && transactionsNode.GetArrayLength() > 0)
+            {
+                var firstTxn = transactionsNode[0];
+                if (firstTxn.TryGetProperty("reference", out var referenceNode))
+                    txnRef = referenceNode.GetString() ?? string.Empty;
+            }
+
+            return (status, amount, txnRef);
+        }
+        catch (Exception fallbackEx)
+        {
+            _logger.LogError(fallbackEx, "PayOS REST fallback exception for OrderCode={OrderCode}", orderCode);
+            return null;
+        }
     }
 }
