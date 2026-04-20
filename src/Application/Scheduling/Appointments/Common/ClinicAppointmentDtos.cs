@@ -17,6 +17,11 @@ public class ClinicAppointmentDto
     public string? VisitReason { get; init; }
     public AppointmentStatus Status { get; init; }
     public DateTime CreatedAt { get; init; }
+
+    /// <summary>
+    /// True when the current patient has already submitted feedback for this
+    /// </summary>
+    public bool HasFeedback { get; init; }
 }
 
 public class OrganisationAvailableSlotDto

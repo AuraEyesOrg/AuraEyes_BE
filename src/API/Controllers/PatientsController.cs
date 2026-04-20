@@ -37,10 +37,15 @@ public class PatientsController : BaseApiController
 
     [HttpGet("{patientId:guid}/clinic-appointments")]
     [AuthorizePermission(Permissions.AppointmentsRead)]
-    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ClinicAppointmentDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetPatientClinicAppointments(Guid patientId)
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<ClinicAppointmentDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPatientClinicAppointments(
+        Guid patientId,
+        [FromQuery] PatientAppointmentTab tab = PatientAppointmentTab.All,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10)
     {
-        var result = await _mediator.Send(new GetPatientClinicAppointmentsQuery(patientId));
+        var result = await _mediator.Send(
+            new GetPatientClinicAppointmentsQuery(patientId, tab, pageNumber, pageSize));
         return HandleResult(result);
     }
 }
