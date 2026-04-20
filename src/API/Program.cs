@@ -468,6 +468,12 @@ if (string.IsNullOrWhiteSpace(fullTimeSlotGenerationCron))
     fullTimeSlotGenerationCron = "0 1 * * 1";
 }
 
+var monthlySalaryCron = Environment.GetEnvironmentVariable("HANGFIRE_MONTHLY_SALARY_CRON");
+if (string.IsNullOrWhiteSpace(monthlySalaryCron))
+{
+    monthlySalaryCron = "*/1 * * * *";
+}
+
 if (enableHangfireServer)
 {
     // Register recurring jobs
@@ -479,7 +485,8 @@ if (enableHangfireServer)
         "full-time-slot-generation",
         "fulltime-slot-generation-job",
         // Remove the current id first to force a clean re-registration payload.
-        "fulltime-slot-rolling-window"
+        "fulltime-slot-rolling-window",
+        "monthly-salary-payout"
     };
 
     foreach (var recurringJobId in legacyRecurringJobIds)
@@ -509,6 +516,12 @@ if (enableHangfireServer)
         "fulltime-slot-rolling-window",
         job => job.ExecuteAsync(CancellationToken.None),
         fullTimeSlotGenerationCron,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+    recurringJobManager.AddOrUpdate<MonthlySalaryJob>(
+        "monthly-salary-payout",
+        job => job.ExecuteAsync(CancellationToken.None),
+        monthlySalaryCron,
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
     try
