@@ -231,6 +231,7 @@ public static class Permissions
             ScreeningRead,
             ConsultationsRead, ConsultationsUpdate,
             AppointmentsRead, AppointmentsManage,
+            ApptSlotsManage,
             QuotasRead, QuotasBuy,
             WalletsRead, WalletsHistory,
             ContractsRead,
@@ -240,12 +241,16 @@ public static class Permissions
 
         [Roles.Ophthalmologist] =
         [
+            DashboardRead,
             PatientsRead,
+            OphthalmologistsUpdate,
             ScreeningRead, ScreeningApprove,
             ConsultationsRead, ConsultationsUpdate,
             AppointmentsRead,
             SchedulesManage, ApptSlotsManage,
+            ContractsRead,
             WalletsRead, WalletsWithdraw, WalletsHistory,
+            SettingsRead,
         ],
 
         [Roles.Patient] =
@@ -257,6 +262,7 @@ public static class Permissions
             WalletsRead, WalletsDeposit, WalletsHistory,
             QuotasRead,
             PatientsRead, PatientsUpdate,
+            SettingsRead,
         ],
     };
 }
