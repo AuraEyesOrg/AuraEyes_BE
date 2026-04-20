@@ -57,7 +57,7 @@ public class PayOphthalmologistSalaryCommandHandler : ICommandHandler<PayOphthal
         var transaction = new WalletTransaction(
             wallet.Id,
             payoutAmount.Value,
-            TransactionType.Bonus,
+            TransactionType.Salary,
             noteText,
             referenceType: "Salary",
             referenceId: ophthalmologist.Id);
