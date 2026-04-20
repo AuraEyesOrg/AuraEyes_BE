@@ -497,9 +497,15 @@ public static class EmailTemplates
         string? address,
         string? licenseNumber,
         string? notes,
-        string? businessCode = null,
         string? taxCode = null)
     {
+        static string Encode(string? value)
+            => string.IsNullOrWhiteSpace(value) ? "—" : WebUtility.HtmlEncode(value);
+
+        var formattedNotes = string.IsNullOrWhiteSpace(notes)
+            ? "—"
+            : WebUtility.HtmlEncode(notes).Replace("\n", "<br/>");
+
         var content = $@"
             <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 22px; font-weight: 600;"">
                 Yêu cầu đăng ký tổ chức mới
@@ -508,19 +514,18 @@ public static class EmailTemplates
                 Có một tổ chức mới vừa gửi biểu mẫu onboarding và đang chờ System Admin xác nhận.
             </p>
             <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""border: 1px solid {BorderColor}; border-radius: 8px; margin-bottom: 24px;"">
-                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor}; width: 180px;"">Tên tổ chức</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{organisationName}</td></tr>
-                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Loại hình</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{orgType}</td></tr>
-                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Người liên hệ</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{contactFullName}</td></tr>
-                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Email</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{contactEmail}</td></tr>
-                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Số điện thoại</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{contactPhone ?? "—"}</td></tr>
-                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Địa chỉ</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{address ?? "—"}</td></tr>
-                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã giấy phép</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{licenseNumber ?? "—"}</td></tr>
-                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã số doanh nghiệp</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{businessCode ?? "—"}</td></tr>
-                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã số thuế</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{taxCode ?? "—"}</td></tr>
-                <tr><td style=""padding: 12px 16px; font-weight: 600;"">Ghi chú</td><td style=""padding: 12px 16px;"">{notes ?? "—"}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor}; width: 180px;"">Tên tổ chức</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{Encode(organisationName)}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Loại hình</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{Encode(orgType)}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Người liên hệ</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{Encode(contactFullName)}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Email</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{Encode(contactEmail)}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Số điện thoại</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{Encode(contactPhone)}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Địa chỉ</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{Encode(address)}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã giấy phép</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{Encode(licenseNumber)}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600; border-bottom: 1px solid {BorderColor};"">Mã số thuế</td><td style=""padding: 12px 16px; border-bottom: 1px solid {BorderColor};"">{Encode(taxCode)}</td></tr>
+                <tr><td style=""padding: 12px 16px; font-weight: 600;"">Ghi chú</td><td style=""padding: 12px 16px;"">{formattedNotes}</td></tr>
             </table>
             <div style=""border-left: 3px solid {BorderWarning}; padding-left: 16px; color: {AlertWarningText};"">
-                Vui lòng vào giao diện quản trị tổ chức để xác nhận và cấp tài khoản.
+                Vui lòng vào trang <strong>System Admin &gt; Organisations</strong> (<code>/system-admin/organisations</code>) để xác nhận và cấp tài khoản.
             </div>";
 
         return WrapInBaseTemplate(content);

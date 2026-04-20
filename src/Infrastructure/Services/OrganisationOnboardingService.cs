@@ -25,6 +25,7 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
     private readonly IRepository<ContractTemplate> _contractTemplateRepository;
     private readonly IContractRepository _contractRepository;
     private readonly IEmailService _emailService;
+    private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly AdminNotificationSettings _adminNotificationSettings;
@@ -36,6 +37,7 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
         IRepository<ContractTemplate> contractTemplateRepository,
         IContractRepository contractRepository,
         IEmailService emailService,
+        INotificationService notificationService,
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager,
         IOptions<AdminNotificationSettings> adminNotificationSettings,
@@ -46,6 +48,7 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
         _contractTemplateRepository = contractTemplateRepository;
         _contractRepository = contractRepository;
         _emailService = emailService;
+        _notificationService = notificationService;
         _unitOfWork = unitOfWork;
         _userManager = userManager;
         _adminNotificationSettings = adminNotificationSettings.Value;
@@ -80,7 +83,18 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
 
         await _requestRepository.AddAsync(onboardingRequest, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await NotifyAdminAsync(onboardingRequest, cancellationToken);
+
+        try
+        {
+            await NotifyAdminAsync(onboardingRequest, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Organisation onboarding request {RequestId} was saved but admin notification delivery failed.",
+                onboardingRequest.Id);
+        }
 
         return Result<OrganisationRegistrationResponse>.Success(new OrganisationRegistrationResponse
         {
@@ -231,29 +245,21 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
         OrganisationOnboardingRequest request,
         CancellationToken cancellationToken)
     {
+        var systemAdmins = await _userManager.GetUsersInRoleAsync(Roles.SystemAdmin);
+
         var adminEmails = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(_adminNotificationSettings.OrganisationOnboardingEmail))
         {
             adminEmails.Add(_adminNotificationSettings.OrganisationOnboardingEmail!);
         }
-        else
-        {
-            var admins = await _userManager.GetUsersInRoleAsync(Roles.SystemAdmin);
-            adminEmails.AddRange(
-                admins.Where(a => !string.IsNullOrWhiteSpace(a.Email))
-                    .Select(a => a.Email!));
-        }
+
+        adminEmails.AddRange(
+            systemAdmins.Where(a => !string.IsNullOrWhiteSpace(a.Email))
+                .Select(a => a.Email!));
 
         foreach (var email in adminEmails.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            var businessCode = ExtractStructuredNoteValue(
-                request.Notes,
-                "business code",
-                "business registration code",
-                "mã số doanh nghiệp",
-                "ma so doanh nghiep");
-
             var taxCode = request.TaxCode ?? ExtractStructuredNoteValue(
                 request.Notes,
                 "tax code",
@@ -262,22 +268,61 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
                 "ma so thue",
                 "mst");
 
-            await _emailService.SendAsync(
-                email,
-                EmailTemplates.OrganisationOnboardingSubject,
-                EmailTemplates.GetOrganisationOnboardingAdminBody(
-                    request.OrganisationName,
-                    request.OrgType.ToString(),
-                    request.ContactFullName,
-                    request.ContactEmail,
-                    request.ContactPhone,
-                    request.Address,
-                    request.LicenseNumber,
-                    request.Notes,
-                    businessCode,
-                    taxCode),
-                isHtml: true,
-                cancellationToken);
+            try
+            {
+                await _emailService.SendAsync(
+                    email,
+                    EmailTemplates.OrganisationOnboardingSubject,
+                    EmailTemplates.GetOrganisationOnboardingAdminBody(
+                        request.OrganisationName,
+                        request.OrgType.ToString(),
+                        request.ContactFullName,
+                        request.ContactEmail,
+                        request.ContactPhone,
+                        request.Address,
+                        request.LicenseNumber,
+                        request.Notes,
+                        taxCode),
+                    isHtml: true,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Failed to send organisation onboarding email to admin {AdminEmail} for request {RequestId}.",
+                    email,
+                    request.Id);
+            }
+        }
+
+        foreach (var admin in systemAdmins)
+        {
+            try
+            {
+                await _notificationService.SendAsync(
+                    admin.Id,
+                    "Yêu cầu onboarding tổ chức mới",
+                    $"{request.OrganisationName} vừa gửi biểu mẫu onboarding và đang chờ xác nhận.",
+                    NotificationType.SystemAlert,
+                    payload: new
+                    {
+                        action = "organisation_onboarding_submitted",
+                        onboardingRequestId = request.Id,
+                        organisationName = request.OrganisationName,
+                        routeHint = "/system-admin/organisations"
+                    },
+                    cancellationToken: cancellationToken,
+                    referenceId: request.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Failed to send organisation onboarding notification to system admin {AdminUserId} for request {RequestId}.",
+                    admin.Id,
+                    request.Id);
+            }
         }
     }
 
