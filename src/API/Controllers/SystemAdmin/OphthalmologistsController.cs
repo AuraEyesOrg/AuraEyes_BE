@@ -34,7 +34,7 @@ using Application.Ophthalmologists.Contracts.GetMyContract;
 using Application.Ophthalmologists.Commands.UnverifyOphthalmologist;
 using Application.Ophthalmologists.Commands.DeleteOphthalmologist;
 using Application.Ophthalmologists.Queries.GetDashboardMetrics;
-using Application.Ophthalmologists.Commands.VerifyOphthalmologist;
+using SystemAdminVerify = Application.SystemAdmin.Ophthalmologists.Commands.VerifyOphthalmologist;
 
 namespace API.Controllers.SystemAdmin;
 
@@ -263,19 +263,27 @@ public class OphthalmologistsController : BaseApiController
     }
 
     /// <summary>
-    /// Verify an ophthalmologist profile.
+    /// Verify an ophthalmologist profile (Approve or Reject).
     /// </summary>
     /// <param name="id">Ophthalmologist ID.</param>
+    /// <param name="request">Approval or rejection details.</param>
     /// <returns>Success response.</returns>
     [HttpPost("{id:guid}/verify")]
     [AuthorizePermission(Permissions.OphthalmologistsVerify)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> VerifyOphthalmologist(Guid id)
+    public async Task<IActionResult> VerifyOphthalmologist(Guid id, [FromBody] VerifyOphthalmologistRequest request)
     {
-        var result = await _mediator.Send(new VerifyOphthalmologistCommand(id));
-        return HandleResult(result, "Ophthalmologist verified successfully.");
+        var command = new SystemAdminVerify.VerifyOphthalmologistCommand
+        {
+            OphthalmologistId = id,
+            Approve = request.Approve,
+            RejectionReason = request.RejectionReason
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result);
     }
 
     /// <summary>
