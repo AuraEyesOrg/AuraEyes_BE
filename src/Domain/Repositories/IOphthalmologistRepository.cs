@@ -38,4 +38,11 @@ public interface IOphthalmologistRepository : IRepository<Ophthalmologist>
     /// Get all verified ophthalmologists.
     /// </summary>
     Task<IReadOnlyList<Ophthalmologist>> GetVerifiedAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get display names keyed by ophthalmologist ID.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, string>> GetDisplayNamesByIdsAsync(
+        IReadOnlyCollection<Guid> ophthalmologistIds,
+        CancellationToken cancellationToken = default);
 }
