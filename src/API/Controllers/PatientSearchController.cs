@@ -1,5 +1,6 @@
 using Application.Common.Models;
 using Application.Ophthalmologists.Common;
+using Application.Ophthalmologists.Queries.GetOphthalmologistDisplayNamesByIds;
 using Application.Ophthalmologists.Queries.GetOphthalmologist;
 using Application.Ophthalmologists.Queries.GetOphthalmologists;
 using Application.Scheduling.AppointmentSlots.Common;
@@ -106,18 +107,17 @@ public class PatientSearchController : BaseApiController
     /// Get available booking slots for a specific ophthalmologist or organisation.
     /// </summary>
     /// <param name="ophthalmologistId">Filter by ophthalmologist ID.</param>
-    /// <param name="organisationId">Filter by organisation ID.</param>
     /// <param name="fromDate">Filter slots from this date.</param>
     /// <param name="toDate">Filter slots up to this date.</param>
     /// <param name="pageNumber">Page number (default: 1).</param>
     /// <param name="pageSize">Page size (default: 10).</param>
+    /// <param name="lite">Return a lightweight payload for slot list view.</param>
     /// <returns>Paginated list of available slots.</returns>
     [HttpGet("available-slots")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<AppointmentSlotListDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SearchAvailableSlots(
         [FromQuery] Guid? ophthalmologistId = null,
-        [FromQuery] Guid? organisationId = null,
         [FromQuery] DateOnly? fromDate = null,
         [FromQuery] DateOnly? toDate = null,
         [FromQuery] int pageNumber = 1,
@@ -127,7 +127,6 @@ public class PatientSearchController : BaseApiController
         var query = new GetAppointmentSlotsQuery
         {
             OphthalId = ophthalmologistId,
-            OrgId = organisationId,
             Status = ScheduleStatus.Available,
             FromDate = fromDate,
             ToDate = toDate,
@@ -140,29 +139,30 @@ public class PatientSearchController : BaseApiController
 
         if (lite && result.IsSuccess && result.Data != null)
         {
-            var doctorNameById = new Dictionary<Guid, string>();
-            var doctorIds = result.Data.Items
+            var doctorSlots = result.Data.Items
                 .Where(x => x.OphthalId.HasValue)
+                .ToList();
+
+            var doctorNameById = new Dictionary<Guid, string>();
+            var doctorIds = doctorSlots
                 .Select(x => x.OphthalId!.Value)
                 .Distinct()
                 .ToList();
 
             if (doctorIds.Count > 0)
             {
-                var doctorDetailTasks = doctorIds.Select(id => _mediator.Send(new GetOphthalmologistQuery(id)));
-                var doctorDetails = await Task.WhenAll(doctorDetailTasks);
-
-                for (var i = 0; i < doctorIds.Count; i++)
+                var namesResult = await _mediator.Send(new GetOphthalmologistDisplayNamesByIdsQuery
                 {
-                    var detail = doctorDetails[i];
-                    if (detail.IsSuccess && detail.Data != null && !string.IsNullOrWhiteSpace(detail.Data.UserFullName))
-                    {
-                        doctorNameById[doctorIds[i]] = detail.Data.UserFullName!;
-                    }
+                    Ids = doctorIds
+                });
+
+                if (namesResult.IsSuccess && namesResult.Data != null)
+                {
+                    doctorNameById = new Dictionary<Guid, string>(namesResult.Data);
                 }
             }
 
-            var liteItems = result.Data.Items.Select(x => new
+            var liteItems = doctorSlots.Select(x => new
             {
                 id = x.Id,
                 date = x.Date.ToString("yyyy-MM-dd"),
@@ -170,7 +170,7 @@ public class PatientSearchController : BaseApiController
                 endTime = x.EndTime.ToString("HH:mm"),
                 cost = x.Cost,
                 doctorId = x.OphthalId,
-                doctorName = x.OphthalId.HasValue && doctorNameById.TryGetValue(x.OphthalId.Value, out var doctorName)
+                doctorName = doctorNameById.TryGetValue(x.OphthalId!.Value, out var doctorName)
                     ? doctorName
                     : null
             }).ToList();
