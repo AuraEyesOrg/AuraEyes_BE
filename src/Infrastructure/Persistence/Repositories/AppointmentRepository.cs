@@ -227,6 +227,60 @@ public class AppointmentRepository : Repository<Appointment>, IAppointmentReposi
         return (items, totalCount);
     }
 
+    public async Task<(IReadOnlyList<Appointment> Items, int TotalCount)> GetPagedByPatientAsync(
+        Guid patientId,
+        AppointmentType? type = null,
+        IReadOnlyCollection<AppointmentStatus>? statuses = null,
+        int pageNumber = 1,
+        int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbSet
+            .Include(a => a.Organisation)
+            .Include(a => a.Doctor)
+            .Include(a => a.AppointmentSlot)
+            .Where(a => a.PatientId == patientId);
+
+        if (type.HasValue)
+            query = query.Where(a => a.Type == type.Value);
+
+        if (statuses is { Count: > 0 })
+        {
+            var statusArray = statuses.Distinct().ToArray();
+            query = query.Where(a => statusArray.Contains(a.Status));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var pageIndex = pageNumber < 1 ? 0 : pageNumber - 1;
+        var safeSize = pageSize <= 0 ? 10 : pageSize;
+
+        var items = await query
+            .OrderByDescending(a => a.AppointmentSlot!.Date)
+            .ThenByDescending(a => a.AppointmentSlot!.StartTime)
+            .Skip(pageIndex * safeSize)
+            .Take(safeSize)
+            .ToListAsync(cancellationToken);
+
+        return (items, totalCount);
+    }
+
+    public async Task<Dictionary<AppointmentStatus, int>> GetPatientStatusCountsAsync(
+        Guid patientId,
+        AppointmentType? type = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbSet.Where(a => a.PatientId == patientId);
+
+        if (type.HasValue)
+            query = query.Where(a => a.Type == type.Value);
+
+        return await query
+            .GroupBy(a => a.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Status, x => x.Count, cancellationToken);
+    }
+
     public async Task<Dictionary<AppointmentStatus, int>> GetStatusCountsAsync(
         Guid? organisationId = null,
         Guid? doctorId = null,

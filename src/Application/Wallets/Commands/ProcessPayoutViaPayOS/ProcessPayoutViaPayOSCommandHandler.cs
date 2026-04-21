@@ -69,15 +69,51 @@ public class ProcessPayoutViaPayOSCommandHandler
         // Sinh referenceId duy nhất: payout_{withdrawalRequestId}
         var referenceId = $"payout_{withdrawalRequest.Id:N}";
 
-        // Mô tả thanh toán
-        var description = $"Thanh toan bac si AuraEyes";
+        // 1. Ước tính phí (Estimate Credit) từ PayOS trước khi chi
+        long estimatedFee = 0;
+        try
+        {
+            var payoutItems = new List<PayOSPayoutItem>
+            {
+                new PayOSPayoutItem
+                {
+                    ReferenceId = referenceId,
+                    Amount = (long)withdrawalRequest.Amount,
+                    Description = $"Estimate for {withdrawalRequest.Id}",
+                    ToBin = withdrawalRequest.BankBin,
+                    ToAccountNumber = withdrawalRequest.BankAccountNumber
+                }
+            };
+
+            estimatedFee = await _payOSPayoutService.EstimateCreditAsync(
+                referenceId: $"est_{referenceId}",
+                categories: request.Categories,
+                payouts: payoutItems,
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            return Result<PayoutViaPayOSResponse>.Failure(
+                $"PayOS estimate credit failed: {ex.Message}. Vui lòng thử lại sau.");
+        }
+
+        // 2. Tính số tiền thực nhận sau khi trừ phí
+        var netPayoutAmount = withdrawalRequest.Amount - estimatedFee;
+        if (netPayoutAmount <= 0)
+        {
+            return Result<PayoutViaPayOSResponse>.Failure(
+                $"Số tiền yêu cầu ({withdrawalRequest.Amount:N0} VND) không đủ để trả phí PayOS ({estimatedFee:N0} VND).");
+        }
+
+        // Mô tả thanh toán (PayOS giới hạn 25 ký tự)
+        var description = $"Rut tien AuraEyes {withdrawalRequest.Amount:N0}";
 
         PayOSPayoutResult payoutResult;
         try
         {
             payoutResult = await _payOSPayoutService.CreatePayoutAsync(
                 referenceId: referenceId,
-                amountVnd: withdrawalRequest.Amount,
+                amountVnd: netPayoutAmount, // Chi số tiền đã trừ phí
                 description: description,
                 toBin: withdrawalRequest.BankBin,
                 toAccountNumber: withdrawalRequest.BankAccountNumber,
@@ -93,13 +129,13 @@ public class ProcessPayoutViaPayOSCommandHandler
         // Lấy transaction đầu tiên nếu có
         var firstTxn = payoutResult.Transactions.FirstOrDefault();
 
-        // Cập nhật entity
+        // Cập nhật entity kèm phí đã thu
         withdrawalRequest.SetPayOSPayout(
             payOSReferenceId: referenceId,
             externalPayoutId: payoutResult.Id,
             approvalState: payoutResult.ApprovalState,
             transactionId: firstTxn?.Id,
-            fee: null);
+            fee: estimatedFee);
 
         // PayOS trả approvalState ở cấp batch: "COMPLETED" | "PROCESSING" | "FAILED"
         // Từng transaction bên trong có state: "SUCCEEDED" | "PROCESSING" | "FAILED"

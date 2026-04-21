@@ -251,6 +251,7 @@ public static class DependencyInjection
         services.AddScoped<MonthlyQuotaResetJob>();
         services.AddScoped<SlotMaintenanceJob>();
         services.AddScoped<FullTimeSlotGenerationJob>();
+        services.AddScoped<MonthlySalaryJob>();
 
         // Configure PayOS Settings
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));

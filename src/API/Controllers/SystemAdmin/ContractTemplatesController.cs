@@ -200,10 +200,9 @@ public partial class ContractTemplatesController
         if (templateFile is null || templateFile.Length == 0)
             return new TemplateUploadResult(false, ErrorMessage: "Template DOCX file is required.");
 
-        var extension = Path.GetExtension(templateFile.FileName);
-        if (!string.Equals(extension, ".docx", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(extension, ".doc", StringComparison.OrdinalIgnoreCase))
-            return new TemplateUploadResult(false, ErrorMessage: "Only .doc and .docx files are allowed for contract templates.");
+        var extension = Path.GetExtension(templateFile.FileName).ToLowerInvariant();
+        if (extension != ".docx" && extension != ".doc")
+            return new TemplateUploadResult(false, ErrorMessage: "Only .doc and .docx files are allowed.");
 
         const long maxSizeBytes = 20 * 1024 * 1024;
         if (templateFile.Length > maxSizeBytes)
@@ -213,7 +212,7 @@ public partial class ContractTemplatesController
         var storagePath = await _fileStorageService.SaveFileAsync(
             stream,
             templateFile.FileName,
-            "admin/contract_templates");
+            "admin/contracts");
 
         return new TemplateUploadResult(true, StoragePath: storagePath);
     }

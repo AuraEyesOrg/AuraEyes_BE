@@ -44,8 +44,8 @@ public sealed class CloudinaryStorageService : IFileStorageService
         string subFolder,
         CancellationToken cancellationToken = default)
     {
-        var safeFileName = Path.GetFileNameWithoutExtension(fileName)
-            .Replace(" ", "_");
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
+        var safeFileName = Path.GetFileNameWithoutExtension(fileName).Replace(" ", "_");
         
         // Combine folder and subfolder
         var folderPath = string.IsNullOrWhiteSpace(subFolder)
@@ -56,30 +56,55 @@ public sealed class CloudinaryStorageService : IFileStorageService
         if (fileStream.CanSeek)
             fileStream.Position = 0;
 
-        var uploadParams = new ImageUploadParams
+        // Determine resource type based on extension
+        var isImage = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff" }.Contains(extension);
+        var isVideo = new[] { ".mp4", ".mov", ".avi", ".mkv", ".webm" }.Contains(extension);
+
+        RawUploadResult finalResult;
+
+        if (isImage)
         {
-            File = new FileDescription(fileName, fileStream),
-            Folder = folderPath,
-            // Use Guid to ensure uniqueness, similar to Supabase implementation
-            PublicId = $"{Guid.NewGuid():N}_{safeFileName}",
-            Overwrite = true,
-            AccessMode = "public"
-        };
-
-        _logger.LogDebug(
-            "Uploading to Cloudinary – Folder={Folder}, PublicId={PublicId}",
-            uploadParams.Folder, uploadParams.PublicId);
-
-        var uploadResult = await _cloudinary.UploadAsync(uploadParams, cancellationToken);
-
-        if (uploadResult.Error != null)
+            finalResult = await _cloudinary.UploadAsync(new ImageUploadParams
+            {
+                File = new FileDescription(fileName, fileStream),
+                Folder = folderPath,
+                PublicId = $"{Guid.NewGuid():N}_{safeFileName}",
+                Overwrite = true,
+                AccessMode = "public"
+            });
+        }
+        else if (isVideo)
         {
-            _logger.LogError("Cloudinary upload failed: {Error}", uploadResult.Error.Message);
-            throw new Exception($"Cloudinary upload failed: {uploadResult.Error.Message}");
+            finalResult = await _cloudinary.UploadAsync(new VideoUploadParams
+            {
+                File = new FileDescription(fileName, fileStream),
+                Folder = folderPath,
+                PublicId = $"{Guid.NewGuid():N}_{safeFileName}",
+                Overwrite = true,
+                AccessMode = "public"
+            });
+        }
+        else
+        {
+            // For DOCX, PDF, etc. - use Raw resource type
+            finalResult = await _cloudinary.UploadAsync(new RawUploadParams
+            {
+                File = new FileDescription(fileName, fileStream),
+                Folder = folderPath,
+                PublicId = $"{Guid.NewGuid():N}_{safeFileName}{extension}",
+                Overwrite = true,
+                AccessMode = "public"
+            });
         }
 
-        _logger.LogInformation("Uploaded to Cloudinary: {Url}", uploadResult.SecureUrl);
-        return uploadResult.SecureUrl.ToString();
+        if (finalResult.Error != null)
+        {
+            _logger.LogError("Cloudinary upload failed: {Error}", finalResult.Error.Message);
+            throw new Exception($"Cloudinary upload failed (Type: {finalResult.ResourceType}): {finalResult.Error.Message}");
+        }
+
+        _logger.LogInformation("Uploaded to Cloudinary ({Type}): {Url}", finalResult.ResourceType, finalResult.SecureUrl);
+        return finalResult.SecureUrl.ToString();
     }
 
     /// <inheritdoc />
@@ -90,16 +115,22 @@ public sealed class CloudinaryStorageService : IFileStorageService
             var publicId = ExtractPublicId(relativePath);
             if (string.IsNullOrEmpty(publicId)) return false;
 
-            var deletionParams = new DeletionParams(publicId);
+            // Detect resource type from URL if possible, otherwise try all or default to image
+            var resourceType = DetectResourceTypeFromUrl(relativePath);
+            var deletionParams = new DeletionParams(publicId)
+            {
+                ResourceType = resourceType
+            };
+            
             var result = _cloudinary.Destroy(deletionParams);
 
             if (result.Result == "ok")
             {
-                _logger.LogInformation("Deleted file from Cloudinary: {PublicId}", publicId);
+                _logger.LogInformation("Deleted ({Type}) from Cloudinary: {PublicId}", resourceType, publicId);
                 return true;
             }
 
-            _logger.LogWarning("Failed to delete file from Cloudinary: {PublicId}, Result: {Result}", publicId, result.Result);
+            _logger.LogWarning("Failed to delete ({Type}) from Cloudinary: {PublicId}, Result: {Result}", resourceType, publicId, result.Result);
             return false;
         }
         catch (Exception ex)
@@ -117,9 +148,13 @@ public sealed class CloudinaryStorageService : IFileStorageService
             var publicId = ExtractPublicId(relativePath);
             if (string.IsNullOrEmpty(publicId)) return false;
 
-            var getResourceParams = new GetResourceParams(publicId);
-            var result = _cloudinary.GetResource(getResourceParams);
+            var resourceType = DetectResourceTypeFromUrl(relativePath);
+            var getResourceParams = new GetResourceParams(publicId)
+            {
+                ResourceType = resourceType
+            };
             
+            var result = _cloudinary.GetResource(getResourceParams);
             return result.StatusCode == System.Net.HttpStatusCode.OK;
         }
         catch
@@ -128,9 +163,16 @@ public sealed class CloudinaryStorageService : IFileStorageService
         }
     }
 
+    private static ResourceType DetectResourceTypeFromUrl(string url)
+    {
+        if (url.Contains("/video/", StringComparison.OrdinalIgnoreCase)) return ResourceType.Video;
+        if (url.Contains("/raw/", StringComparison.OrdinalIgnoreCase)) return ResourceType.Raw;
+        return ResourceType.Image;
+    }
+
     /// <summary>
     /// Extract the public ID from a Cloudinary URL.
-    /// Format: https://res.cloudinary.com/{cloud_name}/image/upload/v{version}/{public_id}.{format}
+    /// Format: https://res.cloudinary.com/{cloud_name}/{resource_type}/upload/v{version}/{folder}/{public_id}.{format}
     /// </summary>
     private string ExtractPublicId(string urlOrPath)
     {
@@ -170,10 +212,17 @@ public sealed class CloudinaryStorageService : IFileStorageService
             if (startIdx >= segments.Length)
                 return urlOrPath;
 
-            // Join remaining segments and remove extension
+            // Join remaining segments (folder + filename)
             var publicIdWithExt = string.Join("", segments.Skip(startIdx)).Trim('/');
-            var lastDotIdx = publicIdWithExt.LastIndexOf('.');
             
+            // For 'raw' files, we don't want to remove the extension as it's part of the public ID
+            if (DetectResourceTypeFromUrl(urlOrPath) == ResourceType.Raw)
+            {
+                return publicIdWithExt;
+            }
+
+            // For image/video, remove extension
+            var lastDotIdx = publicIdWithExt.LastIndexOf('.');
             return lastDotIdx > 0 ? publicIdWithExt[..lastDotIdx] : publicIdWithExt;
         }
         catch
