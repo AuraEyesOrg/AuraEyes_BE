@@ -43,28 +43,36 @@ public class GetOverviewMetricsQueryHandler : IQueryHandler<GetOverviewMetricsQu
         var organisationCount = await _organisationRepository.CountAsync(cancellationToken: cancellationToken);
         var screeningCount = await _aiScreeningRepository.CountAsync(cancellationToken: cancellationToken);
 
-        var websiteFeedbackCount = await _websiteFeedbackRepository.CountAsync(cancellationToken: cancellationToken);
-        var websiteFeedbackRatingSum = await _websiteFeedbackRepository.Query()
-            .Select(x => (int?)x.Rating)
-            .SumAsync(cancellationToken);
-
-        var organisationFeedbackCount = await _organisationFeedbackRepository.CountAsync(cancellationToken: cancellationToken);
-        var organisationFeedbackRatingSum = await _organisationFeedbackRepository.Query()
-            .Select(x => (int?)x.Rating)
-            .SumAsync(cancellationToken);
-
-        var ophthalmologistFeedbackCount = await _ophthalmologistFeedbackRepository.CountAsync(cancellationToken: cancellationToken);
-        var ophthalmologistFeedbackRatingSum = await _ophthalmologistFeedbackRepository.Query()
-            .Select(x => (int?)x.Rating)
-            .SumAsync(cancellationToken);
-
-        var totalFeedbackCount = websiteFeedbackCount
-            + organisationFeedbackCount
-            + ophthalmologistFeedbackCount;
-
-        var totalFeedbackRating = (websiteFeedbackRatingSum ?? 0)
-            + (organisationFeedbackRatingSum ?? 0)
-            + (ophthalmologistFeedbackRatingSum ?? 0);
+        var websiteFeedbackMetrics = await _websiteFeedbackRepository.Query()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Count = g.Count(),
+                RatingSum = g.Sum(x => (int?)x.Rating) ?? 0
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        var organisationFeedbackMetrics = await _organisationFeedbackRepository.Query()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Count = g.Count(),
+                RatingSum = g.Sum(x => (int?)x.Rating) ?? 0
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        var ophthalmologistFeedbackMetrics = await _ophthalmologistFeedbackRepository.Query()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Count = g.Count(),
+                RatingSum = g.Sum(x => (int?)x.Rating) ?? 0
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        var totalFeedbackCount = (websiteFeedbackMetrics?.Count ?? 0)
+            + (organisationFeedbackMetrics?.Count ?? 0)
+            + (ophthalmologistFeedbackMetrics?.Count ?? 0);
+        var totalFeedbackRating = (websiteFeedbackMetrics?.RatingSum ?? 0)
+            + (organisationFeedbackMetrics?.RatingSum ?? 0)
+            + (ophthalmologistFeedbackMetrics?.RatingSum ?? 0);
 
         double? averageRating = totalFeedbackCount > 0
             ? Math.Round((double)totalFeedbackRating / totalFeedbackCount, 1)

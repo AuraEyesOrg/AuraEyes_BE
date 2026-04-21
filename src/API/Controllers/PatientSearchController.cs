@@ -140,6 +140,28 @@ public class PatientSearchController : BaseApiController
 
         if (lite && result.IsSuccess && result.Data != null)
         {
+            var doctorNameById = new Dictionary<Guid, string>();
+            var doctorIds = result.Data.Items
+                .Where(x => x.OphthalId.HasValue)
+                .Select(x => x.OphthalId!.Value)
+                .Distinct()
+                .ToList();
+
+            if (doctorIds.Count > 0)
+            {
+                var doctorDetailTasks = doctorIds.Select(id => _mediator.Send(new GetOphthalmologistQuery(id)));
+                var doctorDetails = await Task.WhenAll(doctorDetailTasks);
+
+                for (var i = 0; i < doctorIds.Count; i++)
+                {
+                    var detail = doctorDetails[i];
+                    if (detail.IsSuccess && detail.Data != null && !string.IsNullOrWhiteSpace(detail.Data.UserFullName))
+                    {
+                        doctorNameById[doctorIds[i]] = detail.Data.UserFullName!;
+                    }
+                }
+            }
+
             var liteItems = result.Data.Items.Select(x => new
             {
                 id = x.Id,
@@ -147,7 +169,10 @@ public class PatientSearchController : BaseApiController
                 startTime = x.StartTime.ToString("HH:mm"),
                 endTime = x.EndTime.ToString("HH:mm"),
                 cost = x.Cost,
-                doctorId = x.OphthalId
+                doctorId = x.OphthalId,
+                doctorName = x.OphthalId.HasValue && doctorNameById.TryGetValue(x.OphthalId.Value, out var doctorName)
+                    ? doctorName
+                    : null
             }).ToList();
 
             return Ok(liteItems);
