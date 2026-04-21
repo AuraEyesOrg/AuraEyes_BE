@@ -29,6 +29,9 @@ public class OrganisationOnboardingRequestConfiguration : IEntityTypeConfigurati
         builder.Property(e => e.LicenseNumber)
             .HasMaxLength(100);
 
+        builder.Property(e => e.TaxCode)
+            .HasMaxLength(50);
+
         builder.Property(e => e.Notes)
             .HasColumnType("text");
 

@@ -195,7 +195,8 @@ public static class DatabaseSeeder
                     name: "Auski Hospital",
                     orgType: OrgType.Hospital,
                     address: "S1006 Vinhomes Grand Park, Ho Chi Minh City, Viet Nam",
-                    licenseNumber: "MED-HCM-2024-001"
+                    licenseNumber: "MED-HCM-2024-001",
+                    taxCode: "0312345678"
                 );
 
                 await context.Organisations.AddAsync(organisation);
@@ -463,8 +464,9 @@ public static class DatabaseSeeder
                 continue;
             }
 
-            // Only fetch assignments for this role to avoid N+1
+            // Use IgnoreQueryFilters to catch soft-deleted records and avoid unique constraint violations
             var existingRolePermissionIds = await context.RolePermissions
+                .IgnoreQueryFilters()
                 .Where(rp => rp.RoleId == role.Id)
                 .Select(rp => rp.PermissionId)
                 .ToListAsync();

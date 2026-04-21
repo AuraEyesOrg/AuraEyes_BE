@@ -185,6 +185,11 @@ public interface IIdentityService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Get all effective permissions for a user (Role-based + User-based).
+    /// </summary>
+    Task<IList<string>> GetUserPermissionsAsync(Guid userId);
+
+    /// <summary>
     /// Change user password.
     /// </summary>
     Task<(bool Succeeded, string[] Errors)> ChangePasswordAsync(
@@ -192,6 +197,11 @@ public interface IIdentityService
         string currentPassword,
         string newPassword,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Synchronize all roles with their default permissions defined in code.
+    /// </summary>
+    Task SynchronizeRolesWithDefaultsAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>

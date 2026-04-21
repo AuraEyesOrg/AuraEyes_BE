@@ -13,7 +13,12 @@ using Application.SystemAdmin.Permissions.Queries.GetPermissionById;
 using Application.SystemAdmin.Permissions.Queries.GetPermissions;
 using Application.SystemAdmin.Permissions.Queries.GetRolePermissions;
 using Application.SystemAdmin.Permissions.Queries.GetUserPermissions;
+using Application.SystemAdmin.Permissions.Commands.SynchronizeRolePermissions;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+using Infrastructure.Identity.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -29,7 +34,7 @@ namespace API.Controllers.SystemAdmin;
 ///   UserPermission → per-user overrides: grant extras OR explicitly revoke role permissions
 /// </summary>
 [Route("api/system-admin/[controller]")]
-[Authorize(Policy = Policies.SystemAdminOnly)]
+[AuthorizePermission(Permissions.PermissionsRead)]
 public class PermissionsController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -83,6 +88,7 @@ public class PermissionsController : BaseApiController
     /// (e.g. "users:read", "screening.approve").
     /// </summary>
     [HttpPost]
+    [AuthorizePermission(Permissions.PermissionsManage)]
     [ProducesResponseType(typeof(ApiResponse<PermissionDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
@@ -97,6 +103,7 @@ public class PermissionsController : BaseApiController
     /// The permission name (unique key) cannot be changed.
     /// </summary>
     [HttpPut("{id:guid}")]
+    [AuthorizePermission(Permissions.PermissionsManage)]
     [ProducesResponseType(typeof(ApiResponse<PermissionDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -118,6 +125,7 @@ public class PermissionsController : BaseApiController
     /// Deactivated permissions remain in the database for audit but cannot be assigned.
     /// </summary>
     [HttpDelete("{id:guid}")]
+    [AuthorizePermission(Permissions.PermissionsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeletePermission(Guid id)
@@ -157,6 +165,7 @@ public class PermissionsController : BaseApiController
     /// Every user in this role will inherit the permission.
     /// </summary>
     [HttpPost("roles")]
+    [AuthorizePermission(Permissions.PermissionsManage)]
     [ProducesResponseType(typeof(ApiResponse<RolePermissionDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -172,12 +181,26 @@ public class PermissionsController : BaseApiController
     /// Pass the <c>rolePermissionId</c> returned by GET /roles/{roleId}.
     /// </summary>
     [HttpDelete("roles/{rolePermissionId:guid}")]
+    [AuthorizePermission(Permissions.PermissionsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RemovePermissionFromRole(Guid rolePermissionId)
     {
         var result = await _mediator.Send(new RemovePermissionFromRoleCommand(rolePermissionId));
         return HandleResult(result, "Permission removed from role successfully.");
+    }
+
+    /// <summary>
+    /// Synchronize all roles with their default permissions defined in code.
+    /// This will add missing permissions and remove unauthorized ones for each role.
+    /// </summary>
+    [HttpPost("sync-roles")]
+    [AuthorizePermission(Permissions.PermissionsManage)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SynchronizeRolePermissions()
+    {
+        var result = await _mediator.Send(new SynchronizeRolePermissionsCommand());
+        return HandleResult(result, "Roles synchronized with default permissions successfully.");
     }
 
     // =========================================================================
@@ -205,6 +228,7 @@ public class PermissionsController : BaseApiController
     /// </list>
     /// </summary>
     [HttpPost("users")]
+    [AuthorizePermission(Permissions.PermissionsManage)]
     [ProducesResponseType(typeof(ApiResponse<UserPermissionDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -221,6 +245,7 @@ public class PermissionsController : BaseApiController
     /// The user will fall back to their role-based permissions.
     /// </summary>
     [HttpPatch("users/{userPermissionId:guid}/revoke")]
+    [AuthorizePermission(Permissions.PermissionsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]

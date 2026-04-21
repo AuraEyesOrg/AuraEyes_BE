@@ -37,6 +37,13 @@ jobs:
         run: |
           mkdir -p "$DEPLOY_DIR"
           cp docker-compose.yml "$DEPLOY_DIR/docker-compose.yml"
+          
+          # Copy Nginx configs for Docker Proxy
+          mkdir -p "$DEPLOY_DIR/deploy/nginx"
+          cp -r deploy/nginx/* "$DEPLOY_DIR/deploy/nginx/"
+          
+          # Create certbot challenge directory
+          mkdir -p "$DEPLOY_DIR/deploy/certbot/www"
       
       - name: Create .env file
         run: |
@@ -90,6 +97,13 @@ jobs:
           SupabaseStorage__ServiceKey=${{ secrets.SUPABASE_STORAGE_KEY }}
           SupabaseStorage__BucketName=${{ secrets.SUPABASE_STORAGE_BUCKET }}
 
+          # ── Cloudinary ──
+          Cloudinary__CloudName=${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          Cloudinary__ApiKey=${{ secrets.CLOUDINARY_API_KEY }}
+          Cloudinary__ApiSecret=${{ secrets.CLOUDINARY_API_SECRET }}
+          Cloudinary__Folder=auraeyes_dev
+
+
           GoogleAuth__ClientId=${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GoogleMeet__ClientId=${{ secrets.GOOGLE_MEET_CLIENT_ID }}
           GoogleMeet__ClientSecret=${{ secrets.GOOGLE_MEET_CLIENT_SECRET }}
@@ -136,6 +150,7 @@ jobs:
           BaseUrl=${{ secrets.FRONTEND_URL }}
 
           DOCKER_IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/auraeyes-api
+          WEB_IMAGE=${{ secrets.FE_DOCKER_USERNAME || secrets.DOCKER_USERNAME }}/auraeyes-web:latest
           EOF
 
       - name: Pull & run containers

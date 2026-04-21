@@ -281,7 +281,7 @@ public class AuthService : IAuthService
                 var uploadedUrl = await _fileStorageService.SaveFileAsync(
                     stream,
                     file.FileName,
-                    $"credentials/{user.Id}",
+                    $"ophthalmologists/credentials/{user.Id}",
                     cancellationToken);
 
                 uploadedFileUrls.Add(uploadedUrl);
@@ -767,8 +767,9 @@ public class AuthService : IAuthService
         CancellationToken cancellationToken)
     {
         var roles = await _userManager.GetRolesAsync(user);
+        var permissions = await _identityService.GetUserPermissionsAsync(user.Id);
 
-        var additionalClaims = await BuildProfileClaimsAsync(user.Id, roles, cancellationToken);
+        var additionalClaims = await BuildProfileClaimsAsync(user.Id, roles, permissions, cancellationToken);
 
         var tokenResult = await _tokenService.GenerateAccessTokenAsync(
             user.Id,
@@ -818,7 +819,10 @@ public class AuthService : IAuthService
                 verificationStatus = doctors[0].VerificationStatus.ToString();
                 employmentType = doctors[0].EmploymentType.ToString();
             }
+        }
 
+        if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+        {
             var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
             if (contract != null)
             {
@@ -851,7 +855,9 @@ public class AuthService : IAuthService
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
                 ContractStatus = contractStatus,
-                EmploymentType = employmentType
+                MustChangePassword = user.MustChangePassword,
+                EmploymentType = employmentType,
+                Permissions = permissions.ToArray()
             }
         };
     }
@@ -900,7 +906,8 @@ public class AuthService : IAuthService
             }
 
             var roles = await _userManager.GetRolesAsync(user);
-            var additionalClaims = await BuildProfileClaimsAsync(user.Id, roles, cancellationToken);
+            var permissions = await _identityService.GetUserPermissionsAsync(user.Id);
+            var additionalClaims = await BuildProfileClaimsAsync(user.Id, roles, permissions, cancellationToken);
 
             var tokenResult = await _tokenService.GenerateAccessTokenAsync(
                 user.Id,
@@ -948,7 +955,10 @@ public class AuthService : IAuthService
                     verificationStatus = doctors[0].VerificationStatus.ToString();
                     employmentType = doctors[0].EmploymentType.ToString();
                 }
+            }
 
+            if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+            {
                 var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
                 if (contract != null)
                 {
@@ -981,7 +991,9 @@ public class AuthService : IAuthService
                     IsVerified = isVerified,
                     VerificationStatus = verificationStatus,
                     ContractStatus = contractStatus,
-                    EmploymentType = employmentType
+                    MustChangePassword = user.MustChangePassword,
+                    EmploymentType = employmentType,
+                    Permissions = permissions.ToArray()
                 }
             });
         }
@@ -1165,6 +1177,7 @@ public class AuthService : IAuthService
             var userDetails = await _identityService.GetUserDetailsAsync(userId, cancellationToken);
             var identityUser = await _userManager.FindByIdAsync(userId.ToString());
             var roles = await _identityService.GetUserRolesAsync(userId);
+            var permissions = await _identityService.GetUserPermissionsAsync(userId);
             var twoFactorEnabled = await _identityService.IsTwoFactorEnabledAsync(userId);
 
             // Resolve role-specific profile entity (PatientId / OphthalmologistId)
@@ -1192,7 +1205,10 @@ public class AuthService : IAuthService
                     verificationStatus = doctors[0].VerificationStatus.ToString();
                     employmentType = doctors[0].EmploymentType.ToString();
                 }
+            }
 
+            if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+            {
                 var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
                 if (contract != null)
                 {
@@ -1216,7 +1232,9 @@ public class AuthService : IAuthService
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
                 ContractStatus = contractStatus,
-                EmploymentType = employmentType
+                MustChangePassword = identityUser?.MustChangePassword ?? false,
+                EmploymentType = employmentType,
+                Permissions = permissions.ToArray()
             });
         }
         catch (Exception ex)
@@ -1252,7 +1270,7 @@ public class AuthService : IAuthService
         }
     }
     private async Task<List<Claim>> BuildProfileClaimsAsync(
-        Guid userId, IList<string> roles, CancellationToken cancellationToken)
+        Guid userId, IList<string> roles, IEnumerable<string> permissions, CancellationToken cancellationToken)
     {
         var claims = new List<Claim>();
 
@@ -1273,6 +1291,12 @@ public class AuthService : IAuthService
                 claims.Add(new Claim("IsVerified", doctors[0].IsVerified.ToString()));
                 claims.Add(new Claim("verification_status", doctors[0].VerificationStatus.ToString()));
             }
+        }
+
+        // Add permissions as claims
+        foreach (var permission in permissions)
+        {
+            claims.Add(new Claim("permission", permission));
         }
 
         return claims;

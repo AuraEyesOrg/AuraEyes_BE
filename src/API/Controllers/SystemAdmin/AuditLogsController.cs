@@ -5,6 +5,10 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using Infrastructure.Identity.Authorization;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
 namespace API.Controllers.SystemAdmin;
 
 /// <summary>
@@ -12,7 +16,7 @@ namespace API.Controllers.SystemAdmin;
 /// Provides audit trail access for compliance and security monitoring.
 /// </summary>
 [Route("api/system-admin/audit-logs")]
-[Authorize(Policy = Policies.SystemAdminOnly)]
+[AuthorizePermission(Permissions.AuditLogsRead)]
 public class AuditLogsController : BaseApiController
 {
     private readonly IMediator _mediator;

@@ -1,8 +1,0 @@
-      <UploadCredentialsModal 
-        isOpen={showUploadCredentialsModal} 
-        onClose={() => setShowUploadCredentialsModal(false)} 
-        ophthalmologistId={ophthalmologistId as string} 
-      />
-    </div>
-  );
-}

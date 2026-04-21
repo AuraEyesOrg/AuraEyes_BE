@@ -35,6 +35,7 @@ public static class Permissions
     public const string OphthalmologistsCreate = "ophthalmologists:create";
     public const string OphthalmologistsUpdate = "ophthalmologists:update";
     public const string OphthalmologistsVerify = "ophthalmologists:verify";
+    public const string OphthalmologistsDelete = "ophthalmologists:delete";
 
     // ─── Organisations ────────────────────────────────────────────────────────
     public const string OrganisationsRead = "organisations:read";
@@ -52,10 +53,52 @@ public static class Permissions
     public const string ConsultationsCreate = "consultations:create";
     public const string ConsultationsUpdate = "consultations:update";
 
-    // ─── Audits ───────────────────────────────────────────────────────────────
+    // ─── Quotas ───────────────────────────────────────────────────────────────
+    public const string QuotasRead = "quotas:read";
+    public const string QuotasBuy = "quotas:buy";
+
+    // ─── Wallets ──────────────────────────────────────────────────────────────
+    public const string WalletsRead = "wallets:read";
+    public const string WalletsDeposit = "wallets:deposit";
+    public const string WalletsWithdraw = "wallets:withdraw";
+    public const string WalletsHistory = "wallets:history";
+    public const string WalletsManage = "wallets:manage";
+
+    // ─── Appointments & Scheduling ────────────────────────────────────────────
+    public const string AppointmentsRead = "appointments:read";
+    public const string AppointmentsCreate = "appointments:create";
+    public const string AppointmentsManage = "appointments:manage";
+    public const string ApptSlotsManage = "appt-slots:manage";
+    public const string SchedulesManage = "schedules:manage";
+
+    // ─── Financial Admin ──────────────────────────────────────────────────────
+    public const string PayoutsRead = "payouts:read";
+    public const string PayoutsManage = "payouts:manage";
+    public const string CashflowRead = "cashflow:read";
+
+    // ─── Legal & Contracts ────────────────────────────────────────────────────
+    public const string ContractsRead = "contracts:read";
+    public const string ContractsManage = "contracts:manage";
+    public const string ContractTemplatesManage = "contracts:templates-manage";
+
+    // ─── Platform & Models ────────────────────────────────────────────────────
+    public const string AiModelsRead = "aimodels:read";
+    public const string AiModelsManage = "aimodels:manage";
+    public const string NetworkManage = "network:manage";
+    public const string FeedbackRead = "feedback:read";
+    public const string RoadmapsManage = "roadmaps:manage";
+
+    // ─── Settings ─────────────────────────────────────────────────────────────
+    public const string SettingsRead = "settings:read";
+    public const string SettingsManage = "settings:manage";
+
+    // ─── Notifications ────────────────────────────────────────────────────────
+    public const string NotificationsManage = "notifications:manage";
+
+    // ─── Audit ────────────────────────────────────────────────────────────────
     public const string AuditLogsRead = "audit-logs:read";
 
-    // ─── Dashboard / Analytics ───────────────────────────────────────────────
+    // ─── Dashboard ─────────────────────────────────────────────────────────────
     public const string DashboardRead = "dashboard:read";
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -84,11 +127,11 @@ public static class Permissions
 
         // Ophthalmologists
         new(OphthalmologistsRead,   "Read Ophthalmologists",   "View ophthalmologist profiles",      "Ophthalmologists"),
+
         new(OphthalmologistsCreate, "Create Ophthalmologists", "Register new ophthalmologist accounts","Ophthalmologists"),
         new(OphthalmologistsUpdate, "Update Ophthalmologists", "Edit ophthalmologist profiles",       "Ophthalmologists"),
         new(OphthalmologistsVerify, "Verify Ophthalmologists", "Approve or reject credential verification","Ophthalmologists"),
-
-        // Organisations
+        new(OphthalmologistsDelete, "Delete Ophthalmologists", "Soft-delete ophthalmologist profiles", "Ophthalmologists"),
         new(OrganisationsRead,   "Read Organisations",   "View organisation list and details",  "Organisations"),
         new(OrganisationsCreate, "Create Organisations", "Register new organisations",          "Organisations"),
         new(OrganisationsUpdate, "Update Organisations", "Edit organisation information",       "Organisations"),
@@ -99,10 +142,51 @@ public static class Permissions
         new(ScreeningCreate,  "Create Screening",  "Submit retinal images for screening",     "Screening"),
         new(ScreeningApprove, "Approve Screening", "Approve or flag AI screening results",    "Screening"),
 
-        // Consultations
+        // Consultations & Appointments
         new(ConsultationsRead,   "Read Consultations",   "View consultation sessions",          "Consultations"),
         new(ConsultationsCreate, "Create Consultations", "Book new consultation sessions",      "Consultations"),
         new(ConsultationsUpdate, "Update Consultations", "Modify or cancel consultation sessions","Consultations"),
+        new(AppointmentsRead,    "Read Appointments",    "View clinic appointments",            "Appointments"),
+        new(AppointmentsCreate,  "Create Appointments",  "Book clinic appointments",            "Appointments"),
+        new(AppointmentsManage,  "Manage Appointments",  "Reschedule or cancel appointments",    "Appointments"),
+
+        // Scheduling
+        new(ApptSlotsManage,  "Manage Time Slots",  "Generate or manage appointment slots",    "Scheduling"),
+        new(SchedulesManage,  "Manage Templates",   "Manage ophthalmologist weekly schedules", "Scheduling"),
+
+        // Quotas
+        new(QuotasRead, "Read Quotas", "View AI quota balance",                           "Quotas"),
+        new(QuotasBuy,  "Buy Quotas",  "Purchase additional AI quota credits",          "Quotas"),
+
+        // Wallets & Financial
+        new(WalletsRead,     "Read Wallets",     "View wallet balance and account info",     "Wallets"),
+        new(WalletsDeposit,  "Deposit Funds",    "Deposit money into wallet via PayOS",      "Wallets"),
+        new(WalletsWithdraw, "Withdraw Funds",   "Request withdrawal of funds",              "Wallets"),
+        new(WalletsHistory,  "Wallet History",   "View transaction and deposit history",     "Wallets"),
+        new(WalletsManage,   "Manage All Wallets","View and audit all user wallets",          "Wallets"),
+        
+        new(PayoutsRead,     "Read Payouts",     "View withdrawal requests",                 "Financial"),
+        new(PayoutsManage,   "Manage Payouts",   "Approve or reject withdrawal requests",     "Financial"),
+        new(CashflowRead,    "Read Cashflow",    "View system financial analytics",          "Financial"),
+
+        // Contracts
+        new(ContractsRead,            "Read Contracts",      "View organisation contracts",          "Contracts"),
+        new(ContractsManage,         "Manage Contracts",    "Issue or cancel contracts",            "Contracts"),
+        new(ContractTemplatesManage, "Manage Templates",    "Manage contract legal templates",      "Contracts"),
+
+        // Platform
+        new(AiModelsRead,     "Read AI Models",     "View available AI screening models",       "Platform"),
+        new(AiModelsManage,   "Manage AI Models",   "Update model metadata or active status",   "Platform"),
+        new(NetworkManage,    "Manage Network",    "Manage health network and affiliations",    "Platform"),
+        new(FeedbackRead,     "Read Feedback",     "View user feedback and survey results",    "Platform"),
+        new(RoadmapsManage,   "Manage Roadmaps",   "Curate patient health journey roadmaps",   "Platform"),
+
+        // Settings
+        new(SettingsRead,   "Read Settings",   "View system and organization settings",    "Settings"),
+        new(SettingsManage, "Manage Settings", "Modify system-wide or org settings",       "Settings"),
+
+        // Notifications
+        new(NotificationsManage, "Manage Notifications", "Send system-wide broadcast notifications", "Notifications"),
 
         // Audit
         new(AuditLogsRead, "Read Audit Logs", "View system audit trail",                      "Audit"),
@@ -113,8 +197,6 @@ public static class Permissions
 
     /// <summary>
     /// Default permissions seeded per role (RBAC baseline).
-    /// This defines which permissions each role gets out of the box.
-    /// Admins can change these at runtime via the Permissions API.
     /// </summary>
     public static readonly Dictionary<string, string[]> DefaultRolePermissions = new()
     {
@@ -123,10 +205,19 @@ public static class Permissions
             UsersRead, UsersCreate, UsersUpdate, UsersDelete, UsersManageRoles,
             PermissionsRead, PermissionsManage,
             PatientsRead, PatientsCreate, PatientsUpdate, PatientsDelete,
-            OphthalmologistsRead, OphthalmologistsCreate, OphthalmologistsUpdate, OphthalmologistsVerify,
+            OphthalmologistsRead, OphthalmologistsCreate, OphthalmologistsUpdate, OphthalmologistsVerify, OphthalmologistsDelete,
             OrganisationsRead, OrganisationsCreate, OrganisationsUpdate, OrganisationsDelete,
             ScreeningRead, ScreeningCreate, ScreeningApprove,
             ConsultationsRead, ConsultationsCreate, ConsultationsUpdate,
+            AppointmentsRead, AppointmentsCreate, AppointmentsManage,
+            ApptSlotsManage, SchedulesManage,
+            QuotasRead, QuotasBuy,
+            WalletsRead, WalletsDeposit, WalletsWithdraw, WalletsHistory, WalletsManage,
+            PayoutsRead, PayoutsManage, CashflowRead,
+            ContractsRead, ContractsManage, ContractTemplatesManage,
+            AiModelsRead, AiModelsManage, NetworkManage, FeedbackRead, RoadmapsManage,
+            SettingsRead, SettingsManage,
+            NotificationsManage,
             AuditLogsRead,
             DashboardRead,
         ],
@@ -134,25 +225,44 @@ public static class Permissions
         [Roles.OrgAdmin] =
         [
             UsersRead,
-            PatientsRead, PatientsUpdate,
-            OphthalmologistsRead, OphthalmologistsCreate, OphthalmologistsUpdate,
+            PatientsRead, PatientsCreate, PatientsUpdate,
+            OphthalmologistsRead, OphthalmologistsCreate, OphthalmologistsUpdate, OphthalmologistsDelete,
             OrganisationsRead, OrganisationsUpdate,
-            ScreeningRead,
-            ConsultationsRead, ConsultationsUpdate,
+            ScreeningRead, ScreeningCreate, ScreeningApprove,
+            ConsultationsRead, ConsultationsCreate, ConsultationsUpdate,
+            AppointmentsRead, AppointmentsCreate, AppointmentsManage,
+            ApptSlotsManage,
+            QuotasRead, QuotasBuy,
+            WalletsRead, WalletsHistory, WalletsWithdraw,
+            ContractsRead,
+            SettingsRead, SettingsManage,
             DashboardRead,
         ],
 
         [Roles.Ophthalmologist] =
         [
-            PatientsRead,
-            ScreeningRead, ScreeningApprove,
-            ConsultationsRead, ConsultationsUpdate,
+            DashboardRead,
+            PatientsRead, PatientsUpdate, PatientsCreate,
+            OphthalmologistsUpdate,
+            ScreeningRead, ScreeningCreate, ScreeningApprove,
+            ConsultationsRead, ConsultationsCreate, ConsultationsUpdate,
+            AppointmentsRead, AppointmentsCreate,
+            SchedulesManage, ApptSlotsManage,
+            ContractsRead,
+            WalletsRead, WalletsWithdraw, WalletsHistory,
+            SettingsRead,
         ],
 
         [Roles.Patient] =
         [
+            DashboardRead,
             ScreeningRead, ScreeningCreate,
             ConsultationsRead, ConsultationsCreate,
+            AppointmentsRead, AppointmentsCreate,
+            WalletsRead, WalletsDeposit, WalletsHistory,
+            QuotasRead,
+            PatientsRead, PatientsUpdate,
+            SettingsRead,
         ],
     };
 }

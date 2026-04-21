@@ -178,6 +178,8 @@ public record RegisterOrganisationRequest
 
     public string? LicenseNumber { get; init; }
 
+    public string? TaxCode { get; init; }
+
     public string? Notes { get; init; }
 }
 
@@ -268,10 +270,21 @@ public record UserInfoResponse
     public string? ContractStatus { get; init; }
 
     /// <summary>
+    /// Indicates whether the user must change password before accessing protected features.
+    /// Used for first login after temporary credentials are provisioned.
+    /// </summary>
+    public bool MustChangePassword { get; init; }
+
+    /// <summary>
     /// Employment type for ophthalmologist users (FullTime/PartTime).
     /// Null for non-ophthalmologist roles.
     /// </summary>
     public string? EmploymentType { get; init; }
+    
+    /// <summary>
+    /// Granular permissions for the user based on their roles.
+    /// </summary>
+    public string[] Permissions { get; init; } = Array.Empty<string>();
 }
 
 /// <summary>

@@ -1,6 +1,8 @@
 using Application.Common.Models;
 using Microsoft.AspNetCore.Mvc;
 
+using Microsoft.AspNetCore.Authorization;
+
 namespace API.Controllers;
 
 /// <summary>
@@ -10,6 +12,7 @@ namespace API.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize]
 public abstract class BaseApiController : ControllerBase
 {
     /// <summary>

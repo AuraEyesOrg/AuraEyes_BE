@@ -3,6 +3,7 @@ using API.Middleware;
 using API.Services;
 using Application;
 using Application.Common.Interfaces;
+using Application.Common.Models;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Infrastructure;
@@ -14,7 +15,9 @@ using Microsoft.OpenApi.Models;
 using Npgsql;
 using Serilog;
 using System.Reflection;
+using System.Security.Claims;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 
 static string ResolveHangfireSchema(string? configuredSchema, bool isDevelopment)
 {
@@ -276,6 +279,82 @@ builder.Services.AddOutputCache(options =>
                .SetVaryByQuery("*")); // Vary cache by query parameters
 });
 
+var rateLimitingSettings = builder.Configuration
+    .GetSection(Infrastructure.Settings.RateLimitingSettings.SectionName)
+    .Get<Infrastructure.Settings.RateLimitingSettings>() ?? new Infrastructure.Settings.RateLimitingSettings();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, token) =>
+    {
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter =
+                Math.Ceiling(retryAfter.TotalSeconds).ToString();
+        }
+
+        var response = ApiResponseFactory.Error("Too many requests. Please retry later.");
+        await context.HttpContext.Response.WriteAsJsonAsync(response, cancellationToken: token);
+    };
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var path = httpContext.Request.Path;
+        var method = httpContext.Request.Method;
+
+        var isSensitiveEndpoint =
+            (HttpMethods.IsPost(method) &&
+             (path.StartsWithSegments("/api/auth/login", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/auth/google-login", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/auth/register", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/auth/forgot-password", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/auth/reset-password", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/auth/resend-confirmation", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/auth/refresh", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/two-factor/setup", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/two-factor/enable", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/two-factor/disable", StringComparison.OrdinalIgnoreCase)
+              || path.StartsWithSegments("/api/two-factor/recovery-codes", StringComparison.OrdinalIgnoreCase)));
+
+        var isReadRequest = HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method);
+
+        var partitionKey = httpContext.User.Identity?.IsAuthenticated == true
+            ? $"user:{httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? httpContext.User.Identity.Name ?? "unknown"}"
+            : $"ip:{httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
+
+        var policyKey = isSensitiveEndpoint ? "sensitive" : isReadRequest ? "read" : "write";
+        partitionKey = $"{policyKey}:{partitionKey}";
+
+        var permitLimit = isSensitiveEndpoint
+            ? rateLimitingSettings.ActualSensitivePermitLimit
+            : isReadRequest
+                ? rateLimitingSettings.ActualReadPermitLimit
+                : rateLimitingSettings.ActualWritePermitLimit;
+
+        var windowSeconds = isSensitiveEndpoint
+            ? rateLimitingSettings.ActualSensitiveWindowSeconds
+            : isReadRequest
+                ? rateLimitingSettings.ActualReadWindowSeconds
+                : rateLimitingSettings.ActualWriteWindowSeconds;
+
+        var queueLimit = isSensitiveEndpoint
+            ? rateLimitingSettings.ActualSensitiveQueueLimit
+            : isReadRequest
+                ? rateLimitingSettings.ActualReadQueueLimit
+                : rateLimitingSettings.ActualWriteQueueLimit;
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = permitLimit,
+            Window = TimeSpan.FromSeconds(windowSeconds),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = queueLimit,
+            AutoReplenishment = true
+        });
+    });
+});
+
 var app = builder.Build();
 
 // Seed domain entities (Organisation, Ophthalmologist, Patient)
@@ -291,12 +370,12 @@ using (var scope = app.Services.CreateScope())
         var loggerFactory = services.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>();
         var seederLogger = loggerFactory.CreateLogger("DatabaseSeeder");
 
-        // await Infrastructure.Services.DatabaseSeeder.SeedAsync(
-        //     context,
-        //     userManager,
-        //     roleManager,
-        //     builder.Configuration,
-        //     seederLogger);
+        await Infrastructure.Services.DatabaseSeeder.SeedAsync(
+            context,
+            userManager,
+            roleManager,
+            builder.Configuration,
+            seederLogger);
         Log.Information("Database seeding completed successfully");
     }
     catch (Exception ex)
@@ -336,6 +415,8 @@ app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseHttpsRedirection();
 
 app.UseResponseCompression();
+
+app.UseRateLimiter();
 
 app.UseCors("FrontendCors");
 app.UseOutputCache();
@@ -387,6 +468,12 @@ if (string.IsNullOrWhiteSpace(fullTimeSlotGenerationCron))
     fullTimeSlotGenerationCron = "0 1 * * 1";
 }
 
+var monthlySalaryCron = Environment.GetEnvironmentVariable("HANGFIRE_MONTHLY_SALARY_CRON");
+if (string.IsNullOrWhiteSpace(monthlySalaryCron))
+{
+    monthlySalaryCron = "0 0 5 * *";
+}
+
 if (enableHangfireServer)
 {
     // Register recurring jobs
@@ -398,7 +485,8 @@ if (enableHangfireServer)
         "full-time-slot-generation",
         "fulltime-slot-generation-job",
         // Remove the current id first to force a clean re-registration payload.
-        "fulltime-slot-rolling-window"
+        "fulltime-slot-rolling-window",
+        "monthly-salary-payout"
     };
 
     foreach (var recurringJobId in legacyRecurringJobIds)
@@ -428,6 +516,12 @@ if (enableHangfireServer)
         "fulltime-slot-rolling-window",
         job => job.ExecuteAsync(CancellationToken.None),
         fullTimeSlotGenerationCron,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+    recurringJobManager.AddOrUpdate<MonthlySalaryJob>(
+        "monthly-salary-payout",
+        job => job.ExecuteAsync(CancellationToken.None),
+        monthlySalaryCron,
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
     try

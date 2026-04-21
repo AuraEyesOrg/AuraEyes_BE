@@ -27,6 +27,18 @@ public interface INotificationService
         Guid? referenceId = null);
 
     /// <summary>
+    /// Sends a notification to all users in a specific role
+    /// </summary>
+    Task SendToRoleAsync(
+        string roleName,
+        string title,
+        string message,
+        NotificationType type = NotificationType.SystemAlert,
+        object? payload = null,
+        CancellationToken cancellationToken = default,
+        Guid? referenceId = null);
+
+    /// <summary>
     /// Legacy method - sends a simple reminder notification
     /// </summary>
     [Obsolete("Use SendAsync with NotificationType instead")]

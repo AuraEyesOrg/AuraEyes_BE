@@ -75,4 +75,29 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
             .OrderByDescending(o => o.YearsOfExperience)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyDictionary<Guid, string>> GetDisplayNamesByIdsAsync(
+        IReadOnlyCollection<Guid> ophthalmologistIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (ophthalmologistIds.Count == 0)
+            return new Dictionary<Guid, string>();
+
+        var uniqueIds = ophthalmologistIds.Distinct().ToArray();
+
+        var rows = await (
+            from ophthalmologist in _dbSet
+            join user in _context.Users on ophthalmologist.UserId equals user.Id
+            where uniqueIds.Contains(ophthalmologist.Id) && ophthalmologist.IsVerified && !user.IsDeleted
+            select new
+            {
+                ophthalmologist.Id,
+                user.FullName
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Where(x => !string.IsNullOrWhiteSpace(x.FullName))
+            .ToDictionary(x => x.Id, x => x.FullName);
+    }
 }

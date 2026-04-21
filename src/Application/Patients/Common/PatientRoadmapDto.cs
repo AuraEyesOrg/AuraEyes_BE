@@ -5,6 +5,7 @@ public class PatientRoadmapDto
     public Guid Id { get; set; }
     public Guid PatientId { get; set; }
     public Guid MedicalDiagnosisId { get; set; }
+    public Guid? ScreeningId { get; set; }
     public string RiskLevel { get; set; } = string.Empty;
     public string Summary { get; set; } = string.Empty;
     public IReadOnlyList<string> NextSteps { get; set; } = [];

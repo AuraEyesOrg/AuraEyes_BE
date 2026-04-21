@@ -19,6 +19,7 @@ using Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlots;
 using Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlotStats;
 using Application.Scheduling.AppointmentSlots.Queries.GetAllowedPriceRange;
 using Domain.Enums;
+using Infrastructure.Identity.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -44,7 +45,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Get appointment slots with pagination and filtering.
     /// </summary>
     [HttpGet]
-    [Authorize]
+    [AuthorizePermission(Permissions.AppointmentsRead)]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<AppointmentSlotListDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAppointmentSlots(
         [FromQuery] Guid? scheduleTemplateId = null,
@@ -78,7 +79,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Get a specific appointment slot by ID.
     /// </summary>
     [HttpGet("{slotId:guid}")]
-    [Authorize]
+    [AuthorizePermission(Permissions.AppointmentsRead)]
     [ProducesResponseType(typeof(ApiResponse<AppointmentSlotDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAppointmentSlot(Guid slotId)
@@ -91,7 +92,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Get allowed cost range for an ophthalmologist based on years of experience.
     /// </summary>
     [HttpGet("ophthalmologists/{ophthalmologistId:guid}/pricing-range")]
-    [Authorize]
+    [AuthorizePermission(Permissions.AppointmentsRead)]
     [ProducesResponseType(typeof(ApiResponse<AllowedPriceRangeDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -105,7 +106,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Create a new appointment slot.
     /// </summary>
     [HttpPost]
-    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
+    [AuthorizePermission(Permissions.ApptSlotsManage)]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -137,7 +138,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Get appointment slot statistics by ophthalmologist or organisation.
     /// </summary>
     [HttpGet("stats")]
-    [Authorize]
+    [AuthorizePermission(Permissions.AppointmentsRead)]
     [ProducesResponseType(typeof(ApiResponse<AppointmentSlotStatsDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAppointmentSlotStats(
@@ -158,7 +159,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Update an existing appointment slot.
     /// </summary>
     [HttpPut("{slotId:guid}")]
-    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
+    [AuthorizePermission(Permissions.ApptSlotsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -182,7 +183,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Delete (cancel) an appointment slot.
     /// </summary>
     [HttpDelete("{slotId:guid}")]
-    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
+    [AuthorizePermission(Permissions.ApptSlotsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -197,7 +198,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Book an appointment slot.
     /// </summary>
     [HttpPost("{slotId:guid}/book")]
-    [Authorize]
+    [AuthorizePermission(Permissions.AppointmentsCreate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -220,7 +221,7 @@ public class AppointmentSlotsController : BaseApiController
     /// PatientId is resolved from the authenticated user's profile_id claim.
     /// </summary>
     [HttpPost("book")]
-    [Authorize(Policy = Policies.PatientOnly)]
+    [AuthorizePermission(Permissions.AppointmentsCreate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
@@ -253,7 +254,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Uses row-locking and transaction handling from the ReserveSlotCommand handler.
     /// </summary>
     [HttpPost("reserve")]
-    [Authorize(Policy = Policies.PatientOnly)]
+    [AuthorizePermission(Permissions.AppointmentsCreate)]
     [ProducesResponseType(typeof(ApiResponse<ReserveSlotResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
@@ -289,7 +290,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Requires explicit consent flags for sharing AI results and retinal images with the doctor.
     /// </summary>
     [HttpPost("confirm")]
-    [Authorize(Policy = Policies.PatientOnly)]
+    [AuthorizePermission(Permissions.AppointmentsCreate)]
     [ProducesResponseType(typeof(ApiResponse<ConfirmReservationResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
@@ -332,7 +333,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Release a reserved slot (slotId provided in request body).
     /// </summary>
     [HttpPost("release")]
-    [Authorize(Policy = Policies.PatientOnly)]
+    [AuthorizePermission(Permissions.AppointmentsCreate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
@@ -366,7 +367,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Update appointment slot status.
     /// </summary>
     [HttpPatch("{slotId:guid}/status")]
-    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
+    [AuthorizePermission(Permissions.ApptSlotsManage)]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -386,7 +387,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Update appointment slot cost.
     /// </summary>
     [HttpPatch("{slotId:guid}/cost")]
-    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
+    [AuthorizePermission(Permissions.ApptSlotsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateAppointmentSlotCost(Guid slotId, [FromBody] UpdateAppointmentSlotCostRequest request)
@@ -405,7 +406,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Generate appointment slots from a schedule template for a date range.
     /// </summary>
     [HttpPost("generate")]
-    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
+    [AuthorizePermission(Permissions.ApptSlotsManage)]
     [ProducesResponseType(typeof(ApiResponse<int>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -427,7 +428,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Reserve an appointment slot for a patient (starts reservation timer).
     /// </summary>
     [HttpPost("{slotId:guid}/reserve")]
-    [Authorize(Policy = Policies.PatientOnly)]
+    [AuthorizePermission(Permissions.AppointmentsCreate)]
     [ProducesResponseType(typeof(ApiResponse<ReserveSlotResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -449,7 +450,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Confirm a slot reservation after payment (creates consultation session).
     /// </summary>
     [HttpPost("{slotId:guid}/confirm")]
-    [Authorize(Policy = Policies.PatientOnly)]
+    [AuthorizePermission(Permissions.AppointmentsCreate)]
     [ProducesResponseType(typeof(ApiResponse<ConfirmReservationResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
@@ -473,7 +474,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Release a slot reservation (cancel before payment).
     /// </summary>
     [HttpPost("{slotId:guid}/release")]
-    [Authorize(Policy = Policies.PatientOnly)]
+    [AuthorizePermission(Permissions.AppointmentsCreate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
@@ -495,7 +496,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Block an appointment slot (doctor not available).
     /// </summary>
     [HttpPost("{slotId:guid}/block")]
-    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
+    [AuthorizePermission(Permissions.ApptSlotsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
@@ -518,7 +519,7 @@ public class AppointmentSlotsController : BaseApiController
     /// Unblock an appointment slot (make available again).
     /// </summary>
     [HttpPost("{slotId:guid}/unblock")]
-    [Authorize(Policy = Policies.OphthalmologistOrOrgAdmin)]
+    [AuthorizePermission(Permissions.ApptSlotsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]

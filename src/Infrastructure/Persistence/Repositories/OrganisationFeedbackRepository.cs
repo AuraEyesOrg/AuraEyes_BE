@@ -20,6 +20,24 @@ public class OrganisationFeedbackRepository : Repository<OrganisationFeedback>, 
             cancellationToken);
     }
 
+    public async Task<IReadOnlySet<Guid>> GetAppointmentIdsWithFeedbackAsync(
+        Guid patientId,
+        IReadOnlyCollection<Guid> appointmentIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (appointmentIds is null || appointmentIds.Count == 0)
+            return new HashSet<Guid>();
+
+        var distinctIds = appointmentIds.Distinct().ToArray();
+
+        var existing = await _dbSet
+            .Where(x => x.PatientId == patientId && distinctIds.Contains(x.AppointmentId))
+            .Select(x => x.AppointmentId)
+            .ToListAsync(cancellationToken);
+
+        return new HashSet<Guid>(existing);
+    }
+
     public async Task<OrganisationFeedback?> GetByIdForOrganisationAsync(
         Guid organisationId,
         Guid feedbackId,

@@ -5,6 +5,7 @@ using Application.SystemAdmin.AiModels.Queries.GetModelVersions;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Infrastructure.Identity.Authorization;
 
 namespace API.Controllers.SystemAdmin;
 
@@ -14,7 +15,7 @@ namespace API.Controllers.SystemAdmin;
 /// Note: AI model management is not yet implemented - these are placeholder endpoints
 /// </summary>
 [Route("api/system-admin/ai-models")]
-[Authorize(Policy = Policies.SystemAdminOnly)]
+[AuthorizePermission(Permissions.AiModelsRead)]
 public class AiModelsController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -66,6 +67,7 @@ public class AiModelsController : BaseApiController
     /// Note: Mock implementation - AI model management not yet implemented
     /// </remarks>
     [HttpPost("{id:guid}/promote")]
+    [AuthorizePermission(Permissions.AiModelsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public IActionResult PromoteModel(Guid id, [FromBody] PromoteModelRequest request)
@@ -83,6 +85,7 @@ public class AiModelsController : BaseApiController
     /// Note: Mock implementation - AI model management not yet implemented
     /// </remarks>
     [HttpPost]
+    [AuthorizePermission(Permissions.AiModelsManage)]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public IActionResult DeployModel([FromBody] DeployModelRequest request)

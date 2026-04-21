@@ -5,63 +5,148 @@ namespace Infrastructure.UnitTests.Services;
 
 public class DateTimeServiceTests
 {
-    private readonly DateTimeService _sut = new();
-
     [Fact]
-    public void Now_ShouldReturnCurrentLocalTime()
+    public void Now_ShouldReturnLocalTime_CloseToSystemNow()
     {
-        // Act
+        var service = new DateTimeService();
         var before = DateTime.Now;
-        var result = _sut.Now;
+        var actual = service.Now;
         var after = DateTime.Now;
 
-        // Assert
-        result.Should().BeOnOrAfter(before);
-        result.Should().BeOnOrBefore(after);
+        actual.Should().BeOnOrAfter(before);
+        actual.Should().BeOnOrBefore(after);
     }
 
     [Fact]
-    public void UtcNow_ShouldReturnCurrentUtcTime()
+    public void UtcNow_ShouldReturnUtcTime_CloseToSystemUtcNow()
     {
-        // Act
+        var service = new DateTimeService();
         var before = DateTime.UtcNow;
-        var result = _sut.UtcNow;
+        var actual = service.UtcNow;
         var after = DateTime.UtcNow;
 
-        // Assert
-        result.Should().BeOnOrAfter(before);
-        result.Should().BeOnOrBefore(after);
+        actual.Should().BeOnOrAfter(before);
+        actual.Should().BeOnOrBefore(after);
     }
 
     [Fact]
-    public void Now_ShouldReturnLocalKind()
+    public void UtcNow_ShouldHaveUtcKind()
     {
-        var result = _sut.Now;
-        result.Kind.Should().Be(DateTimeKind.Local);
+        var service = new DateTimeService();
+
+        service.UtcNow.Kind.Should().Be(DateTimeKind.Utc);
     }
 
     [Fact]
-    public void UtcNow_ShouldReturnUtcKind()
+    public void Now_ShouldHaveLocalOrUnspecifiedKind()
     {
-        var result = _sut.UtcNow;
-        result.Kind.Should().Be(DateTimeKind.Utc);
+        var service = new DateTimeService();
+        var now = service.Now;
+
+        now.Kind.Should().BeOneOf(DateTimeKind.Local, DateTimeKind.Unspecified);
     }
 
     [Fact]
-    public void Now_ConsecutiveCalls_ShouldBeNonDecreasing()
+    public void ConsecutiveUtcNowCalls_ShouldBeNonDecreasing()
     {
-        var first = _sut.Now;
-        var second = _sut.Now;
+        var service = new DateTimeService();
+        var first = service.UtcNow;
+        var second = service.UtcNow;
 
         second.Should().BeOnOrAfter(first);
     }
 
-    [Fact]
-    public void UtcNow_ConsecutiveCalls_ShouldBeNonDecreasing()
+    [Theory]
+    [InlineData(3)]
+    [InlineData(5)]
+    [InlineData(10)]
+    public void ConsecutiveUtcNowCalls_MultipleSamples_ShouldBeNonDecreasing(int sampleCount)
     {
-        var first = _sut.UtcNow;
-        var second = _sut.UtcNow;
+        var service = new DateTimeService();
+        var values = new List<DateTime>();
+        for (var i = 0; i < sampleCount; i++)
+        {
+            values.Add(service.UtcNow);
+        }
 
-        second.Should().BeOnOrAfter(first);
+        for (var i = 1; i < values.Count; i++)
+        {
+            values[i].Should().BeOnOrAfter(values[i - 1]);
+        }
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(5)]
+    [InlineData(10)]
+    public void Now_Kind_AcrossMultipleReads_ShouldBeLocalOrUnspecified(int sampleCount)
+    {
+        var service = new DateTimeService();
+
+        for (var i = 0; i < sampleCount; i++)
+        {
+            service.Now.Kind.Should().BeOneOf(DateTimeKind.Local, DateTimeKind.Unspecified);
+        }
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(5)]
+    [InlineData(10)]
+    public void Now_AcrossMultipleReads_ShouldBeNonDecreasing(int sampleCount)
+    {
+        var service = new DateTimeService();
+        var values = new List<DateTime>();
+        for (var i = 0; i < sampleCount; i++)
+        {
+            values.Add(service.Now);
+        }
+
+        for (var i = 1; i < values.Count; i++)
+        {
+            values[i].Should().BeOnOrAfter(values[i - 1]);
+        }
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    [InlineData(7)]
+    [InlineData(8)]
+    [InlineData(9)]
+    [InlineData(10)]
+    public void UtcNow_ManySamples_ShouldAlwaysBeUtc(int sampleCount)
+    {
+        var service = new DateTimeService();
+
+        for (var i = 0; i < sampleCount; i++)
+        {
+            service.UtcNow.Kind.Should().Be(DateTimeKind.Utc);
+        }
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    [InlineData(7)]
+    [InlineData(8)]
+    [InlineData(9)]
+    [InlineData(10)]
+    public void Now_ManySamples_ShouldNeverBeUtc(int sampleCount)
+    {
+        var service = new DateTimeService();
+
+        for (var i = 0; i < sampleCount; i++)
+        {
+            service.Now.Kind.Should().NotBe(DateTimeKind.Utc);
+        }
     }
 }

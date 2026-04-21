@@ -185,6 +185,12 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
                 .FirstOrDefaultAsync(cancellationToken);
         }
 
+        var latestDiagnosis = await _context.Set<MedicalDiagnosis>()
+            .AsNoTracking()
+            .Where(d => d.DoctorId == ophthalmologistProfileId && d.AiScreeningId == screeningId)
+            .OrderByDescending(d => d.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
         var screening = row.Screening;
         return new OphthalmologistScreeningDetailReadModel
         {
@@ -199,7 +205,8 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
             // Only include images if consent given
             Images = images,
             // Only include results if consent given
-            LatestResult = latest
+            LatestResult = latest,
+            ReviewStatus = MapReviewStatus(latestDiagnosis)
         };
     }
 

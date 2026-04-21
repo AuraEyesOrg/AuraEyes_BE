@@ -14,6 +14,7 @@ using Application.Wallets.Queries.GetWallet;
 using Application.Wallets.Queries.GetWalletTransactions;
 using Application.Common.Constants;
 using Domain.Enums;
+using Infrastructure.Identity.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -24,6 +25,7 @@ namespace API.Controllers;
 /// Wallet management endpoints.
 /// Provides wallet operations including deposits via PayOS.
 /// </summary>
+[AuthorizePermission(Permissions.WalletsRead)]
 public class WalletsController : BaseApiController
 {
     private readonly IMediator _mediator;
@@ -45,7 +47,7 @@ public class WalletsController : BaseApiController
     /// </summary>
     /// <returns>Wallet details including balance.</returns>
     [HttpGet]
-    [Authorize]
+    [AuthorizePermission(Permissions.WalletsRead)]
     [ProducesResponseType(typeof(ApiResponse<WalletDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetWallet()
@@ -67,7 +69,7 @@ public class WalletsController : BaseApiController
     /// <param name="pageSize">Page size (default: 20).</param>
     /// <returns>Paginated list of wallet transactions.</returns>
     [HttpGet("transactions")]
-    [Authorize]
+    [AuthorizePermission(Permissions.WalletsHistory)]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<WalletTransactionDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetTransactions(
@@ -98,7 +100,7 @@ public class WalletsController : BaseApiController
     /// <param name="pageSize">Page size (default: 20).</param>
     /// <returns>Paginated list of deposit requests.</returns>
     [HttpGet("deposits")]
-    [Authorize]
+    [AuthorizePermission(Permissions.WalletsHistory)]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<DepositRequestDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetDepositHistory(
@@ -128,7 +130,7 @@ public class WalletsController : BaseApiController
     /// <param name="id">Deposit request ID.</param>
     /// <returns>Deposit request details.</returns>
     [HttpGet("deposits/{id:guid}")]
-    [Authorize]
+    [AuthorizePermission(Permissions.WalletsHistory)]
     [ProducesResponseType(typeof(ApiResponse<DepositRequestDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
@@ -157,7 +159,7 @@ public class WalletsController : BaseApiController
     /// <param name="request">Deposit request details.</param>
     /// <returns>Payment link and deposit request information.</returns>
     [HttpPost("deposit")]
-    [Authorize]
+    [AuthorizePermission(Permissions.WalletsDeposit)]
     [ProducesResponseType(typeof(ApiResponse<CreateDepositResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
@@ -195,7 +197,7 @@ public class WalletsController : BaseApiController
     /// <param name="request">Verify payment request.</param>
     /// <returns>Payment verification result.</returns>
     [HttpPost("verify-payment")]
-    [Authorize]
+    [AuthorizePermission(Permissions.WalletsDeposit)]
     [ProducesResponseType(typeof(ApiResponse<VerifyPaymentResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
@@ -222,7 +224,7 @@ public class WalletsController : BaseApiController
     /// BankBin là mã ngân hàng PayOS (ví dụ: 970415 = Vietinbank), cần thiết để chi tự động.
     /// </summary>
     [HttpPost("withdraw-requests")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [AuthorizePermission(Permissions.WalletsWithdraw)]
     [ProducesResponseType(typeof(ApiResponse<WithdrawalRequestDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
@@ -254,7 +256,7 @@ public class WalletsController : BaseApiController
     /// Get current ophthalmologist withdrawal requests.
     /// </summary>
     [HttpGet("withdraw-requests")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [AuthorizePermission(Permissions.WalletsWithdraw)]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<WithdrawalRequestDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetWithdrawalRequests(
@@ -281,7 +283,7 @@ public class WalletsController : BaseApiController
     /// [Ophthalmologist] Lấy trạng thái lệnh chi PayOS của một withdrawal request.
     /// </summary>
     [HttpGet("withdraw-requests/{id:guid}/payout-status")]
-    [Authorize]
+    [AuthorizePermission(Permissions.WalletsWithdraw)]
     [ProducesResponseType(typeof(ApiResponse<PayoutStatusResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
@@ -306,6 +308,7 @@ public class WalletsController : BaseApiController
     /// <param name="orderCode">PayOS order code.</param>
     /// <returns>Payment status information.</returns>
     [HttpGet("payment-status/{orderCode}")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<VerifyPaymentResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -327,6 +330,7 @@ public class WalletsController : BaseApiController
     /// <param name="request">PayOS webhook payload.</param>
     /// <returns>Acknowledgment response.</returns>
     [HttpPost("webhook/payos")]
+    [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> PayOSWebhook([FromBody] PayOSWebhookRequest request)
     {

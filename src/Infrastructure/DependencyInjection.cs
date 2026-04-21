@@ -3,6 +3,7 @@ using Application.AiQuota.Interfaces;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.OrganisationScreenings.Interfaces;
+using Application.Screenings.Interfaces;
 using Application.Scheduling.ScheduleTemplates.Interfaces;
 using Application.SystemAdmin.Ophthalmologists.Interfaces;
 using Application.SystemAdmin.Interfaces;
@@ -23,6 +24,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authorization;
+using Infrastructure.Identity.Authorization;
+
 
 namespace Infrastructure;
 
@@ -58,10 +62,16 @@ public static class DependencyInjection
         // SMTP Settings
         services.Configure<SmtpSettings>(configuration.GetSection(SmtpSettings.SectionName));
 
+        // Rate Limiting Settings
+        services.Configure<RateLimitingSettings>(configuration.GetSection(RateLimitingSettings.SectionName));
+
         // Admin notification settings
         services.Configure<AdminNotificationSettings>(configuration.GetSection(AdminNotificationSettings.SectionName));
 
-        // Supabase Storage Settings
+        // Cloudinary Settings
+        services.Configure<CloudinarySettings>(configuration.GetSection(CloudinarySettings.SectionName));
+
+        // Supabase Storage Settings (Keep for potential legacy needs)
         services.Configure<SupabaseStorageSettings>(configuration.GetSection(SupabaseStorageSettings.SectionName));
 
         // Google Meet Settings
@@ -151,7 +161,7 @@ public static class DependencyInjection
         });
 
         // Configure Authorization Policies
-        services.AddAuthorizationBuilder()
+        var authBuilder = services.AddAuthorizationBuilder()
             .AddPolicy(Policies.Authenticated, policy => policy.RequireAuthenticatedUser())
             .AddPolicy(Policies.PatientOnly, policy => policy.RequireRole(Roles.Patient))
             .AddPolicy(Policies.OphthalmologistOnly, policy => policy.RequireRole(Roles.Ophthalmologist))
@@ -169,6 +179,19 @@ public static class DependencyInjection
             .AddPolicy(Policies.OrganizationMember, policy =>
                 policy.RequireAssertion(context =>
                     context.User.HasClaim(c => c.Type == "org_id" && !string.IsNullOrEmpty(c.Value))));
+
+        // Register Permission-based policies dynamically from Permissions constant class
+        foreach (var prop in typeof(Permissions).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.FlattenHierarchy))
+        {
+            if (prop.IsLiteral && !prop.IsInitOnly && prop.FieldType == typeof(string))
+            {
+                var permissionValue = (string)prop.GetValue(null)!;
+                authBuilder.AddPolicy(permissionValue, policy => 
+                    policy.Requirements.Add(new PermissionRequirement(permissionValue)));
+            }
+        }
+
+        services.AddScoped<IAuthorizationHandler, PermissionHandler>();
 
         // Register repositories
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
@@ -203,7 +226,7 @@ public static class DependencyInjection
         services.AddTransient<IDateTime, DateTimeService>();
         services.AddTransient<IEmailService, EmailService>();
         services.AddScoped<IOrganisationOnboardingService, OrganisationOnboardingService>();
-        services.AddScoped<IFileStorageService, SupabaseStorageService>();
+        services.AddScoped<IFileStorageService, CloudinaryStorageService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IGoogleMeetService, GoogleMeetService>();
         services.AddScoped<IPatientRoadmapGenerationService, PatientRoadmapGenerationService>();
@@ -212,7 +235,7 @@ public static class DependencyInjection
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
         services.AddScoped<ISystemSettingService, SystemSettingService>();
         services.AddScoped<IOrganisationScreeningPdfService, OrganisationScreeningPdfService>();
-        services.AddScoped<IFullTimeTemplateProvisioningService, FullTimeTemplateProvisioningService>();
+        services.AddScoped<IPatientScreeningPdfService, PatientScreeningPdfService>();
         services.AddScoped<IOphthalmologistContractProvisioningService, OphthalmologistContractProvisioningService>();
         services.AddSingleton<IAiAssetBaseUrlProvider, AiAssetBaseUrlProvider>();
         services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();
@@ -228,6 +251,7 @@ public static class DependencyInjection
         services.AddScoped<MonthlyQuotaResetJob>();
         services.AddScoped<SlotMaintenanceJob>();
         services.AddScoped<FullTimeSlotGenerationJob>();
+        services.AddScoped<MonthlySalaryJob>();
 
         // Configure PayOS Settings
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));

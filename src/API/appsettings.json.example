@@ -40,6 +40,17 @@
     "ServerEnabled": true,
     "WorkerCount": 1
   },
+  "RateLimiting": {
+    "ReadPermitLimit": 240,
+    "ReadWindowSeconds": 60,
+    "ReadQueueLimit": 0,
+    "WritePermitLimit": 80,
+    "WriteWindowSeconds": 60,
+    "WriteQueueLimit": 0,
+    "SensitivePermitLimit": 20,
+    "SensitiveWindowSeconds": 60,
+    "SensitiveQueueLimit": 0
+  },
   "BetterStack": {
     "Dashboard": {
       "EmbedUrl": ""
