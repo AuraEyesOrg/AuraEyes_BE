@@ -165,8 +165,14 @@ public class Appointment : BaseEntity, IAggregateRoot
 
     /// <summary>
     /// Check in the patient at the clinic (for CLINIC_VISIT).
+    /// Validates slot time window: patient can only check-in from
+    /// (<paramref name="slotStartUtc"/> - <paramref name="earlyWindow"/>) up to <paramref name="slotEndUtc"/>.
     /// </summary>
-    public void CheckIn()
+    /// <param name="nowUtc">Current time (UTC).</param>
+    /// <param name="slotStartUtc">Slot start moment in UTC.</param>
+    /// <param name="slotEndUtc">Slot end moment in UTC.</param>
+    /// <param name="earlyWindow">How early a patient may check in before <paramref name="slotStartUtc"/>.</param>
+    public void CheckIn(DateTime nowUtc, DateTime slotStartUtc, DateTime slotEndUtc, TimeSpan earlyWindow)
     {
         if (Type != AppointmentType.ClinicVisit)
             throw new InvalidOperationException("Check-in is only applicable to clinic visits.");
@@ -174,9 +180,25 @@ public class Appointment : BaseEntity, IAggregateRoot
         if (Status != AppointmentStatus.Pending && Status != AppointmentStatus.Confirmed)
             throw new InvalidOperationException($"Cannot check in appointment with status {Status}.");
 
+        if (earlyWindow < TimeSpan.Zero)
+            throw new ArgumentException("Early window cannot be negative.", nameof(earlyWindow));
+
+        var earliestAllowed = slotStartUtc - earlyWindow;
+        if (nowUtc < earliestAllowed)
+        {
+            throw new InvalidOperationException(
+                $"Check-in is only allowed from {earliestAllowed:u} (slot starts at {slotStartUtc:u}).");
+        }
+
+        if (nowUtc > slotEndUtc)
+        {
+            throw new InvalidOperationException(
+                $"Slot already ended at {slotEndUtc:u}. Mark as no-show or cancel instead.");
+        }
+
         Status = AppointmentStatus.CheckedIn;
-        CheckedInAt = DateTime.UtcNow;
-        UpdatedAt = DateTime.UtcNow;
+        CheckedInAt = nowUtc;
+        UpdatedAt = nowUtc;
     }
 
     /// <summary>

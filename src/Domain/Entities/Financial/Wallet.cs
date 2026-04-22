@@ -4,10 +4,19 @@ namespace Domain.Entities.Financial;
 
 /// <summary>
 /// Wallet entity - digital wallet for any actor in the system.
-/// OwnerType distinguishes Patient | Ophthalmologist | Organisation | System wallets.
+/// OwnerType distinguishes Patient | Ophthalmologist | Organisation | System | Escrow wallets.
 /// </summary>
 public class Wallet : BaseEntity, IAggregateRoot
 {
+    /// <summary>OwnerType for the platform escrow wallet (holds booking funds until capture or refund).</summary>
+    public const string OwnerTypeEscrow = "Escrow";
+
+    /// <summary>OwnerType for the System-Admin commission wallet (holds platform commission for review).</summary>
+    public const string OwnerTypeSystem = "System";
+
+    /// <summary>Sentinel UserId used to anchor the system-owned Escrow wallet (no real user).</summary>
+    public static readonly Guid EscrowSentinelUserId = new("11111111-1111-1111-1111-111111111111");
+
     public Guid UserId { get; private set; }
 
     /// <summary>"Patient" | "Ophthalmologist" | "Organisation" | "System"</summary>

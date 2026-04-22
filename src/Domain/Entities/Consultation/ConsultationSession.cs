@@ -154,6 +154,28 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// Business rule: determines whether the doctor can finalize (send) the diagnosis report.
+    /// - <see cref="ConsultationSessionType.Verification"/>: always allowed (no schedule).
+    /// - <see cref="ConsultationSessionType.VideoCall"/>: only when <paramref name="nowUtc"/> has reached
+    ///   <see cref="AppointmentTime"/> (a small <paramref name="earlyGrace"/> tolerance can be configured).
+    /// - Other types cannot submit reports.
+    /// </summary>
+    public bool CanSubmitReport(DateTime nowUtc, TimeSpan? earlyGrace = null)
+    {
+        if (Type == ConsultationSessionType.Verification)
+            return true;
+
+        if (Type != ConsultationSessionType.VideoCall)
+            return false;
+
+        if (!AppointmentTime.HasValue)
+            return true;
+
+        var grace = earlyGrace ?? TimeSpan.Zero;
+        return nowUtc >= AppointmentTime.Value - grace;
+    }
+
     public void SetMeetingInfo(string meetingLink, string? calendarEventId = null)
     {
         if (string.IsNullOrWhiteSpace(meetingLink))
