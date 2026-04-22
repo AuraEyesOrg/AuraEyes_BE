@@ -104,6 +104,8 @@ public class WalletRepository : Repository<Wallet>, IWalletRepository
     public async Task<(IReadOnlyList<(WalletTransaction Transaction, Wallet Wallet)> Items, int TotalCount)> GetCashflowTransactionsPagedAsync(
         string? ownerType = null,
         string? searchTerm = null,
+        string? sortBy = null,
+        string? sortDirection = null,
         int pageNumber = 1,
         int pageSize = 20,
         CancellationToken cancellationToken = default)
@@ -130,8 +132,22 @@ public class WalletRepository : Repository<Wallet>, IWalletRepository
 
         var totalCount = await query.CountAsync(cancellationToken);
 
+        bool isDescending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+
+        if (string.Equals(sortBy, "amount", StringComparison.OrdinalIgnoreCase))
+        {
+            query = isDescending ? query.OrderByDescending(x => x.transaction.Amount) : query.OrderBy(x => x.transaction.Amount);
+        }
+        else if (string.Equals(sortBy, "createdAt", StringComparison.OrdinalIgnoreCase))
+        {
+            query = isDescending ? query.OrderByDescending(x => x.transaction.CreatedAt) : query.OrderBy(x => x.transaction.CreatedAt);
+        }
+        else
+        {
+            query = query.OrderByDescending(x => x.transaction.CreatedAt);
+        }
+
         var rows = await query
-            .OrderByDescending(x => x.transaction.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);

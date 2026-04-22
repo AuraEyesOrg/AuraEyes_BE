@@ -47,6 +47,8 @@ public class GetCashflowTransactionsQueryHandler : IQueryHandler<GetCashflowTran
         var (items, totalCount) = await _walletRepository.GetCashflowTransactionsPagedAsync(
             normalizedActorRole,
             request.SearchTerm,
+            request.SortBy,
+            request.SortDirection,
             pageNumber,
             pageSize,
             cancellationToken);

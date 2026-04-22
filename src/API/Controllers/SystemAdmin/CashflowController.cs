@@ -25,6 +25,8 @@ public class CashflowController : BaseApiController
         [FromQuery] string? actorRole = null,
         [FromQuery] string? status = null,
         [FromQuery] string? searchTerm = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortDirection = null,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 20)
     {
@@ -33,6 +35,8 @@ public class CashflowController : BaseApiController
             ActorRole = actorRole,
             Status = status,
             SearchTerm = searchTerm,
+            SortBy = sortBy,
+            SortDirection = sortDirection,
             PageNumber = pageNumber,
             PageSize = pageSize,
         };
