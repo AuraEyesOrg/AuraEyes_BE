@@ -85,4 +85,9 @@ public interface IWalletRepository : IRepository<Wallet>
         int pageNumber = 1,
         int pageSize = 20,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Check if a salary transaction has already been processed for a user in a given month.
+    /// </summary>
+    Task<bool> HasSalaryBeenPaidAsync(Guid userId, int year, int month, CancellationToken cancellationToken = default);
 }

@@ -11,6 +11,13 @@ public class ConsultationSessionConfiguration : IEntityTypeConfiguration<Consult
 {
     public void Configure(EntityTypeBuilder<ConsultationSession> builder)
     {
+        builder.ToTable("ConsultationSessions", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_ConsultationSessions_EndTime_After_StartTime",
+                "\"StartTime\" IS NULL OR \"EndTime\" IS NULL OR \"EndTime\" >= \"StartTime\"");
+        });
+
         builder.HasKey(e => e.Id);
 
         builder.Property(e => e.Type)
@@ -52,6 +59,12 @@ public class ConsultationSessionConfiguration : IEntityTypeConfiguration<Consult
         builder.Property(e => e.LastReminderSentAt)
             .IsRequired(false);
 
+        builder.Property(e => e.StartTime)
+            .IsRequired(false);
+
+        builder.Property(e => e.EndTime)
+            .IsRequired(false);
+
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
@@ -85,6 +98,8 @@ public class ConsultationSessionConfiguration : IEntityTypeConfiguration<Consult
         builder.HasIndex(e => e.PatientId);
         builder.HasIndex(e => e.OphthalmologistId);
         builder.HasIndex(e => e.AppointmentSlotId);
+        builder.HasIndex(e => new { e.OphthalmologistId, e.Status, e.StartTime, e.EndTime })
+            .HasDatabaseName("IX_ConsultationSessions_WorkloadLookup");
         builder.HasIndex(e => new { e.Status, e.ChatStatus, e.LastActivityAt, e.LastReminderSentAt })
             .HasDatabaseName("IX_ConsultationSessions_StaleSessionLookup");
     }

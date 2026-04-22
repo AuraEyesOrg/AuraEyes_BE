@@ -35,13 +35,50 @@ public class FullTimeSlotGenerationJob
 
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
+        await ExecuteInternalAsync(null, cancellationToken);
+    }
+
+    public async Task ExecuteForOphthalmologistAsync(
+        Guid ophthalmologistId,
+        CancellationToken cancellationToken = default)
+    {
+        if (ophthalmologistId == Guid.Empty)
+        {
+            throw new ArgumentException("Ophthalmologist ID is required.", nameof(ophthalmologistId));
+        }
+
+        await ExecuteInternalAsync(new[] { ophthalmologistId }, cancellationToken);
+    }
+
+    private async Task ExecuteInternalAsync(
+        IReadOnlyCollection<Guid>? targetOphthalmologistIds,
+        CancellationToken cancellationToken)
+    {
         var windowDays = await GetWindowDaysAsync(cancellationToken);
         var fromDate = DateOnly.FromDateTime(DateTime.UtcNow);
         var toDate = fromDate.AddDays(windowDays - 1);
 
-        var fullTimeOphthalmologists = await _context.Ophthalmologists
-            .Where(ophthal => ophthal.EmploymentType == OphthalmologistEmploymentType.FullTime)
-            .ToListAsync(cancellationToken);
+        IQueryable<Domain.Entities.Users.Ophthalmologist> ophthalmologistQuery = _context.Ophthalmologists
+            .Where(ophthal => ophthal.EmploymentType == OphthalmologistEmploymentType.FullTime);
+
+        if (targetOphthalmologistIds is { Count: > 0 })
+        {
+            ophthalmologistQuery = ophthalmologistQuery
+                .Where(ophthal => targetOphthalmologistIds.Contains(ophthal.Id));
+        }
+
+        var fullTimeOphthalmologists = await ophthalmologistQuery.ToListAsync(cancellationToken);
+
+        if (fullTimeOphthalmologists.Count == 0)
+        {
+            _logger.LogInformation(
+                "No full-time ophthalmologists matched slot generation scope. Targeted={IsTargeted}, RequestedDoctorCount={RequestedDoctorCount}",
+                targetOphthalmologistIds is { Count: > 0 },
+                targetOphthalmologistIds?.Count ?? 0);
+            return;
+        }
+
+        var matchedDoctorIds = fullTimeOphthalmologists.Select(ophthal => ophthal.Id).ToArray();
 
         var templatesEnsured = 0;
         foreach (var ophthalmologist in fullTimeOphthalmologists)
@@ -51,21 +88,30 @@ public class FullTimeSlotGenerationJob
         }
 
         _logger.LogInformation(
-            "Starting full-time slot rolling-window generation. FromDate={FromDate}, ToDate={ToDate}, WindowDays={WindowDays}, TemplatesEnsured={TemplatesEnsured}",
+            "Starting full-time slot rolling-window generation. FromDate={FromDate}, ToDate={ToDate}, WindowDays={WindowDays}, TemplatesEnsured={TemplatesEnsured}, Targeted={IsTargeted}, DoctorCount={DoctorCount}",
             fromDate,
             toDate,
             windowDays,
-            templatesEnsured);
+            templatesEnsured,
+            targetOphthalmologistIds is { Count: > 0 },
+            fullTimeOphthalmologists.Count);
 
-        var templates = await (
+        var templatesQuery =
             from template in _context.ScheduleTemplates
             where template.OphthalId.HasValue
             join ophthal in _context.Ophthalmologists on template.OphthalId!.Value equals ophthal.Id
             where template.Source == ScheduleTemplateSource.SystemGenerated
                 && template.IsActive
-                  && ophthal.EmploymentType == OphthalmologistEmploymentType.FullTime
-            select template)
-            .ToListAsync(cancellationToken);
+                && ophthal.EmploymentType == OphthalmologistEmploymentType.FullTime
+            select template;
+
+        if (targetOphthalmologistIds is { Count: > 0 })
+        {
+            templatesQuery = templatesQuery.Where(template =>
+                template.OphthalId.HasValue && matchedDoctorIds.Contains(template.OphthalId.Value));
+        }
+
+        var templates = await templatesQuery.ToListAsync(cancellationToken);
 
         var createdSlots = 0;
         var skippedInvalidTemplates = 0;
@@ -73,6 +119,7 @@ public class FullTimeSlotGenerationJob
         var approvedLeaveRangesByDoctor = await _context.OphthalmologistLeaveRequests
             .Where(x => x.Status == OphthalmologistLeaveRequestStatus.Approved)
             .Where(x => x.StartDate <= toDate && x.EndDate >= fromDate)
+            .Where(x => targetOphthalmologistIds == null || matchedDoctorIds.Contains(x.OphthalmologistId))
             .Select(x => new
             {
                 x.OphthalmologistId,
@@ -171,11 +218,13 @@ public class FullTimeSlotGenerationJob
         }
 
         _logger.LogInformation(
-            "Completed full-time slot rolling-window generation. Templates={TemplateCount}, TemplatesEnsured={TemplatesEnsured}, SlotsCreated={SlotsCreated}, SkippedInvalidTemplates={SkippedInvalidTemplates}",
+            "Completed full-time slot rolling-window generation. Templates={TemplateCount}, TemplatesEnsured={TemplatesEnsured}, SlotsCreated={SlotsCreated}, SkippedInvalidTemplates={SkippedInvalidTemplates}, Targeted={IsTargeted}, DoctorCount={DoctorCount}",
             templates.Count,
             templatesEnsured,
             createdSlots,
-            skippedInvalidTemplates);
+            skippedInvalidTemplates,
+            targetOphthalmologistIds is { Count: > 0 },
+            fullTimeOphthalmologists.Count);
     }
 
     /// <summary>

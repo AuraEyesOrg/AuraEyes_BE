@@ -955,7 +955,9 @@ public class IdentityService : IIdentityService
         }
 
         // 3. Ensure all permissions from the code constants exist / update metadata
-        var existingPermissions = await _context.Permissions.ToListAsync(cancellationToken);
+        var existingPermissions = await _context.Permissions
+            .IgnoreQueryFilters()
+            .ToListAsync(cancellationToken);
 
         foreach (var def in allPermissionDefinitions)
         {
@@ -970,15 +972,22 @@ public class IdentityService : IIdentityService
             }
             else
             {
-                // Update metadata if changed (DisplayName, etc.)
+                // Update metadata and RESTORE if it was soft-deleted
                 existing.Update(def.DisplayName, def.Description, def.Category);
+                
+                if (existing.IsDeleted)
+                {
+                    existing.GetType().GetProperty("IsDeleted")?.SetValue(existing, false);
+                }
             }
         }
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        // Refresh list after insertion
-        var permissions = await _context.Permissions.ToListAsync(cancellationToken);
+        // Refresh list after insertion (including restored ones)
+        var permissions = await _context.Permissions
+            .IgnoreQueryFilters()
+            .ToListAsync(cancellationToken);
 
         // 4. Synchronize Role Permissions (Reset each role to match code)
         foreach (var entry in Application.Common.Constants.Permissions.DefaultRolePermissions)
@@ -989,37 +998,45 @@ public class IdentityService : IIdentityService
             var role = await _roleManager.FindByNameAsync(roleName);
             if (role == null) continue;
 
-            // Get current assignments for this role using join
-            var currentRolePermData = await (from rp in _context.RolePermissions
-                                            join p in _context.Permissions on rp.PermissionId equals p.Id
-                                            where rp.RoleId == role.Id
-                                            select new { RolePermissionId = rp.Id, PermissionName = p.Name })
-                                           .ToListAsync(cancellationToken);
+            // Get ALL current assignments for this role (including deleted ones)
+            var currentRolePermData = await _context.RolePermissions
+                .IgnoreQueryFilters()
+                .Where(rp => rp.RoleId == role.Id)
+                .Join(_context.Permissions.IgnoreQueryFilters(), 
+                    rp => rp.PermissionId, 
+                    p => p.Id, 
+                    (rp, p) => new { RolePermission = rp, PermissionName = p.Name })
+                .ToListAsync(cancellationToken);
 
-            // Remove assignments that shouldn't be there
-            var toRemoveIds = currentRolePermData
-                .Where(x => !expectedPermissionNames.Contains(x.PermissionName))
-                .Select(x => x.RolePermissionId)
+            // Remove assignments from DB that aren't in code
+            var expectedSet = new HashSet<string>(expectedPermissionNames, StringComparer.OrdinalIgnoreCase);
+            var toRemove = currentRolePermData
+                .Where(x => !x.RolePermission.IsDeleted && !expectedSet.Contains(x.PermissionName))
+                .Select(x => x.RolePermission)
                 .ToList();
 
-            if (toRemoveIds.Any())
+            if (toRemove.Any())
             {
-                var toRemoveEntities = await _context.RolePermissions
-                    .Where(rp => toRemoveIds.Contains(rp.Id))
-                    .ToListAsync(cancellationToken);
-                _context.RolePermissions.RemoveRange(toRemoveEntities);
+                _context.RolePermissions.RemoveRange(toRemove);
             }
 
-            // Add missing assignments
+            // Restore or Add expected assignments
             foreach (var permName in expectedPermissionNames)
             {
-                if (!currentRolePermData.Any(x => x.PermissionName == permName))
+                var existingMapping = currentRolePermData.FirstOrDefault(x => x.PermissionName == permName);
+                
+                if (existingMapping == null)
                 {
                     var permission = permissions.FirstOrDefault(p => p.Name == permName);
                     if (permission != null)
                     {
                         _context.RolePermissions.Add(new Domain.Entities.Authorization.RolePermission(role.Id, permission.Id));
                     }
+                }
+                else if (existingMapping.RolePermission.IsDeleted)
+                {
+                    // Restore soft-deleted mapping
+                    existingMapping.RolePermission.GetType().GetProperty("IsDeleted")?.SetValue(existingMapping.RolePermission, false);
                 }
             }
         }

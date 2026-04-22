@@ -225,14 +225,15 @@ public static class Permissions
         [Roles.OrgAdmin] =
         [
             UsersRead,
-            PatientsRead, PatientsUpdate,
+            PatientsRead, PatientsCreate, PatientsUpdate,
             OphthalmologistsRead, OphthalmologistsCreate, OphthalmologistsUpdate, OphthalmologistsDelete,
             OrganisationsRead, OrganisationsUpdate,
-            ScreeningRead,
-            ConsultationsRead, ConsultationsUpdate,
-            AppointmentsRead, AppointmentsManage,
+            ScreeningRead, ScreeningCreate, ScreeningApprove,
+            ConsultationsRead, ConsultationsCreate, ConsultationsUpdate,
+            AppointmentsRead, AppointmentsCreate, AppointmentsManage,
+            ApptSlotsManage,
             QuotasRead, QuotasBuy,
-            WalletsRead, WalletsHistory,
+            WalletsRead, WalletsHistory, WalletsWithdraw,
             ContractsRead,
             SettingsRead, SettingsManage,
             DashboardRead,
@@ -240,12 +241,16 @@ public static class Permissions
 
         [Roles.Ophthalmologist] =
         [
-            PatientsRead,
-            ScreeningRead, ScreeningApprove,
-            ConsultationsRead, ConsultationsUpdate,
-            AppointmentsRead,
+            DashboardRead,
+            PatientsRead, PatientsUpdate, PatientsCreate,
+            OphthalmologistsUpdate,
+            ScreeningRead, ScreeningCreate, ScreeningApprove,
+            ConsultationsRead, ConsultationsCreate, ConsultationsUpdate,
+            AppointmentsRead, AppointmentsCreate,
             SchedulesManage, ApptSlotsManage,
+            ContractsRead,
             WalletsRead, WalletsWithdraw, WalletsHistory,
+            SettingsRead,
         ],
 
         [Roles.Patient] =
@@ -257,6 +262,7 @@ public static class Permissions
             WalletsRead, WalletsDeposit, WalletsHistory,
             QuotasRead,
             PatientsRead, PatientsUpdate,
+            SettingsRead,
         ],
     };
 }

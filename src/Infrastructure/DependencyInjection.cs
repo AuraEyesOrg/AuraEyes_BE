@@ -240,6 +240,7 @@ public static class DependencyInjection
         services.AddSingleton<IAiAssetBaseUrlProvider, AiAssetBaseUrlProvider>();
         services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();
         services.AddScoped<IFullTimeTemplateProvisioningService, FullTimeTemplateProvisioningService>();
+        services.AddScoped<IFullTimeSlotGenerationService, FullTimeSlotGenerationService>();
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
@@ -251,6 +252,7 @@ public static class DependencyInjection
         services.AddScoped<MonthlyQuotaResetJob>();
         services.AddScoped<SlotMaintenanceJob>();
         services.AddScoped<FullTimeSlotGenerationJob>();
+        services.AddScoped<MonthlySalaryJob>();
 
         // Configure PayOS Settings
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));

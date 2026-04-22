@@ -819,7 +819,10 @@ public class AuthService : IAuthService
                 verificationStatus = doctors[0].VerificationStatus.ToString();
                 employmentType = doctors[0].EmploymentType.ToString();
             }
+        }
 
+        if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+        {
             var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
             if (contract != null)
             {
@@ -952,7 +955,10 @@ public class AuthService : IAuthService
                     verificationStatus = doctors[0].VerificationStatus.ToString();
                     employmentType = doctors[0].EmploymentType.ToString();
                 }
+            }
 
+            if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+            {
                 var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
                 if (contract != null)
                 {
@@ -1199,7 +1205,10 @@ public class AuthService : IAuthService
                     verificationStatus = doctors[0].VerificationStatus.ToString();
                     employmentType = doctors[0].EmploymentType.ToString();
                 }
+            }
 
+            if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+            {
                 var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
                 if (contract != null)
                 {

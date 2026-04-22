@@ -165,4 +165,22 @@ public class WalletRepository : Repository<Wallet>, IWalletRepository
 
         return (items, totalCount);
     }
+
+    public async Task<bool> HasSalaryBeenPaidAsync(Guid userId, int year, int month, CancellationToken cancellationToken = default)
+    {
+        var startDate = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var endDate = startDate.AddMonths(1);
+
+        return await _context.WalletTransactions
+            .AsNoTracking()
+            .Join(_context.Wallets, 
+                t => t.WalletId, 
+                w => w.Id, 
+                (t, w) => new { t, w })
+            .AnyAsync(x => x.w.UserId == userId && 
+                           x.t.TransactionType == Domain.Enums.TransactionType.Salary && 
+                           x.t.CreatedAt >= startDate && 
+                           x.t.CreatedAt < endDate, 
+                      cancellationToken);
+    }
 }
