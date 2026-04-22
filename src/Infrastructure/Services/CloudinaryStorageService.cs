@@ -57,7 +57,7 @@ public sealed class CloudinaryStorageService : IFileStorageService
             fileStream.Position = 0;
 
         // Determine resource type based on extension
-        var isImage = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff" }.Contains(extension);
+        var isImage = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".pdf" }.Contains(extension);
         var isVideo = new[] { ".mp4", ".mov", ".avi", ".mkv", ".webm" }.Contains(extension);
 
         RawUploadResult finalResult;
@@ -167,6 +167,7 @@ public sealed class CloudinaryStorageService : IFileStorageService
     {
         if (url.Contains("/video/", StringComparison.OrdinalIgnoreCase)) return ResourceType.Video;
         if (url.Contains("/raw/", StringComparison.OrdinalIgnoreCase)) return ResourceType.Raw;
+        
         return ResourceType.Image;
     }
 
