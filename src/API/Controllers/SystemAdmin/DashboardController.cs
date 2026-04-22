@@ -1,11 +1,15 @@
 using Application.Common.Constants;
+using Application.Common.Helpers;
 using Application.Common.Models;
 using Application.SystemAdmin.Dashboard.Queries.GetDashboardMetrics;
+using Application.SystemAdmin.Dashboard.Queries.GetDoctorWorkload;
+using Application.SystemAdmin.Dashboard.Queries.GetDoctorWorkloads;
 using Application.SystemAdmin.Dashboard.Queries.GetPartTimeSlotQuotaUsage;
 using Application.SystemAdmin.Dashboard.Queries.GetPopulationRiskAnalysis;
 using Application.SystemAdmin.Dashboard.Queries.GetRecentScreenings;
 using Application.SystemAdmin.Dashboard.Queries.GetScreeningVolumeTrends;
 using Application.SystemAdmin.Dashboard.Queries.GetSystemHealth;
+using Domain.Enums;
 using Infrastructure.Services;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -150,6 +154,71 @@ public class DashboardController : BaseApiController
         {
             FromDate = fromDate ?? today,
             ToDate = toDate ?? today.AddDays(7)
+        };
+
+        var result = await _mediator.Send(query);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Get weekly/monthly workload compliance for a single doctor.
+    /// Working hours are calculated from completed consultation sessions only.
+    /// </summary>
+    [HttpGet("doctor-workload")]
+    [ProducesResponseType(typeof(ApiResponse<DoctorWorkloadDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetDoctorWorkload(
+        [FromQuery] Guid doctorId,
+        [FromQuery] WorkloadPeriodType periodType = WorkloadPeriodType.Week,
+        [FromQuery] DateOnly? date = null)
+    {
+        if (doctorId == Guid.Empty)
+            return BadRequest(ApiResponseFactory.Error("doctorId is required."));
+
+        var localToday = DateOnly.FromDateTime(
+            TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, VietnamTimeZoneResolver.TimeZone));
+
+        var query = new GetDoctorWorkloadQuery
+        {
+            DoctorId = doctorId,
+            PeriodType = periodType,
+            Date = date ?? localToday
+        };
+
+        var result = await _mediator.Send(query);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Get paged workload compliance list for doctors (dashboard view).
+    /// </summary>
+    [HttpGet("doctor-workloads")]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<DoctorWorkloadListItemDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetDoctorWorkloads(
+        [FromQuery] WorkloadPeriodType periodType = WorkloadPeriodType.Week,
+        [FromQuery] DateOnly? date = null,
+        [FromQuery] string? searchTerm = null,
+        [FromQuery] OphthalmologistEmploymentType? employmentType = null,
+        [FromQuery] string? status = null,
+        [FromQuery] bool warningOnly = false,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        var localToday = DateOnly.FromDateTime(
+            TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, VietnamTimeZoneResolver.TimeZone));
+
+        var query = new GetDoctorWorkloadsQuery
+        {
+            PeriodType = periodType,
+            Date = date ?? localToday,
+            SearchTerm = searchTerm,
+            EmploymentType = employmentType,
+            Status = status,
+            WarningOnly = warningOnly,
+            PageNumber = pageNumber,
+            PageSize = pageSize
         };
 
         var result = await _mediator.Send(query);

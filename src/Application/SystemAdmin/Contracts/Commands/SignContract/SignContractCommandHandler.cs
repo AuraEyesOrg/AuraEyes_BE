@@ -18,6 +18,7 @@ public class SignContractCommandHandler : ICommandHandler<SignContractCommand, C
     private readonly IRepository<Organisation> _organisationRepository;
     private readonly IIdentityService _identityService;
     private readonly INotificationService _notificationService;
+    private readonly IFullTimeSlotGenerationService _fullTimeSlotGenerationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<SignContractCommandHandler> _logger;
 
@@ -28,6 +29,7 @@ public class SignContractCommandHandler : ICommandHandler<SignContractCommand, C
         IRepository<Organisation> organisationRepository,
         IIdentityService identityService,
         INotificationService notificationService,
+        IFullTimeSlotGenerationService fullTimeSlotGenerationService,
         IUnitOfWork unitOfWork,
         ILogger<SignContractCommandHandler> logger)
     {
@@ -37,6 +39,7 @@ public class SignContractCommandHandler : ICommandHandler<SignContractCommand, C
         _organisationRepository = organisationRepository;
         _identityService = identityService;
         _notificationService = notificationService;
+        _fullTimeSlotGenerationService = fullTimeSlotGenerationService;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -96,6 +99,26 @@ public class SignContractCommandHandler : ICommandHandler<SignContractCommand, C
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        if (!isOrganisationContract
+            && ophthalmologist is not null
+            && ophthalmologist.EmploymentType == OphthalmologistEmploymentType.FullTime)
+        {
+            try
+            {
+                await _fullTimeSlotGenerationService.TriggerForOphthalmologistAsync(
+                    ophthalmologist.Id,
+                    cancellationToken);
+            }
+            catch (Exception slotEx)
+            {
+                _logger.LogWarning(
+                    slotEx,
+                    "Failed to trigger full-time slot generation after activating contract {ContractId} for ophthalmologist {OphthalmologistId}.",
+                    contract.Id,
+                    ophthalmologist.Id);
+            }
+        }
 
         var user = await _identityService.GetUserByIdAsync(contract.UserId, cancellationToken);
 

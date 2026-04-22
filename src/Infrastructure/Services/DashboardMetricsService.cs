@@ -1,11 +1,14 @@
 using Application.AiQuota.Interfaces;
 using Application.Common.Constants;
+using Application.Common.Helpers;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Ophthalmologists.Queries.GetDashboardMetrics;
 using Application.Organisations.Queries.GetDashboardMetrics;
 using Application.Patients.Queries.GetDashboardMetrics;
 using Application.SystemAdmin.Dashboard.Queries.GetDashboardMetrics;
+using Application.SystemAdmin.Dashboard.Queries.GetDoctorWorkload;
+using Application.SystemAdmin.Dashboard.Queries.GetDoctorWorkloads;
 using Application.SystemAdmin.Dashboard.Queries.GetPopulationRiskAnalysis;
 using Application.SystemAdmin.Dashboard.Queries.GetRecentScreenings;
 using Application.SystemAdmin.Dashboard.Queries.GetScreeningVolumeTrends;
@@ -20,6 +23,9 @@ namespace Infrastructure.Services;
 
 public class DashboardMetricsService : IDashboardMetricsService
 {
+    private const string FullTimeRequiredHoursWeekSettingKey = "FULLTIME_REQUIRED_HOURS_WEEK";
+    private const string FullTimeRequiredHoursMonthSettingKey = "FULLTIME_REQUIRED_HOURS_MONTH";
+
     private readonly ApplicationDbContext _context;
     private readonly IAiQuotaService _aiQuotaService;
     private readonly IBetterStackHeartbeatService _betterStackHeartbeatService;
@@ -575,6 +581,169 @@ public class DashboardMetricsService : IDashboardMetricsService
         });
     }
 
+    public async Task<DoctorWorkloadDto?> GetDoctorWorkloadAsync(
+        Guid doctorId,
+        WorkloadPeriodType periodType,
+        DateOnly date,
+        CancellationToken cancellationToken = default)
+    {
+        var doctor = await (from ophthal in _context.Ophthalmologists.AsNoTracking()
+                            join user in _context.Users.AsNoTracking() on ophthal.UserId equals user.Id
+                            where ophthal.Id == doctorId && !user.IsDeleted
+                            select new DoctorProjection
+                            {
+                                Id = ophthal.Id,
+                                Name = user.FullName,
+                                Email = user.Email,
+                                EmploymentType = ophthal.EmploymentType
+                            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (doctor is null)
+            return null;
+
+        var anchorDate = ResolveAnchorDate(date);
+        var periodBounds = GetPeriodBounds(periodType, anchorDate);
+
+        var intervals = await QueryCompletedSessionIntervalsAsync(
+            new[] { doctor.Id },
+            periodBounds.StartUtc,
+            periodBounds.EndUtcExclusive,
+            cancellationToken);
+
+        var actualHours = CalculateMergedHours(intervals, periodBounds.StartUtc, periodBounds.EndUtcExclusive);
+        var requiredHours = await GetRequiredHoursAsync(doctor.EmploymentType, periodType, cancellationToken);
+        var completionRate = CalculateCompletionRate(actualHours, requiredHours);
+        var status = actualHours >= requiredHours ? "OK" : "UNDER";
+
+        return new DoctorWorkloadDto
+        {
+            DoctorId = doctor.Id,
+            PeriodType = ToApiPeriodType(periodType),
+            PeriodStart = periodBounds.StartUtc,
+            PeriodEnd = periodBounds.EndUtcInclusive,
+            RequiredHours = requiredHours,
+            ActualHours = actualHours,
+            CompletionRate = completionRate,
+            Status = status
+        };
+    }
+
+    public async Task<PagedResult<DoctorWorkloadListItemDto>> GetDoctorWorkloadsAsync(
+        WorkloadPeriodType periodType,
+        DateOnly date,
+        string? searchTerm,
+        OphthalmologistEmploymentType? employmentType,
+        string? status,
+        bool warningOnly,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedStatus = NormalizeStatusFilter(status);
+        var anchorDate = ResolveAnchorDate(date);
+        var periodBounds = GetPeriodBounds(periodType, anchorDate);
+
+        var doctorsQuery = from ophthal in _context.Ophthalmologists.AsNoTracking()
+                           join user in _context.Users.AsNoTracking() on ophthal.UserId equals user.Id
+                           where !user.IsDeleted
+                           select new DoctorProjection
+                           {
+                               Id = ophthal.Id,
+                               Name = user.FullName,
+                               Email = user.Email,
+                               EmploymentType = ophthal.EmploymentType
+                           };
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var normalizedSearchTerm = $"%{searchTerm.Trim()}%";
+            doctorsQuery = doctorsQuery.Where(x =>
+                EF.Functions.ILike(x.Name, normalizedSearchTerm)
+                || (x.Email != null && EF.Functions.ILike(x.Email, normalizedSearchTerm)));
+        }
+
+        if (employmentType.HasValue)
+        {
+            doctorsQuery = doctorsQuery.Where(x => x.EmploymentType == employmentType.Value);
+        }
+
+        var doctors = await doctorsQuery.ToListAsync(cancellationToken);
+        if (doctors.Count == 0)
+        {
+            return new PagedResult<DoctorWorkloadListItemDto>(
+                new List<DoctorWorkloadListItemDto>(),
+                0,
+                pageNumber,
+                pageSize);
+        }
+
+        var intervals = await QueryCompletedSessionIntervalsAsync(
+            doctors.Select(x => x.Id).ToList(),
+            periodBounds.StartUtc,
+            periodBounds.EndUtcExclusive,
+            cancellationToken);
+
+        var intervalsByDoctor = intervals
+            .GroupBy(x => x.DoctorId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var requiredHoursByEmploymentType = await GetRequiredHoursByEmploymentTypeAsync(periodType, cancellationToken);
+
+        var computed = new List<DoctorWorkloadListItemDto>(doctors.Count);
+        foreach (var doctor in doctors)
+        {
+            var doctorIntervals = intervalsByDoctor.TryGetValue(doctor.Id, out var value)
+                ? value
+                : new List<SessionIntervalProjection>();
+
+            var actualHours = CalculateMergedHours(doctorIntervals, periodBounds.StartUtc, periodBounds.EndUtcExclusive);
+            var requiredHours = requiredHoursByEmploymentType.TryGetValue(doctor.EmploymentType, out var required)
+                ? required
+                : 0m;
+
+            var completionRate = CalculateCompletionRate(actualHours, requiredHours);
+            var workloadStatus = actualHours >= requiredHours ? "OK" : "UNDER";
+            var warningFlag = completionRate < 0.8m;
+
+            if (normalizedStatus is not null && !string.Equals(workloadStatus, normalizedStatus, StringComparison.Ordinal))
+                continue;
+
+            if (warningOnly && !warningFlag)
+                continue;
+
+            computed.Add(new DoctorWorkloadListItemDto
+            {
+                DoctorId = doctor.Id,
+                DoctorName = doctor.Name,
+                Email = doctor.Email,
+                EmploymentType = ToApiEmploymentType(doctor.EmploymentType),
+                PeriodType = ToApiPeriodType(periodType),
+                PeriodStart = periodBounds.StartUtc,
+                PeriodEnd = periodBounds.EndUtcInclusive,
+                RequiredHours = requiredHours,
+                ActualHours = actualHours,
+                CompletionRate = completionRate,
+                Status = workloadStatus,
+                WarningFlag = warningFlag
+            });
+        }
+
+        var ordered = computed
+            .OrderByDescending(item => item.WarningFlag)
+            .ThenBy(item => item.CompletionRate)
+            .ThenBy(item => item.DoctorName)
+            .ToList();
+
+        var totalCount = ordered.Count;
+        var pageItems = ordered
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return new PagedResult<DoctorWorkloadListItemDto>(pageItems, totalCount, pageNumber, pageSize);
+    }
+
     public async Task<OphthalmologistDashboardMetricsDto> GetOphthalmologistMetricsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var doctorId = await _context.Ophthalmologists
@@ -745,4 +914,256 @@ public class DashboardMetricsService : IDashboardMetricsService
             RemainingQuota = quota.RemainingQuota
         };
     }
+
+    private async Task<decimal> GetRequiredHoursAsync(
+        OphthalmologistEmploymentType employmentType,
+        WorkloadPeriodType periodType,
+        CancellationToken cancellationToken)
+    {
+        var requiredHours = await _context.WorkloadRequirements
+            .AsNoTracking()
+            .Where(x => x.EmploymentType == employmentType && x.PeriodType == periodType)
+            .Select(x => (decimal?)x.RequiredHours)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (employmentType == OphthalmologistEmploymentType.FullTime)
+        {
+            var configuredRequiredHours = await GetConfiguredFullTimeRequiredHoursAsync(periodType, cancellationToken);
+            if (configuredRequiredHours.HasValue)
+                return configuredRequiredHours.Value;
+        }
+
+        return requiredHours.GetValueOrDefault(0m);
+    }
+
+    private async Task<Dictionary<OphthalmologistEmploymentType, decimal>> GetRequiredHoursByEmploymentTypeAsync(
+        WorkloadPeriodType periodType,
+        CancellationToken cancellationToken)
+    {
+        var requiredHoursByEmploymentType = await _context.WorkloadRequirements
+            .AsNoTracking()
+            .Where(x => x.PeriodType == periodType)
+            .GroupBy(x => x.EmploymentType)
+            .Select(group => new
+            {
+                EmploymentType = group.Key,
+                RequiredHours = group
+                    .OrderByDescending(item => item.UpdatedAt ?? item.CreatedAt)
+                    .Select(item => item.RequiredHours)
+                    .FirstOrDefault()
+            })
+            .ToDictionaryAsync(x => x.EmploymentType, x => x.RequiredHours, cancellationToken);
+
+        var configuredRequiredHours = await GetConfiguredFullTimeRequiredHoursAsync(periodType, cancellationToken);
+        if (configuredRequiredHours.HasValue)
+        {
+            requiredHoursByEmploymentType[OphthalmologistEmploymentType.FullTime] = configuredRequiredHours.Value;
+        }
+
+        return requiredHoursByEmploymentType;
+    }
+
+    private async Task<decimal?> GetConfiguredFullTimeRequiredHoursAsync(
+        WorkloadPeriodType periodType,
+        CancellationToken cancellationToken)
+    {
+        var settingKey = periodType == WorkloadPeriodType.Week
+            ? FullTimeRequiredHoursWeekSettingKey
+            : FullTimeRequiredHoursMonthSettingKey;
+
+        var configuredValue = await _context.SystemSettings
+            .AsNoTracking()
+            .Where(x => x.Key == settingKey)
+            .Select(x => x.Value)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return TryParseConfiguredRequiredHours(configuredValue);
+    }
+
+    private static decimal? TryParseConfiguredRequiredHours(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        if (!decimal.TryParse(value.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
+            return null;
+
+        if (parsed < 0m || parsed > 744m)
+            return null;
+
+        return Math.Round(parsed, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private async Task<List<SessionIntervalProjection>> QueryCompletedSessionIntervalsAsync(
+        IReadOnlyCollection<Guid> doctorIds,
+        DateTime periodStartUtc,
+        DateTime periodEndUtcExclusive,
+        CancellationToken cancellationToken)
+    {
+        if (doctorIds.Count == 0)
+            return new List<SessionIntervalProjection>();
+
+        return await _context.ConsultationSessions
+            .AsNoTracking()
+            .Where(session =>
+                session.OphthalmologistId.HasValue
+                && doctorIds.Contains(session.OphthalmologistId.Value)
+                && session.Status == SessionStatus.Completed
+                && session.StartTime.HasValue
+                && session.EndTime.HasValue
+                && session.StartTime.Value < periodEndUtcExclusive
+                && session.EndTime.Value > periodStartUtc)
+            .Select(session => new SessionIntervalProjection
+            {
+                DoctorId = session.OphthalmologistId!.Value,
+                StartUtc = session.StartTime!.Value,
+                EndUtc = session.EndTime!.Value
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    private static decimal CalculateMergedHours(
+        IEnumerable<SessionIntervalProjection> intervals,
+        DateTime periodStartUtc,
+        DateTime periodEndUtcExclusive)
+    {
+        var normalized = intervals
+            .Select(interval =>
+            {
+                var clampedStart = interval.StartUtc < periodStartUtc ? periodStartUtc : interval.StartUtc;
+                var clampedEnd = interval.EndUtc > periodEndUtcExclusive ? periodEndUtcExclusive : interval.EndUtc;
+
+                return new WorkloadInterval
+                {
+                    StartUtc = clampedStart,
+                    EndUtc = clampedEnd
+                };
+            })
+            .Where(interval => interval.EndUtc > interval.StartUtc)
+            .OrderBy(interval => interval.StartUtc)
+            .ToList();
+
+        if (normalized.Count == 0)
+            return 0m;
+
+        var mergedStart = normalized[0].StartUtc;
+        var mergedEnd = normalized[0].EndUtc;
+        decimal totalHours = 0m;
+
+        foreach (var interval in normalized.Skip(1))
+        {
+            if (interval.StartUtc <= mergedEnd)
+            {
+                if (interval.EndUtc > mergedEnd)
+                    mergedEnd = interval.EndUtc;
+
+                continue;
+            }
+
+            totalHours += ConvertTicksToHours(mergedEnd - mergedStart);
+            mergedStart = interval.StartUtc;
+            mergedEnd = interval.EndUtc;
+        }
+
+        totalHours += ConvertTicksToHours(mergedEnd - mergedStart);
+        return Math.Round(totalHours, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static decimal ConvertTicksToHours(TimeSpan duration)
+    {
+        if (duration <= TimeSpan.Zero)
+            return 0m;
+
+        return duration.Ticks / (decimal)TimeSpan.TicksPerHour;
+    }
+
+    private static DateOnly ResolveAnchorDate(DateOnly date)
+    {
+        if (date != default)
+            return date;
+
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, VietnamTimeZoneResolver.TimeZone);
+        return DateOnly.FromDateTime(localNow);
+    }
+
+    private static PeriodBounds GetPeriodBounds(WorkloadPeriodType periodType, DateOnly date)
+    {
+        var localDateTime = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+
+        DateTime localStart;
+        DateTime localEndExclusive;
+
+        if (periodType == WorkloadPeriodType.Week)
+        {
+            var offset = ((int)localDateTime.DayOfWeek + 6) % 7;
+            localStart = localDateTime.Date.AddDays(-offset);
+            localEndExclusive = localStart.AddDays(7);
+        }
+        else
+        {
+            localStart = new DateTime(localDateTime.Year, localDateTime.Month, 1, 0, 0, 0, DateTimeKind.Unspecified);
+            localEndExclusive = localStart.AddMonths(1);
+        }
+
+        var periodStartUtc = TimeZoneInfo.ConvertTimeToUtc(localStart, VietnamTimeZoneResolver.TimeZone);
+        var periodEndUtcExclusive = TimeZoneInfo.ConvertTimeToUtc(localEndExclusive, VietnamTimeZoneResolver.TimeZone);
+
+        return new PeriodBounds(
+            periodStartUtc,
+            periodEndUtcExclusive,
+            periodEndUtcExclusive.AddTicks(-1));
+    }
+
+    private static decimal CalculateCompletionRate(decimal actualHours, decimal requiredHours)
+    {
+        if (requiredHours <= 0)
+            return 1m;
+
+        var completionRate = actualHours / requiredHours;
+        if (completionRate < 0)
+            return 0m;
+
+        return Math.Round(completionRate, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static string ToApiPeriodType(WorkloadPeriodType periodType)
+        => periodType == WorkloadPeriodType.Week ? "WEEK" : "MONTH";
+
+    private static string ToApiEmploymentType(OphthalmologistEmploymentType employmentType)
+        => employmentType == OphthalmologistEmploymentType.FullTime ? "FULL_TIME" : "PART_TIME";
+
+    private static string? NormalizeStatusFilter(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+            return null;
+
+        var normalized = status.Trim().ToUpperInvariant();
+        return normalized is "OK" or "UNDER" ? normalized : null;
+    }
+
+    private sealed class DoctorProjection
+    {
+        public Guid Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public string? Email { get; init; }
+        public OphthalmologistEmploymentType EmploymentType { get; init; }
+    }
+
+    private sealed class SessionIntervalProjection
+    {
+        public Guid DoctorId { get; init; }
+        public DateTime StartUtc { get; init; }
+        public DateTime EndUtc { get; init; }
+    }
+
+    private sealed class WorkloadInterval
+    {
+        public DateTime StartUtc { get; init; }
+        public DateTime EndUtc { get; init; }
+    }
+
+    private readonly record struct PeriodBounds(
+        DateTime StartUtc,
+        DateTime EndUtcExclusive,
+        DateTime EndUtcInclusive);
 }

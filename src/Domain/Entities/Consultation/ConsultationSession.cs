@@ -32,6 +32,8 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     public bool IsAIResultShared { get; private set; }
 
     public DateTime? AppointmentTime { get; private set; }
+    public DateTime? StartTime { get; private set; }
+    public DateTime? EndTime { get; private set; }
     public string? MeetingLink { get; private set; }
     public string? CalendarEventId { get; private set; }
 
@@ -183,6 +185,7 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
         if (Status == SessionStatus.Pending)
             Status = SessionStatus.Confirmed;
 
+        EnsureStartTime(DateTime.UtcNow);
         ChatStatus = ChatStatus.Open;
         LastActivityAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
@@ -214,12 +217,16 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
         if (OphthalmologistId.HasValue && OphthalmologistId.Value != doctorId)
             throw new InvalidOperationException("Only the assigned ophthalmologist can end this session");
 
+        var nowUtc = DateTime.UtcNow;
+        EnsureStartTime(nowUtc);
+
         Status = SessionStatus.Completed;
         ChatStatus = ChatStatus.Archived;
-        ClosedAt = DateTime.UtcNow;
+        EndTime = nowUtc;
+        ClosedAt = nowUtc;
         ClosedBy = doctorId;
         ClosingReason = reason;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = nowUtc;
     }
 
     /// <summary>
@@ -231,11 +238,15 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
         if (Status == SessionStatus.Completed || Status == SessionStatus.Cancelled)
             return;
 
+        var nowUtc = DateTime.UtcNow;
+        EnsureStartTime(nowUtc);
+
         Status = SessionStatus.Completed;
         ChatStatus = ChatStatus.Archived;
-        ClosedAt = DateTime.UtcNow;
+        EndTime = nowUtc;
+        ClosedAt = nowUtc;
         ClosingReason = reason;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = nowUtc;
     }
 
     public void Cancel(Guid cancelledBy, string reason = "UserCancelled")
@@ -255,5 +266,19 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     {
         _conversations.Add(conversation);
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    private void EnsureStartTime(DateTime nowUtc)
+    {
+        if (StartTime.HasValue)
+            return;
+
+        if (AppointmentTime.HasValue && AppointmentTime.Value <= nowUtc)
+        {
+            StartTime = AppointmentTime.Value;
+            return;
+        }
+
+        StartTime = nowUtc;
     }
 }
