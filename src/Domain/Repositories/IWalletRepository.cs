@@ -1,5 +1,6 @@
 using Domain.Common;
 using Domain.Entities.Financial;
+using Domain.Enums;
 
 namespace Domain.Repositories;
 
@@ -15,9 +16,25 @@ public interface IWalletRepository : IRepository<Wallet>
     Task<Wallet?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Platform treasury wallet (<c>OwnerType == "System"</c>).
+    /// System-Admin commission wallet (<c>OwnerType == "System"</c>) — platform commission ledger.
     /// </summary>
     Task<Wallet?> GetSystemWalletAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Platform escrow wallet (<c>OwnerType == "Escrow"</c>) — holds booking funds until capture or refund.
+    /// </summary>
+    Task<Wallet?> GetEscrowWalletAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Idempotency helper: checks whether a wallet already has a specific transaction
+    /// for a given (referenceType, referenceId, transactionType) tuple.
+    /// </summary>
+    Task<bool> HasTransactionAsync(
+        Guid walletId,
+        TransactionType transactionType,
+        string referenceType,
+        Guid referenceId,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get wallet with transactions included.

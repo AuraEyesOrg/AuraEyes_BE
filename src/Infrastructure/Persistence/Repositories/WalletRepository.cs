@@ -1,4 +1,5 @@
 using Domain.Entities.Financial;
+using Domain.Enums;
 using Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,7 +23,29 @@ public class WalletRepository : Repository<Wallet>, IWalletRepository
     public async Task<Wallet?> GetSystemWalletAsync(CancellationToken cancellationToken = default)
     {
         return await _dbSet
-            .FirstOrDefaultAsync(w => w.OwnerType == "System", cancellationToken);
+            .FirstOrDefaultAsync(w => w.OwnerType == Wallet.OwnerTypeSystem, cancellationToken);
+    }
+
+    public async Task<Wallet?> GetEscrowWalletAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .FirstOrDefaultAsync(w => w.OwnerType == Wallet.OwnerTypeEscrow, cancellationToken);
+    }
+
+    public Task<bool> HasTransactionAsync(
+        Guid walletId,
+        TransactionType transactionType,
+        string referenceType,
+        Guid referenceId,
+        CancellationToken cancellationToken = default)
+    {
+        return _context.WalletTransactions
+            .AnyAsync(
+                t => t.WalletId == walletId
+                     && t.TransactionType == transactionType
+                     && t.ReferenceType == referenceType
+                     && t.ReferenceId == referenceId,
+                cancellationToken);
     }
 
     public async Task<Wallet?> GetByIdWithTransactionsAsync(Guid id, CancellationToken cancellationToken = default)
