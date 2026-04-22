@@ -178,22 +178,76 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
                         }
                         else
                         {
-                            wallet.Deposit(session.Price, $"Refund – cancelled session {session.Id}");
-
-                            var refundTx = new WalletTransaction(
+                            // Idempotency guard: refund once per session.
+                            var alreadyRefunded = await _walletRepository.HasTransactionAsync(
                                 wallet.Id,
-                                session.Price,
                                 TransactionType.Refund,
-                                "Consultation cancellation refund",
-                                referenceType: "Booking",
-                                referenceId: session.Id);
+                                "Booking",
+                                session.Id,
+                                cancellationToken);
 
-                            wallet.AddTransaction(refundTx);
-                            await _walletRepository.AddTransactionAsync(refundTx, cancellationToken);
+                            if (alreadyRefunded)
+                            {
+                                _logger.LogInformation(
+                                    "Refund already recorded for session {SessionId}; skipping.",
+                                    session.Id);
+                            }
+                            else
+                            {
+                                // Release from Escrow first so the ledger stays balanced.
+                                var escrowWallet = await _walletRepository.GetEscrowWalletAsync(cancellationToken);
+                                if (escrowWallet is null)
+                                {
+                                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                                    _logger.LogError(
+                                        "Escrow wallet missing while refunding session {SessionId}.",
+                                        session.Id);
+                                    return Result.Failure(
+                                        "Platform escrow wallet is not configured. Please contact support.");
+                                }
 
-                            _logger.LogInformation(
-                                "Refunded {Amount} VND to patient wallet {WalletId} for session {SessionId}.",
-                                session.Price, wallet.Id, session.Id);
+                                if (escrowWallet.Balance < session.Price)
+                                {
+                                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                                    _logger.LogError(
+                                        "Escrow balance {Balance} insufficient to refund session {SessionId} (Price={Price}).",
+                                        escrowWallet.Balance, session.Id, session.Price);
+                                    return Result.Failure(
+                                        "Escrow balance is insufficient to refund this session. " +
+                                        "Please contact support.");
+                                }
+
+                                escrowWallet.Withdraw(session.Price, $"Escrow refund – cancelled session {session.Id}");
+
+                                var escrowRefundTx = new WalletTransaction(
+                                    escrowWallet.Id,
+                                    session.Price,
+                                    TransactionType.Withdrawal,
+                                    $"Escrow release (refund) – session {session.Id}",
+                                    referenceType: "Booking",
+                                    referenceId: session.Id);
+
+                                escrowWallet.AddTransaction(escrowRefundTx);
+                                await _walletRepository.AddTransactionAsync(escrowRefundTx, cancellationToken);
+
+                                // Credit patient wallet.
+                                wallet.Deposit(session.Price, $"Refund – cancelled session {session.Id}");
+
+                                var refundTx = new WalletTransaction(
+                                    wallet.Id,
+                                    session.Price,
+                                    TransactionType.Refund,
+                                    "Consultation cancellation refund",
+                                    referenceType: "Booking",
+                                    referenceId: session.Id);
+
+                                wallet.AddTransaction(refundTx);
+                                await _walletRepository.AddTransactionAsync(refundTx, cancellationToken);
+
+                                _logger.LogInformation(
+                                    "Refunded {Amount} VND to patient wallet {WalletId} for session {SessionId} (escrow released).",
+                                    session.Price, wallet.Id, session.Id);
+                            }
                         }
                     }
                 }

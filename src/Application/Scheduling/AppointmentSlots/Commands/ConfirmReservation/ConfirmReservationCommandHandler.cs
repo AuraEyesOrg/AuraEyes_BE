@@ -183,6 +183,30 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
 
                 wallet.AddTransaction(transaction);
                 await _walletRepository.AddTransactionAsync(transaction, cancellationToken);
+
+                // It stays there until EndSession captures it or CancelSession refunds it.
+                var escrowWallet = await _walletRepository.GetEscrowWalletAsync(cancellationToken);
+                if (escrowWallet is null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    _logger.LogError(
+                        "Escrow wallet not found while confirming reservation for slot {SlotId}.", slot.Id);
+                    return Result<ConfirmReservationResult>.Failure(
+                        "Platform escrow wallet is not configured. Please contact support.");
+                }
+
+                escrowWallet.Deposit(consultationFee, $"Escrow hold – Slot {slot.Id}");
+
+                var escrowTx = new WalletTransaction(
+                    escrowWallet.Id,
+                    consultationFee,
+                    TransactionType.Deposit,
+                    "Escrow hold for video-call booking",
+                    referenceType: "Booking",
+                    referenceId: slot.Id);
+
+                escrowWallet.AddTransaction(escrowTx);
+                await _walletRepository.AddTransactionAsync(escrowTx, cancellationToken);
             }
 
             // ── 5. Resolve attendee emails & create Google Meet ──

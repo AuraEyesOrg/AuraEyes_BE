@@ -13,10 +13,12 @@ namespace Application.ConsultationSessions.Commands.EndSession;
 /// Doctor completes the session:
 ///   - Session → Completed, ChatStatus → Archived.
 ///   - Slot → Completed.
-///   - Wallet capture: transfer consultation fee to the doctor's wallet.
+///   - Wallet capture (Escrow → Doctor + SystemAdmin commission), idempotent by session id.
 /// </summary>
 public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
 {
+    private const string BookingReferenceType = "Booking";
+
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly IAppointmentSlotRepository _slotRepository;
     private readonly IWalletRepository _walletRepository;
@@ -76,140 +78,14 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
                 }
             }
 
-            // ── 3. Wallet capture: ensure patient payment exists, then transfer fee to doctor ──
+            // ── 3. Wallet capture: Escrow → Doctor + SystemAdmin commission ──
             if (session.Price > 0 && session.OphthalmologistId.HasValue)
             {
-                var patient = await _patientRepository.GetByIdAsync(session.PatientId, cancellationToken);
-                if (patient is null)
+                var captureResult = await CaptureFromEscrowAsync(session, cancellationToken);
+                if (!captureResult.IsSuccess)
                 {
                     await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                    return Result.NotFound($"Patient '{session.PatientId}' not found.");
-                }
-
-                if (!patient.UserId.HasValue)
-                {
-                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                    return Result.Failure("Walk-in patient does not have a wallet for payment.");
-                }
-
-                var patientWallet = await _walletRepository.GetByUserIdWithTransactionsAsync(
-                    patient.UserId.Value,
-                    cancellationToken);
-
-                if (patientWallet is null)
-                {
-                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                    return Result.Failure("Patient wallet not found.");
-                }
-
-                var hasPrepaidBooking = patientWallet.Transactions.Any(tx =>
-                    tx.TransactionType == TransactionType.Payment
-                    && tx.ReferenceType == "Booking"
-                    && tx.ReferenceId.HasValue
-                    && (tx.ReferenceId.Value == session.Id
-                        || (session.AppointmentSlotId.HasValue
-                            && tx.ReferenceId.Value == session.AppointmentSlotId.Value)));
-
-                if (!hasPrepaidBooking)
-                {
-                    if (patientWallet.Balance < session.Price)
-                    {
-                        await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                        return Result.Failure(
-                            $"Insufficient patient wallet balance. Required: {session.Price:N0} VND, Available: {patientWallet.Balance:N0} VND.");
-                    }
-
-                    patientWallet.Withdraw(session.Price,
-                        $"Consultation payment – Session {session.Id}");
-
-                    var patientPaymentTx = new WalletTransaction(
-                        patientWallet.Id,
-                        session.Price,
-                        TransactionType.Payment,
-                        "Consultation payment",
-                        referenceType: "Booking",
-                        referenceId: session.Id);
-
-                    patientWallet.AddTransaction(patientPaymentTx);
-                    await _walletRepository.AddTransactionAsync(patientPaymentTx, cancellationToken);
-                }
-
-                var doctor = await _ophthalmologistRepository.GetByIdAsync(
-                    session.OphthalmologistId.Value, cancellationToken);
-
-                if (doctor is not null)
-                {
-                    // CommissionRate on Ophthalmologist is stored as 0–100 (platform's share of the session fee).
-                    var commissionPercent = doctor.CommissionRate ?? 0m;
-                    var platformShare = Math.Round(
-                        session.Price * (commissionPercent / 100m),
-                        0,
-                        MidpointRounding.AwayFromZero);
-                    var doctorShare = session.Price - platformShare;
-                    var doctorSharePercent = 100m - commissionPercent;
-
-                    if (doctorShare < 0 || platformShare < 0)
-                    {
-                        await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                        return Result.Failure("Invalid commission configuration for this ophthalmologist.");
-                    }
-
-                    var doctorWallet = await _walletRepository.GetByUserIdAsync(
-                        doctor.UserId, cancellationToken);
-
-                    if (doctorShare > 0 && doctorWallet is null)
-                    {
-                        await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                        return Result.Failure("Doctor wallet not found; consultation earnings cannot be recorded.");
-                    }
-
-                    if (doctorWallet is not null && doctorShare > 0)
-                    {
-                        var doctorNote = $"Consultation earnings: {doctorShare:N0} VND (Receive {doctorSharePercent:0.##}% from original fee {session.Price:N0} VND) – Session {session.Id}";
-                        
-                        doctorWallet.Deposit(doctorShare, doctorNote);
-
-                        var earningsTx = new WalletTransaction(
-                            doctorWallet.Id,
-                            doctorShare,
-                            TransactionType.Deposit,
-                            $"Consultation earnings (After deducting {commissionPercent:0.##}% platform fee)",
-                            referenceType: "Booking",
-                            referenceId: session.Id);
-
-                        doctorWallet.AddTransaction(earningsTx);
-                        await _walletRepository.AddTransactionAsync(earningsTx, cancellationToken);
-
-                        _logger.LogInformation(
-                            "Captured {DoctorShare} VND (platform {PlatformShare} VND) to doctor wallet {WalletId} for session {SessionId}.",
-                            doctorShare, platformShare, doctorWallet.Id, session.Id);
-                    }
-
-                    if (platformShare > 0)
-                    {
-                        var platformWallet = await _walletRepository.GetSystemWalletAsync(cancellationToken);
-                        if (platformWallet is null)
-                        {
-                            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                            return Result.Failure(
-                                "System (platform) wallet not found. Ensure a wallet with OwnerType \"System\" exists.");
-                        }
-
-                        var platformNote =
-                            $"Platform commission: {platformShare:N0} VND ({commissionPercent:0.##}% of {session.Price:N0} VND) – Session {session.Id}";
-                        platformWallet.Deposit(platformShare, platformNote);
-
-                        var platformTx = new WalletTransaction(
-                            platformWallet.Id,
-                            platformShare,
-                            TransactionType.Deposit,
-                            $"Platform commission ({commissionPercent:0.##}% of fee)",
-                            referenceType: "Booking",
-                            referenceId: session.Id);
-
-                        platformWallet.AddTransaction(platformTx);
-                        await _walletRepository.AddTransactionAsync(platformTx, cancellationToken);
-                    }
+                    return captureResult;
                 }
             }
 
@@ -225,5 +101,136 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
             _logger.LogError(ex, "Error ending session {SessionId}", request.SessionId);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Capture the booking amount from Escrow and split it between the Doctor wallet
+    /// and the SystemAdmin commission wallet. Fully idempotent: if the doctor already has
+    /// a Deposit transaction for this session, the whole step is a no-op.
+    /// </summary>
+    private async Task<Result> CaptureFromEscrowAsync(
+        Domain.Entities.Consultation.ConsultationSession session,
+        CancellationToken cancellationToken)
+    {
+        var doctor = await _ophthalmologistRepository.GetByIdAsync(
+            session.OphthalmologistId!.Value, cancellationToken);
+        if (doctor is null)
+            return Result.NotFound($"Ophthalmologist '{session.OphthalmologistId}' not found.");
+
+        var doctorWallet = await _walletRepository.GetByUserIdAsync(doctor.UserId, cancellationToken);
+        if (doctorWallet is null)
+            return Result.Failure("Doctor wallet not found; consultation earnings cannot be recorded.");
+
+        // Idempotency guard: has this session already been captured?
+        var alreadyCaptured = await _walletRepository.HasTransactionAsync(
+            doctorWallet.Id,
+            TransactionType.Deposit,
+            BookingReferenceType,
+            session.Id,
+            cancellationToken);
+
+        if (alreadyCaptured)
+        {
+            _logger.LogInformation(
+                "Session {SessionId} already captured to doctor wallet {WalletId}; skipping.",
+                session.Id, doctorWallet.Id);
+            return Result.Success();
+        }
+
+        var commissionPercent = doctor.CommissionRate ?? 0m;
+        if (commissionPercent < 0m || commissionPercent > 100m)
+            return Result.Failure("Invalid commission configuration for this ophthalmologist.");
+
+        var platformShare = Math.Round(
+            session.Price * (commissionPercent / 100m),
+            0,
+            MidpointRounding.AwayFromZero);
+        var doctorShare = session.Price - platformShare;
+        var doctorSharePercent = 100m - commissionPercent;
+
+        if (doctorShare < 0 || platformShare < 0)
+            return Result.Failure("Invalid commission split calculated for this session.");
+
+        // ── Escrow guard — ensure patient's booking was placed in escrow ──
+        var escrowWallet = await _walletRepository.GetEscrowWalletAsync(cancellationToken);
+        if (escrowWallet is null)
+            return Result.Failure(
+                "Platform escrow wallet is not configured. Please contact support.");
+
+        if (escrowWallet.Balance < session.Price)
+        {
+            _logger.LogError(
+                "Escrow balance {Balance} is insufficient to capture session {SessionId} (Price={Price}).",
+                escrowWallet.Balance, session.Id, session.Price);
+            return Result.Failure(
+                "Escrow balance is insufficient to capture this session. " +
+                "The booking payment may be missing or already released.");
+        }
+
+        // Withdraw the full price from escrow (double-entry).
+        escrowWallet.Withdraw(session.Price, $"Escrow release – Session {session.Id}");
+
+        var escrowReleaseTx = new WalletTransaction(
+            escrowWallet.Id,
+            session.Price,
+            TransactionType.Withdrawal,
+            $"Escrow release for session {session.Id}",
+            referenceType: BookingReferenceType,
+            referenceId: session.Id);
+
+        escrowWallet.AddTransaction(escrowReleaseTx);
+        await _walletRepository.AddTransactionAsync(escrowReleaseTx, cancellationToken);
+
+        // Credit doctor wallet.
+        if (doctorShare > 0)
+        {
+            var doctorNote =
+                $"Consultation earnings: {doctorShare:N0} VND (Receive {doctorSharePercent:0.##}% from original fee {session.Price:N0} VND) – Session {session.Id}";
+
+            doctorWallet.Deposit(doctorShare, doctorNote);
+
+            var earningsTx = new WalletTransaction(
+                doctorWallet.Id,
+                doctorShare,
+                TransactionType.Deposit,
+                $"Consultation earnings (After deducting {commissionPercent:0.##}% platform fee)",
+                referenceType: BookingReferenceType,
+                referenceId: session.Id);
+
+            doctorWallet.AddTransaction(earningsTx);
+            await _walletRepository.AddTransactionAsync(earningsTx, cancellationToken);
+
+            _logger.LogInformation(
+                "Captured {DoctorShare} VND (platform {PlatformShare} VND) to doctor wallet {WalletId} for session {SessionId}.",
+                doctorShare, platformShare, doctorWallet.Id, session.Id);
+        }
+
+        // Credit SystemAdmin commission wallet.
+        if (platformShare > 0)
+        {
+            var platformWallet = await _walletRepository.GetSystemWalletAsync(cancellationToken);
+            if (platformWallet is null)
+            {
+                return Result.Failure(
+                    "System commission wallet not found. Ensure a wallet with OwnerType \"System\" exists.");
+            }
+
+            var platformNote =
+                $"Platform commission: {platformShare:N0} VND ({commissionPercent:0.##}% of {session.Price:N0} VND) – Session {session.Id}";
+            platformWallet.Deposit(platformShare, platformNote);
+
+            var platformTx = new WalletTransaction(
+                platformWallet.Id,
+                platformShare,
+                TransactionType.Deposit,
+                $"Platform commission ({commissionPercent:0.##}% of fee)",
+                referenceType: BookingReferenceType,
+                referenceId: session.Id);
+
+            platformWallet.AddTransaction(platformTx);
+            await _walletRepository.AddTransactionAsync(platformTx, cancellationToken);
+        }
+
+        return Result.Success();
     }
 }

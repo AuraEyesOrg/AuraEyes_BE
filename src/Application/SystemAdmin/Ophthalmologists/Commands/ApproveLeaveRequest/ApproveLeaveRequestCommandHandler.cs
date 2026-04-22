@@ -389,6 +389,50 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
             return;
         }
 
+        // Idempotency guard — avoid double refund if this method is replayed.
+        var alreadyRefunded = await _walletRepository.HasTransactionAsync(
+            wallet.Id,
+            TransactionType.Refund,
+            "Booking",
+            session.Id,
+            cancellationToken);
+
+        if (alreadyRefunded)
+        {
+            return;
+        }
+
+        // Release from Escrow first so the ledger stays balanced.
+        var escrowWallet = await _walletRepository.GetEscrowWalletAsync(cancellationToken);
+        if (escrowWallet is null)
+        {
+            _logger.LogError(
+                "Escrow wallet missing while refunding session {SessionId} (doctor leave).",
+                session.Id);
+            return;
+        }
+
+        if (escrowWallet.Balance < session.Price)
+        {
+            _logger.LogError(
+                "Escrow balance {Balance} insufficient to refund session {SessionId} (doctor leave, Price={Price}).",
+                escrowWallet.Balance, session.Id, session.Price);
+            return;
+        }
+
+        escrowWallet.Withdraw(session.Price, $"Escrow refund – session {session.Id} (doctor leave)");
+
+        var escrowRefundTx = new WalletTransaction(
+            escrowWallet.Id,
+            session.Price,
+            TransactionType.Withdrawal,
+            $"Escrow release (refund, doctor leave) – session {session.Id}",
+            referenceType: "Booking",
+            referenceId: session.Id);
+
+        escrowWallet.AddTransaction(escrowRefundTx);
+        await _walletRepository.AddTransactionAsync(escrowRefundTx, cancellationToken);
+
         wallet.Deposit(session.Price, $"Refund – session {session.Id} cancelled due to doctor leave");
 
         var refundTx = new WalletTransaction(
