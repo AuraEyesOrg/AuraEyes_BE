@@ -64,6 +64,10 @@ public static class DatabaseSeeder
         // Idempotent — runs on every startup so new permissions defined in code
         // are automatically added to the database on next deployment.
         await SeedPermissionsAsync(context, roleManager, logger);
+
+        // Step 5: Seed platform wallets (Escrow + SystemAdmin commission).
+        // Idempotent — required for the payment capture flow. Runs on every startup.
+        await SeedPlatformWalletsAsync(context, userManager, logger);
     }
 
     private static async Task SeedRolesAsync(RoleManager<ApplicationRole> roleManager, ILogger? logger)
@@ -353,6 +357,89 @@ public static class DatabaseSeeder
         }
 
         logger?.LogInformation("Wallet seeding completed.");
+    }
+
+    private static async Task SeedPlatformWalletsAsync(
+        ApplicationDbContext context,
+        UserManager<ApplicationUser> userManager,
+        ILogger? logger)
+    {
+        logger?.LogInformation("Seeding platform wallets (Escrow + System commission)...");
+
+        var escrowWallet = await context.Wallets
+            .FirstOrDefaultAsync(w => w.OwnerType == Domain.Entities.Financial.Wallet.OwnerTypeEscrow);
+
+        if (escrowWallet is null)
+        {
+            var escrow = new Domain.Entities.Financial.Wallet(
+                userId: Domain.Entities.Financial.Wallet.EscrowSentinelUserId,
+                ownerType: Domain.Entities.Financial.Wallet.OwnerTypeEscrow,
+                initialBalance: 0m);
+
+            await context.Wallets.AddAsync(escrow);
+            await context.SaveChangesAsync();
+            logger?.LogInformation(
+                "✓ Created platform Escrow wallet (Id={WalletId}) → Wallets table",
+                escrow.Id);
+        }
+        else
+        {
+            logger?.LogInformation("Escrow wallet already exists (Id={WalletId}). Skipping.", escrowWallet.Id);
+        }
+
+        var systemWallet = await context.Wallets
+            .FirstOrDefaultAsync(w => w.OwnerType == Domain.Entities.Financial.Wallet.OwnerTypeSystem);
+
+        if (systemWallet is null)
+        {
+            // Link the commission wallet to the first SystemAdmin user so they can review it.
+            var systemAdminUsers = await userManager.GetUsersInRoleAsync(Roles.SystemAdmin);
+            var systemAdmin = systemAdminUsers.FirstOrDefault();
+
+            if (systemAdmin is null)
+            {
+                logger?.LogWarning(
+                    "No SystemAdmin user found. Platform commission wallet will be skipped; " +
+                    "seed a SystemAdmin account first and restart to create it.");
+                return;
+            }
+
+            var existingSystemAdminWallet = await context.Wallets
+                .FirstOrDefaultAsync(w => w.UserId == systemAdmin.Id);
+
+            if (existingSystemAdminWallet is not null
+                && existingSystemAdminWallet.OwnerType != Domain.Entities.Financial.Wallet.OwnerTypeSystem)
+            {
+                // UserId is unique per wallet; normalise the existing row into the System commission wallet.
+                existingSystemAdminWallet.SetOwnerType(Domain.Entities.Financial.Wallet.OwnerTypeSystem);
+                context.Wallets.Update(existingSystemAdminWallet);
+                await context.SaveChangesAsync();
+                logger?.LogInformation(
+                    "✓ Normalised SystemAdmin wallet {WalletId} → OwnerType=System",
+                    existingSystemAdminWallet.Id);
+            }
+            else if (existingSystemAdminWallet is null)
+            {
+                var commissionWallet = new Domain.Entities.Financial.Wallet(
+                    userId: systemAdmin.Id,
+                    ownerType: Domain.Entities.Financial.Wallet.OwnerTypeSystem,
+                    initialBalance: 0m);
+
+                await context.Wallets.AddAsync(commissionWallet);
+                await context.SaveChangesAsync();
+                logger?.LogInformation(
+                    "✓ Created System commission wallet (Id={WalletId}) for SystemAdmin {Email}",
+                    commissionWallet.Id, systemAdmin.Email);
+            }
+        }
+        else
+        {
+            logger?.LogInformation(
+                "System commission wallet already exists (Id={WalletId}, UserId={UserId}). Skipping.",
+                systemWallet.Id, systemWallet.UserId);
+        }
+
+        logger?.LogInformation("Platform wallet seeding completed.");
     }
 
     private static async Task SeedScheduleTemplatesAsync(
