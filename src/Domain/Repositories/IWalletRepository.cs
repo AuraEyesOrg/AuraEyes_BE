@@ -65,6 +65,8 @@ public interface IWalletRepository : IRepository<Wallet>
     Task<(IReadOnlyList<(WalletTransaction Transaction, Wallet Wallet)> Items, int TotalCount)> GetCashflowTransactionsPagedAsync(
         string? ownerType = null,
         string? searchTerm = null,
+        string? sortBy = null,
+        string? sortDirection = null,
         int pageNumber = 1,
         int pageSize = 20,
         CancellationToken cancellationToken = default);
