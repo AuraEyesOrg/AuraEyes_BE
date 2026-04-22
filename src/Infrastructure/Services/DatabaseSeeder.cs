@@ -60,7 +60,10 @@ public static class DatabaseSeeder
             logger?.LogInformation("Roles already exist. Skipping initial account seed.");
         }
 
-        // Step 4: Seed permissions + default role assignments
+        // Step 4: Ensure System Admin wallet exists with OwnerType = "System"
+        await EnsureSystemAdminWalletAsync(context, userManager, logger);
+
+        // Step 5: Seed permissions + default role assignments
         // Idempotent — runs on every startup so new permissions defined in code
         // are automatically added to the database on next deployment.
         await SeedPermissionsAsync(context, roleManager, logger);
@@ -353,6 +356,49 @@ public static class DatabaseSeeder
         }
 
         logger?.LogInformation("Wallet seeding completed.");
+    }
+
+    private static async Task EnsureSystemAdminWalletAsync(
+        ApplicationDbContext context,
+        UserManager<ApplicationUser> userManager,
+        ILogger? logger)
+    {
+        logger?.LogInformation("Ensuring System Admin wallet (OwnerType = System)...");
+
+        var systemAdminUser = (await userManager.GetUsersInRoleAsync(Roles.SystemAdmin))
+            .FirstOrDefault();
+
+        if (systemAdminUser == null)
+        {
+            logger?.LogWarning("No user with role {Role} found. Skipping System wallet seeding.", Roles.SystemAdmin);
+            return;
+        }
+
+        var existingWallet = await context.Wallets
+            .FirstOrDefaultAsync(w => w.UserId == systemAdminUser.Id);
+
+        if (existingWallet == null)
+        {
+            var systemWallet = new Domain.Entities.Financial.Wallet(
+                userId: systemAdminUser.Id,
+                ownerType: "System",
+                initialBalance: 0m
+            );
+
+            await context.Wallets.AddAsync(systemWallet);
+            await context.SaveChangesAsync();
+
+            logger?.LogInformation(
+                "✓ Created wallet for System Admin {Email} with OwnerType System → Wallets table",
+                systemAdminUser.Email);
+            return;
+        }
+
+        if (string.Equals(existingWallet.OwnerType, "System", StringComparison.OrdinalIgnoreCase))
+        {
+            logger?.LogInformation("System Admin wallet already exists with OwnerType System. Skipping.");
+            return;
+        }
     }
 
     private static async Task SeedScheduleTemplatesAsync(
