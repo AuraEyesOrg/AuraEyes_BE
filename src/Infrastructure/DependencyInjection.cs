@@ -240,6 +240,7 @@ public static class DependencyInjection
         services.AddSingleton<IAiAssetBaseUrlProvider, AiAssetBaseUrlProvider>();
         services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();
         services.AddScoped<IFullTimeTemplateProvisioningService, FullTimeTemplateProvisioningService>();
+        services.AddScoped<IFullTimeSlotGenerationService, FullTimeSlotGenerationService>();
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
