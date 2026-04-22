@@ -1,4 +1,5 @@
 using Application.Common.Constants;
+using Microsoft.Extensions.Logging;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Wallets.Common;
@@ -27,19 +28,22 @@ public class ProcessPayoutViaPayOSCommandHandler
     private readonly IPayOSPayoutService _payOSPayoutService;
     private readonly IIdentityService _identityService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<ProcessPayoutViaPayOSCommandHandler> _logger;
 
     public ProcessPayoutViaPayOSCommandHandler(
         IWithdrawalRequestRepository withdrawalRequestRepository,
         IWalletRepository walletRepository,
         IPayOSPayoutService payOSPayoutService,
         IIdentityService identityService,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        ILogger<ProcessPayoutViaPayOSCommandHandler> logger)
     {
         _withdrawalRequestRepository = withdrawalRequestRepository;
         _walletRepository = walletRepository;
         _payOSPayoutService = payOSPayoutService;
         _identityService = identityService;
         _unitOfWork = unitOfWork;
+        _logger = logger;
     }
 
     public async Task<Result<PayoutViaPayOSResponse>> Handle(
@@ -79,7 +83,7 @@ public class ProcessPayoutViaPayOSCommandHandler
                 {
                     ReferenceId = referenceId,
                     Amount = (long)withdrawalRequest.Amount,
-                    Description = $"Estimate for {withdrawalRequest.Id}",
+                    Description = $"Est {withdrawalRequest.Id:N}".Substring(0, 25),
                     ToBin = withdrawalRequest.BankBin,
                     ToAccountNumber = withdrawalRequest.BankAccountNumber
                 }
@@ -99,14 +103,19 @@ public class ProcessPayoutViaPayOSCommandHandler
 
         // 2. Tính số tiền thực nhận sau khi trừ phí
         var netPayoutAmount = withdrawalRequest.Amount - estimatedFee;
+        _logger.LogInformation("Payout calculation: Amount={Amount}, Fee={Fee}, Net={Net}", 
+            withdrawalRequest.Amount, estimatedFee, netPayoutAmount);
+
         if (netPayoutAmount <= 0)
         {
+            _logger.LogWarning("Payout amount too low to cover fees: {Amount} <= {Fee}", 
+                withdrawalRequest.Amount, estimatedFee);
             return Result<PayoutViaPayOSResponse>.Failure(
                 $"Số tiền yêu cầu ({withdrawalRequest.Amount:N0} VND) không đủ để trả phí PayOS ({estimatedFee:N0} VND).");
         }
 
         // Mô tả thanh toán (PayOS giới hạn 25 ký tự)
-        var description = $"Rut tien AuraEyes {withdrawalRequest.Amount:N0}";
+        var description = $"AuraEyes {withdrawalRequest.Id:N}".Substring(0, 25);
 
         PayOSPayoutResult payoutResult;
         try
