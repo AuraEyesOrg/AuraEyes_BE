@@ -221,26 +221,28 @@ public class PayOSPayoutService : IPayOSPayoutService
             referenceId,
             category = categoryList,
             validateDestination = true,
-            payouts = payoutList.Select(p => new
+            payouts = payoutList.Select(p => new SortedDictionary<string, object>(StringComparer.Ordinal)
             {
-                referenceId = p.ReferenceId,
-                amount = p.Amount,
-                description = p.Description,
-                toBin = p.ToBin,
-                toAccountNumber = p.ToAccountNumber
+                ["amount"] = p.Amount,
+                ["description"] = p.Description,
+                ["referenceId"] = p.ReferenceId,
+                ["toAccountNumber"] = p.ToAccountNumber,
+                ["toBin"] = p.ToBin
             }).ToList()
         };
 
         var jsonBody = JsonSerializer.Serialize(payload, JsonOptions);
 
-        // Signature for estimate-credit: same encodeURIComponent format as CreatePayoutAsync.
-        // Only include top-level scalar/array fields; nested "payouts" array is excluded.
-        var estimateSigFields = new SortedDictionary<string, object>(StringComparer.Ordinal)
+        // Signature for estimate-credit: ALL top-level body fields, sorted alphabetically.
+        // Nested objects/arrays are stringified (minified JSON).
+        var signatureFields = new SortedDictionary<string, object>(StringComparer.Ordinal)
         {
             ["category"] = (object)categoryList,
+            ["payouts"] = (object)payload.payouts,
             ["referenceId"] = (object)referenceId,
+            ["validateDestination"] = (object)true,
         };
-        var signatureData = BuildPayOSSignatureData(estimateSigFields);
+        var signatureData = BuildPayOSSignatureData(signatureFields);
         var signature = GenerateSignature(signatureData);
 
         _logger.LogInformation("Estimating PayOS payout credit: ReferenceId={ReferenceId}", referenceId);
@@ -251,6 +253,10 @@ public class PayOSPayoutService : IPayOSPayoutService
 
         var response = await _httpClient.SendAsync(request, cancellationToken);
         var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "PayOS estimate credit response: StatusCode={StatusCode}, Body={Body}",
+            (int)response.StatusCode, responseContent);
 
         response.EnsureSuccessStatusCode();
 
@@ -343,9 +349,13 @@ public class PayOSPayoutService : IPayOSPayoutService
             string strValue;
             if (value is System.Collections.IEnumerable enumerable and not string)
             {
-                // Arrays → JSON.stringify equivalent: ["salary"] or ["salary","hoa"]
-                var items = enumerable.Cast<object>().Select(item => $"\"{item}\"");
-                strValue = $"[{string.Join(",", items)}]";
+                // Arrays → JSON.stringify equivalent for PayOS
+                // This correctly handles both List<string> and List<object> (payouts)
+                strValue = JsonSerializer.Serialize(enumerable, JsonOptions);
+            }
+            else if (value is bool b)
+            {
+                strValue = b ? "true" : "false";
             }
             else
             {
