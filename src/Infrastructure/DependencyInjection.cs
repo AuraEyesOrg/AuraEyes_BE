@@ -202,6 +202,8 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentSlotRepository, AppointmentSlotRepository>();
         services.AddScoped<IExperiencePricingRuleRepository, ExperiencePricingRuleRepository>();
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
+        services.AddScoped<ISlotAssignmentRepository, SlotAssignmentRepository>();
+        services.AddScoped<IPatientVisitRepository, PatientVisitRepository>();
         services.AddScoped<IConsultationSessionRepository, ConsultationSessionRepository>();
         services.AddScoped<IOrganisationFeedbackRepository, OrganisationFeedbackRepository>();
         services.AddScoped<IOphthalmologistFeedbackRepository, OphthalmologistFeedbackRepository>();
@@ -241,7 +243,6 @@ public static class DependencyInjection
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
-        services.AddHostedService<ReservationExpirationWorker>();
         services.AddHostedService<ConsultationStateWorker>();
 
         // Register Hangfire daily job

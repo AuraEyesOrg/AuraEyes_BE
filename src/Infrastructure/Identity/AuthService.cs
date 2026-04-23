@@ -39,7 +39,6 @@ public class AuthService : IAuthService
     private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
     private readonly IClinicStaffRepository _clinicStaffRepository;
     private readonly IContractRepository _contractRepository;
-    private readonly IFullTimeTemplateProvisioningService _fullTimeTemplateProvisioningService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
@@ -58,7 +57,6 @@ public class AuthService : IAuthService
         IRepository<Ophthalmologist> ophthalmologistRepository,
         IClinicStaffRepository clinicStaffRepository,
         IContractRepository contractRepository,
-        IFullTimeTemplateProvisioningService fullTimeTemplateProvisioningService,
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
@@ -76,7 +74,6 @@ public class AuthService : IAuthService
         _ophthalmologistRepository = ophthalmologistRepository;
         _clinicStaffRepository = clinicStaffRepository;
         _contractRepository = contractRepository;
-        _fullTimeTemplateProvisioningService = fullTimeTemplateProvisioningService;
         _unitOfWork = unitOfWork;
         _userManager = userManager;
         _signInManager = signInManager;
@@ -319,13 +316,7 @@ public class AuthService : IAuthService
 
             if (ophthalmologist.EmploymentType == OphthalmologistEmploymentType.FullTime)
             {
-                var createdTemplates = await _fullTimeTemplateProvisioningService
-                    .EnsureSystemGeneratedTemplatesAsync(ophthalmologist, cancellationToken);
-
-                _logger.LogInformation(
-                    "Provisioned {CreatedTemplates} system templates for newly registered full-time ophthalmologist {OphthalmologistId}",
-                    createdTemplates,
-                    ophthalmologist.Id);
+                // Full time template provisioning is now clinic-level, not doctor-level.
             }
 
             // All DB operations succeeded — commit transaction

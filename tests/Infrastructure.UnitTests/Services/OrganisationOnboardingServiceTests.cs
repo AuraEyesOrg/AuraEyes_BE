@@ -203,7 +203,7 @@ public class OrganisationOnboardingServiceTests
     public async Task ApproveRequestAsync_ShouldCreateOrganisationAdmin_AndApproveRequest()
     {
         await using var context = CreateContext();
-        await EnsureRoleAsync(context, Roles.OrgAdmin);
+        await EnsureRoleAsync(context, Roles.SystemAdmin);
         var request = new OrganisationOnboardingRequest("Org C", OrgType.Hospital, "Owner C", "ownerc@test.local", "0909", "Addr", "LIC-1");
         await context.OrganisationOnboardingRequests.AddAsync(request);
         await context.ContractTemplates.AddAsync(new ContractTemplate(
@@ -229,7 +229,7 @@ public class OrganisationOnboardingServiceTests
     public async Task ApproveRequestAsync_WhenNoActiveTemplate_ShouldStillSucceedWithoutContract()
     {
         await using var context = CreateContext();
-        await EnsureRoleAsync(context, Roles.OrgAdmin);
+        await EnsureRoleAsync(context, Roles.SystemAdmin);
         var request = new OrganisationOnboardingRequest("Org D", OrgType.Clinic, "Owner D", "ownerd@test.local");
         await context.OrganisationOnboardingRequests.AddAsync(request);
         var inactiveTemplate = new ContractTemplate("Inactive", ContractType.MedicalOrganizationContract, "v1", "<html/>");
@@ -248,7 +248,7 @@ public class OrganisationOnboardingServiceTests
     public async Task ApproveRequestAsync_ShouldAssignOrgAdminRoleToCreatedUser()
     {
         await using var context = CreateContext();
-        await EnsureRoleAsync(context, Roles.OrgAdmin);
+        await EnsureRoleAsync(context, Roles.SystemAdmin);
         var request = new OrganisationOnboardingRequest("Org Role", OrgType.Clinic, "Role Owner", "role-owner@test.local");
         await context.OrganisationOnboardingRequests.AddAsync(request);
         await context.SaveChangesAsync();
@@ -258,7 +258,7 @@ public class OrganisationOnboardingServiceTests
 
         result.IsSuccess.Should().BeTrue();
         var createdUserId = result.Data!.OrgAdminUserId;
-        var role = await context.Roles.FirstAsync(r => r.Name == Roles.OrgAdmin);
+        var role = await context.Roles.FirstAsync(r => r.Name == Roles.SystemAdmin);
         var hasRole = await context.UserRoles.AnyAsync(ur => ur.UserId == createdUserId && ur.RoleId == role.Id);
         hasRole.Should().BeTrue();
     }
@@ -267,7 +267,7 @@ public class OrganisationOnboardingServiceTests
     public async Task ApproveRequestAsync_WhenEmailSendingFails_ShouldReturnFailure()
     {
         await using var context = CreateContext();
-        await EnsureRoleAsync(context, Roles.OrgAdmin);
+        await EnsureRoleAsync(context, Roles.SystemAdmin);
         var request = new OrganisationOnboardingRequest("Org E", OrgType.Clinic, "Owner E", "ownere@test.local");
         await context.OrganisationOnboardingRequests.AddAsync(request);
         await context.SaveChangesAsync();
@@ -292,6 +292,7 @@ public class OrganisationOnboardingServiceTests
             new Repository<ContractTemplate>(context),
             new ContractRepository(context),
             emailService,
+            new FakeNotificationService(),
             context,
             userManager,
             Options.Create(new AdminNotificationSettings { OrganisationOnboardingEmail = adminEmail }),
@@ -357,6 +358,9 @@ public class OrganisationOnboardingServiceTests
             Sent.Add((to, subject, body, isHtml));
             return Task.CompletedTask;
         }
+        public Task SendClinicAppointmentConfirmationAsync(string email, ClinicAppointmentConfirmationEmailPayload payload, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task SendOrganisationScreeningResultShareAsync(string email, OrganisationScreeningResultShareEmailPayload payload, IReadOnlyCollection<EmailAttachment> attachments, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task SendWithAttachmentsAsync(string to, string subject, string body, IReadOnlyCollection<EmailAttachment> attachments, bool isHtml = true, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class ThrowingEmailService : IEmailService
@@ -366,5 +370,15 @@ public class OrganisationOnboardingServiceTests
         public Task SendWelcomeEmailAsync(string email, string fullName, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task SendAsync(string to, string subject, string body, bool isHtml = true, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("smtp-down");
+        public Task SendClinicAppointmentConfirmationAsync(string email, ClinicAppointmentConfirmationEmailPayload payload, CancellationToken cancellationToken = default) => throw new InvalidOperationException("smtp-down");
+        public Task SendOrganisationScreeningResultShareAsync(string email, OrganisationScreeningResultShareEmailPayload payload, IReadOnlyCollection<EmailAttachment> attachments, CancellationToken cancellationToken = default) => throw new InvalidOperationException("smtp-down");
+        public Task SendWithAttachmentsAsync(string to, string subject, string body, IReadOnlyCollection<EmailAttachment> attachments, bool isHtml = true, CancellationToken cancellationToken = default) => throw new InvalidOperationException("smtp-down");
+    }
+
+    private sealed class FakeNotificationService : INotificationService
+    {
+        public Task SendAsync(Guid userId, string title, string message, NotificationType type, object? payload = null, CancellationToken cancellationToken = default, Guid? referenceId = null) => Task.CompletedTask;
+        public Task SendToRoleAsync(string roleName, string title, string message, NotificationType type = NotificationType.SystemAlert, object? payload = null, CancellationToken cancellationToken = default, Guid? referenceId = null) => Task.CompletedTask;
+        public Task SendAsync(Guid userId, string message, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

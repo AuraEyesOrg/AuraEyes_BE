@@ -65,6 +65,8 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<ScheduleTemplate> ScheduleTemplates => Set<ScheduleTemplate>();
     public DbSet<AppointmentSlot> AppointmentSlots => Set<AppointmentSlot>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<SlotAssignment> SlotAssignments => Set<SlotAssignment>();
+    public DbSet<PatientVisit> PatientVisits => Set<PatientVisit>();
     public DbSet<OphthalmologistLeaveRequest> OphthalmologistLeaveRequests => Set<OphthalmologistLeaveRequest>();
     public DbSet<ExperiencePricingRule> ExperiencePricingRules => Set<ExperiencePricingRule>();
 

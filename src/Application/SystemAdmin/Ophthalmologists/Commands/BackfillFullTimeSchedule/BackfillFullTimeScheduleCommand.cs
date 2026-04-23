@@ -1,12 +1,12 @@
+using Application.Common.Interfaces;
 using Application.Common.Models;
-using MediatR;
 
 namespace Application.SystemAdmin.Ophthalmologists.Commands.BackfillFullTimeSchedule;
 
 /// <summary>
 /// Backfills system-generated full-time templates and missing slots for one ophthalmologist.
 /// </summary>
-public record BackfillFullTimeScheduleCommand : IRequest<Result<BackfillFullTimeScheduleResultDto>>
+public record BackfillFullTimeScheduleCommand : ICommand<BackfillFullTimeScheduleResultDto>
 {
     public Guid OphthalmologistId { get; init; }
     public int? WindowDays { get; init; }

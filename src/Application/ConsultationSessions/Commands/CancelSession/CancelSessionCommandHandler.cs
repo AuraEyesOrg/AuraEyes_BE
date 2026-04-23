@@ -133,14 +133,17 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
                 var slot = await _slotRepository.GetByIdWithLockAsync(
                     session.AppointmentSlotId.Value, cancellationToken);
 
-                if (slot is not null && slot.Status == ScheduleStatus.Booked)
+                if (slot is not null && slot.BookedCount > 0)
                 {
                     if (isCancelledByDoctor)
                     {
                         slot.CancelBooking(); // Release back to Available first to allow cancellation
-                        slot.Cancel(); // "Burn" the slot — Cancelled, no rebooking
+                        if (slot.BookedCount == 0) 
+                        {
+                            slot.Block(); // "Burn" the slot — Blocked, no rebooking
+                        }
                         _logger.LogInformation(
-                            "Slot {SlotId} burned (doctor-cancelled session {SessionId}).",
+                            "Slot {SlotId} burned/released (doctor-cancelled session {SessionId}).",
                             slot.Id, session.Id);
                     }
                     else

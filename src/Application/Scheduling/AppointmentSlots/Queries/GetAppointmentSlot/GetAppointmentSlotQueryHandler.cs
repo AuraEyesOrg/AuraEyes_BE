@@ -20,16 +20,12 @@ public class GetAppointmentSlotQueryHandler : IQueryHandler<GetAppointmentSlotQu
         if (slot is null)
             return Result<AppointmentSlotDto>.NotFound($"Appointment slot with ID '{request.SlotId}' was not found.");
 
-        var availableCapacity = slot.ScheduleTemplate != null
-            ? slot.ScheduleTemplate.MaxCapacity - slot.BookedCount
-            : 0;
+        var availableCapacity = slot.MaxCapacity - slot.BookedCount;
 
         var dto = new AppointmentSlotDto
         {
             Id = slot.Id,
             ScheduleTemplateId = slot.ScheduleTemplateId,
-            OphthalId = slot.ScheduleTemplate?.OphthalId,
-            OrgId = slot.ScheduleTemplate?.OrgId,
             Date = slot.Date,
             StartTime = slot.StartTime,
             EndTime = slot.EndTime,
@@ -38,8 +34,6 @@ public class GetAppointmentSlotQueryHandler : IQueryHandler<GetAppointmentSlotQu
             MaxCapacity = slot.MaxCapacity,
             BookedCount = slot.BookedCount,
             AvailableCapacity = availableCapacity,
-            ReservedBy = slot.ReservedBy,
-            ReservationExpireAt = slot.ReservationExpireAt,
             CreatedAt = slot.CreatedAt,
             UpdatedAt = slot.UpdatedAt
         };
