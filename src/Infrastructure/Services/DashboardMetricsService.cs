@@ -874,7 +874,7 @@ public class DashboardMetricsService : IDashboardMetricsService
             ? 0m
             : Math.Round((decimal)totalBooked / totalCapacity * 100m, 1);
 
-        var quota = await _aiQuotaService.GetQuotaAsync(userId, Roles.OrgAdmin, cancellationToken);
+        var quota = await _aiQuotaService.GetQuotaAsync(userId, Roles.SystemAdmin, cancellationToken);
 
         return new OrganisationDashboardMetricsDto
         {

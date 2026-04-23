@@ -51,7 +51,7 @@ public sealed class GetBillingSummaryQueryHandler
 
         var quota = await _aiQuotaService.GetQuotaAsync(
             request.OrgAdminUserId,
-            Roles.OrgAdmin,
+            Roles.SystemAdmin,
             cancellationToken);
 
         var configuredUnitPrice = await _settingService.GetSettingAsync("AI_QUOTA_UNIT_PRICE", cancellationToken);

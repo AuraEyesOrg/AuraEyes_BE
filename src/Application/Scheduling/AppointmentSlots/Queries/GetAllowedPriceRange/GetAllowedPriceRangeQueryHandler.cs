@@ -37,7 +37,7 @@ public class GetAllowedPriceRangeQueryHandler : IQueryHandler<GetAllowedPriceRan
                     "You are not authorized to access pricing range of another ophthalmologist.");
             }
         }
-        else if (!_currentUser.IsInRole(Roles.OrgAdmin) && !_currentUser.IsInRole(Roles.SystemAdmin))
+        else if (!_currentUser.IsInRole(Roles.ClinicStaff) && !_currentUser.IsInRole(Roles.SystemAdmin))
         {
             return Result<AllowedPriceRangeDto>.Forbidden("You are not authorized to access this resource.");
         }

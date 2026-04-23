@@ -41,6 +41,7 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<Ophthalmologist> Ophthalmologists => Set<Ophthalmologist>();
     public DbSet<OphthalmologistEmploymentTypeChangeRequest> OphthalmologistEmploymentTypeChangeRequests => Set<OphthalmologistEmploymentTypeChangeRequest>();
     public DbSet<Patient> Patients => Set<Patient>();
+    public DbSet<ClinicStaff> ClinicStaffs => Set<ClinicStaff>();
     public DbSet<OrganisationPatientLink> OrganisationPatientLinks => Set<OrganisationPatientLink>();
     public DbSet<Certificate> Certificates => Set<Certificate>();
     public DbSet<Consent> Consents => Set<Consent>();

@@ -44,12 +44,7 @@ public class GetUserProfileQueryHandler : IQueryHandler<GetUserProfileQuery, Use
         var roles = await _identityService.GetUserRolesAsync(request.UserId);
 
         string? bio = ophthalmologist?.Bio;
-        if (roles.Contains(Roles.OrgAdmin))
-        {
-            var organisation = await _organisationRepository.Query()
-                .FirstOrDefaultAsync(o => o.OwnerId == request.UserId, cancellationToken);
-            bio = organisation?.Description;
-        }
+        // In Digital Clinic model there is no separate Organisation entity
 
         var postCount = await _postRepository.GetPostCountByAuthorAsync(request.UserId, cancellationToken);
 

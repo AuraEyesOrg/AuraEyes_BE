@@ -247,7 +247,8 @@ public class AiQuotaService : IAiQuotaService
 
     private static bool IsOrganisationQuotaRole(string role)
     {
-        return string.Equals(role, Roles.OrgAdmin, StringComparison.OrdinalIgnoreCase);
+        // In Digital Clinic model, SystemAdmin manages clinic-level quota
+        return string.Equals(role, Roles.SystemAdmin, StringComparison.OrdinalIgnoreCase);
     }
 
     private static decimal ApplyOrganisationDiscount(decimal patientUnitPrice)

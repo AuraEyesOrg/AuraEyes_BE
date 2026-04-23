@@ -37,9 +37,9 @@ public class GetWalletQueryHandler : IQueryHandler<GetWalletQuery, WalletDto>
             var roles = await _identityService.GetUserRolesAsync(request.UserId);
             var ownerType = roles.Contains(Roles.Ophthalmologist)
                 ? "Ophthalmologist"
-                : roles.Contains(Roles.OrgAdmin)
-                    ? "Organisation"
-                    : Roles.Patient;
+                : roles.Contains(Roles.ClinicStaff)
+                    ? "ClinicStaff"
+                    : "Patient";
 
             wallet = new Wallet(request.UserId, ownerType, 0);
             await _walletRepository.AddAsync(wallet, cancellationToken);

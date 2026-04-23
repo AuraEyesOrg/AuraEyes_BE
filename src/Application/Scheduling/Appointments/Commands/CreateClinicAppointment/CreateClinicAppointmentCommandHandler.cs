@@ -250,7 +250,7 @@ public class CreateClinicAppointmentCommandHandler
                         cancellationToken);
 
                     var organisationAdminUserIds = await _identityService.GetUserIdsByRoleAndOrganizationAsync(
-                        Roles.OrgAdmin,
+                        Roles.SystemAdmin,
                         request.OrganisationId,
                         cancellationToken);
 

@@ -198,7 +198,7 @@ public class SaveAiScreeningResultsCommandHandler : ICommandHandler<SaveAiScreen
             return;
 
         var organisationAdminUserIds = await _identityService.GetUserIdsByRoleAndOrganizationAsync(
-            Roles.OrgAdmin,
+            Roles.SystemAdmin,
             organisationId,
             cancellationToken);
 
