@@ -7,6 +7,7 @@ using Application.Scheduling.AppointmentSlots.Common;
 using Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlot;
 using Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlots;
 using Application.SystemAdmin.Organisations.Queries.GetOrganisations;
+using Application.Organisations.Queries.GetOrganisationSchedule;
 using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -164,6 +165,25 @@ public class PatientSearchController : BaseApiController
     public async Task<IActionResult> GetAvailableSlotDetail(Guid slotId)
     {
         var result = await _mediator.Send(new GetAppointmentSlotQuery(slotId));
+        return HandleResult(result);
+    }
+
+    [HttpGet("organisations/{organisationId:guid}/schedule")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<OrganisationScheduleDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOrganisationSchedule(
+        Guid organisationId,
+        [FromQuery] DateOnly? fromDate = null,
+        [FromQuery] DateOnly? toDate = null)
+    {
+        var query = new GetOrganisationScheduleQuery
+        {
+            OrganisationId = organisationId,
+            FromDate = fromDate,
+            ToDate = toDate
+        };
+
+        var result = await _mediator.Send(query);
         return HandleResult(result);
     }
 }

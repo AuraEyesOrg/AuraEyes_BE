@@ -1,0 +1,23 @@
+using Application.Common.Models;
+using Application.Scheduling.AppointmentSlots.Common;
+using MediatR;
+
+namespace Application.Organisations.Queries.GetOrganisationSchedule;
+
+public class GetOrganisationScheduleQuery : IRequest<Result<OrganisationScheduleDto>>
+{
+    public Guid OrganisationId { get; init; }
+    public DateOnly? FromDate { get; init; }
+    public DateOnly? ToDate { get; init; }
+}
+
+public class OrganisationScheduleDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Address { get; set; }
+    public string? Description { get; set; }
+    public decimal RatingAverage { get; set; }
+    public int RatingCount { get; set; }
+    public List<AppointmentSlotListDto> AvailableSlots { get; set; } = new();
+}
