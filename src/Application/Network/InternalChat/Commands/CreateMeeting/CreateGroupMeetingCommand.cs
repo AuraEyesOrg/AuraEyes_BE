@@ -55,7 +55,7 @@ public class CreateGroupMeetingCommandHandler : ICommandHandler<CreateGroupMeeti
         
         foreach (var memberId in memberIds)
         {
-            var user = await _identityService.GetUserByIdAsync(memberId, cancellationToken);
+            var user = await _identityService.GetUserByIdAsync(memberId);
             if (user != null && !string.IsNullOrEmpty(user.Email))
             {
                 attendeeEmails.Add(user.Email);

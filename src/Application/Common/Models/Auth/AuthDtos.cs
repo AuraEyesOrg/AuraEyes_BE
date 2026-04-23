@@ -270,8 +270,8 @@ public record UserInfoResponse
     public string? ContractStatus { get; init; }
 
     /// <summary>
-    /// Indicates whether the user must change password before accessing protected features.
-    /// Used for first login after temporary credentials are provisioned.
+    /// Indicates whether the user must update their profile information before accessing protected features.
+    /// Used for initial onboarding of new staff members.
     /// </summary>
     public bool MustUpdateProfile { get; init; }
 

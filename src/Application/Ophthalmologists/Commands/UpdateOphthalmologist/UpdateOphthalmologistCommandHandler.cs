@@ -61,6 +61,7 @@ public class UpdateOphthalmologistCommandHandler : ICommandHandler<UpdateOphthal
                     request.Phone,
                     null, null,
                     request.Address,
+                    null, // CitizenId not updated from ophthalmologist profile
                     cancellationToken);
 
                 if (!succeeded)

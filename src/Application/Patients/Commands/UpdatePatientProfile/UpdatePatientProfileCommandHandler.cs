@@ -61,6 +61,7 @@ public class UpdatePatientProfileCommandHandler : ICommandHandler<UpdatePatientP
             dateOfBirth,
             genderValue,
             request.Address,
+            request.CitizenId, // Assuming CitizenId is part of the request, otherwise pass null
             cancellationToken);
 
         if (!succeeded)

@@ -378,8 +378,7 @@ public class IdentityService : IIdentityService
             user.IsDeleted,
             user.OrganizationId,
             user.TwoFactorEnabled,
-            avatarUrl,
-            user.MustChangePassword
+            avatarUrl
         );
     }
 
@@ -634,8 +633,7 @@ public class IdentityService : IIdentityService
                 user.IsActive,
                 user.EmailConfirmed,
                 user.CreatedAt,
-                user.LastLoginAt,
-                user.MustChangePassword
+                user.LastLoginAt
             ));
         }
 
@@ -756,7 +754,6 @@ public class IdentityService : IIdentityService
             EmailConfirmed = user.EmailConfirmed,
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt,
-            MustChangePassword = user.MustChangePassword,
         };
     }
 
@@ -894,7 +891,6 @@ public class IdentityService : IIdentityService
         if (result.Succeeded)
         {
             user.UpdatedAt = DateTime.UtcNow;
-            user.MustChangePassword = false;
             await _userManager.UpdateAsync(user);
         }
 
@@ -1061,200 +1057,5 @@ public class IdentityService : IIdentityService
         }
 
         await _context.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task<List<UserAdminDto>> GetInternalUsersAsync(string? searchTerm = null, CancellationToken cancellationToken = default)
-    {
-        var internalRoles = new[] { "SystemAdmin", "Ophthalmologist", "ClinicStaff" };
-        var users = new List<ApplicationUser>();
-
-        foreach (var role in internalRoles)
-        {
-            var usersInRole = await _userManager.GetUsersInRoleAsync(role);
-            users.AddRange(usersInRole.Where(u => !u.IsDeleted && u.IsActive));
-        }
-
-        // Distinct by Id
-        var distinctUsersList = users.GroupBy(u => u.Id).Select(g => g.First()).ToList();
-
-        if (!string.IsNullOrWhiteSpace(searchTerm))
-        {
-            distinctUsersList = distinctUsersList.Where(u =>
-                (u.Email != null && u.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
-                u.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
-        }
-
-        var result = new List<UserAdminDto>();
-        foreach (var user in distinctUsersList)
-        {
-            var roles = await _userManager.GetRolesAsync(user);
-            result.Add(new UserAdminDto(
-                user.Id,
-                user.Email ?? string.Empty,
-                user.FullName,
-                user.PhoneNumber,
-                roles.ToList(),
-                GetUserStatus(user),
-                user.IsActive,
-                user.EmailConfirmed,
-                user.CreatedAt,
-                user.LastLoginAt,
-                user.MustChangePassword
-            ));
-        }
-
-        return result;
-    }
-
-    public async Task<(List<UserAdminDto> Users, int TotalCount)> GetUsersAsync(
-        string? searchTerm = null,
-        string? roleFilter = null,
-        string? statusFilter = null,
-        int pageNumber = 1,
-        int pageSize = 10,
-        CancellationToken cancellationToken = default)
-    {
-        var query = _userManager.Users.Where(u => !u.IsDeleted);
-
-        if (!string.IsNullOrWhiteSpace(searchTerm))
-        {
-            query = query.Where(u => u.Email.Contains(searchTerm) || u.FullName.Contains(searchTerm));
-        }
-
-        if (!string.IsNullOrWhiteSpace(statusFilter))
-        {
-            switch (statusFilter.ToLower())
-            {
-                case "active":
-                    query = query.Where(u => u.IsActive && u.EmailConfirmed);
-                    break;
-                case "pending":
-                    query = query.Where(u => !u.EmailConfirmed);
-                    break;
-                case "suspended":
-                case "locked":
-                    query = query.Where(u => !u.IsActive || (u.LockoutEnd != null && u.LockoutEnd > DateTimeOffset.UtcNow));
-                    break;
-            }
-        }
-
-        var totalCount = await query.CountAsync(cancellationToken);
-        
-        // This is a simple implementation. In a real system with many users, 
-        // we would do the role filtering in the database query.
-        var pagedUsers = await query
-            .OrderByDescending(u => u.CreatedAt)
-            .ToListAsync(cancellationToken);
-
-        var resultUsers = new List<UserAdminDto>();
-        foreach (var user in pagedUsers)
-        {
-            var roles = await _userManager.GetRolesAsync(user);
-            
-            if (!string.IsNullOrEmpty(roleFilter) && !roles.Contains(roleFilter))
-                continue;
-
-            resultUsers.Add(new UserAdminDto(
-                user.Id,
-                user.Email,
-                user.FullName,
-                user.PhoneNumber,
-                roles.ToList(),
-                GetUserStatus(user),
-                user.IsActive,
-                user.EmailConfirmed,
-                user.CreatedAt,
-                user.LastLoginAt,
-                user.MustChangePassword
-            ));
-        }
-
-        var filteredCount = resultUsers.Count;
-        var paginatedResult = resultUsers
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .ToList();
-
-        return (paginatedResult, string.IsNullOrEmpty(roleFilter) ? totalCount : filteredCount);
-    }
-
-    public async Task<UserMetricsDto> GetUserMetricsAsync(CancellationToken cancellationToken = default)
-    {
-        var totalUsers = await _userManager.Users.CountAsync(u => !u.IsDeleted, cancellationToken);
-        var activeDoctors = await GetUsersInRoleCountAsync("Ophthalmologist", true, cancellationToken);
-        var pendingApprovals = await GetPendingApprovalsCountAsync(cancellationToken);
-        
-        var patientsScreened = await _context.Screenings.CountAsync(cancellationToken);
-        
-        var clinicStaffCount = await GetUsersInRoleCountAsync("ClinicStaff", false, cancellationToken);
-        var ophthalmologistCount = await GetUsersInRoleCountAsync("Ophthalmologist", false, cancellationToken);
-
-        return new UserMetricsDto(
-            totalUsers,
-            0,
-            activeDoctors,
-            0,
-            patientsScreened,
-            0,
-            pendingApprovals,
-            clinicStaffCount,
-            ophthalmologistCount
-        );
-    }
-
-    public async Task<int> GetUsersInRoleCountAsync(string role, bool activeOnly = true, CancellationToken cancellationToken = default)
-    {
-        var users = await _userManager.GetUsersInRoleAsync(role);
-        var query = users.AsQueryable();
-        if (activeOnly)
-            query = query.Where(u => u.IsActive && !u.IsDeleted);
-        
-        return query.Count();
-    }
-
-    public async Task<int> GetPendingApprovalsCountAsync(CancellationToken cancellationToken = default)
-    {
-        return await _userManager.Users.CountAsync(u => !u.EmailConfirmed && !u.IsDeleted, cancellationToken);
-    }
-
-    public async Task<(bool Succeeded, string[] Errors)> ActivateUserAsync(Guid userId)
-    {
-        var user = await _userManager.FindByIdAsync(userId.ToString());
-        if (user == null) return (false, new[] { "User not found" });
-
-        user.IsActive = true;
-        user.UpdatedAt = DateTime.UtcNow;
-        var result = await _userManager.UpdateAsync(user);
-        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
-    }
-
-    public async Task<(bool Succeeded, string[] Errors)> ApproveUserAsync(Guid userId)
-    {
-        var user = await _userManager.FindByIdAsync(userId.ToString());
-        if (user == null) return (false, new[] { "User not found" });
-
-        user.EmailConfirmed = true;
-        user.IsActive = true;
-        user.UpdatedAt = DateTime.UtcNow;
-        var result = await _userManager.UpdateAsync(user);
-        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
-    }
-
-    public async Task<(bool Succeeded, string[] Errors)> RemoveFromRoleAsync(Guid userId, string role)
-    {
-        var user = await _userManager.FindByIdAsync(userId.ToString());
-        if (user == null) return (false, new[] { "User not found" });
-
-        var result = await _userManager.RemoveFromRoleAsync(user, role);
-        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
-    }
-
-    private string GetUserStatus(ApplicationUser user)
-    {
-        if (user.IsDeleted) return "Deleted";
-        if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow) return "Locked";
-        if (!user.IsActive) return "Suspended";
-        if (!user.EmailConfirmed) return "Pending";
-        return "Active";
     }
 }

@@ -859,7 +859,6 @@ public class AuthService : IAuthService
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
                 ContractStatus = contractStatus,
-                MustUpdateProfile = user.MustUpdateProfile,
                 EmploymentType = employmentType,
                 StaffSubRoles = staffSubRoles,
                 Permissions = permissions.ToArray()
@@ -1006,7 +1005,7 @@ public class AuthService : IAuthService
                     IsVerified = isVerified,
                     VerificationStatus = verificationStatus,
                     ContractStatus = contractStatus,
-                    MustChangePassword = user.MustChangePassword,
+                    MustUpdateProfile = user.MustUpdateProfile,
                     EmploymentType = employmentType,
                     StaffSubRoles = staffSubRoles,
                     Permissions = permissions.ToArray()
@@ -1258,7 +1257,6 @@ public class AuthService : IAuthService
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
                 ContractStatus = contractStatus,
-                MustChangePassword = identityUser?.MustChangePassword ?? false,
                 MustUpdateProfile = identityUser?.MustUpdateProfile ?? false,
                 EmploymentType = employmentType,
                 StaffSubRoles = staffSubRoles,

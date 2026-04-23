@@ -1,4 +1,5 @@
 using Application.Common.Constants;
+using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Network.InternalChat.Commands.CreateGroupChat;
 using Application.Network.InternalChat.Commands.SendMessage;
@@ -23,17 +24,6 @@ public class InternalChatController : BaseApiController
     public InternalChatController(IMediator mediator)
     {
         _mediator = mediator;
-    }
-
-    /// <summary>
-    /// Search for internal system users (Staff/Doctors) to add to groups.
-    /// </summary>
-    [HttpGet("users")]
-    [ProducesResponseType(typeof(ApiResponse<List<UserAdminDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetUsers([FromQuery] string? searchTerm)
-    {
-        var result = await _mediator.Send(new Application.Network.InternalChat.Queries.GetInternalUsers.GetInternalUsersQuery { SearchTerm = searchTerm });
-        return Ok(ApiResponseFactory.Success(result));
     }
 
     /// <summary>

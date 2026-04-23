@@ -208,11 +208,6 @@ public interface IIdentityService
     /// Synchronize all roles with their default permissions defined in code.
     /// </summary>
     Task SynchronizeRolesWithDefaultsAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Get all internal staff and doctors (SystemAdmin, Ophthalmologist, ClinicStaff).
-    /// </summary>
-    Task<List<UserAdminDto>> GetInternalUsersAsync(string? searchTerm = null, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -227,8 +222,7 @@ public record UserDto(
     bool IsDeleted,
     Guid? OrganizationId,
     bool TwoFactorEnabled = false,
-    string? AvatarUrl = null,
-    bool MustChangePassword = false
+    string? AvatarUrl = null
 );
 
 /// <summary>
@@ -244,8 +238,7 @@ public record UserAdminDto(
     bool IsActive,
     bool EmailConfirmed,
     DateTime CreatedAt,
-    DateTime? LastLoginAt,
-    bool MustChangePassword = false
+    DateTime? LastLoginAt
 );
 
 /// <summary>
@@ -258,9 +251,7 @@ public record UserMetricsDto(
     decimal ActiveDoctorsChange,
     int PatientsScreened,
     decimal PatientsScreenedChange,
-    int PendingApprovals,
-    int ClinicStaffCount,
-    int OphthalmologistCount
+    int PendingApprovals
 );
 
 /// <summary>
@@ -280,7 +271,6 @@ public record UserDetailsDto
     public bool EmailConfirmed { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
-    public bool MustChangePassword { get; init; }
 }
 
 /// <summary>

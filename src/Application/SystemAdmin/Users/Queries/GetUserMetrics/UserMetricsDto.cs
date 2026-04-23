@@ -12,6 +12,4 @@ public class UserMetricsDto
     public int PatientsScreened { get; set; }
     public decimal PatientsScreenedChange { get; set; }
     public int PendingApprovals { get; set; }
-    public int ClinicStaffCount { get; set; }
-    public int OphthalmologistCount { get; set; }
 }

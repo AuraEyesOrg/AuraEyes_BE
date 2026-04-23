@@ -97,7 +97,7 @@ public class OnboardStaffCommandHandler : ICommandHandler<OnboardStaffCommand, G
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
-            // 5. Finalize onboarding (Confirm email + Set MustChangePassword)
+            // 5. Finalize onboarding (Confirm email + Set MustUpdateProfile)
             await _identityService.SetStaffOnboardingStatusAsync(user.Id);
 
             // 6. Send beautiful onboarding email with temporary password
