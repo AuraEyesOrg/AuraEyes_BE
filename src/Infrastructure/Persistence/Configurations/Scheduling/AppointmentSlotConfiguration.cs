@@ -25,9 +25,6 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
             .HasMaxLength(20)
             .HasDefaultValue(Domain.Enums.SlotSource.Doctor);
 
-        builder.Property(e => e.Cost)
-            .HasPrecision(18, 2);
-
         builder.Property(e => e.MaxCapacity)
             .HasDefaultValue(1);
 

@@ -40,7 +40,6 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
                 StartTime = slot.StartTime,
                 EndTime = slot.EndTime,
                 Status = slot.Status.ToString(),
-                Cost = slot.Cost,
                 MaxCapacity = slot.MaxCapacity,
                 BookedCount = slot.BookedCount,
                 AvailableCapacity = availableCapacity,

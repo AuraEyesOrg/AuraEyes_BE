@@ -20,10 +20,6 @@ public class ScheduleTemplateConfiguration : IEntityTypeConfiguration<ScheduleTe
         builder.Property(e => e.MaxCapacity)
             .IsRequired();
 
-        builder.Property(e => e.Cost)
-            .HasPrecision(18, 2)
-            .IsRequired(false);
-
         builder.Property(e => e.Source)
             .HasConversion<string>()
             .HasMaxLength(30)

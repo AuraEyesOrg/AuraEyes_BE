@@ -58,6 +58,10 @@ public class OphthalmologistConfiguration : IEntityTypeConfiguration<Ophthalmolo
         builder.Property(e => e.RatingCount)
             .HasDefaultValue(0);
 
+        builder.Property(e => e.ConsultationFee)
+            .HasPrecision(18, 2)
+            .HasDefaultValue(0m);
+
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
