@@ -45,17 +45,16 @@ public class PatientVisit : BaseEntity, IAggregateRoot
     /// <summary>
     /// Create a visit from an existing appointment (scheduled visit).
     /// </summary>
-    public static PatientVisit CreateFromAppointment(Guid appointmentId, Guid patientId)
+    public static PatientVisit CreateFromAppointment(Appointment appointment)
     {
-        if (appointmentId == Guid.Empty)
-            throw new ArgumentException("Appointment ID is required.", nameof(appointmentId));
-        if (patientId == Guid.Empty)
-            throw new ArgumentException("Patient ID is required.", nameof(patientId));
+        if (appointment == null)
+            throw new ArgumentNullException(nameof(appointment));
 
         return new PatientVisit
         {
-            AppointmentId = appointmentId,
-            PatientId = patientId,
+            AppointmentId = appointment.Id,
+            PatientId = appointment.PatientId,
+            AssignedDoctorId = appointment.RequestedDoctorId,
             Status = PatientVisitStatus.CheckedIn,
             CheckedInAt = DateTime.UtcNow
         };

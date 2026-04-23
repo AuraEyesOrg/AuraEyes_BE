@@ -23,8 +23,12 @@ public class CreateClinicAppointmentCommandHandler
     private readonly IIdentityService _identityService;
     private readonly IEmailService _emailService;
     private readonly INotificationService _notificationService;
+    private readonly ISlotAssignmentRepository _slotAssignmentRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CreateClinicAppointmentCommandHandler> _logger;
+
+    private const decimal BASE_CLINIC_PRICE = 50000m; // Base clinic price for auto-assign
 
     public CreateClinicAppointmentCommandHandler(
         IAppointmentSlotRepository appointmentSlotRepository,
@@ -35,6 +39,8 @@ public class CreateClinicAppointmentCommandHandler
         IIdentityService identityService,
         IEmailService emailService,
         INotificationService notificationService,
+        ISlotAssignmentRepository slotAssignmentRepository,
+        IOphthalmologistRepository ophthalmologistRepository,
         IUnitOfWork unitOfWork,
         ILogger<CreateClinicAppointmentCommandHandler> logger)
     {
@@ -46,6 +52,8 @@ public class CreateClinicAppointmentCommandHandler
         _identityService = identityService;
         _emailService = emailService;
         _notificationService = notificationService;
+        _slotAssignmentRepository = slotAssignmentRepository;
+        _ophthalmologistRepository = ophthalmologistRepository;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -96,7 +104,40 @@ public class CreateClinicAppointmentCommandHandler
                 return Result<CreateClinicAppointmentResult>.Conflict("You already have an appointment for this slot.");
             }
 
-            var depositFee = slot.Cost ?? 0;
+            decimal price = BASE_CLINIC_PRICE;
+
+            if (request.PricingType == PricingType.DoctorSelected)
+            {
+                if (request.RequestedDoctorId == null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.Failure("Doctor must be selected for DoctorSelected pricing type.");
+                }
+
+                var doctor = await _ophthalmologistRepository.GetByIdAsync(request.RequestedDoctorId.Value, cancellationToken);
+                if (doctor == null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.NotFound($"Doctor '{request.RequestedDoctorId}' not found.");
+                }
+
+                // Validate requested doctor belongs to slot via SlotAssignment
+                var isAssigned = await _slotAssignmentRepository.HasAssignmentAsync(
+                    request.SlotId,
+                    request.RequestedDoctorId.Value,
+                    SlotAssignmentRole.Doctor,
+                    cancellationToken);
+
+                if (!isAssigned)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.Failure("The selected doctor is not available for this appointment slot.");
+                }
+
+                price = doctor.ConsultationFee;
+            }
+
+            var depositFee = price;
 
             if (depositFee > 0)
             {
@@ -143,6 +184,9 @@ public class CreateClinicAppointmentCommandHandler
             var appointment = new Appointment(
                 patientId,
                 request.SlotId,
+                price,
+                request.PricingType,
+                request.RequestedDoctorId,
                 request.VisitReason);
 
             await _appointmentRepository.AddAsync(appointment, cancellationToken);

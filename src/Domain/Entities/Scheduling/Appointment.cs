@@ -28,10 +28,20 @@ public class Appointment : BaseEntity, IAggregateRoot
 
     /// <summary>Reason for cancellation.</summary>
     public string? CancellationReason { get; private set; }
+    
+    /// <summary>Optional preferred doctor for this appointment.</summary>
+    public Guid? RequestedDoctorId { get; private set; }
+
+    /// <summary>Determines if price is base or doctor-specific.</summary>
+    public PricingType PricingType { get; private set; }
+
+    /// <summary>Snapshot of the price at the time of booking.</summary>
+    public decimal Price { get; private set; }
 
     // Navigation properties
     public Patient? Patient { get; private set; }
     public AppointmentSlot? AppointmentSlot { get; private set; }
+    public Ophthalmologist? RequestedDoctor { get; private set; }
 
     private Appointment() { } // EF Core
 
@@ -41,10 +51,19 @@ public class Appointment : BaseEntity, IAggregateRoot
     public Appointment(
         Guid patientId,
         Guid appointmentSlotId,
+        decimal price,
+        PricingType pricingType = PricingType.AutoAssign,
+        Guid? requestedDoctorId = null,
         string? visitReason = null)
     {
+        if (price < 0)
+            throw new ArgumentException("Price cannot be negative", nameof(price));
+
         PatientId = patientId;
         AppointmentSlotId = appointmentSlotId;
+        Price = price;
+        PricingType = pricingType;
+        RequestedDoctorId = requestedDoctorId;
         VisitReason = visitReason;
         Status = AppointmentStatus.Pending;
     }

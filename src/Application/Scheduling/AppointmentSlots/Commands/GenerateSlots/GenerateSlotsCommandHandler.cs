@@ -107,7 +107,6 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
                         timeWindow.Start,
                         timeWindow.End,
                         template.MaxCapacity,
-                        template.Cost,
                         SlotSource.System);
 
                     await _appointmentSlotRepository.AddAsync(slot, cancellationToken);

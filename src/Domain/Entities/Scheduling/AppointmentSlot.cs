@@ -25,16 +25,13 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     public ScheduleStatus Status { get; private set; }
 
     /// <summary>Slot creation source (staff or system).</summary>
-    public SlotSource Source { get; private set; }
-
-    /// <summary>Cost of the appointment (optional).</summary>
-    public decimal? Cost { get; private set; }
-
-    /// <summary>Maximum number of patients that can book this slot.</summary>
     public int MaxCapacity { get; private set; }
 
     /// <summary>Number of patients currently booked in this slot.</summary>
     public int BookedCount { get; private set; }
+
+    /// <summary>Slot creation source (staff or system).</summary>
+    public SlotSource Source { get; private set; }
 
     /// <summary>Navigation property to the template.</summary>
     public ScheduleTemplate? ScheduleTemplate { get; private set; }
@@ -55,7 +52,6 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
         TimeOnly startTime,
         TimeOnly endTime,
         int maxCapacity = 1,
-        decimal? cost = null,
         SlotSource source = SlotSource.Doctor)
     {
         if (endTime <= startTime)
@@ -68,7 +64,6 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
         StartTime = startTime;
         EndTime = endTime;
         MaxCapacity = maxCapacity;
-        Cost = cost;
         Source = source;
         Status = ScheduleStatus.Available;
         BookedCount = 0;
@@ -154,12 +149,6 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
             throw new InvalidOperationException($"Cannot reduce capacity below current booked count ({BookedCount})");
 
         MaxCapacity = newCapacity;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    public void UpdateCost(decimal? cost)
-    {
-        Cost = cost;
         UpdatedAt = DateTime.UtcNow;
     }
 }

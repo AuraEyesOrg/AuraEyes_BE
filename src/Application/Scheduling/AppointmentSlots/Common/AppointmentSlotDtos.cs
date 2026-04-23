@@ -8,7 +8,6 @@ public record AppointmentSlotListDto
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }
     public string Status { get; init; } = string.Empty;
-    public decimal? Cost { get; init; }
     public int MaxCapacity { get; init; }
     public int BookedCount { get; init; }
     public int AvailableCapacity { get; init; }
@@ -23,7 +22,6 @@ public record AppointmentSlotDto
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }
     public string Status { get; init; } = string.Empty;
-    public decimal? Cost { get; init; }
     public int MaxCapacity { get; init; }
     public int BookedCount { get; init; }
     public int AvailableCapacity { get; init; }

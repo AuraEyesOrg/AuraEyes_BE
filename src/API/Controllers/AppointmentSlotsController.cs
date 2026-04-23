@@ -6,8 +6,6 @@ using Application.Scheduling.AppointmentSlots.Commands.CreateAppointmentSlot;
 using Application.Scheduling.AppointmentSlots.Commands.DeleteAppointmentSlot;
 using Application.Scheduling.AppointmentSlots.Commands.GenerateSlots;
 using Application.Scheduling.AppointmentSlots.Commands.UnblockSlot;
-using Application.Scheduling.AppointmentSlots.Commands.UpdateAppointmentSlot;
-using Application.Scheduling.AppointmentSlots.Commands.UpdateAppointmentSlotCost;
 using Application.Scheduling.AppointmentSlots.Common;
 using Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlot;
 using Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlots;
@@ -108,8 +106,7 @@ public class AppointmentSlotsController : BaseApiController
             ScheduleTemplateId = request.ScheduleTemplateId,
             Date = request.Date,
             StartTime = request.StartTime,
-            EndTime = request.EndTime,
-            Cost = request.Cost
+            EndTime = request.EndTime
         };
 
         var result = await _mediator.Send(command);
@@ -140,29 +137,6 @@ public class AppointmentSlotsController : BaseApiController
         return HandleResult(result);
     }
 
-    /// <summary>
-    /// Update an existing appointment slot.
-    /// </summary>
-    [HttpPut("{slotId:guid}")]
-    [AuthorizePermission(Permissions.ApptSlotsManage)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> UpdateAppointmentSlot(Guid slotId, [FromBody] UpdateAppointmentSlotRequest request)
-    {
-        var command = new UpdateAppointmentSlotCommand
-        {
-            AppointmentSlotId = slotId,
-            Date = request.Date,
-            StartTime = request.StartTime,
-            EndTime = request.EndTime,
-            Cost = request.Cost
-        };
-
-        var result = await _mediator.Send(command);
-        return HandleResult(result);
-    }
 
     /// <summary>
     /// Delete (cancel) an appointment slot.
@@ -181,24 +155,6 @@ public class AppointmentSlotsController : BaseApiController
 
 
 
-    /// <summary>
-    /// Update appointment slot cost.
-    /// </summary>
-    [HttpPatch("{slotId:guid}/cost")]
-    [AuthorizePermission(Permissions.ApptSlotsManage)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateAppointmentSlotCost(Guid slotId, [FromBody] UpdateAppointmentSlotCostRequest request)
-    {
-        var command = new UpdateAppointmentSlotCostCommand
-        {
-            AppointmentSlotId = slotId,
-            Cost = request.Cost
-        };
-
-        var result = await _mediator.Send(command);
-        return HandleResult(result);
-    }
 
     /// <summary>
     /// Generate appointment slots from a schedule template for a date range.
@@ -273,22 +229,6 @@ public record CreateAppointmentSlotRequest
     public DateOnly Date { get; init; }
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }
-    public decimal? Cost { get; init; }
-}
-
-public record UpdateAppointmentSlotRequest
-{
-    public DateOnly Date { get; init; }
-    public TimeOnly StartTime { get; init; }
-    public TimeOnly EndTime { get; init; }
-    public decimal? Cost { get; init; }
-}
-
-
-
-public record UpdateAppointmentSlotCostRequest
-{
-    public decimal? Cost { get; init; }
 }
 
 public record GenerateSlotsRequest

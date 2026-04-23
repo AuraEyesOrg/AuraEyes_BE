@@ -25,9 +25,6 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
     /// <summary>Maximum concurrent patients per slot.</summary>
     public int MaxCapacity { get; private set; }
 
-    /// <summary>Default cost for slots generated from this template (optional).</summary>
-    public decimal? Cost { get; private set; }
-
     /// <summary>Template source (staff-defined or system-generated).</summary>
     public ScheduleTemplateSource Source { get; private set; }
 
@@ -46,7 +43,6 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         TimeOnly endTime,
         int slotDuration,
         int maxCapacity,
-        decimal? cost = null,
         ScheduleTemplateSource source = ScheduleTemplateSource.Doctor)
     {
         if (endTime <= startTime)
@@ -55,15 +51,12 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
             throw new ArgumentException("Slot duration must be at least 1 minute", nameof(slotDuration));
         if (maxCapacity < 1)
             throw new ArgumentException("Max capacity must be at least 1", nameof(maxCapacity));
-        if (cost.HasValue && cost.Value < 0)
-            throw new ArgumentException("Cost cannot be negative", nameof(cost));
 
         DayOfWeek = dayOfWeek;
         StartTime = startTime;
         EndTime = endTime;
         SlotDuration = slotDuration;
         MaxCapacity = maxCapacity;
-        Cost = cost;
         Source = source;
         IsActive = true;
     }
@@ -73,8 +66,7 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         TimeOnly startTime,
         TimeOnly endTime,
         int slotDuration,
-        int maxCapacity,
-        decimal? cost)
+        int maxCapacity)
     {
         if (endTime <= startTime)
             throw new ArgumentException("End time must be after start time");
@@ -82,15 +74,12 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
             throw new ArgumentException("Slot duration must be at least 1 minute", nameof(slotDuration));
         if (maxCapacity < 1)
             throw new ArgumentException("Max capacity must be at least 1", nameof(maxCapacity));
-        if (cost.HasValue && cost.Value < 0)
-            throw new ArgumentException("Cost cannot be negative", nameof(cost));
 
         DayOfWeek = dayOfWeek;
         StartTime = startTime;
         EndTime = endTime;
         SlotDuration = slotDuration;
         MaxCapacity = maxCapacity;
-        Cost = cost;
         UpdatedAt = DateTime.UtcNow;
     }
 

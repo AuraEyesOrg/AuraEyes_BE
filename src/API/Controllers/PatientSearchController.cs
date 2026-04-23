@@ -143,7 +143,6 @@ public class PatientSearchController : BaseApiController
                 date = x.Date.ToString("yyyy-MM-dd"),
                 startTime = x.StartTime.ToString("HH:mm"),
                 endTime = x.EndTime.ToString("HH:mm"),
-                cost = x.Cost,
                 availableCapacity = x.AvailableCapacity
             }).ToList();
 

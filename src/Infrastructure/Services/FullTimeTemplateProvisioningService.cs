@@ -68,7 +68,6 @@ public class FullTimeTemplateProvisioningService : IFullTimeTemplateProvisioning
                 endTime: DefaultEndTime,
                 slotDuration: DefaultSlotDurationMinutes,
                 maxCapacity: DefaultMaxCapacity,
-                cost: null,
                 source: ScheduleTemplateSource.SystemGenerated));
 
             createdCount++;
