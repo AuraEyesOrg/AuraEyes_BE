@@ -630,29 +630,4 @@ public class DashboardMetricsServiceTests
         return new ApplicationDbContext(options);
     }
 
-    private sealed class FakeAiQuotaService : IAiQuotaService
-    {
-        public AiQuotaDto Quota { get; set; } = new();
-
-        public Task<AiQuotaDto> GetQuotaAsync(Guid userId, string role, CancellationToken cancellationToken = default)
-            => Task.FromResult(Quota);
-
-        public Task<bool> HasAvailableQuotaAsync(Guid userId, string role, CancellationToken cancellationToken = default)
-            => Task.FromResult(Quota.RemainingQuota > 0);
-
-        public Task DeductQuotaAsync(Guid userId, string role, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task AddPurchasedQuotaAsync(Guid userId, string role, int amount, CancellationToken cancellationToken = default) => Task.CompletedTask;
-    }
-
-    private sealed class FakeBetterStackHeartbeatService(
-        IReadOnlyList<BetterStackMonitorDescriptor>? descriptors = null,
-        string? embedUrl = null) : IBetterStackHeartbeatService
-    {
-        public Task NotifyStartedAsync(BetterStackMonitor monitor, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task NotifySucceededAsync(BetterStackMonitor monitor, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task NotifyFailedAsync(BetterStackMonitor monitor, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public IReadOnlyList<BetterStackMonitorDescriptor> GetMonitorDescriptors() => descriptors ?? [];
-        public string? GetEmbedUrl() => embedUrl;
-    }
 }

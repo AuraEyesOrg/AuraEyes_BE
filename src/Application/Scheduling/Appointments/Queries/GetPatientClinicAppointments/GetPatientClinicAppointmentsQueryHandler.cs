@@ -53,7 +53,6 @@ public class GetPatientClinicAppointmentsQueryHandler
 
         var (appointments, totalCount) = await _appointmentRepository.GetPagedByPatientAsync(
             request.PatientId,
-            AppointmentType.ClinicVisit,
             statuses,
             pageNumber,
             pageSize,
@@ -78,8 +77,6 @@ public class GetPatientClinicAppointmentsQueryHandler
             {
                 Id = a.Id,
                 PatientId = a.PatientId,
-                OrganisationId = a.OrganisationId ?? Guid.Empty,
-                OrganisationName = a.Organisation?.Name,
                 SlotId = a.AppointmentSlotId,
                 Date = a.AppointmentSlot!.Date,
                 StartTime = a.AppointmentSlot.StartTime,
@@ -101,11 +98,9 @@ public class GetPatientClinicAppointmentsQueryHandler
             PatientAppointmentTab.Upcoming => new[]
             {
                 AppointmentStatus.Pending,
-                AppointmentStatus.Confirmed,
-                AppointmentStatus.CheckedIn,
-                AppointmentStatus.InProgress
+                AppointmentStatus.Confirmed
             },
-            PatientAppointmentTab.Completed => new[] { AppointmentStatus.Completed },
+            PatientAppointmentTab.Completed => Array.Empty<AppointmentStatus>(), // Legacy UI tab. PatientVisits will handle actual completion logic.
             PatientAppointmentTab.Cancelled => new[]
             {
                 AppointmentStatus.Cancelled,

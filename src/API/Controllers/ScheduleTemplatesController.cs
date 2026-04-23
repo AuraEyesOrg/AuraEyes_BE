@@ -32,16 +32,12 @@ public class ScheduleTemplatesController : BaseApiController
     [Authorize]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<ScheduleTemplateListDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetScheduleTemplates(
-        [FromQuery] Guid? ophthalId = null,
-        [FromQuery] Guid? orgId = null,
         [FromQuery] DayOfWeek? dayOfWeek = null,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10)
     {
         var query = new GetScheduleTemplatesQuery
         {
-            OphthalId = ophthalId,
-            OrgId = orgId,
             DayOfWeek = dayOfWeek,
             PageNumber = pageNumber,
             PageSize = pageSize
@@ -76,8 +72,6 @@ public class ScheduleTemplatesController : BaseApiController
     {
         var command = new CreateScheduleTemplateCommand
         {
-            OrgId = request.OrgId,
-            OphthalId = request.OphthalId,
             DayOfWeek = request.DayOfWeek,
             StartTime = request.StartTime,
             EndTime = request.EndTime,
@@ -143,8 +137,6 @@ public class ScheduleTemplatesController : BaseApiController
 
 public record CreateScheduleTemplateRequest
 {
-    public Guid? OrgId { get; init; }
-    public Guid? OphthalId { get; init; }
     public DayOfWeek DayOfWeek { get; init; }
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }

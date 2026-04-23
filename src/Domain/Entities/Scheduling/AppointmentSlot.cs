@@ -5,11 +5,7 @@ namespace Domain.Entities.Scheduling;
 
 /// <summary>
 /// AppointmentSlot - A specific time slot for a specific date, generated from a ScheduleTemplate.
-/// Tracks bookings, reservations, and availability.
-/// 
-/// Slot ownership is determined by the parent ScheduleTemplate:
-/// - If template has OphthalId → Online consultation slot (capacity = 1)
-/// - If template has OrgId only → Clinic visit slot (capacity >= 1)
+/// Tracks capacity and availability. Simplified from reservation-based to capacity-based model.
 /// </summary>
 public class AppointmentSlot : BaseEntity, IAggregateRoot
 {
@@ -25,26 +21,20 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     /// <summary>End time of this slot.</summary>
     public TimeOnly EndTime { get; private set; }
 
-    /// <summary>Status of this slot.</summary>
+    /// <summary>Status of this slot (Available or Blocked).</summary>
     public ScheduleStatus Status { get; private set; }
 
-    /// <summary>Slot creation source (doctor or system).</summary>
+    /// <summary>Slot creation source (staff or system).</summary>
     public SlotSource Source { get; private set; }
 
     /// <summary>Cost of the appointment (optional).</summary>
     public decimal? Cost { get; private set; }
 
-    /// <summary>Maximum number of patients that can book this slot (copied from template).</summary>
+    /// <summary>Maximum number of patients that can book this slot.</summary>
     public int MaxCapacity { get; private set; }
 
     /// <summary>Number of patients currently booked in this slot.</summary>
     public int BookedCount { get; private set; }
-
-    /// <summary>Patient who has reserved this slot (pending payment) - for online consultations.</summary>
-    public Guid? ReservedBy { get; private set; }
-
-    /// <summary>When the reservation expires (auto-release after this time).</summary>
-    public DateTime? ReservationExpireAt { get; private set; }
 
     /// <summary>Navigation property to the template.</summary>
     public ScheduleTemplate? ScheduleTemplate { get; private set; }
@@ -52,6 +42,10 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     // Navigation to appointments
     private readonly List<Appointment> _appointments = new();
     public IReadOnlyCollection<Appointment> Appointments => _appointments.AsReadOnly();
+
+    // Navigation to slot assignments
+    private readonly List<SlotAssignment> _slotAssignments = new();
+    public IReadOnlyCollection<SlotAssignment> SlotAssignments => _slotAssignments.AsReadOnly();
 
     private AppointmentSlot() { } // EF Core
 
@@ -81,95 +75,6 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     }
 
     /// <summary>
-    /// Reserve the slot for a patient (pending payment).
-    /// </summary>
-    public void Reserve(Guid patientId, DateTime expirationTime)
-    {
-        if (Status != ScheduleStatus.Available)
-            throw new InvalidOperationException($"Slot is not available for reservation. Current status: {Status}");
-
-        if (expirationTime <= DateTime.UtcNow)
-            throw new ArgumentException("Expiration time must be in the future", nameof(expirationTime));
-
-        Status = ScheduleStatus.Reserved;
-        ReservedBy = patientId;
-        ReservationExpireAt = expirationTime;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// Confirm the reservation after payment - transitions to Booked.
-    /// </summary>
-    public void ConfirmReservation(Guid patientId)
-    {
-        if (Status != ScheduleStatus.Reserved)
-            throw new InvalidOperationException($"Slot is not in reserved state. Current status: {Status}");
-
-        if (ReservedBy != patientId)
-            throw new InvalidOperationException("Only the patient who reserved this slot can confirm it");
-
-        if (ReservationExpireAt.HasValue && ReservationExpireAt.Value < DateTime.UtcNow)
-            throw new InvalidOperationException("Reservation has expired");
-
-        Status = ScheduleStatus.Booked;
-        BookedCount = 1;
-        ReservedBy = null;
-        ReservationExpireAt = null;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// Release the reservation (manual or timeout) - returns to Available.
-    /// </summary>
-    public void ReleaseReservation()
-    {
-        if (Status != ScheduleStatus.Reserved)
-            throw new InvalidOperationException($"Slot is not in reserved state. Current status: {Status}");
-
-        Status = ScheduleStatus.Available;
-        ReservedBy = null;
-        ReservationExpireAt = null;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// Check if the reservation has expired.
-    /// </summary>
-    public bool IsReservationExpired()
-    {
-        return Status == ScheduleStatus.Reserved &&
-               ReservationExpireAt.HasValue &&
-               ReservationExpireAt.Value < DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// Block the slot (doctor unavailable).
-    /// </summary>
-    public void Block()
-    {
-        if (Status == ScheduleStatus.Booked)
-            throw new InvalidOperationException("Cannot block a slot that is already booked. Cancel the booking first.");
-
-        if (Status == ScheduleStatus.Reserved)
-            throw new InvalidOperationException("Cannot block a slot that is reserved. Wait for reservation to expire or release it first.");
-
-        Status = ScheduleStatus.Blocked;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// Unblock the slot (make available again).
-    /// </summary>
-    public void Unblock()
-    {
-        if (Status != ScheduleStatus.Blocked)
-            throw new InvalidOperationException($"Slot is not blocked. Current status: {Status}");
-
-        Status = ScheduleStatus.Available;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    /// <summary>
     /// Check if the slot has available capacity for more bookings.
     /// </summary>
     public bool HasCapacity()
@@ -183,8 +88,7 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     public int RemainingCapacity => Math.Max(0, MaxCapacity - BookedCount);
 
     /// <summary>
-    /// Book for capacity-based slots (organisation clinic appointments).
-    /// Increments booked count if capacity available.
+    /// Book a patient into this slot. Increments booked count if capacity available.
     /// </summary>
     public void BookWithCapacity()
     {
@@ -202,24 +106,7 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     }
 
     /// <summary>
-    /// Legacy book method for single-capacity slots (online consultation).
-    /// </summary>
-    public void Book()
-    {
-        if (Status != ScheduleStatus.Available)
-            throw new InvalidOperationException("Slot is not available for booking");
-
-        BookedCount++;
-        if (MaxCapacity == 1)
-        {
-            Status = ScheduleStatus.Booked;
-        }
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    /// <summary>
     /// Cancel a booking and decrement the booked count.
-    /// For capacity-based slots, slot remains available if count > 0.
     /// </summary>
     public void CancelBooking()
     {
@@ -227,12 +114,30 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
             throw new InvalidOperationException("No bookings to cancel");
 
         BookedCount--;
+        UpdatedAt = DateTime.UtcNow;
+    }
 
-        // For single-capacity slots (online consultation)
-        if (MaxCapacity == 1 && BookedCount == 0 && Status == ScheduleStatus.Booked)
-        {
-            Status = ScheduleStatus.Available;
-        }
+    /// <summary>
+    /// Block the slot (not available for booking).
+    /// </summary>
+    public void Block()
+    {
+        if (BookedCount > 0)
+            throw new InvalidOperationException("Cannot block a slot that has bookings. Cancel the bookings first.");
+
+        Status = ScheduleStatus.Blocked;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Unblock the slot (make available again).
+    /// </summary>
+    public void Unblock()
+    {
+        if (Status != ScheduleStatus.Blocked)
+            throw new InvalidOperationException($"Slot is not blocked. Current status: {Status}");
+
+        Status = ScheduleStatus.Available;
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -252,41 +157,9 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void UpdateStatus(ScheduleStatus newStatus)
-    {
-        Status = newStatus;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    public void Complete()
-    {
-        if (Status != ScheduleStatus.Booked)
-            throw new InvalidOperationException("Only booked slots can be completed");
-
-        Status = ScheduleStatus.Completed;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    public void MarkNoShow()
-    {
-        if (Status != ScheduleStatus.Booked)
-            throw new InvalidOperationException("Only booked slots can be marked as no-show");
-
-        Status = ScheduleStatus.NoShow;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
     public void UpdateCost(decimal? cost)
     {
         Cost = cost;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    public void Cancel()
-    {
-        Status = ScheduleStatus.Cancelled;
-        ReservedBy = null;
-        ReservationExpireAt = null;
         UpdatedAt = DateTime.UtcNow;
     }
 }

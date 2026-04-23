@@ -436,5 +436,10 @@ public class AiQuotaServiceTests
 
         public Task UpdateSettingsAsync(Dictionary<string, string> settings, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+
+        public Task<(bool Success, int UsedSlots, int Quota, int RemainingSlots)> TryReservePartTimeSlotsAsync(DateOnly date, int quantity, int dailyLimit, CancellationToken cancellationToken = default) => Task.FromResult((true, 0, dailyLimit, dailyLimit));
+
+        public Task<IReadOnlyDictionary<DateOnly, int>> GetPartTimeReservedSlotsByDateRangeAsync(DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyDictionary<DateOnly, int>>(new Dictionary<DateOnly, int>());
     }
 }

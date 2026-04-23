@@ -6,14 +6,6 @@ public class CreateScheduleTemplateCommandValidator : AbstractValidator<CreateSc
 {
     public CreateScheduleTemplateCommandValidator()
     {
-        RuleFor(x => x)
-            .Must(x => x.OrgId.HasValue || x.OphthalId.HasValue)
-            .WithMessage("At least one of OrgId or OphthalId must be provided.");
-
-        RuleFor(x => x)
-            .Must(x => !(x.OrgId.HasValue && x.OphthalId.HasValue))
-            .WithMessage("OrgId must be null when OphthalId is provided.");
-
         RuleFor(x => x.DayOfWeek)
             .IsInEnum()
             .WithMessage("Invalid day of week.");

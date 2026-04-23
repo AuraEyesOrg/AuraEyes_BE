@@ -287,8 +287,8 @@ public static class DatabaseSeeder
         // Step 4: Seed Wallets for Ophthalmologist and Patient
         await SeedWalletsAsync(context, ophthalmologistUser, patientUser, logger);
 
-        // Step 5: Seed ScheduleTemplate for Ophthalmologist
-        await SeedScheduleTemplatesAsync(context, ophthalmologistId, Guid.Empty, logger);
+        // Step 5: Seed ScheduleTemplate
+        await SeedScheduleTemplatesAsync(context, logger);
 
         logger?.LogInformation("Domain entity seeding completed.");
     }
@@ -398,22 +398,12 @@ public static class DatabaseSeeder
 
     private static async Task SeedScheduleTemplatesAsync(
         ApplicationDbContext context,
-        Guid ophthalmologistId,
-        Guid organisationId,
         ILogger? logger)
     {
         logger?.LogInformation("Seeding schedule templates...");
 
-        // Only seed if ophthalmologist exists
-        if (ophthalmologistId == Guid.Empty)
-        {
-            logger?.LogWarning("Ophthalmologist ID is empty. Skipping schedule template seeding.");
-            return;
-        }
-
-        // Check if schedule template already exists
-        var existingTemplate = await context.ScheduleTemplates
-            .FirstOrDefaultAsync(s => s.OphthalId == ophthalmologistId);
+        // Check if any schedule template already exists
+        var existingTemplate = await context.ScheduleTemplates.FirstOrDefaultAsync();
 
         if (existingTemplate == null)
         {
@@ -429,8 +419,6 @@ public static class DatabaseSeeder
                     endTime: new TimeOnly(17, 0),  // 5 PM
                     slotDuration: 30,              // 30-minute slots
                     maxCapacity: 2,                // Max 2 patients per slot
-                    orgId: null,
-                    ophthalId: ophthalmologistId,
                     cost: 500000m                  // 500,000 VND per consultation
                 );
 

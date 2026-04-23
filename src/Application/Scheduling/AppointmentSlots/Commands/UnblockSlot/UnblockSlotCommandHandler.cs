@@ -29,18 +29,12 @@ public class UnblockSlotCommandHandler : ICommandHandler<UnblockSlotCommand>
 
     public async Task<Result> Handle(UnblockSlotCommand request, CancellationToken cancellationToken)
     {
-        var slot = await _appointmentSlotRepository.GetByIdWithTemplateAsync(
+        var slot = await _appointmentSlotRepository.GetByIdAsync(
             request.AppointmentSlotId, cancellationToken);
 
         if (slot is null)
         {
             return Result.NotFound($"Appointment slot '{request.AppointmentSlotId}' not found.");
-        }
-
-        // Verify the slot belongs to this ophthalmologist
-        if (slot.ScheduleTemplate?.OphthalId != request.OphthalmologistId)
-        {
-            return Result.Forbidden("You are not authorized to modify this slot.");
         }
 
         if (slot.Status != ScheduleStatus.Blocked)
@@ -54,8 +48,8 @@ public class UnblockSlotCommandHandler : ICommandHandler<UnblockSlotCommand>
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Slot {SlotId} unblocked by ophthalmologist {OphthalmologistId}",
-                request.AppointmentSlotId, request.OphthalmologistId);
+                "Slot {SlotId} unblocked",
+                request.AppointmentSlotId);
 
             return Result.Success();
         }
@@ -66,9 +60,8 @@ public class UnblockSlotCommandHandler : ICommandHandler<UnblockSlotCommand>
         catch (Exception ex)
         {
             _logger.LogError(ex,
-                "Database error when unblocking slot {SlotId} by ophthalmologist {OphthalmologistId}",
-                request.AppointmentSlotId,
-                request.OphthalmologistId);
+                "Database error when unblocking slot {SlotId}",
+                request.AppointmentSlotId);
 
             return Result.Failure(ex.InnerException?.Message ?? ex.Message);
         }

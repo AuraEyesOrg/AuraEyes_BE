@@ -8,8 +8,6 @@ public class ClinicAppointmentDto
     public Guid PatientId { get; init; }
     public string? PatientName { get; init; }
     public string? PatientAvatarUrl { get; init; }
-    public Guid OrganisationId { get; init; }
-    public string? OrganisationName { get; init; }
     public Guid SlotId { get; init; }
     public DateOnly Date { get; init; }
     public TimeOnly StartTime { get; init; }

@@ -17,7 +17,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
     private readonly IOphthalmologistLeaveRequestRepository _leaveRequestRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IConsultationSessionRepository _consultationSessionRepository;
-    private readonly IAppointmentRepository _appointmentRepository;
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IWalletRepository _walletRepository;
@@ -30,7 +29,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
         IOphthalmologistLeaveRequestRepository leaveRequestRepository,
         IOphthalmologistRepository ophthalmologistRepository,
         IConsultationSessionRepository consultationSessionRepository,
-        IAppointmentRepository appointmentRepository,
         IAppointmentSlotRepository appointmentSlotRepository,
         IRepository<Patient> patientRepository,
         IWalletRepository walletRepository,
@@ -42,7 +40,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
         _leaveRequestRepository = leaveRequestRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _consultationSessionRepository = consultationSessionRepository;
-        _appointmentRepository = appointmentRepository;
         _appointmentSlotRepository = appointmentSlotRepository;
         _patientRepository = patientRepository;
         _walletRepository = walletRepository;
@@ -90,15 +87,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
         {
             leaveRequest.Approve(request.ReviewedByAdminUserId, request.AdminNote);
 
-            var slotsInRange = (await _appointmentSlotRepository.GetByOphthalmologistAsync(
-                leaveRequest.OphthalmologistId,
-                leaveRequest.StartDate,
-                leaveRequest.EndDate,
-                null,
-                cancellationToken)).ToList();
-
-            var slotMap = slotsInRange.ToDictionary(x => x.Id, x => x);
-
             var sessionWindowStartUtc = GetUtcStartOfDay(leaveRequest.StartDate);
             var sessionWindowEndUtcExclusive = GetUtcStartOfDay(leaveRequest.EndDate.AddDays(1));
 
@@ -111,19 +99,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
                 .ToListAsync(cancellationToken);
 
             var patientIds = sessions.Select(x => x.PatientId).ToHashSet();
-
-            var appointments = await _appointmentRepository.GetByDoctorAsync(
-                leaveRequest.OphthalmologistId,
-                leaveRequest.StartDate,
-                leaveRequest.EndDate,
-                null,
-                null,
-                cancellationToken);
-
-            foreach (var appointment in appointments)
-            {
-                patientIds.Add(appointment.PatientId);
-            }
 
             var patientUserMap = await _patientRepository.Query()
                 .Where(x => patientIds.Contains(x.Id))
@@ -140,10 +115,14 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
 
                 await TryDeleteCalendarEventAsync(session, cancellationToken);
 
-                if (session.AppointmentSlotId.HasValue
-                    && slotMap.TryGetValue(session.AppointmentSlotId.Value, out var sessionSlot))
+                if (session.AppointmentSlotId.HasValue)
                 {
-                    ReleaseBookedOrReservedState(sessionSlot);
+                    var sessionSlot = await _appointmentSlotRepository.GetByIdWithLockAsync(session.AppointmentSlotId.Value, cancellationToken);
+                    if (sessionSlot != null)
+                    {
+                        ReleaseBookedOrReservedState(sessionSlot);
+                        await _appointmentSlotRepository.UpdateAsync(sessionSlot, cancellationToken);
+                    }
                 }
 
                 await TryRefundSessionAsync(session, patientUserMap, walletCache, cancellationToken);
@@ -164,45 +143,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
                             Action = "DoctorLeaveApproved"
                         },
                         session.Id));
-                }
-            }
-
-            var cancelledAppointments = 0;
-            foreach (var appointment in appointments.Where(IsCancellableAppointment))
-            {
-                appointment.Cancel(request.ReviewedByAdminUserId, "CancelledDueToApprovedDoctorLeave");
-                cancelledAppointments++;
-
-                if (slotMap.TryGetValue(appointment.AppointmentSlotId, out var appointmentSlot))
-                {
-                    ReleaseBookedOrReservedState(appointmentSlot);
-                }
-
-                if (patientUserMap.TryGetValue(appointment.PatientId, out var patientUserId)
-                    && patientUserId.HasValue)
-                {
-                    pendingNotifications.Add(new PendingNotification(
-                        patientUserId.Value,
-                        "Lịch hẹn bị hủy",
-                        BuildAppointmentCancellationMessage(appointment.AppointmentSlot?.Date, appointment.AppointmentSlot?.StartTime),
-                        NotificationType.ScheduleChanged,
-                        new
-                        {
-                            AppointmentId = appointment.Id,
-                            AppointmentSlotId = appointment.AppointmentSlotId,
-                            LeaveRequestId = leaveRequest.Id,
-                            Action = "DoctorLeaveApproved"
-                        },
-                        appointment.Id));
-                }
-            }
-
-            var blockedSlots = 0;
-            foreach (var slot in slotsInRange)
-            {
-                if (TryBlockSlot(slot))
-                {
-                    blockedSlots++;
                 }
             }
 
@@ -230,8 +170,8 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
             {
                 LeaveRequestId = leaveRequest.Id,
                 CancelledConsultationSessions = cancelledSessions,
-                CancelledAppointments = cancelledAppointments,
-                BlockedSlots = blockedSlots
+                CancelledAppointments = 0,
+                BlockedSlots = 0
             });
         }
         catch (InvalidOperationException ex)
@@ -244,13 +184,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
             await _unitOfWork.RollbackTransactionAsync(cancellationToken);
             throw;
         }
-    }
-
-    private static bool IsCancellableAppointment(Domain.Entities.Scheduling.Appointment appointment)
-    {
-        return appointment.Status == AppointmentStatus.Pending
-            || appointment.Status == AppointmentStatus.Confirmed
-            || appointment.Status == AppointmentStatus.CheckedIn;
     }
 
     private static DateTime GetUtcStartOfDay(DateOnly date)
@@ -268,16 +201,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
 
         var vietnamTime = TimeZoneInfo.ConvertTimeFromUtc(appointmentTimeUtc.Value, VietnamTimeZoneResolver.TimeZone);
         return $"Lịch tư vấn lúc {vietnamTime:HH:mm} ngày {vietnamTime:dd/MM/yyyy} đã bị hủy do bác sĩ nghỉ phép được phê duyệt.";
-    }
-
-    private static string BuildAppointmentCancellationMessage(DateOnly? date, TimeOnly? startTime)
-    {
-        if (!date.HasValue || !startTime.HasValue)
-        {
-            return "Lịch hẹn của bạn đã bị hủy do bác sĩ nghỉ phép được phê duyệt.";
-        }
-
-        return $"Lịch hẹn lúc {startTime:HH\\:mm} ngày {date:dd/MM/yyyy} đã bị hủy do bác sĩ nghỉ phép được phê duyệt.";
     }
 
     private async Task TryDeleteCalendarEventAsync(
@@ -307,45 +230,10 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
 
     private static void ReleaseBookedOrReservedState(Domain.Entities.Scheduling.AppointmentSlot slot)
     {
-        if (slot.Status == ScheduleStatus.Booked && slot.BookedCount > 0)
+        if (slot.BookedCount > 0)
         {
             slot.CancelBooking();
-            return;
         }
-
-        if (slot.Status == ScheduleStatus.Reserved)
-        {
-            slot.ReleaseReservation();
-        }
-    }
-
-    private static bool TryBlockSlot(Domain.Entities.Scheduling.AppointmentSlot slot)
-    {
-        if (slot.Status == ScheduleStatus.Blocked
-            || slot.Status == ScheduleStatus.Cancelled
-            || slot.Status == ScheduleStatus.Completed
-            || slot.Status == ScheduleStatus.NoShow)
-        {
-            return false;
-        }
-
-        if (slot.Status == ScheduleStatus.Reserved)
-        {
-            slot.ReleaseReservation();
-        }
-
-        if (slot.Status == ScheduleStatus.Booked)
-        {
-            if (slot.BookedCount > 0)
-            {
-                return false;
-            }
-
-            slot.UpdateStatus(ScheduleStatus.Available);
-        }
-
-        slot.Block();
-        return true;
     }
 
     private async Task TryRefundSessionAsync(

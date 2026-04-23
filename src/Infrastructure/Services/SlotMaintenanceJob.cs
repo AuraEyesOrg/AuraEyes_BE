@@ -51,7 +51,7 @@ public class SlotMaintenanceJob
                     slot.BookedCount == 0 &&
                     (slot.Date < utcDate || (slot.Date == utcDate && slot.StartTime < utcTime)))
                 .ExecuteUpdateAsync(updates => updates
-                    .SetProperty(slot => slot.Status, ScheduleStatus.Expired)
+                    .SetProperty(slot => slot.Status, ScheduleStatus.Blocked)
                     .SetProperty(slot => slot.UpdatedAt, utcNow),
                     cancellationToken);
 
