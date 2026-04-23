@@ -32,7 +32,8 @@ public enum PostCategory
 public enum AuthorType
 {
     Ophthalmologist,
-    Organisation
+    ClinicStaff,
+    SystemAdmin
 }
 
 /// <summary>
