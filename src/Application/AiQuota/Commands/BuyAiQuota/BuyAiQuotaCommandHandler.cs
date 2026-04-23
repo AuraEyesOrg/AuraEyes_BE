@@ -165,6 +165,7 @@ public class BuyAiQuotaCommandHandler : ICommandHandler<BuyAiQuotaCommand, BuyAi
 
     private static bool IsOrganisationBillingRole(string role)
     {
-        return string.Equals(role, Roles.OrgAdmin, StringComparison.OrdinalIgnoreCase);
+        // In the Digital Clinic model, ClinicStaff handles billing operations
+        return string.Equals(role, Roles.ClinicStaff, StringComparison.OrdinalIgnoreCase);
     }
 }

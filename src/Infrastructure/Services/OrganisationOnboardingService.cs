@@ -179,7 +179,7 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
                     createResult.Errors.Select(e => e.Description));
             }
 
-            await _userManager.AddToRoleAsync(orgAdmin, Roles.OrgAdmin);
+            await _userManager.AddToRoleAsync(orgAdmin, Roles.ClinicStaff);
 
             var organisation = new Organisation(
                 orgAdmin.Id,

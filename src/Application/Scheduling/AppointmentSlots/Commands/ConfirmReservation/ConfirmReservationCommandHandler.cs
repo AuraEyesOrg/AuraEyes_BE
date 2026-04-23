@@ -314,7 +314,7 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                 else if (slot.ScheduleTemplate?.OrgId is Guid orgId)
                 {
                     var organisationAdminUserIds = await _identityService.GetUserIdsByRoleAndOrganizationAsync(
-                        Roles.OrgAdmin,
+                        Roles.SystemAdmin,
                         orgId,
                         cancellationToken);
 

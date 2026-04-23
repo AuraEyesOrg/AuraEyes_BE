@@ -165,9 +165,8 @@ public static class DependencyInjection
             .AddPolicy(Policies.Authenticated, policy => policy.RequireAuthenticatedUser())
             .AddPolicy(Policies.PatientOnly, policy => policy.RequireRole(Roles.Patient))
             .AddPolicy(Policies.OphthalmologistOnly, policy => policy.RequireRole(Roles.Ophthalmologist))
-            .AddPolicy(Policies.OrgAdminOnly, policy => policy.RequireRole(Roles.OrgAdmin))
-            .AddPolicy(Policies.OphthalmologistOrOrgAdmin, policy =>
-                policy.RequireRole(Roles.Ophthalmologist, Roles.OrgAdmin))
+            .AddPolicy(Policies.ClinicStaffOnly, policy => policy.RequireRole(Roles.ClinicStaff))
+            .AddPolicy(Policies.ClinicalTeam, policy => policy.RequireRole(Roles.ClinicalTeam))
             .AddPolicy(Policies.SystemAdminOnly, policy => policy.RequireRole(Roles.SystemAdmin))
             .AddPolicy(Policies.AdminsOnly, policy => policy.RequireRole(Roles.Admins))
             .AddPolicy(Policies.MedicalStaff, policy => policy.RequireRole(Roles.Medical))
@@ -175,10 +174,7 @@ public static class DependencyInjection
             {
                 policy.RequireRole(Roles.Ophthalmologist);
                 policy.RequireClaim("IsVerified", "True");
-            })
-            .AddPolicy(Policies.OrganizationMember, policy =>
-                policy.RequireAssertion(context =>
-                    context.User.HasClaim(c => c.Type == "org_id" && !string.IsNullOrEmpty(c.Value))));
+            });
 
         // Register Permission-based policies dynamically from Permissions constant class
         foreach (var prop in typeof(Permissions).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.FlattenHierarchy))
@@ -196,6 +192,7 @@ public static class DependencyInjection
         // Register repositories
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IOphthalmologistRepository, OphthalmologistRepository>();
+        services.AddScoped<IClinicStaffRepository, ClinicStaffRepository>();
         services.AddScoped<IWalletRepository, WalletRepository>();
         services.AddScoped<IDepositRequestRepository, DepositRequestRepository>();
         services.AddScoped<IWithdrawalRequestRepository, WithdrawalRequestRepository>();

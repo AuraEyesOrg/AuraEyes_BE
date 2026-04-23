@@ -102,8 +102,8 @@ public static class DatabaseSeeder
         {
             Roles.Patient => "End users who use the retinal screening service",
             Roles.Ophthalmologist => "Medical professionals who review screenings and provide diagnoses",
-            Roles.OrgAdmin => "Organization administrators who manage their organization's users and settings",
-            Roles.SystemAdmin => "System administrators with full access to all features",
+            Roles.ClinicStaff => "Clinic employees (Receptionist, Coordinator, Cashier) managing clinic operations",
+            Roles.SystemAdmin => "Clinic Owner — full system access and administration",
             _ => roleName
         };
     }
@@ -115,12 +115,24 @@ public static class DatabaseSeeder
     {
         logger?.LogInformation("Seeding default user accounts into AspNetUsers and AspNetUserRoles...");
 
+        // Digital Clinic model: SystemAdmin + Ophthalmologist + ClinicStaff + Patient
         var defaultAccounts = new List<(string Email, string Password, string Role, string FullName)>
         {
-            (configuration["Swagger:Username"] ?? "systemadmin@gmail.com", configuration["Swagger:Password"] ?? "SystemAdmin@123$", Roles.SystemAdmin, "System Administrator"),
-            ("orgadmin@gmail.com", "OrgAdmin@123$", Roles.OrgAdmin, "Organization Administrator"),
-            ("ophthalmologist@gmail.com", "Ophthalmologist@123$", Roles.Ophthalmologist, "Doctor Ophthalmologist"),
-            ("patient@gmail.com", "Patient@123$", Roles.Patient, "Patient User")
+            // Clinic Owner
+            (configuration["Swagger:Username"] ?? "systemadmin@auraeyes.vn",
+             configuration["Swagger:Password"] ?? "Admin@123$",
+             Roles.SystemAdmin, "Clinic Owner (System Admin)"),
+
+            // Ophthalmologist
+            ("doctor@auraeyes.vn", "Doctor@123$", Roles.Ophthalmologist, "BS. Nguyen Van An"),
+
+            // Clinic Staff — three sub-role examples
+            ("receptionist@auraeyes.vn", "Staff@123$", Roles.ClinicStaff, "Tran Thi Binh - Receptionist"),
+            ("coordinator@auraeyes.vn",  "Staff@123$", Roles.ClinicStaff, "Le Van Ca - Coordinator"),
+            ("cashier@auraeyes.vn",      "Staff@123$", Roles.ClinicStaff, "Pham Thi Dung - Cashier"),
+
+            // Patient
+            ("patient@auraeyes.vn", "Patient@123$", Roles.Patient, "Nguyen Van Em")
         };
 
         if (string.IsNullOrWhiteSpace(defaultAccounts[0].Email) || string.IsNullOrWhiteSpace(defaultAccounts[0].Password))
@@ -141,25 +153,19 @@ public static class DatabaseSeeder
                 CreatedAt = DateTime.UtcNow
             };
 
-            // Create user → inserts into AspNetUsers table
             var createResult = await userManager.CreateAsync(user, password);
 
             if (createResult.Succeeded)
             {
                 logger?.LogInformation("✓ Created user: {Email} → AspNetUsers", email);
 
-                // Assign role → inserts into AspNetUserRoles table
                 var roleResult = await userManager.AddToRoleAsync(user, role);
 
                 if (roleResult.Succeeded)
-                {
                     logger?.LogInformation("✓ Assigned role {Role} to {Email} → AspNetUserRoles", role, email);
-                }
                 else
-                {
                     logger?.LogError("✗ Failed to assign role {Role} to user {Email}: {Errors}",
                         role, email, string.Join(", ", roleResult.Errors.Select(e => e.Description)));
-                }
             }
             else
             {
@@ -176,55 +182,12 @@ public static class DatabaseSeeder
         UserManager<ApplicationUser> userManager,
         ILogger? logger)
     {
-        logger?.LogInformation("Seeding domain entities (Organisation, Ophthalmologist, Patient, Wallets, Schedules)...");
+        logger?.LogInformation("Seeding domain entities (Ophthalmologist, ClinicStaff, Patient, Wallets, Schedules)...");
 
-        // Step 1: Seed Organisation
-        var orgAdminUser = await userManager.FindByEmailAsync("orgadmin@gmail.com");
-        Guid organisationId = Guid.Empty;
-        
-        if (orgAdminUser == null)
-        {
-            logger?.LogWarning("OrgAdmin user not found. Skipping organisation seeding.");
-        }
-        else
-        {
-            var existingOrg = await context.Organisations
-                .FirstOrDefaultAsync(o => o.OwnerId == orgAdminUser.Id);
-
-            if (existingOrg == null)
-            {
-                var organisation = new Organisation(
-                    ownerId: orgAdminUser.Id,
-                    name: "Auski Hospital",
-                    orgType: OrgType.Hospital,
-                    address: "S1006 Vinhomes Grand Park, Ho Chi Minh City, Viet Nam",
-                    licenseNumber: "MED-HCM-2024-001",
-                    taxCode: "0312345678"
-                );
-
-                await context.Organisations.AddAsync(organisation);
-                await context.SaveChangesAsync();
-                organisationId = organisation.Id;
-
-                logger?.LogInformation("✓ Created organisation: {OrgName} → Organisations table", organisation.Name);
-
-                // Update OrgAdmin's OrganizationId
-                orgAdminUser.OrganizationId = organisation.Id;
-                await userManager.UpdateAsync(orgAdminUser);
-                logger?.LogInformation("✓ Linked OrgAdmin to organisation");
-            }
-            else
-            {
-                organisationId = existingOrg.Id;
-                logger?.LogInformation("Organisation already exists. Skipping.");
-            }
-        }
-
-        // Step 2: Seed Ophthalmologist entity
-        var ophthalmologistUser = await userManager.FindByEmailAsync("ophthalmologist@gmail.com");
+        // Step 1: Seed Ophthalmologist entity
+        var ophthalmologistUser = await userManager.FindByEmailAsync("doctor@auraeyes.vn");
         Guid ophthalmologistId = Guid.Empty;
-        Guid ophthalmologistWalletId = Guid.Empty;
-        
+
         if (ophthalmologistUser == null)
         {
             logger?.LogWarning("Ophthalmologist user not found. Skipping ophthalmologist entity seeding.");
@@ -238,7 +201,7 @@ public static class DatabaseSeeder
             {
                 var ophthalmologist = new Ophthalmologist(
                     userId: ophthalmologistUser.Id,
-                    bio: "Experienced ophthalmologist specializing in retinal diseases and diabetic retinopathy screening.",
+                    bio: "Bác sĩ chuyên khoa mắt với kinh nghiệm trong lĩnh vực sàng lọc bệnh võng mạc.",
                     yearsOfExperience: 5,
                     phone: "+84123456789",
                     licenseUrl: null,
@@ -259,11 +222,44 @@ public static class DatabaseSeeder
             }
         }
 
+        // Step 2: Seed ClinicStaff profiles
+        var staffAccounts = new[]
+        {
+            ("receptionist@auraeyes.vn", new[] { ClinicStaffRole.Receptionist }),
+            ("coordinator@auraeyes.vn",  new[] { ClinicStaffRole.Coordinator }),
+            ("cashier@auraeyes.vn",      new[] { ClinicStaffRole.Cashier }),
+        };
+
+        foreach (var (email, subRoles) in staffAccounts)
+        {
+            var staffUser = await userManager.FindByEmailAsync(email);
+            if (staffUser == null)
+            {
+                logger?.LogWarning("ClinicStaff user {Email} not found. Skipping.", email);
+                continue;
+            }
+
+            var existingStaff = await context.ClinicStaffs
+                .FirstOrDefaultAsync(s => s.UserId == staffUser.Id);
+
+            if (existingStaff == null)
+            {
+                var clinicStaff = new ClinicStaff(staffUser.Id, subRoles, department: "Clinic Operations");
+                await context.ClinicStaffs.AddAsync(clinicStaff);
+                logger?.LogInformation("✓ Created ClinicStaff profile for {Email} [{SubRoles}] → ClinicStaffs table",
+                    email, string.Join(",", subRoles.Select(r => r.ToString())));
+            }
+            else
+            {
+                logger?.LogInformation("ClinicStaff profile for {Email} already exists. Skipping.", email);
+            }
+        }
+
+        await context.SaveChangesAsync();
+
         // Step 3: Seed Patient entity
-        var patientUser = await userManager.FindByEmailAsync("patient@gmail.com");
-        Guid patientId = Guid.Empty;
-        Guid patientWalletId = Guid.Empty;
-        
+        var patientUser = await userManager.FindByEmailAsync("patient@auraeyes.vn");
+
         if (patientUser == null)
         {
             logger?.LogWarning("Patient user not found. Skipping patient entity seeding.");
@@ -278,14 +274,12 @@ public static class DatabaseSeeder
                 var patient = new Patient(userId: patientUser.Id);
                 await context.Patients.AddAsync(patient);
                 await context.SaveChangesAsync();
-                patientId = patient.Id;
 
                 logger?.LogInformation("✓ Created patient profile for {Email} → Patients table",
                     patientUser.Email);
             }
             else
             {
-                patientId = existingPatient.Id;
                 logger?.LogInformation("Patient profile already exists. Skipping.");
             }
         }
@@ -293,11 +287,12 @@ public static class DatabaseSeeder
         // Step 4: Seed Wallets for Ophthalmologist and Patient
         await SeedWalletsAsync(context, ophthalmologistUser, patientUser, logger);
 
-        // Step 5: Seed ScheduleTemplate and AppointmentSlots for Ophthalmologist
-        await SeedScheduleTemplatesAsync(context, ophthalmologistId, organisationId, logger);
+        // Step 5: Seed ScheduleTemplate for Ophthalmologist
+        await SeedScheduleTemplatesAsync(context, ophthalmologistId, Guid.Empty, logger);
 
         logger?.LogInformation("Domain entity seeding completed.");
     }
+
 
     private static async Task SeedWalletsAsync(
         ApplicationDbContext context,

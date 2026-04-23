@@ -37,6 +37,7 @@ public class AuthService : IAuthService
     private readonly IFileStorageService _fileStorageService;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
+    private readonly IClinicStaffRepository _clinicStaffRepository;
     private readonly IContractRepository _contractRepository;
     private readonly IFullTimeTemplateProvisioningService _fullTimeTemplateProvisioningService;
     private readonly IUnitOfWork _unitOfWork;
@@ -55,6 +56,7 @@ public class AuthService : IAuthService
         IFileStorageService fileStorageService,
         IRepository<Patient> patientRepository,
         IRepository<Ophthalmologist> ophthalmologistRepository,
+        IClinicStaffRepository clinicStaffRepository,
         IContractRepository contractRepository,
         IFullTimeTemplateProvisioningService fullTimeTemplateProvisioningService,
         IUnitOfWork unitOfWork,
@@ -72,6 +74,7 @@ public class AuthService : IAuthService
         _fileStorageService = fileStorageService;
         _patientRepository = patientRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
+        _clinicStaffRepository = clinicStaffRepository;
         _contractRepository = contractRepository;
         _fullTimeTemplateProvisioningService = fullTimeTemplateProvisioningService;
         _unitOfWork = unitOfWork;
@@ -794,12 +797,13 @@ public class AuthService : IAuthService
 
         _logger.LogInformation("User logged in: {Email}", user.Email);
 
-        // Resolve role-specific profile entity (PatientId / OphthalmologistId)
+        // Resolve role-specific profile entity
         Guid? roleId = null;
         bool? isVerified = null;
         string? verificationStatus = null;
         string? contractStatus = null;
         string? employmentType = null;
+        string? staffSubRoles = null;
 
         if (roles.Contains(Roles.Patient))
         {
@@ -820,8 +824,17 @@ public class AuthService : IAuthService
                 employmentType = doctors[0].EmploymentType.ToString();
             }
         }
+        else if (roles.Contains(Roles.ClinicStaff))
+        {
+            var staff = await _clinicStaffRepository.GetByUserIdAsync(user.Id, cancellationToken);
+            if (staff is not null)
+            {
+                roleId = staff.Id;
+                staffSubRoles = staff.SubRoles;
+            }
+        }
 
-        if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+        if (roles.Contains(Roles.Ophthalmologist))
         {
             var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
             if (contract != null)
@@ -849,7 +862,7 @@ public class AuthService : IAuthService
                 ProviderAvatarUrl = providerAvatarUrl,
                 Roles = roles.ToArray(),
                 EmailConfirmed = user.EmailConfirmed,
-                OrganizationId = user.OrganizationId,
+                OrganizationId = null,          // removed in Digital Clinic model
                 RoleId = roleId,
                 TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
                 IsVerified = isVerified,
@@ -857,6 +870,7 @@ public class AuthService : IAuthService
                 ContractStatus = contractStatus,
                 MustChangePassword = user.MustChangePassword,
                 EmploymentType = employmentType,
+                StaffSubRoles = staffSubRoles,
                 Permissions = permissions.ToArray()
             }
         };
@@ -930,12 +944,13 @@ public class AuthService : IAuthService
 
             _logger.LogInformation("Token refreshed for user: {UserId}", user.Id);
 
-            // Resolve role-specific profile entity (PatientId / OphthalmologistId)
+            // Resolve role-specific profile entity
             Guid? roleId = null;
             bool? isVerified = null;
             string? verificationStatus = null;
             string? contractStatus = null;
             string? employmentType = null;
+            string? staffSubRoles = null;
 
             if (roles.Contains(Roles.Patient))
             {
@@ -956,8 +971,17 @@ public class AuthService : IAuthService
                     employmentType = doctors[0].EmploymentType.ToString();
                 }
             }
+            else if (roles.Contains(Roles.ClinicStaff))
+            {
+                var staff = await _clinicStaffRepository.GetByUserIdAsync(user.Id, cancellationToken);
+                if (staff is not null)
+                {
+                    roleId = staff.Id;
+                    staffSubRoles = staff.SubRoles;
+                }
+            }
 
-            if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+            if (roles.Contains(Roles.Ophthalmologist))
             {
                 var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
                 if (contract != null)
@@ -985,7 +1009,7 @@ public class AuthService : IAuthService
                     ProviderAvatarUrl = providerAvatarUrl,
                     Roles = roles.ToArray(),
                     EmailConfirmed = user.EmailConfirmed,
-                    OrganizationId = user.OrganizationId,
+                    OrganizationId = null,
                     RoleId = roleId,
                     TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
                     IsVerified = isVerified,
@@ -993,6 +1017,7 @@ public class AuthService : IAuthService
                     ContractStatus = contractStatus,
                     MustChangePassword = user.MustChangePassword,
                     EmploymentType = employmentType,
+                    StaffSubRoles = staffSubRoles,
                     Permissions = permissions.ToArray()
                 }
             });
@@ -1180,12 +1205,13 @@ public class AuthService : IAuthService
             var permissions = await _identityService.GetUserPermissionsAsync(userId);
             var twoFactorEnabled = await _identityService.IsTwoFactorEnabledAsync(userId);
 
-            // Resolve role-specific profile entity (PatientId / OphthalmologistId)
+            // Resolve role-specific profile entity
             Guid? roleId = null;
             bool? isVerified = null;
             string? verificationStatus = null;
             string? contractStatus = null;
             string? employmentType = null;
+            string? staffSubRoles = null;
 
             if (roles.Contains(Roles.Patient))
             {
@@ -1206,8 +1232,17 @@ public class AuthService : IAuthService
                     employmentType = doctors[0].EmploymentType.ToString();
                 }
             }
+            else if (roles.Contains(Roles.ClinicStaff))
+            {
+                var staff = await _clinicStaffRepository.GetByUserIdAsync(userId, cancellationToken);
+                if (staff is not null)
+                {
+                    roleId = staff.Id;
+                    staffSubRoles = staff.SubRoles;
+                }
+            }
 
-            if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+            if (roles.Contains(Roles.Ophthalmologist))
             {
                 var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
                 if (contract != null)
@@ -1226,7 +1261,7 @@ public class AuthService : IAuthService
                 ProviderAvatarUrl = await GetProviderAvatarUrlAsync(identityUser),
                 Roles = roles.ToArray(),
                 EmailConfirmed = userDto.EmailConfirmed,
-                OrganizationId = userDto.OrganizationId,
+                OrganizationId = null,
                 RoleId = roleId,
                 TwoFactorEnabled = twoFactorEnabled,
                 IsVerified = isVerified,
@@ -1234,6 +1269,7 @@ public class AuthService : IAuthService
                 ContractStatus = contractStatus,
                 MustChangePassword = identityUser?.MustChangePassword ?? false,
                 EmploymentType = employmentType,
+                StaffSubRoles = staffSubRoles,
                 Permissions = permissions.ToArray()
             });
         }
@@ -1335,7 +1371,7 @@ public class AuthService : IAuthService
             }
         }
 
-        if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+        if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.SystemAdmin))
         {
             var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
             if (contract is not null)
