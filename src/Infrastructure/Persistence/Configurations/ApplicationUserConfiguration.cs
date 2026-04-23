@@ -25,7 +25,7 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(u => u.CitizenId)
             .HasMaxLength(12);
 
-        builder.Property(u => u.MustChangePassword)
+        builder.Property(u => u.MustUpdateProfile)
             .HasDefaultValue(false);
 
         // Indexes for common queries

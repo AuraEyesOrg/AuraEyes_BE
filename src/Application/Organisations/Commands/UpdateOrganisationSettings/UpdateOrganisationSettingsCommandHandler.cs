@@ -72,6 +72,7 @@ public class UpdateOrganisationSettingsCommandHandler
             ownerDetails?.DateOfBirth,
             ownerDetails?.Gender is null ? null : (int)ownerDetails.Gender.Value,
             request.Address,
+            null, // CitizenId is not managed here
             cancellationToken);
 
         if (!profileUpdate.Succeeded)

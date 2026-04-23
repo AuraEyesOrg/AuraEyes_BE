@@ -891,7 +891,6 @@ public class IdentityService : IIdentityService
         if (result.Succeeded)
         {
             user.UpdatedAt = DateTime.UtcNow;
-            user.MustChangePassword = false;
             await _userManager.UpdateAsync(user);
         }
 
@@ -916,6 +915,22 @@ public class IdentityService : IIdentityService
         user.DateOfBirth = dateOfBirth;
         user.Gender = gender.HasValue ? (Domain.Enums.Gender)gender.Value : null;
         user.Address = address;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var result = await _userManager.UpdateAsync(user);
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<(bool Succeeded, string[] Errors)> SetStaffOnboardingStatusAsync(Guid userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null)
+        {
+            return (false, new[] { "User not found" });
+        }
+
+        user.EmailConfirmed = true;
+        user.MustUpdateProfile = true;
         user.UpdatedAt = DateTime.UtcNow;
 
         var result = await _userManager.UpdateAsync(user);

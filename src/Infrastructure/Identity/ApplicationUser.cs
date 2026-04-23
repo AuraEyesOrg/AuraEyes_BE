@@ -45,7 +45,7 @@ public class ApplicationUser : IdentityUser<Guid>
     public Guid? OrganizationId { get; set; }
 
     // Security policy flags
-    public bool MustChangePassword { get; set; } = false;
+    public bool MustUpdateProfile { get; set; } = false;
 
     // Navigation Properties
     public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();

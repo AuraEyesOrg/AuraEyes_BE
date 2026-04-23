@@ -168,7 +168,7 @@ public class OrganisationOnboardingService : IOrganisationOnboardingService
                 Address = request.Address,
                 EmailConfirmed = true,
                 IsActive = true,
-                MustChangePassword = true
+                MustUpdateProfile = true
             };
 
             var createResult = await _userManager.CreateAsync(orgAdmin, temporaryPassword);

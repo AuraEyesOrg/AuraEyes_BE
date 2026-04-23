@@ -1,4 +1,5 @@
 using Application.Common.Constants;
+using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Network.InternalChat.Commands.CreateGroupChat;
 using Application.Network.InternalChat.Commands.SendMessage;
@@ -74,6 +75,28 @@ public class InternalChatController : BaseApiController
         var result = await _mediator.Send(command);
         return HandleResult(result, "Message sent successfully");
     }
+
+    /// <summary>
+    /// Create a Google Meet consultation for the group.
+    /// </summary>
+    [HttpPost("groups/{groupId:guid}/meetings")]
+    [ProducesResponseType(typeof(ApiResponse<MeetingInfo>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CreateMeeting(Guid groupId, [FromBody] CreateMeetingRequest request)
+    {
+        var command = new Application.Network.InternalChat.Commands.CreateMeeting.CreateGroupMeetingCommand
+        {
+            GroupId = groupId,
+            Title = request.Title
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result, "Meeting created successfully");
+    }
+}
+
+public class CreateMeetingRequest
+{
+    public string Title { get; set; } = string.Empty;
 }
 
 public class SendMessageGrRequest

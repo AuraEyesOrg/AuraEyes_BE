@@ -158,6 +158,7 @@ public interface IIdentityService
         DateTime? dateOfBirth,
         int? gender,
         string? address,
+        string? citizenId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -197,6 +198,11 @@ public interface IIdentityService
         string currentPassword,
         string newPassword,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Finalize staff onboarding: confirms email and sets MustChangePassword flag.
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> SetStaffOnboardingStatusAsync(Guid userId);
 
     /// <summary>
     /// Synchronize all roles with their default permissions defined in code.
