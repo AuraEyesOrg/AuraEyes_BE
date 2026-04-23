@@ -1,8 +1,8 @@
 using Application.Common.Interfaces;
+using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Network.InternalChat;
 using Domain.Enums.Network;
-using Domain.Repositories;
 
 namespace Application.Network.InternalChat.Commands.CreateGroupChat;
 
@@ -27,7 +27,7 @@ public class CreateInternalGroupChatCommandHandler : ICommandHandler<CreateInter
         _currentUserService = currentUserService;
     }
 
-    public async Task<Application.Common.Models.Result<Guid>> Handle(CreateInternalGroupChatCommand request, CancellationToken cancellationToken)
+    public async Task<Result<Guid>> Handle(CreateInternalGroupChatCommand request, CancellationToken cancellationToken)
     {
         var currentUserId = _currentUserService.UserId ?? throw new UnauthorizedAccessException();
         var currentUserRole = _currentUserService.Roles.FirstOrDefault();
@@ -48,13 +48,15 @@ public class CreateInternalGroupChatCommandHandler : ICommandHandler<CreateInter
         {
             if (memberId != currentUserId)
             {
-                group.AddMember(memberId, AuthorType.ClinicStaff); // Simplified
+                // In a real scenario, we should look up the member's role to determine AuthorType
+                group.AddMember(memberId, AuthorType.ClinicStaff); 
             }
         }
 
         await _groupChatRepository.AddAsync(group, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Application.Common.Models.Result<Guid>.Success(group.Id);
+        return Result<Guid>.Success(group.Id);
     }
 }
+

@@ -3,7 +3,7 @@ using Domain.Enums.Network;
 
 namespace Domain.Entities.Network.InternalChat;
 
-public class InternalGroupMember : BaseEntity
+public class InternalGroupMember : BaseEntity, IAggregateRoot
 {
     public Guid GroupId { get; private set; }
     public Guid MemberId { get; private set; }
