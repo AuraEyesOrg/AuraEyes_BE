@@ -33,7 +33,8 @@ public enum AuthorType
 {
     Ophthalmologist,
     ClinicStaff,
-    SystemAdmin
+    SystemAdmin,
+    Organisation
 }
 
 /// <summary>

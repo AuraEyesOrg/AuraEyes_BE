@@ -1,4 +1,5 @@
 using Application.Common.Interfaces;
+using Domain.Common;
 using Domain.Entities.Network.InternalChat;
 using Domain.Enums.Network;
 using Domain.Repositories;
@@ -28,8 +29,8 @@ public class CreateInternalGroupChatCommandHandler : ICommandHandler<CreateInter
 
     public async Task<Application.Common.Models.Result<Guid>> Handle(CreateInternalGroupChatCommand request, CancellationToken cancellationToken)
     {
-        var currentUserId = Guid.Parse(_currentUserService.UserId ?? throw new UnauthorizedAccessException());
-        var currentUserRole = _currentUserService.Role;
+        var currentUserId = _currentUserService.UserId ?? throw new UnauthorizedAccessException();
+        var currentUserRole = _currentUserService.Roles.FirstOrDefault();
         
         var creatorType = currentUserRole switch
         {
