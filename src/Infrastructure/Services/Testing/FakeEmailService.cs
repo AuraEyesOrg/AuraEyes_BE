@@ -81,4 +81,9 @@ public sealed class FakeEmailService : IEmailService
             attachments.Count);
         return Task.CompletedTask;
     }
+
+    public Task SendStaffOnboardingEmailAsync(string email, string fullName, string temporaryPassword, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
 }
