@@ -10,12 +10,12 @@ namespace Infrastructure.Services;
 
 /// <summary>
 /// Recurring job that keeps a rolling window of slots for clinic-level templates.
-/// Simplified for the clinic-centric scheduling model.
+/// Redesigned for clinic-centric, resource-based scheduling.
 /// </summary>
 public class FullTimeSlotGenerationJob
 {
     private const string FullTimeSlotWindowDaysSettingKey = "FULLTIME_SLOT_WINDOW_DAYS";
-    private const int FixedRollingWindowDays = 7;
+    private const int DefaultRollingWindowDays = 14;
 
     private readonly ApplicationDbContext _context;
     private readonly IFullTimeTemplateProvisioningService _fullTimeTemplateProvisioningService;
@@ -40,7 +40,7 @@ public class FullTimeSlotGenerationJob
         var fromDate = DateOnly.FromDateTime(DateTime.UtcNow);
         var toDate = fromDate.AddDays(windowDays - 1);
 
-        // Ensure clinic-level templates exist
+        // Ensure clinic-level templates exist for basic weekdays
         var templatesEnsured = await _fullTimeTemplateProvisioningService
             .EnsureClinicTemplatesAsync(cancellationToken);
 
@@ -48,9 +48,9 @@ public class FullTimeSlotGenerationJob
             "Starting clinic slot rolling-window generation. FromDate={FromDate}, ToDate={ToDate}, WindowDays={WindowDays}, TemplatesEnsured={TemplatesEnsured}",
             fromDate, toDate, windowDays, templatesEnsured);
 
-        // Get all active system-generated templates
+        // Get all active templates (usually SystemGenerated for rolling windows)
         var templates = await _context.ScheduleTemplates
-            .Where(t => t.Source == ScheduleTemplateSource.SystemGenerated && t.IsActive)
+            .Where(t => t.IsActive && !t.IsDeleted)
             .ToListAsync(cancellationToken);
 
         var createdSlots = 0;
@@ -58,14 +58,11 @@ public class FullTimeSlotGenerationJob
 
         foreach (var template in templates)
         {
-            var slotDuration = TimeSpan.FromMinutes(template.SlotDuration);
+            var slotDurationMinutes = template.SlotDuration;
             var templateStart = template.StartTime.ToTimeSpan();
             var templateEnd = template.EndTime.ToTimeSpan();
 
-            if (template.SlotDuration <= 0
-                || slotDuration <= TimeSpan.Zero
-                || templateEnd <= templateStart
-                || template.MaxCapacity <= 0)
+            if (slotDurationMinutes <= 0 || templateEnd <= templateStart || template.MaxCapacity <= 0)
             {
                 skippedInvalidTemplates++;
                 _logger.LogWarning(
@@ -76,24 +73,36 @@ public class FullTimeSlotGenerationJob
 
             try
             {
-                var existingDates = await _context.AppointmentSlots
-                    .Where(s => s.ScheduleTemplateId == template.Id)
+                // Fetch all existing slots for this template in the window to prevent duplicates
+                // Using (Date, StartTime) as the unique identity for an occurrence of a template
+                var existingSlots = await _context.AppointmentSlots
+                    .Where(s => s.ScheduleTemplateId == template.Id && !s.IsDeleted)
                     .Where(s => s.Date >= fromDate && s.Date <= toDate)
-                    .Select(s => s.Date)
-                    .Distinct()
+                    .Select(s => new { s.Date, s.StartTime })
                     .ToListAsync(cancellationToken);
 
-                var existingDateSet = existingDates.ToHashSet();
+                var existingSlotMap = existingSlots
+                    .GroupBy(s => s.Date)
+                    .ToDictionary(g => g.Key, g => g.Select(s => s.StartTime).ToHashSet());
 
+                var slotDuration = TimeSpan.FromMinutes(slotDurationMinutes);
                 var currentDate = fromDate;
+
                 while (currentDate <= toDate)
                 {
-                    if (currentDate.DayOfWeek == template.DayOfWeek && !existingDateSet.Contains(currentDate))
+                    if (currentDate.DayOfWeek == template.DayOfWeek)
                     {
+                        existingSlotMap.TryGetValue(currentDate, out var existingTimes);
+                        
                         for (var currentStart = templateStart; currentStart + slotDuration <= templateEnd; currentStart += slotDuration)
                         {
-                            var slotEndSpan = currentStart + slotDuration;
                             var slotStart = TimeOnly.FromTimeSpan(currentStart);
+                            
+                            // PREVENT DUPLICATES: Check if a slot already exists with same template + date + start_time
+                            if (existingTimes != null && existingTimes.Contains(slotStart))
+                                continue;
+
+                            var slotEndSpan = currentStart + slotDuration;
                             var slotEnd = TimeOnly.FromTimeSpan(slotEndSpan);
 
                             _context.AppointmentSlots.Add(new AppointmentSlot(
@@ -102,7 +111,6 @@ public class FullTimeSlotGenerationJob
                                 slotStart,
                                 slotEnd,
                                 template.MaxCapacity,
-                                template.Cost,
                                 SlotSource.System));
 
                             createdSlots++;
@@ -112,13 +120,10 @@ public class FullTimeSlotGenerationJob
                     currentDate = currentDate.AddDays(1);
                 }
             }
-            catch (ArgumentException ex)
+            catch (Exception ex)
             {
                 skippedInvalidTemplates++;
-                _logger.LogWarning(
-                    ex,
-                    "Skipping template {TemplateId} due to invalid data while generating slots.",
-                    template.Id);
+                _logger.LogError(ex, "Error generating slots for template {TemplateId}", template.Id);
             }
         }
 
@@ -128,34 +133,30 @@ public class FullTimeSlotGenerationJob
         }
 
         _logger.LogInformation(
-            "Completed clinic slot rolling-window generation. Templates={TemplateCount}, TemplatesEnsured={TemplatesEnsured}, SlotsCreated={SlotsCreated}, SkippedInvalidTemplates={SkippedInvalidTemplates}",
-            templates.Count, templatesEnsured, createdSlots, skippedInvalidTemplates);
+            "Completed clinic slot rolling-window generation. TemplatesProcessed={TemplateCount}, SlotsCreated={SlotsCreated}, SkippedInvalidTemplates={SkippedInvalidTemplates}",
+            templates.Count, createdSlots, skippedInvalidTemplates);
     }
 
     /// <summary>
     /// Backward-compatible overload for legacy Hangfire payloads.
     /// </summary>
-    [Obsolete("Use ExecuteAsync(CancellationToken) instead. This overload exists for Hangfire compatibility.")]
+    [Obsolete("Use ExecuteAsync(CancellationToken) instead.")]
     public Task ExecuteAsync() => ExecuteAsync(CancellationToken.None);
 
     /// <summary>
     /// Backward-compatible entry point for legacy Hangfire payloads.
     /// </summary>
-    [Obsolete("Use ExecuteAsync(CancellationToken) instead. This overload exists for Hangfire compatibility.")]
+    [Obsolete("Use ExecuteAsync(CancellationToken) instead.")]
     public Task Execute() => ExecuteAsync(CancellationToken.None);
 
     private async Task<int> GetWindowDaysAsync(CancellationToken cancellationToken)
     {
         var configured = await _settingService.GetSettingAsync(FullTimeSlotWindowDaysSettingKey, cancellationToken);
-        if (int.TryParse(configured, out var configuredDays)
-            && configuredDays > 0
-            && configuredDays != FixedRollingWindowDays)
+        if (int.TryParse(configured, out var configuredDays) && configuredDays > 0)
         {
-            _logger.LogWarning(
-                "Ignoring configured {SettingKey}={ConfiguredDays}. Recurring slot generation uses a fixed 7-day window.",
-                FullTimeSlotWindowDaysSettingKey, configuredDays);
+            return configuredDays;
         }
 
-        return FixedRollingWindowDays;
+        return DefaultRollingWindowDays;
     }
 }

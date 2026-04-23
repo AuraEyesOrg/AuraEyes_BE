@@ -49,8 +49,7 @@ public class UpdateScheduleTemplateCommandHandler : ICommandHandler<UpdateSchedu
             request.StartTime,
             request.EndTime,
             request.SlotDuration,
-            request.MaxCapacity,
-            request.Cost);
+            request.MaxCapacity);
 
         await _scheduleTemplateRepository.UpdateAsync(template, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

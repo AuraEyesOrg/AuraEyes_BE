@@ -58,7 +58,6 @@ public class CreateAppointmentSlotCommandHandler : ICommandHandler<CreateAppoint
                 request.StartTime,
                 request.EndTime,
                 template.MaxCapacity,
-                request.Cost,
                 SlotSource.Doctor);
 
             await _repository.AddAsync(slot, cancellationToken);

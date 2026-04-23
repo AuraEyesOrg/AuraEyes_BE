@@ -21,7 +21,15 @@ public class FullTimeSlotGenerationService : IFullTimeSlotGenerationService
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "Targeted full-time slot generation for ophthalmologist {OphthalmologistId} is obsolete.",
+            "Targeted full-time slot generation for ophthalmologist {OphthalmologistId} is obsolete. Triggering full clinic generation instead.",
             ophthalmologistId);
+        
+        await _fullTimeSlotGenerationJob.ExecuteAsync(cancellationToken);
+    }
+
+    public async Task TriggerGenerationAsync(CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Manually triggering clinic-wide full-time slot generation.");
+        await _fullTimeSlotGenerationJob.ExecuteAsync(cancellationToken);
     }
 }

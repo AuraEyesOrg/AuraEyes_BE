@@ -166,7 +166,7 @@ public static class DependencyInjection
             .AddPolicy(Policies.PatientOnly, policy => policy.RequireRole(Roles.Patient))
             .AddPolicy(Policies.OphthalmologistOnly, policy => policy.RequireRole(Roles.Ophthalmologist))
             .AddPolicy(Policies.ClinicStaffOnly, policy => policy.RequireRole(Roles.ClinicStaff))
-            .AddPolicy(Policies.ClinicalTeam, policy => policy.RequireRole(Roles.ClinicalTeam))
+            .AddPolicy(Policies.ClinicalTeam, policy => policy.RequireRole(Roles.Ophthalmologist, Roles.ClinicStaff, Roles.SystemAdmin))
             .AddPolicy(Policies.SystemAdminOnly, policy => policy.RequireRole(Roles.SystemAdmin))
             .AddPolicy(Policies.AdminsOnly, policy => policy.RequireRole(Roles.Admins))
             .AddPolicy(Policies.MedicalStaff, policy => policy.RequireRole(Roles.Medical))

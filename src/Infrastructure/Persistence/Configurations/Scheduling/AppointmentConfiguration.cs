@@ -20,6 +20,13 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
         builder.Property(e => e.CancellationReason)
             .HasMaxLength(500);
 
+        builder.Property(e => e.PricingType)
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        builder.Property(e => e.Price)
+            .HasPrecision(18, 2);
+
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
@@ -34,9 +41,15 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
             .HasForeignKey(e => e.AppointmentSlotId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(e => e.RequestedDoctor)
+            .WithMany()
+            .HasForeignKey(e => e.RequestedDoctorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Indexes
         builder.HasIndex(e => e.PatientId);
         builder.HasIndex(e => e.AppointmentSlotId);
+        builder.HasIndex(e => e.RequestedDoctorId);
         builder.HasIndex(e => e.Status);
 
         // Unique constraint: one active booking per patient/slot

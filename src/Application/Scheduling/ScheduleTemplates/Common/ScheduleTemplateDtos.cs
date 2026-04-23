@@ -11,7 +11,6 @@ public record ScheduleTemplateListDto
     public TimeOnly EndTime { get; init; }
     public int SlotDuration { get; init; }
     public int MaxCapacity { get; init; }
-    public decimal? Cost { get; init; }
     public string Source { get; init; } = string.Empty;
     public bool IsActive { get; init; }
     public DateTime CreatedAt { get; init; }
@@ -28,7 +27,6 @@ public record ScheduleTemplateDto
     public TimeOnly EndTime { get; init; }
     public int SlotDuration { get; init; }
     public int MaxCapacity { get; init; }
-    public decimal? Cost { get; init; }
     public string Source { get; init; } = string.Empty;
     public bool IsActive { get; init; }
     public DateTime CreatedAt { get; init; }

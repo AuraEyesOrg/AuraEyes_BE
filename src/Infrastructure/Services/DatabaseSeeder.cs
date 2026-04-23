@@ -418,8 +418,7 @@ public static class DatabaseSeeder
                     startTime: new TimeOnly(9, 0), // 9 AM
                     endTime: new TimeOnly(17, 0),  // 5 PM
                     slotDuration: 30,              // 30-minute slots
-                    maxCapacity: 2,                // Max 2 patients per slot
-                    cost: 500000m                  // 500,000 VND per consultation
+                    maxCapacity: 2                 // Max 2 patients per slot
                 );
 
                 await context.ScheduleTemplates.AddAsync(template);
