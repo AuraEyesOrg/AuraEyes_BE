@@ -37,6 +37,7 @@ public class GetScheduleTemplatesQueryHandler : IQueryHandler<GetScheduleTemplat
             SlotDuration = t.SlotDuration,
             MaxCapacity = t.MaxCapacity,
             Cost = t.Cost,
+            Source = t.Source.ToString(),
             CreatedAt = t.CreatedAt
         }).ToList();
 

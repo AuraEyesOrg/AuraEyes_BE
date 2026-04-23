@@ -14,6 +14,7 @@ public record ScheduleTemplateListDto
     public int SlotDuration { get; init; }
     public int MaxCapacity { get; init; }
     public decimal? Cost { get; init; }
+    public string Source { get; init; } = string.Empty;
     public DateTime CreatedAt { get; init; }
 }
 
@@ -31,6 +32,7 @@ public record ScheduleTemplateDto
     public int SlotDuration { get; init; }
     public int MaxCapacity { get; init; }
     public decimal? Cost { get; init; }
+    public string Source { get; init; } = string.Empty;
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
 }
