@@ -12,15 +12,18 @@ public class GetPatientProfileQueryHandler : IQueryHandler<GetPatientProfileQuer
 {
     private readonly IIdentityService _identityService;
     private readonly IRepository<Patient> _patientRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<GetPatientProfileQueryHandler> _logger;
 
     public GetPatientProfileQueryHandler(
         IIdentityService identityService,
         IRepository<Patient> patientRepository,
+        IUnitOfWork unitOfWork,
         ILogger<GetPatientProfileQueryHandler> logger)
     {
         _identityService = identityService;
         _patientRepository = patientRepository;
+        _unitOfWork = unitOfWork;
         _logger = logger;
     }
 
@@ -37,7 +40,14 @@ public class GetPatientProfileQueryHandler : IQueryHandler<GetPatientProfileQuer
         var patient = patients.FirstOrDefault();
 
         if (patient is null)
-            return Result<PatientProfileDto>.NotFound("Patient profile not found");
+        {
+            _logger.LogInformation("Patient profile not found for user {UserId}. Creating self-healing profile.", request.UserId);
+            
+            // Self-healing: create missing patient record
+            patient = Patient.CreateRegistered(request.UserId);
+            await _patientRepository.AddAsync(patient, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
 
         var twoFactorEnabled = await _identityService.IsTwoFactorEnabledAsync(request.UserId);
         var userDetails = await _identityService.GetUserDetailsAsync(request.UserId, cancellationToken);
