@@ -37,13 +37,13 @@ public class DeleteScheduleTemplateCommandHandler : ICommandHandler<DeleteSchedu
             return Result.NotFound($"Schedule template with ID '{request.ScheduleTemplateId}' was not found.");
         }
 
-        // Check if there are any active (not cancelled/completed) appointment slots
-        var hasActiveSlots = template.AppointmentSlots?.Any(s =>
-            s.Status == ScheduleStatus.Available || s.Status == ScheduleStatus.Booked) ?? false;
+        // Check if there are any available slots with bookings
+        var hasBookedSlots = template.AppointmentSlots?.Any(s =>
+            s.Status == ScheduleStatus.Available && s.BookedCount > 0) ?? false;
 
-        if (hasActiveSlots)
+        if (hasBookedSlots)
         {
-            return Result.Failure("Cannot delete schedule template with active appointment slots. Please cancel or complete all slots first.");
+            return Result.Failure("Cannot delete schedule template with booked appointment slots. Please cancel all bookings first.");
         }
 
         await _scheduleTemplateRepository.DeleteAsync(template, cancellationToken);

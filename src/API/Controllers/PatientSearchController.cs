@@ -117,7 +117,6 @@ public class PatientSearchController : BaseApiController
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<AppointmentSlotListDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SearchAvailableSlots(
-        [FromQuery] Guid? ophthalmologistId = null,
         [FromQuery] DateOnly? fromDate = null,
         [FromQuery] DateOnly? toDate = null,
         [FromQuery] int pageNumber = 1,
@@ -126,7 +125,6 @@ public class PatientSearchController : BaseApiController
     {
         var query = new GetAppointmentSlotsQuery
         {
-            OphthalId = ophthalmologistId,
             Status = ScheduleStatus.Available,
             FromDate = fromDate,
             ToDate = toDate,
@@ -139,40 +137,14 @@ public class PatientSearchController : BaseApiController
 
         if (lite && result.IsSuccess && result.Data != null)
         {
-            var doctorSlots = result.Data.Items
-                .Where(x => x.OphthalId.HasValue)
-                .ToList();
-
-            var doctorNameById = new Dictionary<Guid, string>();
-            var doctorIds = doctorSlots
-                .Select(x => x.OphthalId!.Value)
-                .Distinct()
-                .ToList();
-
-            if (doctorIds.Count > 0)
-            {
-                var namesResult = await _mediator.Send(new GetOphthalmologistDisplayNamesByIdsQuery
-                {
-                    Ids = doctorIds
-                });
-
-                if (namesResult.IsSuccess && namesResult.Data != null)
-                {
-                    doctorNameById = new Dictionary<Guid, string>(namesResult.Data);
-                }
-            }
-
-            var liteItems = doctorSlots.Select(x => new
+            var liteItems = result.Data.Items.Select(x => new
             {
                 id = x.Id,
                 date = x.Date.ToString("yyyy-MM-dd"),
                 startTime = x.StartTime.ToString("HH:mm"),
                 endTime = x.EndTime.ToString("HH:mm"),
                 cost = x.Cost,
-                doctorId = x.OphthalId,
-                doctorName = doctorNameById.TryGetValue(x.OphthalId!.Value, out var doctorName)
-                    ? doctorName
-                    : null
+                availableCapacity = x.AvailableCapacity
             }).ToList();
 
             return Ok(liteItems);

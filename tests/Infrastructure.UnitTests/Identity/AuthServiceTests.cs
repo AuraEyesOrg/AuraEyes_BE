@@ -704,6 +704,7 @@ public class AuthServiceTests
             fileStorageService: null!,
             patientRepository: null!,
             ophthalmologistRepository: null!,
+            clinicStaffRepository: null!,
             contractRepository: null!,
             unitOfWork: null!,
             userManager: null!,
@@ -730,6 +731,7 @@ public class AuthServiceTests
             fileStorageService: null!,
             patientRepository: new FakeRepository<Patient>(),
             ophthalmologistRepository: new FakeRepository<Ophthalmologist>(),
+            clinicStaffRepository: new FakeClinicStaffRepository(),
             contractRepository: new FakeContractRepository(),
             unitOfWork: new FakeUnitOfWork(),
             userManager: null!,
@@ -747,6 +749,7 @@ public class AuthServiceTests
         public virtual Task<UserDto?> GetUserByEmailAsync(string email, CancellationToken cancellationToken = default) => Task.FromResult<UserDto?>(null);
         public Task<UserDto?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult<UserDto?>(null);
         public Task<bool> IsPhoneNumberInUseByOrganizationAsync(Guid organizationId, string phoneNumber, CancellationToken cancellationToken = default) => Task.FromResult(false);
+        public Task<bool> IsCitizenIdInUseByOrganizationAsync(Guid organizationId, string citizenId, CancellationToken cancellationToken = default) => Task.FromResult(false);
         public Task<bool> IsEmailConfirmedAsync(Guid userId) => Task.FromResult(false);
         public Task<bool> IsUserActiveAsync(Guid userId) => Task.FromResult(false);
         public Task<string> GenerateEmailConfirmationTokenAsync(Guid userId) => Task.FromResult("token");
@@ -783,6 +786,9 @@ public class AuthServiceTests
         public Task<(bool Succeeded, string[] Errors)> UpdateAvatarUrlAsync(Guid userId, string avatarUrl, CancellationToken cancellationToken = default) => Task.FromResult((true, Array.Empty<string>()));
         public Task<(bool Succeeded, string[] Errors)> UpdateUserOrganizationAsync(Guid userId, Guid? organizationId, CancellationToken cancellationToken = default) => Task.FromResult((true, Array.Empty<string>()));
         public Task<(bool Succeeded, string[] Errors)> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken cancellationToken = default) => Task.FromResult((true, Array.Empty<string>()));
+        public Task<(bool Succeeded, string[] Errors)> UpdateUserEmailAsync(Guid userId, string email, CancellationToken cancellationToken = default) => Task.FromResult((true, Array.Empty<string>()));
+        public Task<IList<string>> GetUserPermissionsAsync(Guid userId) => Task.FromResult<IList<string>>(Array.Empty<string>());
+        public Task SynchronizeRolesWithDefaultsAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class FakeTokenService : ITokenService
@@ -826,6 +832,9 @@ public class AuthServiceTests
         public Task SendPasswordResetAsync(string email, string resetLink, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task SendWelcomeEmailAsync(string email, string fullName, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task SendAsync(string to, string subject, string body, bool isHtml = true, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task SendClinicAppointmentConfirmationAsync(string email, ClinicAppointmentConfirmationEmailPayload payload, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task SendOrganisationScreeningResultShareAsync(string email, OrganisationScreeningResultShareEmailPayload payload, IReadOnlyCollection<EmailAttachment> attachments, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task SendWithAttachmentsAsync(string to, string subject, string body, IReadOnlyCollection<EmailAttachment> attachments, bool isHtml = true, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class ThrowingIdentityService : FakeIdentityService
@@ -868,5 +877,15 @@ public class AuthServiceTests
         public Task<(IReadOnlyList<Contract> Items, int TotalCount)> GetPagedAsync(string? searchTerm = null, Guid? userId = null, ContractStatus? status = null, ContractType? contractType = null, int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default) => Task.FromResult<(IReadOnlyList<Contract>, int)>((Array.Empty<Contract>(), 0));
         public Task<bool> ExistsByContractNumberAsync(string contractNumber, Guid? excludeId = null, CancellationToken cancellationToken = default) => Task.FromResult(false);
         public Task<Contract?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult<Contract?>(null);
+    }
+
+    private sealed class FakeClinicStaffRepository : FakeRepository<ClinicStaff>, IClinicStaffRepository
+    {
+        public Task<ClinicStaff?> GetByIdWithDetailsAsync(Guid id, CancellationToken cancellationToken = default) => Task.FromResult<ClinicStaff?>(null);
+        public Task<ClinicStaff?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult<ClinicStaff?>(null);
+        public Task<List<ClinicStaff>> GetAllActiveAsync(CancellationToken cancellationToken = default) => Task.FromResult(new List<ClinicStaff>());
+        public Task<List<ClinicStaff>> GetBySubRoleAsync(ClinicStaffRole subRole, CancellationToken cancellationToken = default) => Task.FromResult(new List<ClinicStaff>());
+        public Task<bool> ExistsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult(false);
+        public void Remove(ClinicStaff clinicStaff) { }
     }
 }

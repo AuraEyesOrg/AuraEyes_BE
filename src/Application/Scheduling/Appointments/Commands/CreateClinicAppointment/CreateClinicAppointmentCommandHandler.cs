@@ -17,9 +17,7 @@ public class CreateClinicAppointmentCommandHandler
 {
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IAppointmentRepository _appointmentRepository;
-    private readonly IRepository<Organisation> _organisationRepository;
     private readonly IRepository<Patient> _patientRepository;
-    private readonly IRepository<OrganisationPatientLink> _organisationPatientLinkRepository;
     private readonly IWalletRepository _walletRepository;
     private readonly ICurrentUserService _currentUser;
     private readonly IIdentityService _identityService;
@@ -31,9 +29,7 @@ public class CreateClinicAppointmentCommandHandler
     public CreateClinicAppointmentCommandHandler(
         IAppointmentSlotRepository appointmentSlotRepository,
         IAppointmentRepository appointmentRepository,
-        IRepository<Organisation> organisationRepository,
         IRepository<Patient> patientRepository,
-        IRepository<OrganisationPatientLink> organisationPatientLinkRepository,
         IWalletRepository walletRepository,
         ICurrentUserService currentUser,
         IIdentityService identityService,
@@ -44,9 +40,7 @@ public class CreateClinicAppointmentCommandHandler
     {
         _appointmentSlotRepository = appointmentSlotRepository;
         _appointmentRepository = appointmentRepository;
-        _organisationRepository = organisationRepository;
         _patientRepository = patientRepository;
-        _organisationPatientLinkRepository = organisationPatientLinkRepository;
         _walletRepository = walletRepository;
         _currentUser = currentUser;
         _identityService = identityService;
@@ -65,13 +59,6 @@ public class CreateClinicAppointmentCommandHandler
             return Result<CreateClinicAppointmentResult>.Unauthorized("Patient profile is required.");
         }
 
-        var organisation = await _organisationRepository.GetByIdAsync(request.OrganisationId, cancellationToken);
-        if (organisation is null)
-        {
-            return Result<CreateClinicAppointmentResult>.NotFound(
-                $"Organisation '{request.OrganisationId}' not found.");
-        }
-
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
         try
@@ -82,12 +69,6 @@ public class CreateClinicAppointmentCommandHandler
                 await _unitOfWork.RollbackTransactionAsync(cancellationToken);
                 return Result<CreateClinicAppointmentResult>.NotFound(
                     $"Appointment slot '{request.SlotId}' not found.");
-            }
-
-            if (slot.ScheduleTemplate?.OrgId != request.OrganisationId)
-            {
-                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                return Result<CreateClinicAppointmentResult>.Failure("The selected slot does not belong to this organisation.");
             }
 
             if (slot.Status != ScheduleStatus.Available)
@@ -115,7 +96,6 @@ public class CreateClinicAppointmentCommandHandler
                 return Result<CreateClinicAppointmentResult>.Conflict("You already have an appointment for this slot.");
             }
 
-            // ── Wallet deposit deduction (anti-spam) ──
             var depositFee = slot.Cost ?? 0;
 
             if (depositFee > 0)
@@ -150,7 +130,7 @@ public class CreateClinicAppointmentCommandHandler
                     wallet.Id,
                     depositFee,
                     TransactionType.Payment,
-                    $"Clinic visit deposit – {organisation.Name}",
+                    $"Clinic visit deposit",
                     referenceType: "ClinicBooking",
                     referenceId: slot.Id);
 
@@ -159,34 +139,11 @@ public class CreateClinicAppointmentCommandHandler
             }
 
             slot.BookWithCapacity();
-            if (slot.BookedCount >= slot.MaxCapacity)
-            {
-                slot.UpdateStatus(ScheduleStatus.Booked);
-            }
 
-            var appointment = Appointment.CreateClinicVisit(
+            var appointment = new Appointment(
                 patientId,
                 request.SlotId,
-                request.OrganisationId,
                 request.VisitReason);
-
-            var existingLink = (await _organisationPatientLinkRepository.FindAsync(
-                link => link.OrganisationId == request.OrganisationId
-                        && link.PatientId == patientId
-                        && !link.IsDeleted,
-                cancellationToken)).FirstOrDefault();
-
-            if (existingLink is null)
-            {
-                await _organisationPatientLinkRepository.AddAsync(
-                    new OrganisationPatientLink(request.OrganisationId, patientId, "clinic-booking"),
-                    cancellationToken);
-            }
-            else
-            {
-                existingLink.Touch("clinic-booking");
-                await _organisationPatientLinkRepository.UpdateAsync(existingLink, cancellationToken);
-            }
 
             await _appointmentRepository.AddAsync(appointment, cancellationToken);
             await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
@@ -194,11 +151,10 @@ public class CreateClinicAppointmentCommandHandler
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Created clinic appointment {AppointmentId} for patient {PatientId} at slot {SlotId} organisation {OrganisationId}, deposit {DepositFee} VND",
+                "Created clinic appointment {AppointmentId} for patient {PatientId} at slot {SlotId}, deposit {DepositFee} VND",
                 appointment.Id,
                 patientId,
                 request.SlotId,
-                request.OrganisationId,
                 depositFee);
 
             var appointmentTime = slot.StartTime.ToString("HH:mm");
@@ -244,32 +200,9 @@ public class CreateClinicAppointmentCommandHandler
                         {
                             AppointmentId = appointment.Id,
                             AppointmentTime = $"{slot.Date:yyyy-MM-dd}T{slot.StartTime.ToString("HH:mm")}:00",
-                            Reason = request.VisitReason,
-                            OrganisationId = request.OrganisationId
+                            Reason = request.VisitReason
                         },
                         cancellationToken);
-
-                    var organisationAdminUserIds = await _identityService.GetUserIdsByRoleAndOrganizationAsync(
-                        Roles.SystemAdmin,
-                        request.OrganisationId,
-                        cancellationToken);
-
-                    foreach (var providerUserId in organisationAdminUserIds)
-                    {
-                        await _notificationService.SendAsync(
-                            providerUserId,
-                            "Lịch hẹn mới từ bệnh nhân",
-                            $"Bạn có 1 lịch vào lúc {appointmentTime}, ngày {appointmentDate} từ bệnh nhân {patientName}",
-                            NotificationType.NewAppointmentBooked,
-                            new
-                            {
-                                AppointmentId = appointment.Id,
-                                AppointmentTime = $"{slot.Date:yyyy-MM-dd}T{slot.StartTime.ToString("HH:mm")}:00",
-                                PatientId = patientId,
-                                OrganisationId = request.OrganisationId
-                            },
-                            cancellationToken);
-                    }
                 }
                 catch (Exception ex)
                 {
@@ -285,7 +218,7 @@ public class CreateClinicAppointmentCommandHandler
                 try
                 {
                     var qrPayload =
-                        $"AURA-CLINIC-APPOINTMENT|{appointment.Id}|{patientId}|{request.OrganisationId}|{slot.Date:yyyy-MM-dd}|{slot.StartTime:HH:mm}|{slot.EndTime:HH:mm}";
+                        $"AURA-CLINIC-APPOINTMENT|{appointment.Id}|{patientId}|{slot.Date:yyyy-MM-dd}|{slot.StartTime:HH:mm}|{slot.EndTime:HH:mm}";
 
                     var checkInCode = appointment.Id.ToString("N")[..10].ToUpperInvariant();
 
@@ -294,7 +227,7 @@ public class CreateClinicAppointmentCommandHandler
                         new ClinicAppointmentConfirmationEmailPayload(
                             appointment.Id,
                             patientName,
-                            organisation.Name,
+                            "Aura Clinic",
                             slot.Date,
                             slot.StartTime,
                             slot.EndTime,

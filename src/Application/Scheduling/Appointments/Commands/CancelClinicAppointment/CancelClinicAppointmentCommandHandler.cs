@@ -38,11 +38,6 @@ public class CancelClinicAppointmentCommandHandler : ICommandHandler<CancelClini
             return Result.NotFound($"Clinic appointment '{request.AppointmentId}' not found.");
         }
 
-        if (appointment.Type != AppointmentType.ClinicVisit)
-        {
-            return Result.Failure("Only clinic visit appointments can be cancelled here.");
-        }
-
         if (appointment.PatientId != _currentUser.ProfileId.Value)
         {
             return Result.Forbidden("You can only cancel your own clinic appointment.");
@@ -56,14 +51,6 @@ public class CancelClinicAppointmentCommandHandler : ICommandHandler<CancelClini
             if (slot is not null)
             {
                 slot.CancelBooking();
-
-                if (slot.MaxCapacity > 1 &&
-                    slot.Status == ScheduleStatus.Booked &&
-                    slot.BookedCount < slot.MaxCapacity)
-                {
-                    slot.UpdateStatus(ScheduleStatus.Available);
-                }
-
                 await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
             }
 

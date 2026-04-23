@@ -12,16 +12,13 @@ namespace Application.Ophthalmologists.Queries.GetOphthalmologist;
 public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQuery, OphthalmologistDto>
 {
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
-    private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IIdentityService _identityService;
 
     public GetOphthalmologistQueryHandler(
         IOphthalmologistRepository ophthalmologistRepository,
-        IAppointmentSlotRepository appointmentSlotRepository,
         IIdentityService identityService)
     {
         _ophthalmologistRepository = ophthalmologistRepository;
-        _appointmentSlotRepository = appointmentSlotRepository;
         _identityService = identityService;
     }
 
@@ -37,16 +34,6 @@ public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQu
         // Get user information
         var user = await _identityService.GetUserByIdAsync(ophthalmologist.UserId, cancellationToken);
         var userDetails = await _identityService.GetUserDetailsAsync(ophthalmologist.UserId, cancellationToken);
-
-        var slots = await _appointmentSlotRepository.GetByOphthalmologistAsync(
-            ophthalmologist.Id,
-            DateOnly.FromDateTime(DateTime.UtcNow),
-            null,
-            Domain.Enums.ScheduleStatus.Available,
-            cancellationToken);
-
-        decimal? minPrice = slots.Any() ? slots.Min(s => s.Cost) : null;
-        decimal? maxPrice = slots.Any() ? slots.Max(s => s.Cost) : null;
 
         var dto = new OphthalmologistDto
         {
@@ -66,8 +53,8 @@ public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQu
             RatingCount = ophthalmologist.RatingCount,
             CommissionRate = ophthalmologist.CommissionRate,
             ActualMonthlySalary = ophthalmologist.ActualMonthlySalary,
-            MinPrice = minPrice,
-            MaxPrice = maxPrice,
+            MinPrice = null,
+            MaxPrice = null,
             Degrees = ophthalmologist.Certificates
                 .Where(c => c.Type == CertificateType.Degree)
                 .OrderByDescending(c => c.IssuedDate)

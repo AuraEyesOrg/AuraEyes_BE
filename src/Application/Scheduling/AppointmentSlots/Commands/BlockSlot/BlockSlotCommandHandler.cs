@@ -29,7 +29,7 @@ public class BlockSlotCommandHandler : ICommandHandler<BlockSlotCommand>
 
     public async Task<Result> Handle(BlockSlotCommand request, CancellationToken cancellationToken)
     {
-        var slot = await _appointmentSlotRepository.GetByIdWithTemplateAsync(
+        var slot = await _appointmentSlotRepository.GetByIdAsync(
             request.AppointmentSlotId, cancellationToken);
 
         if (slot is null)
@@ -37,23 +37,10 @@ public class BlockSlotCommandHandler : ICommandHandler<BlockSlotCommand>
             return Result.NotFound($"Appointment slot '{request.AppointmentSlotId}' not found.");
         }
 
-        // Verify the slot belongs to this ophthalmologist
-        if (slot.ScheduleTemplate?.OphthalId != request.OphthalmologistId)
-        {
-            return Result.Forbidden("You are not authorized to modify this slot.");
-        }
-
-        // Check current status
-        if (slot.Status == ScheduleStatus.Booked)
+        if (slot.BookedCount > 0)
         {
             return Result.Conflict(
-                "Cannot block a slot that is already booked. Please cancel the appointment first.");
-        }
-
-        if (slot.Status == ScheduleStatus.Reserved)
-        {
-            return Result.Conflict(
-                "Cannot block a slot that is currently reserved. Please wait for the reservation to expire.");
+                "Cannot block a slot that has existing bookings. Please cancel the appointments first.");
         }
 
         if (slot.Status == ScheduleStatus.Blocked)
@@ -67,8 +54,8 @@ public class BlockSlotCommandHandler : ICommandHandler<BlockSlotCommand>
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Slot {SlotId} blocked by ophthalmologist {OphthalmologistId}. Reason: {Reason}",
-                request.AppointmentSlotId, request.OphthalmologistId, request.Reason ?? "Not specified");
+                "Slot {SlotId} blocked. Reason: {Reason}",
+                request.AppointmentSlotId, request.Reason ?? "Not specified");
 
             return Result.Success();
         }
@@ -79,9 +66,8 @@ public class BlockSlotCommandHandler : ICommandHandler<BlockSlotCommand>
         catch (Exception ex)
         {
             _logger.LogError(ex,
-                "Database error when blocking slot {SlotId} by ophthalmologist {OphthalmologistId}",
-                request.AppointmentSlotId,
-                request.OphthalmologistId);
+                "Database error when blocking slot {SlotId}",
+                request.AppointmentSlotId);
 
             return Result.Failure(ex.InnerException?.Message ?? ex.Message);
         }

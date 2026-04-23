@@ -803,17 +803,13 @@ public class DashboardMetricsService : IDashboardMetricsService
                 CreatedAt = item.CreatedAt
             })
             .ToList();
-        var completedToday = await _context.Appointments.CountAsync(
-            appointment => appointment.DoctorId == doctorId &&
-                           appointment.Status == AppointmentStatus.Completed &&
-                           appointment.CompletedAt.HasValue &&
-                           appointment.CompletedAt.Value >= DateTime.UtcNow.Date,
+        var completedToday = await _context.ConsultationSessions.CountAsync(
+            session => session.OphthalmologistId == doctorId &&
+                           session.Status == SessionStatus.Completed &&
+                           session.EndTime.HasValue &&
+                           session.EndTime.Value >= DateTime.UtcNow.Date,
             cancellationToken);
-        var openSlotsToday = await (from slot in _context.AppointmentSlots
-                                    join template in _context.ScheduleTemplates on slot.ScheduleTemplateId equals template.Id
-                                    where template.OphthalId == doctorId && slot.Date == today && slot.Status == ScheduleStatus.Available
-                                    select slot.Id)
-            .CountAsync(cancellationToken);
+        var openSlotsToday = 0; // Doctors no longer own slots
 
         return new OphthalmologistDashboardMetricsDto
         {
@@ -838,7 +834,7 @@ public class DashboardMetricsService : IDashboardMetricsService
         }
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var appointmentsQuery = _context.Appointments.Where(appointment => appointment.OrganisationId == organisationId);
+        var appointmentsQuery = _context.Appointments; // Clinic-centric
 
         var totalPatients = await _context.Set<OrganisationPatientLink>().AsNoTracking()
             .CountAsync(
@@ -852,8 +848,8 @@ public class DashboardMetricsService : IDashboardMetricsService
         var confirmedCount = await appointmentsQuery.CountAsync(
             appointment => appointment.Status == AppointmentStatus.Confirmed,
             cancellationToken);
-        var completedCount = await appointmentsQuery.CountAsync(
-            appointment => appointment.Status == AppointmentStatus.Completed,
+        var completedCount = await _context.ConsultationSessions.CountAsync(
+            session => session.Status == SessionStatus.Completed,
             cancellationToken);
         var cancelledCount = await appointmentsQuery.CountAsync(
             appointment => appointment.Status == AppointmentStatus.Cancelled,
@@ -864,7 +860,7 @@ public class DashboardMetricsService : IDashboardMetricsService
 
         var todayCapacity = await (from slot in _context.AppointmentSlots
                                    join template in _context.ScheduleTemplates on slot.ScheduleTemplateId equals template.Id
-                                   where template.OrgId == organisationId && slot.Date == today
+                                   where slot.Date == today
                                    select new { slot.BookedCount, slot.MaxCapacity })
             .ToListAsync(cancellationToken);
 

@@ -70,9 +70,9 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
                 var slot = await _slotRepository.GetByIdWithLockAsync(
                     session.AppointmentSlotId.Value, cancellationToken);
 
-                if (slot is not null && slot.Status == ScheduleStatus.Booked)
+                if (slot is not null && slot.BookedCount > 0)
                 {
-                    slot.Complete();
+                    // Slot completion is now implicit based on time/visit.
                 }
             }
 

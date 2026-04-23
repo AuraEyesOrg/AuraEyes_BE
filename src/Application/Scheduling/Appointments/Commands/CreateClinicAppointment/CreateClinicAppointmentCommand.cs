@@ -5,7 +5,6 @@ namespace Application.Scheduling.Appointments.Commands.CreateClinicAppointment;
 
 public record CreateClinicAppointmentCommand : ICommand<CreateClinicAppointmentResult>
 {
-    public Guid OrganisationId { get; init; }
     public Guid SlotId { get; init; }
     public string? VisitReason { get; init; }
 }

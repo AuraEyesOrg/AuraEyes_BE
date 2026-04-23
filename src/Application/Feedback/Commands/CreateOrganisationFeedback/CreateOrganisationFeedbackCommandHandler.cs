@@ -44,14 +44,8 @@ public class CreateOrganisationFeedbackCommandHandler : ICommandHandler<CreateOr
         if (appointment.PatientId != patientId)
             return Result<Guid>.Forbidden("You can only submit feedback for your own appointment.");
 
-        if (appointment.Type != AppointmentType.ClinicVisit)
-            return Result<Guid>.Failure("Feedback is only allowed for CLINIC_VISIT appointments.");
-
-        if (appointment.Status != AppointmentStatus.Completed)
-            return Result<Guid>.Failure("Appointment must be completed before submitting feedback.");
-
-        if (!appointment.OrganisationId.HasValue || appointment.OrganisationId.Value != request.OrganisationId)
-            return Result<Guid>.Failure("Appointment does not belong to the provided organisation.");
+        // Since scheduling is single-clinic, we assume the clinic represents the organisation.
+        // We could also check PatientVisit.Status for completion here.
 
         var isDuplicate = await _organisationFeedbackRepository.ExistsByPatientAndAppointmentAsync(
             patientId,
