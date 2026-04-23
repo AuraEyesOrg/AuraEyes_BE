@@ -19,12 +19,18 @@ public class CreateInternalGroupChatCommandHandler : ICommandHandler<CreateInter
     private readonly IRepository<InternalGroupChat> _groupChatRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IIdentityService _identityService;
 
-    public CreateInternalGroupChatCommandHandler(IRepository<InternalGroupChat> groupChatRepository, IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
+    public CreateInternalGroupChatCommandHandler(
+        IRepository<InternalGroupChat> groupChatRepository, 
+        IUnitOfWork unitOfWork, 
+        ICurrentUserService currentUserService,
+        IIdentityService identityService)
     {
         _groupChatRepository = groupChatRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
+        _identityService = identityService;
     }
 
     public async Task<Result<Guid>> Handle(CreateInternalGroupChatCommand request, CancellationToken cancellationToken)
@@ -48,8 +54,15 @@ public class CreateInternalGroupChatCommandHandler : ICommandHandler<CreateInter
         {
             if (memberId != currentUserId)
             {
-                // In a real scenario, we should look up the member's role to determine AuthorType
-                group.AddMember(memberId, AuthorType.ClinicStaff); 
+                var roles = await _identityService.GetUserRolesAsync(memberId);
+                var memberType = roles.FirstOrDefault() switch
+                {
+                    "Ophthalmologist" => AuthorType.Ophthalmologist,
+                    "ClinicStaff" => AuthorType.ClinicStaff,
+                    "SystemAdmin" => AuthorType.SystemAdmin,
+                    _ => AuthorType.ClinicStaff // Default fallback
+                };
+                group.AddMember(memberId, memberType); 
             }
         }
 

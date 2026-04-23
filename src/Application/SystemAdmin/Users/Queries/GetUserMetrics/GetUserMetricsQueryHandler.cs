@@ -29,7 +29,9 @@ public class GetUserMetricsQueryHandler : IQueryHandler<GetUserMetricsQuery, Use
             ActiveDoctorsChange = metrics.ActiveDoctorsChange,
             PatientsScreened = metrics.PatientsScreened,
             PatientsScreenedChange = metrics.PatientsScreenedChange,
-            PendingApprovals = metrics.PendingApprovals
+            PendingApprovals = metrics.PendingApprovals,
+            ClinicStaffCount = metrics.ClinicStaffCount,
+            OphthalmologistCount = metrics.OphthalmologistCount
         };
 
         return Result<UserMetricsDto>.Success(dto);

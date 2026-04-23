@@ -26,6 +26,17 @@ public class InternalChatController : BaseApiController
     }
 
     /// <summary>
+    /// Search for internal system users (Staff/Doctors) to add to groups.
+    /// </summary>
+    [HttpGet("users")]
+    [ProducesResponseType(typeof(ApiResponse<List<UserAdminDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetUsers([FromQuery] string? searchTerm)
+    {
+        var result = await _mediator.Send(new Application.Network.InternalChat.Queries.GetInternalUsers.GetInternalUsersQuery { SearchTerm = searchTerm });
+        return Ok(ApiResponseFactory.Success(result));
+    }
+
+    /// <summary>
     /// Get all internal group chats current user belongs to.
     /// </summary>
     [HttpGet("groups")]
@@ -74,6 +85,28 @@ public class InternalChatController : BaseApiController
         var result = await _mediator.Send(command);
         return HandleResult(result, "Message sent successfully");
     }
+
+    /// <summary>
+    /// Create a Google Meet consultation for the group.
+    /// </summary>
+    [HttpPost("groups/{groupId:guid}/meetings")]
+    [ProducesResponseType(typeof(ApiResponse<MeetingInfo>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CreateMeeting(Guid groupId, [FromBody] CreateMeetingRequest request)
+    {
+        var command = new Application.Network.InternalChat.Commands.CreateMeeting.CreateGroupMeetingCommand
+        {
+            GroupId = groupId,
+            Title = request.Title
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result, "Meeting created successfully");
+    }
+}
+
+public class CreateMeetingRequest
+{
+    public string Title { get; set; } = string.Empty;
 }
 
 public class SendMessageGrRequest

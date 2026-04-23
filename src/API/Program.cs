@@ -204,6 +204,7 @@ builder.Services.AddSignalR(options =>
 // Register SignalR hub service for notification,chat broadcasting
 builder.Services.AddScoped<INotificationHubService, NotificationHubService>();
 builder.Services.AddScoped<IChatHubService, ChatHubService>();
+builder.Services.AddScoped<IInternalChatHubService, InternalChatHubService>();
 builder.Services.AddSingleton<IUserIdProvider, SignalRUserIdProvider>();
 
 var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -430,6 +431,7 @@ app.MapControllers();
 // Map SignalR hubs for real-time notifications
 app.MapHub<NotificationHub>("/api/hubs/notifications");
 app.MapHub<ChatHub>("/api/hubs/chat");
+app.MapHub<InternalChatHub>("/api/hubs/internal-chat");
 
 app.MapHealthChecks("/health");
 

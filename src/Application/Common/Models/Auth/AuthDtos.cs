@@ -273,7 +273,7 @@ public record UserInfoResponse
     /// Indicates whether the user must change password before accessing protected features.
     /// Used for first login after temporary credentials are provisioned.
     /// </summary>
-    public bool MustChangePassword { get; init; }
+    public bool MustUpdateProfile { get; init; }
 
     /// <summary>
     /// Employment type for ophthalmologist users (FullTime/PartTime).

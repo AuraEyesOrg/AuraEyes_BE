@@ -208,6 +208,11 @@ public interface IIdentityService
     /// Synchronize all roles with their default permissions defined in code.
     /// </summary>
     Task SynchronizeRolesWithDefaultsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get all internal staff and doctors (SystemAdmin, Ophthalmologist, ClinicStaff).
+    /// </summary>
+    Task<List<UserAdminDto>> GetInternalUsersAsync(string? searchTerm = null, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -253,7 +258,9 @@ public record UserMetricsDto(
     decimal ActiveDoctorsChange,
     int PatientsScreened,
     decimal PatientsScreenedChange,
-    int PendingApprovals
+    int PendingApprovals,
+    int ClinicStaffCount,
+    int OphthalmologistCount
 );
 
 /// <summary>

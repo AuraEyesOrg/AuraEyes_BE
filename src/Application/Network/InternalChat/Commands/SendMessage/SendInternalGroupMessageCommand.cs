@@ -19,17 +19,20 @@ public class SendInternalGroupMessageCommandHandler : ICommandHandler<SendIntern
     private readonly IRepository<InternalGroupMessage> _messageRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IInternalChatHubService _chatHubService;
 
     public SendInternalGroupMessageCommandHandler(
         IRepository<InternalGroupChat> groupChatRepository,
         IRepository<InternalGroupMessage> messageRepository,
         IUnitOfWork unitOfWork,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IInternalChatHubService chatHubService)
     {
         _groupChatRepository = groupChatRepository;
         _messageRepository = messageRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
+        _chatHubService = chatHubService;
     }
 
     public async Task<Result<Guid>> Handle(SendInternalGroupMessageCommand request, CancellationToken cancellationToken)
@@ -65,6 +68,19 @@ public class SendInternalGroupMessageCommandHandler : ICommandHandler<SendIntern
 
         await _messageRepository.AddAsync(message, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Broadcast realtime message
+        var messageDto = new Application.Network.InternalChat.Queries.GetMessages.InternalGroupMessageDto
+        {
+            Id = message.Id,
+            GroupId = message.GroupId,
+            SenderId = message.SenderId,
+            SenderType = message.SenderType,
+            Content = message.Content,
+            CreatedAt = message.CreatedAt
+        };
+        
+        await _chatHubService.BroadcastMessageAsync(group.Id, messageDto, cancellationToken);
 
         return Result<Guid>.Success(message.Id);
     }
