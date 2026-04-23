@@ -448,7 +448,7 @@ public class NetworkController : BaseApiController
         CancellationToken cancellationToken = default)
     {
         var (users, totalCount) = await _identityService.GetUsersAsync(
-            searchTerm, Roles.OrgAdmin, null, pageNumber, pageSize, cancellationToken);
+            searchTerm, Roles.ClinicStaff, null, pageNumber, pageSize, cancellationToken);
 
         var items = users.Select(u => new
         {
