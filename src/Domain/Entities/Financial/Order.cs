@@ -9,6 +9,8 @@ namespace Domain.Entities.Financial;
 public class Order : BaseEntity, IAggregateRoot
 {
     public Guid UserId { get; private set; }
+    public decimal TotalAmount { get; private set; }
+    public string? Description { get; private set; }
     public OrderStatus Status { get; private set; }
 
     // Navigation properties
@@ -17,9 +19,11 @@ public class Order : BaseEntity, IAggregateRoot
 
     private Order() { } // EF Core
 
-    public Order(Guid userId)
+    public Order(Guid userId, decimal totalAmount, string? description = null)
     {
         UserId = userId;
+        TotalAmount = totalAmount;
+        Description = description;
         Status = OrderStatus.Pending;
     }
 
@@ -43,8 +47,8 @@ public class Order : BaseEntity, IAggregateRoot
 
     public void Complete()
     {
-        if (Status != OrderStatus.Processing)
-            throw new InvalidOperationException("Only processing orders can be completed");
+        if (Status != OrderStatus.Processing && Status != OrderStatus.Confirmed && Status != OrderStatus.Pending)
+            throw new InvalidOperationException("Cannot complete order in current status");
 
         Status = OrderStatus.Completed;
         UpdatedAt = DateTime.UtcNow;

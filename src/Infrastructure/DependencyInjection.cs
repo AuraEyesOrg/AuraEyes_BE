@@ -212,6 +212,8 @@ public static class DependencyInjection
         services.AddScoped<IAiScreeningQuery, AiScreeningQuery>();
         services.AddScoped<IOrganisationPatientsRepository, OrganisationPatientsRepository>();
         services.AddScoped<IOphthalmologistScreeningsReadRepository, OphthalmologistScreeningsReadRepository>();
+        services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<IPaymentRepository, PaymentRepository>();
 
         // Register Identity Services
         services.AddScoped<IIdentityService, IdentityService>();

@@ -4,9 +4,9 @@ using Domain.Enums;
 namespace Domain.Entities.Financial;
 
 /// <summary>
-/// Payment entity - payment for orders
+/// Payment entity - payment for orders (supports PayOS)
 /// </summary>
-public class Payment : BaseEntity
+public class Payment : BaseEntity, IAggregateRoot
 {
     public Guid OrderId { get; private set; }
     public decimal Amount { get; private set; }
@@ -14,9 +14,16 @@ public class Payment : BaseEntity
     public PaymentMethod Method { get; private set; }
     public DateTime? PaidAt { get; private set; }
 
+    // PayOS specific fields
+    public string? PaymentOrderCode { get; private set; }
+    public string? PaymentUrl { get; private set; }
+    public string? ProviderTxnRef { get; private set; }
+    public string? ProviderResponse { get; private set; }
+    public string? Description { get; private set; }
+
     private Payment() { } // EF Core
 
-    public Payment(Guid orderId, decimal amount, PaymentMethod method)
+    public Payment(Guid orderId, decimal amount, PaymentMethod method, string? description = null)
     {
         if (amount <= 0)
             throw new ArgumentException("Payment amount must be positive", nameof(amount));
@@ -24,7 +31,18 @@ public class Payment : BaseEntity
         OrderId = orderId;
         Amount = amount;
         Method = method;
+        Description = description;
         Status = PaymentStatus.Pending;
+    }
+
+    /// <summary>
+    /// Set payment link information from PayOS
+    /// </summary>
+    public void SetPaymentLink(string paymentUrl, string orderCode)
+    {
+        PaymentUrl = paymentUrl;
+        PaymentOrderCode = orderCode;
+        UpdatedAt = DateTime.UtcNow;
     }
 
     public void StartProcessing()
@@ -36,19 +54,22 @@ public class Payment : BaseEntity
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void Complete()
+    public void Complete(string? providerTxnRef = null, string? providerResponse = null)
     {
         if (Status != PaymentStatus.Processing && Status != PaymentStatus.Pending)
             throw new InvalidOperationException("Cannot complete payment in current status");
 
         Status = PaymentStatus.Completed;
         PaidAt = DateTime.UtcNow;
+        ProviderTxnRef = providerTxnRef;
+        ProviderResponse = providerResponse;
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void Fail()
+    public void Fail(string? reason = null)
     {
         Status = PaymentStatus.Failed;
+        Description = string.IsNullOrEmpty(Description) ? reason : $"{Description} | Error: {reason}";
         UpdatedAt = DateTime.UtcNow;
     }
 
