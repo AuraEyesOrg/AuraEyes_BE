@@ -558,4 +558,66 @@ public static class EmailTemplates
     }
 
     #endregion
+
+    #region Staff Onboarding Template
+
+    public static string GetStaffOnboardingBody(string fullName, string email, string temporaryPassword)
+    {
+        var displayName = string.IsNullOrWhiteSpace(fullName) ? "Thành viên mới" : fullName;
+
+        var content = $@"
+            <h2 style=""margin: 0 0 20px 0; color: {TextMain}; font-size: 22px; font-weight: 600;"">
+                Chào mừng bạn đến với Đội ngũ Aura
+            </h2>
+            
+            <p style=""margin: 0 0 16px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Xin chào <strong>{displayName}</strong>,
+            </p>
+            
+            <p style=""margin: 0 0 24px 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Tài khoản nhân viên của bạn đã được tạo thành công bởi Quản trị viên hệ thống. Dưới đây là thông tin đăng nhập tạm thời của bạn:
+            </p>
+            
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {BrandSoft}; border: 1px solid {BrandSoftBorder}; border-radius: 8px; margin: 0 0 32px 0;"">
+                <tr>
+                    <td style=""padding: 24px;"">
+                        <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"">
+                            <tr>
+                                <td style=""padding: 0 0 12px 0; color: {TextMuted}; font-size: 14px; width: 140px;"">Email đăng nhập:</td>
+                                <td style=""padding: 0 0 12px 0; color: {TextMain}; font-size: 15px; font-weight: 600;"">{email}</td>
+                            </tr>
+                            <tr>
+                                <td style=""padding: 0; color: {TextMuted}; font-size: 14px;"">Mật khẩu tạm thời:</td>
+                                <td style=""padding: 0; color: {BrandDarkText}; font-size: 16px; font-weight: 700; letter-spacing: 1px;"">{temporaryPassword}</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+            
+            <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color: {AlertWarningBg}; border-left: 3px solid {BorderWarning}; margin-bottom: 32px;"">
+                <tr>
+                    <td style=""padding: 16px;"">
+                        <p style=""margin: 0; color: {AlertWarningText}; font-size: 14px; line-height: 1.5;"">
+                            <strong>Lưu ý quan trọng:</strong> Vì lý do bảo mật, hệ thống yêu cầu bạn <strong>đổi mật khẩu ngay lần đầu đăng nhập</strong>.
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <div style=""text-align: center; margin-bottom: 32px;"">
+                <a href=""https://auraeyes.vn/auth/login"" class=""button"" style=""display: inline-block; background-color: {BrandPrimary}; color: {BrandDarkText}; font-size: 15px; font-weight: 600; padding: 14px 40px; border-radius: 6px; text-decoration: none; box-shadow: 0 4px 6px rgba(0, 229, 255, 0.2);"">
+                    Đăng nhập ngay
+                </a>
+            </div>
+            
+            <p style=""margin: 0; color: {TextMain}; font-size: 15px; line-height: 1.6;"">
+                Trân trọng,<br>
+                <strong>Ban quản trị Aura</strong>
+            </p>";
+
+        return WrapInBaseTemplate(content);
+    }
+
+    #endregion
 }

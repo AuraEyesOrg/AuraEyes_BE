@@ -148,6 +148,27 @@ public class UsersController : BaseApiController
 
         return Ok(ApiResponseFactory.Success(new { success = true }, $"User {request.Action} successfully"));
     }
+
+    /// <summary>
+    /// Onboard a new staff member (SystemAdmin, Ophthalmologist, or ClinicStaff)
+    /// </summary>
+    /// <param name="command">Onboarding data</param>
+    [HttpPost("onboard")]
+    [AuthorizePermission(Permissions.UsersCreate)]
+    [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> OnboardStaff([FromBody] Application.SystemAdmin.Users.Commands.OnboardStaff.OnboardStaffCommand command)
+    {
+        var result = await _mediator.Send(command);
+        if (result.IsSuccess)
+        {
+            return CreatedAtAction(
+                nameof(GetUsers),
+                new { searchTerm = command.Email },
+                ApiResponseFactory.Success(result.Data, "Staff onboarded successfully. Temporary password sent to email."));
+        }
+        return HandleResult(result);
+    }
 }
 
 /// <summary>

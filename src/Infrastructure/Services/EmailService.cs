@@ -66,6 +66,19 @@ public class EmailService : IEmailService
     }
 
     /// <inheritdoc />
+    public async Task SendStaffOnboardingEmailAsync(string email, string fullName, string temporaryPassword, CancellationToken cancellationToken = default)
+    {
+        var subject = "[AURA] Thông tin tài khoản nhân viên mới";
+        var body = EmailTemplates.GetStaffOnboardingBody(fullName, email, temporaryPassword);
+
+        await SendAsync(email, subject, body, isHtml: true, cancellationToken);
+
+        _logger.LogInformation(
+            "Staff onboarding email sent to {Email}",
+            MaskEmail(email));
+    }
+
+    /// <inheritdoc />
     public async Task SendClinicAppointmentConfirmationAsync(
         string email,
         ClinicAppointmentConfirmationEmailPayload payload,

@@ -378,7 +378,8 @@ public class IdentityService : IIdentityService
             user.IsDeleted,
             user.OrganizationId,
             user.TwoFactorEnabled,
-            avatarUrl
+            avatarUrl,
+            user.MustChangePassword
         );
     }
 
@@ -633,7 +634,8 @@ public class IdentityService : IIdentityService
                 user.IsActive,
                 user.EmailConfirmed,
                 user.CreatedAt,
-                user.LastLoginAt
+                user.LastLoginAt,
+                user.MustChangePassword
             ));
         }
 
@@ -754,6 +756,7 @@ public class IdentityService : IIdentityService
             EmailConfirmed = user.EmailConfirmed,
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt,
+            MustChangePassword = user.MustChangePassword,
         };
     }
 
@@ -916,6 +919,22 @@ public class IdentityService : IIdentityService
         user.DateOfBirth = dateOfBirth;
         user.Gender = gender.HasValue ? (Domain.Enums.Gender)gender.Value : null;
         user.Address = address;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var result = await _userManager.UpdateAsync(user);
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<(bool Succeeded, string[] Errors)> SetStaffOnboardingStatusAsync(Guid userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null)
+        {
+            return (false, new[] { "User not found" });
+        }
+
+        user.EmailConfirmed = true;
+        user.MustChangePassword = true;
         user.UpdatedAt = DateTime.UtcNow;
 
         var result = await _userManager.UpdateAsync(user);

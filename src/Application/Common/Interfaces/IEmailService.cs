@@ -11,6 +11,11 @@ public interface IEmailService
 
     Task SendWelcomeEmailAsync(string email, string fullName, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Sends onboarding email to newly created staff members with their credentials.
+    /// </summary>
+    Task SendStaffOnboardingEmailAsync(string email, string fullName, string temporaryPassword, CancellationToken cancellationToken = default);
+
     Task SendClinicAppointmentConfirmationAsync(
         string email,
         ClinicAppointmentConfirmationEmailPayload payload,

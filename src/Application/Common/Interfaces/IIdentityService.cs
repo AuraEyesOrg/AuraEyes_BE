@@ -158,6 +158,7 @@ public interface IIdentityService
         DateTime? dateOfBirth,
         int? gender,
         string? address,
+        string? citizenId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -199,6 +200,11 @@ public interface IIdentityService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Finalize staff onboarding: confirms email and sets MustChangePassword flag.
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> SetStaffOnboardingStatusAsync(Guid userId);
+
+    /// <summary>
     /// Synchronize all roles with their default permissions defined in code.
     /// </summary>
     Task SynchronizeRolesWithDefaultsAsync(CancellationToken cancellationToken = default);
@@ -216,7 +222,8 @@ public record UserDto(
     bool IsDeleted,
     Guid? OrganizationId,
     bool TwoFactorEnabled = false,
-    string? AvatarUrl = null
+    string? AvatarUrl = null,
+    bool MustChangePassword = false
 );
 
 /// <summary>
@@ -232,7 +239,8 @@ public record UserAdminDto(
     bool IsActive,
     bool EmailConfirmed,
     DateTime CreatedAt,
-    DateTime? LastLoginAt
+    DateTime? LastLoginAt,
+    bool MustChangePassword = false
 );
 
 /// <summary>
@@ -265,6 +273,7 @@ public record UserDetailsDto
     public bool EmailConfirmed { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
+    public bool MustChangePassword { get; init; }
 }
 
 /// <summary>
