@@ -5,38 +5,26 @@ using Application.SystemAdmin.Ophthalmologists.Interfaces;
 using Domain.Common;
 using Domain.Enums;
 using Domain.Repositories;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Application.SystemAdmin.Ophthalmologists.Commands.ApproveEmploymentTypeChangeRequest;
 
 public class ApproveEmploymentTypeChangeRequestCommandHandler : ICommandHandler<ApproveEmploymentTypeChangeRequestCommand, ApproveEmploymentTypeChangeRequestResultDto>
 {
-    private const int FullTimeTransitionBackfillWindowDays = 7;
-
     private readonly IOphthalmologistEmploymentTypeChangeRequestRepository _requestRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
-    private readonly IContractRepository _contractRepository;
-    private readonly IOphthalmologistContractProvisioningService _contractProvisioningService;
-    private readonly ISender _sender;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ApproveEmploymentTypeChangeRequestCommandHandler> _logger;
     public ApproveEmploymentTypeChangeRequestCommandHandler(
         IOphthalmologistEmploymentTypeChangeRequestRepository requestRepository,
         IOphthalmologistRepository ophthalmologistRepository,
-        IContractRepository contractRepository,
-        IOphthalmologistContractProvisioningService contractProvisioningService,
-        ISender sender,
         INotificationService notificationService,
         IUnitOfWork unitOfWork,
         ILogger<ApproveEmploymentTypeChangeRequestCommandHandler> logger)
     {
         _requestRepository = requestRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
-        _contractRepository = contractRepository;
-        _contractProvisioningService = contractProvisioningService;
-        _sender = sender;
         _notificationService = notificationService;
         _unitOfWork = unitOfWork;
         _logger = logger;
@@ -66,23 +54,10 @@ public class ApproveEmploymentTypeChangeRequestCommandHandler : ICommandHandler<
                 $"Ophthalmologist '{changeRequest.OphthalmologistId}' was not found.");
         }
 
-        if (!ophthalmologist.IsVerified)
-        {
-            return Result<ApproveEmploymentTypeChangeRequestResultDto>.Conflict(
-                "Only verified ophthalmologists can change employment type.");
-        }
-
         if (ophthalmologist.EmploymentType != changeRequest.CurrentEmploymentType)
         {
             return Result<ApproveEmploymentTypeChangeRequestResultDto>.Conflict(
                 "Employment type has changed since the request was created. Please submit a new request.");
-        }
-
-        var currentContract = await _contractRepository.GetByUserIdAsync(ophthalmologist.UserId, cancellationToken);
-        if (currentContract is null || currentContract.Status != ContractStatus.Active)
-        {
-            return Result<ApproveEmploymentTypeChangeRequestResultDto>.Conflict(
-                "Approval requires an active contract on the ophthalmologist profile.");
         }
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
@@ -104,21 +79,6 @@ public class ApproveEmploymentTypeChangeRequestCommandHandler : ICommandHandler<
 
             // Since scheduling is single-clinic, we don't backfill or delete doctor-specific slots here.
 
-            currentContract.Expire();
-            await _contractRepository.UpdateAsync(currentContract, cancellationToken);
-
-            var newContract = await _contractProvisioningService.CreatePendingContractForEmploymentTypeAsync(
-                ophthalmologist,
-                cancellationToken);
-
-            if (newContract is null)
-            {
-                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                return Result<ApproveEmploymentTypeChangeRequestResultDto>.Failure(
-                    "No active contract template found for the target employment type.");
-            }
-
-            await _contractRepository.AddAsync(newContract, cancellationToken);
             await _requestRepository.UpdateAsync(changeRequest, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
@@ -128,15 +88,14 @@ public class ApproveEmploymentTypeChangeRequestCommandHandler : ICommandHandler<
                 await _notificationService.SendAsync(
                     ophthalmologist.UserId,
                     "Yêu cầu chuyển loại hình làm việc đã được duyệt",
-                    $"Yêu cầu chuyển từ {previousEmploymentType} sang {targetEmploymentType} đã được phê duyệt. Vui lòng ký hợp đồng mới để kích hoạt lại tài khoản.",
+                    $"Yêu cầu chuyển từ {previousEmploymentType} sang {targetEmploymentType} đã được phê duyệt.",
                     NotificationType.SystemAlert,
                     new
                     {
                         RequestId = changeRequest.Id,
                         PreviousEmploymentType = previousEmploymentType.ToString(),
                         TargetEmploymentType = targetEmploymentType.ToString(),
-                        Status = changeRequest.Status.ToString(),
-                        NewContractId = newContract.Id
+                        Status = changeRequest.Status.ToString()
                     },
                     cancellationToken,
                     changeRequest.Id);
@@ -154,8 +113,8 @@ public class ApproveEmploymentTypeChangeRequestCommandHandler : ICommandHandler<
                 RequestId = changeRequest.Id,
                 PreviousEmploymentType = previousEmploymentType,
                 TargetEmploymentType = targetEmploymentType,
-                ExpiredContractId = currentContract.Id,
-                NewPendingContractId = newContract.Id
+                ExpiredContractId = null,
+                NewPendingContractId = null
             });
         }
         catch (InvalidOperationException ex)
