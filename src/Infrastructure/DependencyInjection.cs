@@ -171,10 +171,7 @@ public static class DependencyInjection
             .AddPolicy(Policies.AdminsOnly, policy => policy.RequireRole(Roles.Admins))
             .AddPolicy(Policies.MedicalStaff, policy => policy.RequireRole(Roles.Medical))
             .AddPolicy(Policies.VerifiedOphthalmologist, policy =>
-            {
-                policy.RequireRole(Roles.Ophthalmologist);
-                policy.RequireClaim("IsVerified", "True");
-            });
+                policy.RequireRole(Roles.Ophthalmologist));
 
         // Register Permission-based policies dynamically from Permissions constant class
         foreach (var prop in typeof(Permissions).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.FlattenHierarchy))
