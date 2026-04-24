@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Domain.Repositories;
 
 namespace Application.SystemAdmin.Users.Queries.GetUsers;
 
@@ -9,10 +10,12 @@ namespace Application.SystemAdmin.Users.Queries.GetUsers;
 public class GetUsersQueryHandler : IQueryHandler<GetUsersQuery, PagedResult<UserListDto>>
 {
     private readonly IIdentityService _identityService;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
 
-    public GetUsersQueryHandler(IIdentityService identityService)
+    public GetUsersQueryHandler(IIdentityService identityService, IOphthalmologistRepository ophthalmologistRepository)
     {
         _identityService = identityService;
+        _ophthalmologistRepository = ophthalmologistRepository;
     }
 
     public async Task<Result<PagedResult<UserListDto>>> Handle(
@@ -27,18 +30,26 @@ public class GetUsersQueryHandler : IQueryHandler<GetUsersQuery, PagedResult<Use
             request.PageSize,
             cancellationToken);
 
-        var items = users.Select(u => new UserListDto
-        {
-            Id = u.Id,
-            Email = u.Email,
-            FullName = u.FullName,
-            PhoneNumber = u.PhoneNumber,
-            Roles = u.Roles,
-            Status = u.Status,
-            IsActive = u.IsActive,
-            EmailConfirmed = u.EmailConfirmed,
-            CreatedAt = u.CreatedAt,
-            LastLoginAt = u.LastLoginAt
+        var ophthalmologists = await _ophthalmologistRepository.GetAllAsync(cancellationToken);
+        var ophthalmologistLookup = ophthalmologists.ToDictionary(o => o.UserId, o => o);
+
+        var items = users.Select(u => {
+            var ophthalmologist = ophthalmologistLookup.TryGetValue(u.Id, out var o) ? o : null;
+            return new UserListDto
+            {
+                Id = u.Id,
+                Email = u.Email,
+                FullName = u.FullName,
+                PhoneNumber = u.PhoneNumber,
+                Roles = u.Roles,
+                Status = u.Status,
+                IsActive = u.IsActive,
+                EmailConfirmed = u.EmailConfirmed,
+                CreatedAt = u.CreatedAt,
+                LastLoginAt = u.LastLoginAt,
+                ConsultationFee = ophthalmologist?.ConsultationFee,
+                OphthalmologistId = ophthalmologist?.Id
+            };
         }).ToList();
 
         var pagedResult = new PagedResult<UserListDto>(
