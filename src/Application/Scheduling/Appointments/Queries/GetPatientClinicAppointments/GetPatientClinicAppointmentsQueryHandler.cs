@@ -98,9 +98,14 @@ public class GetPatientClinicAppointmentsQueryHandler
             PatientAppointmentTab.Upcoming => new[]
             {
                 AppointmentStatus.Pending,
-                AppointmentStatus.Confirmed
+                AppointmentStatus.Confirmed,
+                AppointmentStatus.CheckedIn,
+                AppointmentStatus.InProgress
             },
-            PatientAppointmentTab.Completed => Array.Empty<AppointmentStatus>(), // Legacy UI tab. PatientVisits will handle actual completion logic.
+            PatientAppointmentTab.Completed => new[]
+            {
+                AppointmentStatus.Completed
+            },
             PatientAppointmentTab.Cancelled => new[]
             {
                 AppointmentStatus.Cancelled,
