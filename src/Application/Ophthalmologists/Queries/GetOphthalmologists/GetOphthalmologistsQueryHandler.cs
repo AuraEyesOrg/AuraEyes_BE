@@ -55,6 +55,7 @@ public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologists
                 DegreeUrl = ophthalmologist.DegreeUrl,
                 RatingAverage = ophthalmologist.RatingAverage,
                 RatingCount = ophthalmologist.RatingCount,
+                ConsultationFee = ophthalmologist.ConsultationFee,
                 MinPrice = null,
                 MaxPrice = null,
                 Degrees = ophthalmologist.Certificates

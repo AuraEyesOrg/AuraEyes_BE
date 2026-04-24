@@ -53,7 +53,7 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
         builder.HasIndex(e => e.ScheduleTemplateId);
         builder.HasIndex(e => e.Date);
         builder.HasIndex(e => e.Status);
-        builder.HasIndex(e => new { e.ScheduleTemplateId, e.Date, e.StartTime, e.EndTime })
+        builder.HasIndex(e => new { e.ScheduleTemplateId, e.Date, e.StartTime, e.EndTime, e.OphthalId })
             .IsUnique()
             .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("UX_AppointmentSlots_TemplateDateTime");
