@@ -100,4 +100,31 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
             .Where(x => !string.IsNullOrWhiteSpace(x.FullName))
             .ToDictionary(x => x.Id, x => x.FullName);
     }
+
+    public async Task<IReadOnlyDictionary<Guid, (string FullName, string? AvatarUrl)>> GetDoctorDetailsByIdsAsync(
+        IReadOnlyCollection<Guid> ophthalmologistIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (ophthalmologistIds.Count == 0)
+            return new Dictionary<Guid, (string FullName, string? AvatarUrl)>();
+
+        var uniqueIds = ophthalmologistIds.Distinct().ToArray();
+
+        var rows = await (
+            from ophthalmologist in _dbSet
+            join user in _context.Users on ophthalmologist.UserId equals user.Id
+            where uniqueIds.Contains(ophthalmologist.Id) && ophthalmologist.IsVerified && !user.IsDeleted
+            select new
+            {
+                ophthalmologist.Id,
+                user.FullName,
+                user.AvatarUrl
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .ToDictionary(
+                x => x.Id,
+                x => (FullName: x.FullName ?? "Unknown", AvatarUrl: x.AvatarUrl));
+    }
 }

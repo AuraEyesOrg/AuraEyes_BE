@@ -14,6 +14,8 @@ public record OnboardStaffCommand : ICommand<Guid>
     public string Phone { get; init; } = string.Empty;
     public string Role { get; init; } = string.Empty; // Ophthalmologist, ClinicStaff
     
-    // Additional fields for profiles could be added here if needed,
-    // but for initial onboarding, basic info is usually enough.
+    /// <summary>
+    /// Initial consultation fee for ophthalmologists.
+    /// </summary>
+    public decimal ConsultationFee { get; init; }
 }

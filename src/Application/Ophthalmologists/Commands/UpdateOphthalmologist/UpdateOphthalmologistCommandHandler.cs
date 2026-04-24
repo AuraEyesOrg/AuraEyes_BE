@@ -53,6 +53,11 @@ public class UpdateOphthalmologistCommandHandler : ICommandHandler<UpdateOphthal
                 targetWorkingHours,
                 targetExpectedSalary);
 
+            if (request.ConsultationFee.HasValue)
+            {
+                ophthalmologist.UpdateConsultationFee(request.ConsultationFee.Value);
+            }
+
             if (request.UserId.HasValue)
             {
                 var (succeeded, errors) = await _identityService.UpdateUserProfileAsync(

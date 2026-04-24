@@ -58,4 +58,9 @@ public record UpdateOphthalmologistCommand : ICommand
     /// Optional expected monthly salary update.
     /// </summary>
     public decimal? ExpectedMonthlySalary { get; init; }
+
+    /// <summary>
+    /// Optional consultation fee update.
+    /// </summary>
+    public decimal? ConsultationFee { get; init; }
 }
