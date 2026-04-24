@@ -45,6 +45,11 @@ public class FullTimeSlotGenerationJob
             .Where(t => t.IsActive && !t.IsDeleted)
             .ToListAsync(cancellationToken);
 
+        // Fetch doctors once for clinic-wide templates
+        var doctors = await _context.Ophthalmologists
+            .Where(o => o.VerificationStatus != VerificationStatus.Rejected && !o.IsDeleted)
+            .ToListAsync(cancellationToken);
+
         var createdSlots = 0;
         var skippedInvalidTemplates = 0;
 
@@ -70,11 +75,11 @@ public class FullTimeSlotGenerationJob
                 var existingSlots = await _context.AppointmentSlots
                     .Where(s => s.ScheduleTemplateId == template.Id && !s.IsDeleted)
                     .Where(s => s.Date >= fromDate && s.Date <= toDate)
-                    .Select(s => new { s.Date, s.StartTime })
+                    .Select(s => new { s.Date, s.StartTime, s.OphthalId })
                     .ToListAsync(cancellationToken);
 
                 var existingSlotMap = existingSlots
-                    .GroupBy(s => s.Date)
+                    .GroupBy(s => new { s.Date, s.OphthalId })
                     .ToDictionary(g => g.Key, g => g.Select(s => s.StartTime).ToHashSet());
 
                 var slotDuration = TimeSpan.FromMinutes(slotDurationMinutes);
@@ -84,28 +89,69 @@ public class FullTimeSlotGenerationJob
                 {
                     if (currentDate.DayOfWeek == template.DayOfWeek)
                     {
-                        existingSlotMap.TryGetValue(currentDate, out var existingTimes);
-                        
                         for (var currentStart = templateStart; currentStart + slotDuration <= templateEnd; currentStart += slotDuration)
                         {
                             var slotStart = TimeOnly.FromTimeSpan(currentStart);
-                            
-                            // PREVENT DUPLICATES: Check if a slot already exists with same template + date + start_time
-                            if (existingTimes != null && existingTimes.Contains(slotStart))
-                                continue;
-
                             var slotEndSpan = currentStart + slotDuration;
                             var slotEnd = TimeOnly.FromTimeSpan(slotEndSpan);
+                            
+                            if (doctors.Any())
+                            {
+                                foreach (var doctor in doctors)
+                                {
+                                    // Check if this doctor already has a slot for this time
+                                    if (existingSlotMap.TryGetValue(new { Date = currentDate, OphthalId = (Guid?)doctor.Id }, out var docTimes) 
+                                        && docTimes.Contains(slotStart))
+                                        continue;
 
-                            _context.AppointmentSlots.Add(new AppointmentSlot(
-                                template.Id,
-                                currentDate,
-                                slotStart,
-                                slotEnd,
-                                template.MaxCapacity,
-                                SlotSource.System));
+                                    // Check if there is a "generic" slot (OphthalId is null) for this time and remove it
+                                    // to make room for doctor-specific slots and avoid confusion
+                                    if (existingSlotMap.TryGetValue(new { Date = currentDate, OphthalId = (Guid?)null }, out var genericTimes)
+                                        && genericTimes.Contains(slotStart))
+                                    {
+                                        var genericSlot = await _context.AppointmentSlots
+                                            .FirstOrDefaultAsync(s => s.ScheduleTemplateId == template.Id 
+                                                && s.Date == currentDate && s.StartTime == slotStart 
+                                                && s.OphthalId == null && !s.IsDeleted, cancellationToken);
+                                        if (genericSlot != null) _context.AppointmentSlots.Remove(genericSlot);
+                                        
+                                        // Remove from map so we don't try to delete it again for the next doctor
+                                        genericTimes.Remove(slotStart);
+                                    }
 
-                            createdSlots++;
+                                    var slot = new AppointmentSlot(
+                                        template.Id,
+                                        currentDate,
+                                        slotStart,
+                                        slotEnd,
+                                        1,
+                                        SlotSource.System);
+                                    
+                                    slot.UpdateOphthalId(doctor.Id);
+                                    var cost = doctor.ConsultationFee > 0 ? doctor.ConsultationFee : (template.Cost ?? 0);
+                                    slot.UpdateCost(cost);
+
+                                    _context.AppointmentSlots.Add(slot);
+                                    createdSlots++;
+                                }
+                            }
+                            else
+                            {
+                                // Check if generic slot already exists
+                                if (existingSlotMap.TryGetValue(new { Date = currentDate, OphthalId = (Guid?)null }, out var genericTimes) 
+                                    && genericTimes.Contains(slotStart))
+                                    continue;
+
+                                _context.AppointmentSlots.Add(new AppointmentSlot(
+                                    template.Id,
+                                    currentDate,
+                                    slotStart,
+                                    slotEnd,
+                                    template.MaxCapacity,
+                                    SlotSource.System));
+
+                                createdSlots++;
+                            }
                         }
                     }
 
