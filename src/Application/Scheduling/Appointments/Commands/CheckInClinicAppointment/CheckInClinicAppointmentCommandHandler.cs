@@ -45,8 +45,10 @@ public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInCli
         if (appointment.Status == AppointmentStatus.Pending)
         {
             appointment.Confirm();
-            await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
         }
+
+        appointment.CheckIn();
+        await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
 
         var visit = PatientVisit.CreateFromAppointment(appointment);
         await _patientVisitRepository.AddAsync(visit, cancellationToken);
