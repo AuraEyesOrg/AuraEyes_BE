@@ -19,7 +19,7 @@ public class ScheduleTemplateRepository : Repository<ScheduleTemplate>, ISchedul
         CancellationToken cancellationToken = default)
     {
         return await _dbSet
-            .Where(t => t.DayOfWeek == dayOfWeek && t.IsActive)
+            .Where(t => t.DayOfWeek == dayOfWeek && t.IsActive && !t.IsDeleted)
             .OrderBy(t => t.StartTime)
             .ToListAsync(cancellationToken);
     }
@@ -31,7 +31,7 @@ public class ScheduleTemplateRepository : Repository<ScheduleTemplate>, ISchedul
         Guid? excludeTemplateId = null,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.Where(t => t.DayOfWeek == dayOfWeek && t.IsActive);
+        var query = _dbSet.Where(t => t.DayOfWeek == dayOfWeek && t.IsActive && !t.IsDeleted);
 
         if (excludeTemplateId.HasValue)
             query = query.Where(t => t.Id != excludeTemplateId.Value);
@@ -47,7 +47,7 @@ public class ScheduleTemplateRepository : Repository<ScheduleTemplate>, ISchedul
         int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.Where(t => t.IsActive);
+        var query = _dbSet.Where(t => !t.IsDeleted);
 
         if (dayOfWeek.HasValue)
             query = query.Where(t => t.DayOfWeek == dayOfWeek.Value);
@@ -77,7 +77,7 @@ public class ScheduleTemplateRepository : Repository<ScheduleTemplate>, ISchedul
         CancellationToken cancellationToken = default)
     {
         return await _dbSet
-            .Where(t => t.IsActive)
+            .Where(t => t.IsActive && !t.IsDeleted)
             .OrderBy(t => t.DayOfWeek)
             .ThenBy(t => t.StartTime)
             .ToListAsync(cancellationToken);

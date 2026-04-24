@@ -31,17 +31,20 @@ public class UpdateScheduleTemplateCommandHandler : ICommandHandler<UpdateSchedu
             return Result.NotFound($"Schedule template with ID '{request.ScheduleTemplateId}' was not found.");
         }
 
-        // Check for overlapping templates (excluding current template)
-        var hasOverlap = await _scheduleTemplateRepository.HasOverlappingTemplateAsync(
-            request.DayOfWeek,
-            request.StartTime,
-            request.EndTime,
-            request.ScheduleTemplateId,
-            cancellationToken);
-
-        if (hasOverlap)
+        // Check for overlapping templates only if we are keeping/setting this template as ACTIVE
+        if (request.IsActive)
         {
-            return Result.Conflict("An overlapping schedule template already exists for this day and time.");
+            var hasOverlap = await _scheduleTemplateRepository.HasOverlappingTemplateAsync(
+                request.DayOfWeek,
+                request.StartTime,
+                request.EndTime,
+                request.ScheduleTemplateId,
+                cancellationToken);
+
+            if (hasOverlap)
+            {
+                return Result.Conflict("An overlapping schedule template already exists for this day and time.");
+            }
         }
 
         template.Update(
@@ -52,7 +55,8 @@ public class UpdateScheduleTemplateCommandHandler : ICommandHandler<UpdateSchedu
             request.MaxCapacity,
             request.Cost,
             request.OphthalId,
-            request.OrgId);
+            request.OrgId,
+            request.IsActive);
 
         await _scheduleTemplateRepository.UpdateAsync(template, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

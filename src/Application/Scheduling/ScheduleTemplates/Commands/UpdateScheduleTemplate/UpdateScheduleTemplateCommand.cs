@@ -16,4 +16,5 @@ public record UpdateScheduleTemplateCommand : ICommand
     public decimal? Cost { get; init; }
     public Guid? OphthalId { get; init; }
     public Guid? OrgId { get; init; }
+    public bool IsActive { get; init; }
 }

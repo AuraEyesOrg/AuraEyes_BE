@@ -14,15 +14,18 @@ namespace Application.Scheduling.ScheduleTemplates.Commands.DeleteScheduleTempla
 public class DeleteScheduleTemplateCommandHandler : ICommandHandler<DeleteScheduleTemplateCommand>
 {
     private readonly IScheduleTemplateRepository _scheduleTemplateRepository;
+    private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<DeleteScheduleTemplateCommandHandler> _logger;
 
     public DeleteScheduleTemplateCommandHandler(
         IScheduleTemplateRepository scheduleTemplateRepository,
+        IAppointmentSlotRepository appointmentSlotRepository,
         IUnitOfWork unitOfWork,
         ILogger<DeleteScheduleTemplateCommandHandler> logger)
     {
         _scheduleTemplateRepository = scheduleTemplateRepository;
+        _appointmentSlotRepository = appointmentSlotRepository;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -37,13 +40,22 @@ public class DeleteScheduleTemplateCommandHandler : ICommandHandler<DeleteSchedu
             return Result.NotFound($"Schedule template with ID '{request.ScheduleTemplateId}' was not found.");
         }
 
-        // Check if there are any available slots with bookings
-        var hasBookedSlots = template.AppointmentSlots?.Any(s =>
-            s.Status == ScheduleStatus.Available && s.BookedCount > 0) ?? false;
-
-        if (hasBookedSlots)
+        // Handle associated slots
+        if (template.AppointmentSlots != null)
         {
-            return Result.Failure("Cannot delete schedule template with booked appointment slots. Please cancel all bookings first.");
+            foreach (var slot in template.AppointmentSlots)
+            {
+                if (slot.BookedCount == 0)
+                {
+                    // No bookings: safe to soft-delete the slot
+                    await _appointmentSlotRepository.DeleteAsync(slot, cancellationToken);
+                }
+                else
+                {
+                    // Has bookings: keep the slot but block it from further changes/bookings
+                    slot.Block();
+                }
+            }
         }
 
         await _scheduleTemplateRepository.DeleteAsync(template, cancellationToken);
