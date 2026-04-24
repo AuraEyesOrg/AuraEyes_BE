@@ -20,10 +20,20 @@ namespace API.Controllers;
 public class InternalChatController : BaseApiController
 {
     private readonly IMediator _mediator;
+    private readonly ICurrentUserService _currentUserService;
+    private readonly IFileStorageService _fileStorageService;
+    private readonly ILogger<InternalChatController> _logger;
 
-    public InternalChatController(IMediator mediator)
+    public InternalChatController(
+        IMediator mediator,
+        ICurrentUserService currentUserService,
+        IFileStorageService fileStorageService,
+        ILogger<InternalChatController> logger)
     {
         _mediator = mediator;
+        _currentUserService = currentUserService;
+        _fileStorageService = fileStorageService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -77,6 +87,91 @@ public class InternalChatController : BaseApiController
     }
 
     /// <summary>
+    /// Upload internal group chat images.
+    /// </summary>
+    [HttpPost("groups/{groupId:guid}/upload-images")]
+    [ProducesResponseType(typeof(ApiResponse<UploadInternalChatImagesResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> UploadGroupImages(
+        Guid groupId,
+        [FromForm] List<IFormFile> images,
+        CancellationToken cancellationToken = default)
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
+
+        var groupCheckResult = await _mediator.Send(new GetInternalGroupChatsQuery(), cancellationToken);
+        if (!groupCheckResult.IsSuccess || groupCheckResult.Data is null)
+            return HandleResult(groupCheckResult);
+
+        var isMember = groupCheckResult.Data.Any(g => g.Id == groupId);
+        if (!isMember)
+            return Forbid();
+
+        if (images is null || images.Count == 0)
+            return BadRequest(ApiResponseFactory.Error("No images provided"));
+
+        if (images.Count > 10)
+            return BadRequest(ApiResponseFactory.Error("Maximum 10 images allowed"));
+
+        var allowedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/bmp",
+            "image/tiff",
+            "image/x-tiff",
+            "image/webp"
+        };
+
+        var uploadedUrls = new List<string>();
+
+        try
+        {
+            foreach (var image in images)
+            {
+                if (image.Length == 0)
+                    return BadRequest(ApiResponseFactory.Error($"File '{image.FileName}' is empty"));
+
+                if (image.Length > 50 * 1024 * 1024)
+                    return BadRequest(ApiResponseFactory.Error($"File '{image.FileName}' exceeds 50MB limit"));
+
+                if (!allowedTypes.Contains(image.ContentType ?? string.Empty))
+                    return BadRequest(ApiResponseFactory.Error(
+                        $"File '{image.FileName}' has unsupported format. Only JPG, JPEG, PNG, BMP, TIFF, and WebP are allowed"));
+
+                await using var stream = image.OpenReadStream();
+                var uploadedUrl = await _fileStorageService.SaveFileAsync(
+                    stream,
+                    image.FileName,
+                    $"internal-chat/group-images/{groupId}/{_currentUserService.UserId}",
+                    cancellationToken);
+
+                uploadedUrls.Add(uploadedUrl);
+                _logger.LogInformation("Uploaded internal chat group image to storage: {Url}", uploadedUrl);
+            }
+
+            return Ok(ApiResponseFactory.Success(
+                new UploadInternalChatImagesResponse
+                {
+                    UploadedUrls = uploadedUrls,
+                    Count = uploadedUrls.Count
+                },
+                "Internal chat images uploaded successfully"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to upload internal chat images for group {GroupId}", groupId);
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                ApiResponseFactory.Error($"Failed to upload images: {ex.Message}"));
+        }
+    }
+
+    /// <summary>
     /// Create a Google Meet consultation for the group.
     /// </summary>
     [HttpPost("groups/{groupId:guid}/meetings")]
@@ -102,4 +197,10 @@ public class CreateMeetingRequest
 public class SendMessageGrRequest
 {
     public string Content { get; set; } = string.Empty;
+}
+
+public record UploadInternalChatImagesResponse
+{
+    public List<string> UploadedUrls { get; init; } = new();
+    public int Count { get; init; }
 }

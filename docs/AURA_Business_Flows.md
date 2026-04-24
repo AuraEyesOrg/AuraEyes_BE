@@ -137,7 +137,20 @@
 
 ### 4.2 Flow: Platform Configuration & Monitoring
 
-- **Main Flow:** Cấu hình tỷ lệ hoa hồng -> Giám sát AI (Accuracy, Inference Time) -> Quản lý phân quyền (RBAC) -> Xem Audit Logs.
+- **Main Flow:** Quản trị danh mục bác sĩ và nhân sự clinic staff -> Giám sát AI (Accuracy, Inference Time, queue vận hành) -> Quản lý phân quyền (RBAC) -> Xem Audit Logs.
+
+### 4.3 Flow: Internal Collaboration Group Chat (System Admin Driven)
+
+- **Main Flow:**
+  1. System Admin tạo nhóm chat nội bộ và đặt tên nhóm theo mục đích vận hành (VD: "Retina Review Team A", "Clinic Ops Shift Morning").
+  2. Chọn loại nhóm (`General` hoặc `ClinicalCase`) và thêm thành viên (Ophthalmologist / ClinicStaff / SystemAdmin).
+  3. Thành viên trao đổi realtime theo từng group riêng biệt; message được phân tách theo `GroupId`.
+  4. Khi cần hội chuẩn nhanh, thành viên trong group tạo Google Meet trực tiếp từ group chat.
+  5. Link họp được dùng lại trong group để toàn bộ thành viên truy cập nhanh.
+- **Business Rules:**
+  - Chỉ thành viên của group mới xem được lịch sử chat của group đó.
+  - Người tạo group (System Admin) luôn được auto-add vào group.
+  - Group internal chat phục vụ phối hợp chuyên môn và vận hành nội bộ, không chứa PII bệnh nhân không cần thiết.
 
 ---
 
