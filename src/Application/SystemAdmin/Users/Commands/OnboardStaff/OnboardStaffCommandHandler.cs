@@ -79,6 +79,14 @@ public class OnboardStaffCommandHandler : ICommandHandler<OnboardStaffCommand, G
                     bio: "New staff member",
                     yearsOfExperience: 0,
                     phone: request.Phone);
+
+                if (request.ConsultationFee > 0)
+                {
+                    ophthalmologist.UpdateConsultationFee(request.ConsultationFee);
+                }
+
+                // Automatically verify since this is an administrative onboarding
+                ophthalmologist.Verify();
                 
                 await _ophthalmologistRepository.AddAsync(ophthalmologist, cancellationToken);
             }
