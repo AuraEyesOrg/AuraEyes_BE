@@ -12,4 +12,5 @@ public interface IOrderRepository : IRepository<Order>
         int pageNumber = 1,
         int pageSize = 20,
         CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Order>> GetByAppointmentIdsAsync(IEnumerable<Guid> appointmentIds, CancellationToken cancellationToken = default);
 }

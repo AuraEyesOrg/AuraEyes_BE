@@ -20,6 +20,14 @@ public class ClinicAppointmentDto
     /// True when the current patient has already submitted feedback for this
     /// </summary>
     public bool HasFeedback { get; init; }
+
+    // Billing info for Clinic Staff
+    public Guid? OrderId { get; init; }
+    public decimal? TotalAmount { get; init; }
+    public decimal? DepositAmount { get; init; }
+    public bool IsPaidDeposit { get; init; }
+    public decimal? RemainingAmount { get; init; }
+    public OrderStatus? OrderStatus { get; init; }
 }
 
 public class OrganisationAvailableSlotDto
