@@ -110,7 +110,8 @@ public class ScheduleTemplatesController : BaseApiController
             StartTime = request.StartTime,
             EndTime = request.EndTime,
             SlotDuration = request.SlotDuration,
-            MaxCapacity = request.MaxCapacity
+            MaxCapacity = request.MaxCapacity,
+            IsActive = request.IsActive
         };
 
         var result = await _mediator.Send(command);
@@ -149,4 +150,5 @@ public record UpdateScheduleTemplateRequest
     public TimeOnly EndTime { get; init; }
     public int SlotDuration { get; init; }
     public int MaxCapacity { get; init; }
+    public bool IsActive { get; init; }
 }

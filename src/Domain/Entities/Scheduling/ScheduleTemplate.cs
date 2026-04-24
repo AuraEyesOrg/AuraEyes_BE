@@ -84,7 +84,8 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         int maxCapacity,
         decimal? cost = null,
         Guid? ophthalId = null,
-        Guid? orgId = null)
+        Guid? orgId = null,
+        bool isActive = true)
     {
         if (endTime <= startTime)
             throw new ArgumentException("End time must be after start time");
@@ -101,6 +102,7 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         Cost = cost;
         OphthalId = ophthalId;
         OrgId = orgId;
+        IsActive = isActive;
         UpdatedAt = DateTime.UtcNow;
     }
 
