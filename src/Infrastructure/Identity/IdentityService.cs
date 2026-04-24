@@ -169,6 +169,21 @@ public class IdentityService : IIdentityService
         return user == null ? null : await MapToDtoAsync(user);
     }
 
+    public async Task<IReadOnlyList<UserDto>> GetUsersByIdsAsync(IEnumerable<Guid> userIds, CancellationToken cancellationToken = default)
+    {
+        var users = await _userManager.Users
+            .Where(u => userIds.Contains(u.Id) && !u.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        var dtos = new List<UserDto>();
+        foreach (var user in users)
+        {
+            dtos.Add(await MapToDtoAsync(user));
+        }
+
+        return dtos.AsReadOnly();
+    }
+
     public async Task<bool> IsPhoneNumberInUseByOrganizationAsync(
         Guid organizationId,
         string phoneNumber,

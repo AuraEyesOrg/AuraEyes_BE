@@ -35,6 +35,7 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
             return new AppointmentSlotListDto
             {
                 Id = slot.Id,
+                OphthalId = slot.OphthalId ?? Guid.Empty,
                 ScheduleTemplateId = slot.ScheduleTemplateId,
                 Date = slot.Date,
                 StartTime = slot.StartTime,
@@ -43,6 +44,8 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
                 MaxCapacity = slot.MaxCapacity,
                 BookedCount = slot.BookedCount,
                 AvailableCapacity = availableCapacity,
+                Cost = slot.Cost,
+                ReservationExpireAt = slot.ReservationExpireAt,
                 CreatedAt = slot.CreatedAt
             };
         }).ToList();

@@ -2,6 +2,7 @@ using Application.Financial.Commands.CreateOrder;
 using Application.Financial.Commands.HandlePaymentWebhook;
 using Application.Financial.Queries.GetOrderById;
 using Application.Financial.Queries.GetUserOrders;
+using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -50,6 +51,28 @@ public class FinancialController : BaseApiController
       [FromQuery] int pageSize = 20)
   {
       var result = await _mediator.Send(new GetUserOrdersQuery(pageNumber, pageSize));
+      return Ok(result);
+  }
+
+  [HttpGet("orders")]
+  [Authorize(Roles = "ClinicStaff,SystemAdmin")]
+  public async Task<ActionResult> GetAllOrders(
+      [FromQuery] int pageNumber = 1,
+      [FromQuery] int pageSize = 20)
+  {
+      var result = await _mediator.Send(new Application.Financial.Queries.GetAllOrders.GetAllOrdersQuery(pageNumber, pageSize));
+      return Ok(result);
+  }
+
+  /// <summary>
+  /// Completes an order by paying the remaining balance (e.g. at the clinic counter).
+  /// </summary>
+  [HttpPost("orders/{id}/complete")]
+  [Authorize(Roles = "ClinicStaff,SystemAdmin")]
+  public async Task<ActionResult> CompleteOrder(Guid id, [FromQuery] PaymentMethod method = PaymentMethod.Cash)
+  {
+      var result = await _mediator.Send(new Application.Financial.Commands.CompleteOrderPayment.CompleteOrderPaymentCommand(id, method));
+      if (!result.IsSuccess) return BadRequest(result);
       return Ok(result);
   }
 

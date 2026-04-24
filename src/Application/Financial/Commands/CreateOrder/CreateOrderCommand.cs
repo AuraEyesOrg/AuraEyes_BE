@@ -44,7 +44,7 @@ public class CreateOrderCommandHandler : IRequestHandler<CreateOrderCommand, Ord
         var userId = _currentUserService.UserId ?? throw new UnauthorizedAccessException();
 
         // 1. Create Order
-        var order = new Order(userId, request.TotalAmount, request.Description);
+        var order = new Order(userId, request.TotalAmount, null, request.Description);
         await _orderRepository.AddAsync(order, cancellationToken);
 
         // 2. Create Initial Payment
@@ -73,6 +73,8 @@ public class CreateOrderCommandHandler : IRequestHandler<CreateOrderCommand, Ord
             order.Id,
             order.UserId,
             order.TotalAmount,
+            order.DepositAmount,
+            null, // PatientName
             order.Description,
             order.Status,
             order.CreatedAt,
