@@ -41,6 +41,7 @@ public class OrderRepository : Repository<Order>, IOrderRepository
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
+            .Include(o => o.Payments)
             .OrderByDescending(o => o.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
