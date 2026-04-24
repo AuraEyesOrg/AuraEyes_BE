@@ -92,7 +92,40 @@ public class CreateClinicAppointmentCommandHandler
 
         try
         {
-            // ── 1. Validate slot ──────────────────────────────────────────────
+            // ── 1. Resolve Patient ──────────────────────────────────────────
+            Guid targetPatientProfileId;
+            Guid targetUserId;
+            bool isWalkIn = false;
+
+            if (request.PatientId.HasValue)
+            {
+                // Staff booking for another patient
+                var patient = await _patientRepository.GetByIdAsync(request.PatientId.Value, cancellationToken);
+                if (patient == null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.NotFound($"Patient profile '{request.PatientId}' not found.");
+                }
+                targetPatientProfileId = patient.Id;
+                targetUserId = patient.UserId ?? Guid.Empty; // Should have a UserId from CreateUserWalkInPatientAsync
+                
+                // Check if current user is staff/admin
+                isWalkIn = await _identityService.IsInRoleAsync(_currentUser.UserId.Value, Roles.ClinicStaff) ||
+                           await _identityService.IsInRoleAsync(_currentUser.UserId.Value, Roles.SystemAdmin);
+            }
+            else
+            {
+                // Self-booking
+                if (_currentUser.ProfileId is null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.Unauthorized("Patient profile is required for self-booking.");
+                }
+                targetPatientProfileId = _currentUser.ProfileId.Value;
+                targetUserId = _currentUser.UserId.Value;
+            }
+
+            // ── 2. Validate slot ──────────────────────────────────────────────
             var slot = await _appointmentSlotRepository.GetByIdWithLockAsync(request.SlotId, cancellationToken);
             if (slot is null)
             {
@@ -114,20 +147,19 @@ public class CreateClinicAppointmentCommandHandler
                 return Result<CreateClinicAppointmentResult>.Conflict("This appointment slot is fully booked.");
             }
 
-            // ── 2. Duplicate booking check ────────────────────────────────────
-            var patientId = _currentUser.ProfileId.Value;
+            // ── 3. Duplicate booking check ────────────────────────────────────
             var hasExistingAppointment = await _appointmentRepository.HasExistingAppointmentAsync(
-                patientId,
+                targetPatientProfileId,
                 request.SlotId,
                 cancellationToken);
 
             if (hasExistingAppointment)
             {
                 await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                return Result<CreateClinicAppointmentResult>.Conflict("You already have an appointment for this slot.");
+                return Result<CreateClinicAppointmentResult>.Conflict("Patient already has an appointment for this slot.");
             }
 
-            // ── 3. Resolve pricing ────────────────────────────────────────────
+            // ── 4. Resolve pricing ────────────────────────────────────────────
             decimal price = BASE_CLINIC_PRICE;
 
             if (request.PricingType == PricingType.DoctorSelected)
@@ -160,15 +192,17 @@ public class CreateClinicAppointmentCommandHandler
                 price = doctor.ConsultationFee;
             }
 
-            // ── 4. Calculate 30% deposit ──────────────────────────────────────
-            var depositAmount = Math.Round(price * DepositRatio, 0);
-            if (depositAmount < 1) depositAmount = 1; // PayOS minimum 1 VND
+            // ── 5. Calculate deposit ──────────────────────────────────────────
+            // If it's a walk-in (staff booking), there is NO deposit (they pay 100% full amount).
+            // For online bookings, we take 30% deposit.
+            decimal? depositAmount = isWalkIn ? null : Math.Round(price * DepositRatio, 0);
+            if (depositAmount.HasValue && depositAmount.Value < 1) depositAmount = 1;
 
-            // ── 5. Create Appointment ─────────────────────────────────────────
+            // ── 6. Create Appointment ─────────────────────────────────────────
             slot.BookWithCapacity();
 
             var appointment = new Appointment(
-                patientId,
+                targetPatientProfileId,
                 request.SlotId,
                 price,
                 request.PricingType,
@@ -178,57 +212,69 @@ public class CreateClinicAppointmentCommandHandler
             await _appointmentRepository.AddAsync(appointment, cancellationToken);
             await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
 
-            // ── 6. Create Order + Payment for deposit ─────────────────────────
-            // We append the AppointmentId to the description so the webhook can extract it
-            // and send the confirmation email upon successful payment.
-            var orderDescription = $"Đặt cọc khám {slot.Date:dd/MM} {slot.StartTime:HH:mm} [Appt:{appointment.Id}]";
+            // ── 7. Create Order + Payment ─────────────────────────────────────
+            var typeLabel = isWalkIn ? "Thanh toán đủ" : "Đặt cọc";
+            var orderDescription = $"{typeLabel} khám {slot.Date:dd/MM} {slot.StartTime:HH:mm}";
+            
             var order = new Order(
-                _currentUser.UserId.Value,
+                targetUserId,
+                price,
                 depositAmount,
-                orderDescription);
+                orderDescription,
+                appointment.Id);
 
             await _orderRepository.AddAsync(order, cancellationToken);
 
-            var payment = new Payment(order.Id, depositAmount, PaymentMethod.PayOS, orderDescription);
-            await _paymentRepository.AddAsync(payment, cancellationToken);
+            string? paymentUrl = null;
+            if (!isWalkIn)
+            {
+                // Create PayOS payment link for online deposit
+                var payment = new Payment(order.Id, depositAmount!.Value, PaymentMethod.PayOS, orderDescription);
+                await _paymentRepository.AddAsync(payment, cancellationToken);
 
-            // ── 7. Generate PayOS checkout link ───────────────────────────────
-            // Extract the base URL from the PayOS settings so it's fully configurable via appsettings.json
-            var defaultReturnUrl = _configuration["PayOS:DefaultReturnUrl"] ?? "http://localhost:3000";
-            var uri = new Uri(defaultReturnUrl);
-            var baseUrl = $"{uri.Scheme}://{uri.Authority}";
-            
-            var returnUrl = $"{baseUrl}/patient/wallet/payment-callback" +
-                $"?type=clinic-booking&orderId={order.Id}&appointmentId={appointment.Id}";
-            var cancelUrl = $"{baseUrl}/patient/wallet/payment-callback" +
-                $"?type=clinic-booking&orderId={order.Id}&appointmentId={appointment.Id}&cancel=true";
+                var defaultReturnUrl = _configuration["PayOS:DefaultReturnUrl"] ?? "http://localhost:3000";
+                var uri = new Uri(defaultReturnUrl);
+                var baseUrl = $"{uri.Scheme}://{uri.Authority}";
+                
+                var returnUrl = $"{baseUrl}/patient/wallet/payment-callback" +
+                    $"?type=clinic-booking&orderId={order.Id}&appointmentId={appointment.Id}";
+                var cancelUrl = $"{baseUrl}/patient/wallet/payment-callback" +
+                    $"?type=clinic-booking&orderId={order.Id}&appointmentId={appointment.Id}&cancel=true";
 
-            var (paymentUrl, orderCode) = await _payOSService.CreatePaymentLinkAsync(
-                payment.Id,
-                depositAmount,
-                orderDescription,
-                returnUrl,
-                cancelUrl);
+                var (pUrl, orderCode) = await _payOSService.CreatePaymentLinkAsync(
+                    payment.Id,
+                    depositAmount.Value,
+                    orderDescription,
+                    returnUrl,
+                    cancelUrl);
 
-            payment.SetPaymentLink(paymentUrl, orderCode);
+                payment.SetPaymentLink(pUrl, orderCode);
+                paymentUrl = pUrl;
+            }
+            else
+            {
+                // For walk-ins, we can create a "Pending" Cash payment or just leave it for staff to collect
+                // Let's create a pending Cash payment for the full amount
+                var payment = new Payment(order.Id, price, PaymentMethod.Cash, orderDescription);
+                await _paymentRepository.AddAsync(payment, cancellationToken);
+            }
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Created clinic appointment {AppointmentId} for patient {PatientId} at slot {SlotId}. " +
-                "Deposit {DepositAmount} VND (30% of {FullPrice} VND). Order {OrderId}, PayOS URL generated.",
+                "Created {Type} clinic appointment {AppointmentId} for patient {PatientId} at slot {SlotId}. " +
+                "FullPrice: {FullPrice} VND, Deposit: {DepositAmount} VND. Order {OrderId}",
+                isWalkIn ? "Walk-in" : "Online",
                 appointment.Id,
-                patientId,
+                targetPatientProfileId,
                 request.SlotId,
-                depositAmount,
                 price,
+                depositAmount ?? price,
                 order.Id);
 
-            // ── 8. Post-commit: notifications (best-effort) ───────────
-            // We only send an app notification for booking creation. The email will be sent
-            // later when the payment is completed via the webhook.
-            await SendBookingNotificationAsync(appointment, slot, request.VisitReason, cancellationToken);
+            // ── 8. Post-commit: notifications ──────────────────────────
+            await SendBookingNotificationAsync(appointment, targetUserId, slot, request.VisitReason, isWalkIn, cancellationToken);
 
             return Result<CreateClinicAppointmentResult>.Success(new CreateClinicAppointmentResult
             {
@@ -261,18 +307,23 @@ public class CreateClinicAppointmentCommandHandler
 
     private async Task SendBookingNotificationAsync(
         Appointment appointment,
+        Guid targetUserId,
         AppointmentSlot slot,
         string? visitReason,
+        bool isWalkIn,
         CancellationToken cancellationToken)
     {
-        if (!_currentUser.UserId.HasValue) return;
-
         try
         {
+            var title = isWalkIn ? "Đặt lịch khám trực tiếp thành công" : "Đặt lịch khám thành công";
+            var body = isWalkIn 
+                ? $"Bạn đã được đặt lịch khám trực tiếp vào lúc {slot.StartTime:HH:mm}, ngày {slot.Date:dd/MM/yyyy}."
+                : $"Bạn đã đặt lịch thành công vào lúc {slot.StartTime:HH:mm}, ngày {slot.Date:dd/MM/yyyy}. Vui lòng hoàn tất thanh toán đặt cọc.";
+
             await _notificationService.SendAsync(
-                _currentUser.UserId.Value,
-                "Đặt lịch khám thành công",
-                $"Bạn đã đặt lịch thành công vào lúc {slot.StartTime:HH:mm}, ngày {slot.Date:dd/MM/yyyy}. Vui lòng hoàn tất thanh toán đặt cọc.",
+                targetUserId,
+                title,
+                body,
                 NotificationType.NewAppointmentBooked,
                 new
                 {

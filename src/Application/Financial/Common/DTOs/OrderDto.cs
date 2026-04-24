@@ -6,6 +6,8 @@ public record OrderDto(
     Guid Id,
     Guid UserId,
     decimal TotalAmount,
+    decimal? DepositAmount,
+    string? PatientName,
     string? Description,
     OrderStatus Status,
     DateTime CreatedAt,

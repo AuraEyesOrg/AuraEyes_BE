@@ -129,24 +129,26 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
             var order = await _orderRepository.GetByIdAsync(payment.OrderId, cancellationToken);
             if (order != null)
             {
-                order.Complete();
-                _logger.LogInformation(
-                    "Order {OrderId} completed via PayOS webhook. OrderCode={OrderCode}",
-                    order.Id, orderCode);
+                // If it's a deposit payment, mark order as Confirmed. 
+                // If it's a full payment (or final installment), mark as Completed.
+                if (order.DepositAmount.HasValue && Math.Abs(payment.Amount - order.DepositAmount.Value) < 0.01m && order.Status == OrderStatus.Pending)
+                {
+                    order.Confirm();
+                    _logger.LogInformation("Order {OrderId} confirmed (deposit received).", order.Id);
+                }
+                else
+                {
+                    // Basic logic: if this payment completes the total amount, or if no deposit was defined
+                    order.Complete();
+                    _logger.LogInformation("Order {OrderId} completed.", order.Id);
+                }
 
                 // If this is a clinic booking order, extract AppointmentId and send confirmation email
-                if (!string.IsNullOrEmpty(order.Description))
+                if (order.AppointmentId.HasValue)
                 {
-                    var match = System.Text.RegularExpressions.Regex.Match(order.Description, @"\[Appt:([a-fA-F0-9\-]+)\]");
-                    if (match.Success && Guid.TryParse(match.Groups[1].Value, out var appointmentId))
-                    {
-                        // Fire and forget, or await. We await to ensure it's sent.
-                        // We also need to add using Application.Scheduling.Appointments.Commands.CreateClinicAppointment; at the top
-                        // But we can just use the fully qualified name to avoid using issues.
-                        await _mediator.Send(
-                            new Application.Scheduling.Appointments.Commands.CreateClinicAppointment.SendClinicAppointmentConfirmationEmailCommand(appointmentId),
-                            cancellationToken);
-                    }
+                    await _mediator.Send(
+                        new Application.Scheduling.Appointments.Commands.CreateClinicAppointment.SendClinicAppointmentConfirmationEmailCommand(order.AppointmentId.Value),
+                        cancellationToken);
                 }
             }
         }
