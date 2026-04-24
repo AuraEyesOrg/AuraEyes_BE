@@ -53,6 +53,28 @@ public class FinancialController : BaseApiController
       return Ok(result);
   }
 
+  [HttpGet("orders")]
+  [Authorize(Roles = "ClinicStaff,SystemAdmin")]
+  public async Task<ActionResult> GetAllOrders(
+      [FromQuery] int pageNumber = 1,
+      [FromQuery] int pageSize = 20)
+  {
+      var result = await _mediator.Send(new Application.Financial.Queries.GetAllOrders.GetAllOrdersQuery(pageNumber, pageSize));
+      return Ok(result);
+  }
+
+  /// <summary>
+  /// Completes an order by paying the remaining balance (e.g. at the clinic counter).
+  /// </summary>
+  [HttpPost("orders/{id}/complete")]
+  [Authorize(Roles = "ClinicStaff,SystemAdmin")]
+  public async Task<ActionResult> CompleteOrder(Guid id)
+  {
+      var result = await _mediator.Send(new Application.Financial.Commands.CompleteOrderPayment.CompleteOrderPaymentCommand(id));
+      if (!result.IsSuccess) return BadRequest(result);
+      return Ok(result);
+  }
+
     /// <summary>
     /// PayOS webhook – receives payment status updates (PAID, CANCELLED, …).
     /// Must be publicly accessible (no auth) since PayOS calls it directly.

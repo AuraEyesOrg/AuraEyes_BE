@@ -10,6 +10,7 @@ public class Order : BaseEntity, IAggregateRoot
 {
     public Guid UserId { get; private set; }
     public decimal TotalAmount { get; private set; }
+    public decimal? DepositAmount { get; private set; }
     public string? Description { get; private set; }
     public OrderStatus Status { get; private set; }
 
@@ -19,10 +20,11 @@ public class Order : BaseEntity, IAggregateRoot
 
     private Order() { } // EF Core
 
-    public Order(Guid userId, decimal totalAmount, string? description = null)
+    public Order(Guid userId, decimal totalAmount, decimal? depositAmount = null, string? description = null)
     {
         UserId = userId;
         TotalAmount = totalAmount;
+        DepositAmount = depositAmount;
         Description = description;
         Status = OrderStatus.Pending;
     }

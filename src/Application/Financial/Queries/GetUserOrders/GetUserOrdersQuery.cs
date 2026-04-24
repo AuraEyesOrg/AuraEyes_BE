@@ -24,13 +24,16 @@ public class GetUserOrdersQueryHandler : IRequestHandler<GetUserOrdersQuery, Use
 {
     private readonly IOrderRepository _orderRepository;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IIdentityService _identityService;
 
     public GetUserOrdersQueryHandler(
         IOrderRepository orderRepository,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IIdentityService identityService)
     {
         _orderRepository = orderRepository;
         _currentUserService = currentUserService;
+        _identityService = identityService;
     }
 
     public async Task<UserOrdersResult> Handle(GetUserOrdersQuery request, CancellationToken cancellationToken)
@@ -44,6 +47,9 @@ public class GetUserOrdersQueryHandler : IRequestHandler<GetUserOrdersQuery, Use
             pageSize: request.PageSize,
             cancellationToken: cancellationToken);
 
+        var users = await _identityService.GetUsersByIdsAsync(items.Select(o => o.UserId).Distinct(), cancellationToken);
+        var userMap = users.ToDictionary(u => u.Id, u => u.FullName);
+
         var dtos = items.Select(order => {
             var displayDescription = order.Description;
             if (!string.IsNullOrEmpty(displayDescription))
@@ -51,10 +57,14 @@ public class GetUserOrdersQueryHandler : IRequestHandler<GetUserOrdersQuery, Use
                 displayDescription = System.Text.RegularExpressions.Regex.Replace(displayDescription, @"\s*\[Appt:[^\]]+\]", "").Trim();
             }
             
+            userMap.TryGetValue(order.UserId, out var patientName);
+
             return new OrderDto(
                 order.Id,
                 order.UserId,
                 order.TotalAmount,
+                order.DepositAmount,
+                patientName,
                 displayDescription,
                 order.Status,
                 order.CreatedAt,

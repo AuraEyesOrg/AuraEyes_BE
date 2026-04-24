@@ -1,3 +1,4 @@
+using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Financial.Common.DTOs;
 using Domain.Common;
@@ -14,6 +15,7 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
 {
     private readonly IOrderRepository _orderRepository;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IIdentityService _identityService;
     private readonly IPayOSService _payOSService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMediator _mediator;
@@ -22,6 +24,7 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
     public GetOrderByIdQueryHandler(
         IOrderRepository orderRepository,
         ICurrentUserService currentUserService,
+        IIdentityService identityService,
         IPayOSService payOSService,
         IUnitOfWork unitOfWork,
         IMediator mediator,
@@ -29,6 +32,7 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
     {
         _orderRepository = orderRepository;
         _currentUserService = currentUserService;
+        _identityService = identityService;
         _payOSService = payOSService;
         _unitOfWork = unitOfWork;
         _mediator = mediator;
@@ -40,8 +44,16 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
         var order = await _orderRepository.GetWithPaymentsAsync(request.Id, cancellationToken);
         if (order == null) return null;
 
-        // Security: only return the order if it belongs to the current user
-        if (_currentUserService.UserId.HasValue && order.UserId != _currentUserService.UserId.Value)
+        // Security: only return the order if it belongs to the current user OR if they are staff
+        var currentUserId = _currentUserService.UserId;
+        bool isStaff = false;
+        if (currentUserId.HasValue)
+        {
+            isStaff = await _identityService.IsInRoleAsync(currentUserId.Value, Roles.ClinicStaff) ||
+                      await _identityService.IsInRoleAsync(currentUserId.Value, Roles.SystemAdmin);
+        }
+
+        if (!isStaff && currentUserId.HasValue && order.UserId != currentUserId.Value)
             return null;
 
         // Proactive Status Sync for Local Dev / Polling
@@ -57,7 +69,15 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
                     if (payOsStatus is "PAID" or "00")
                     {
                         firstPayment.Complete(txnRef, "Proactive Sync via GetOrder");
-                        order.Complete();
+                        
+                        if (order.DepositAmount.HasValue && Math.Abs(firstPayment.Amount - order.DepositAmount.Value) < 0.01m)
+                        {
+                            order.Confirm();
+                        }
+                        else
+                        {
+                            order.Complete();
+                        }
                         
                         await _unitOfWork.SaveChangesAsync(cancellationToken);
                         
@@ -87,6 +107,9 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
             }
         }
 
+        // Fetch patient name
+        var user = await _identityService.GetUserByIdAsync(order.UserId, cancellationToken);
+
         // Strip out the internal [Appt:...] tag from the description before sending to UI
         var displayDescription = order.Description;
         if (!string.IsNullOrEmpty(displayDescription))
@@ -98,6 +121,8 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
             order.Id,
             order.UserId,
             order.TotalAmount,
+            order.DepositAmount,
+            user?.FullName,
             displayDescription,
             order.Status,
             order.CreatedAt,
