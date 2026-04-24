@@ -9,34 +9,44 @@ using Microsoft.Extensions.Logging;
 
 namespace Application.Financial.Commands.CompleteOrderPayment;
 
-public record CompleteOrderPaymentCommand(Guid OrderId, PaymentMethod Method = PaymentMethod.Cash) : IRequest<Result<bool>>;
+public record CompleteOrderPaymentResponse(
+    Guid OrderId, 
+    Guid PaymentId, 
+    PaymentStatus PaymentStatus, 
+    string? PaymentUrl = null, 
+    string? PaymentOrderCode = null);
 
-public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderPaymentCommand, Result<bool>>
+public record CompleteOrderPaymentCommand(Guid OrderId, PaymentMethod Method = PaymentMethod.Cash) : IRequest<Result<CompleteOrderPaymentResponse>>;
+
+public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderPaymentCommand, Result<CompleteOrderPaymentResponse>>
 {
     private readonly IOrderRepository _orderRepository;
     private readonly IPaymentRepository _paymentRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPayOSService _payOSService;
     private readonly ILogger<CompleteOrderPaymentCommandHandler> _logger;
 
     public CompleteOrderPaymentCommandHandler(
         IOrderRepository orderRepository,
         IPaymentRepository paymentRepository,
         IUnitOfWork unitOfWork,
+        IPayOSService payOSService,
         ILogger<CompleteOrderPaymentCommandHandler> logger)
     {
         _orderRepository = orderRepository;
         _paymentRepository = paymentRepository;
         _unitOfWork = unitOfWork;
+        _payOSService = payOSService;
         _logger = logger;
     }
 
-    public async Task<Result<bool>> Handle(CompleteOrderPaymentCommand request, CancellationToken cancellationToken)
+    public async Task<Result<CompleteOrderPaymentResponse>> Handle(CompleteOrderPaymentCommand request, CancellationToken cancellationToken)
     {
         var order = await _orderRepository.GetByIdAsync(request.OrderId, cancellationToken);
-        if (order == null) return Result<bool>.NotFound("Order not found.");
+        if (order == null) return Result<CompleteOrderPaymentResponse>.NotFound("Order not found.");
 
         if (order.Status == OrderStatus.Completed)
-            return Result<bool>.Failure("Order is already completed.");
+            return Result<CompleteOrderPaymentResponse>.Failure("Order is already completed.");
 
         // Calculate paid amount
         var paidAmount = order.Payments
@@ -49,32 +59,62 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
         {
             order.Complete();
             await _unitOfWork.SaveChangesAsync(cancellationToken);
-            return Result<bool>.Success(true);
+            return Result<CompleteOrderPaymentResponse>.Success(new CompleteOrderPaymentResponse(order.Id, Guid.Empty, PaymentStatus.Completed));
         }
 
         // Create final payment
         var description = $"Thanh toán nốt cho đơn {order.Id.ToString().Substring(0, 8)}";
         var payment = new Payment(order.Id, remainingAmount, request.Method, description);
         
+        await _paymentRepository.AddAsync(payment, cancellationToken);
+        // Save to get the ID for PayOS
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
         if (request.Method == PaymentMethod.Cash)
         {
             payment.Complete("CASH_PAYMENT", "Paid at counter");
             order.Complete();
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            
+            return Result<CompleteOrderPaymentResponse>.Success(new CompleteOrderPaymentResponse(
+                order.Id, 
+                payment.Id, 
+                payment.Status));
+        }
+        else if (request.Method == PaymentMethod.PayOS)
+        {
+            // Generate PayOS link
+            try 
+            {
+                var returnUrl = "https://auraeyes.vn/payment/success"; // Placeholder, will be handled by webhook anyway
+                var cancelUrl = "https://auraeyes.vn/payment/cancel";
+
+                var (paymentUrl, orderCode) = await _payOSService.CreatePaymentLinkAsync(
+                    payment.Id,
+                    remainingAmount,
+                    description,
+                    returnUrl,
+                    cancelUrl);
+
+                payment.SetPaymentLink(paymentUrl, orderCode);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+                return Result<CompleteOrderPaymentResponse>.Success(new CompleteOrderPaymentResponse(
+                    order.Id,
+                    payment.Id,
+                    payment.Status,
+                    paymentUrl,
+                    orderCode));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create PayOS payment link for order {OrderId}", order.Id);
+                return Result<CompleteOrderPaymentResponse>.Failure("Failed to create PayOS payment link.");
+            }
         }
         else
         {
-            // If they choose PayOS or other online methods, we might need to generate a link.
-            // For now, let's assume it's Cash (walk-in completion).
-            // If they want PayOS here, we'd need to return a URL.
-            return Result<bool>.Failure("Online payment completion via staff dashboard is not implemented yet. Please use Cash.");
+            return Result<CompleteOrderPaymentResponse>.Failure($"Payment method {request.Method} is not supported via staff dashboard.");
         }
-
-        await _paymentRepository.AddAsync(payment, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Order {OrderId} completed via staff manual payment ({Method}). Amount: {Amount}", 
-            order.Id, request.Method, remainingAmount);
-
-        return Result<bool>.Success(true);
     }
 }
