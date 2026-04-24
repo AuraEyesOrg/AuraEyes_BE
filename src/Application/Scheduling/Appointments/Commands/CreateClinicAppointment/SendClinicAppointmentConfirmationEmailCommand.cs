@@ -68,7 +68,7 @@ public class SendClinicAppointmentConfirmationEmailCommandHandler : IRequestHand
             if (string.IsNullOrWhiteSpace(patientEmail)) return false;
 
             var qrPayload =
-                $"AURA-CLINIC-APPOINTMENT|{appointment.Id}|{appointment.PatientId}|{slot.Date:yyyy-MM-dd}|{slot.StartTime:HH:mm}|{slot.EndTime:HH:mm}";
+                $"AURA-CLINIC-APPOINTMENT|{appointment.Id}|{appointment.PatientId}||{slot.Date:yyyy-MM-dd}|{slot.StartTime:HH:mm}|{slot.EndTime:HH:mm}";
             var checkInCode = appointment.Id.ToString("N")[..10].ToUpperInvariant();
 
             await _emailService.SendClinicAppointmentConfirmationAsync(
