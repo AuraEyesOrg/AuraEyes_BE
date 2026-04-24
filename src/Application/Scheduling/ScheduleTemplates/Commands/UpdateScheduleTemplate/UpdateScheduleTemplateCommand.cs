@@ -13,4 +13,7 @@ public record UpdateScheduleTemplateCommand : ICommand
     public TimeOnly EndTime { get; init; }
     public int SlotDuration { get; init; }
     public int MaxCapacity { get; init; }
+    public decimal? Cost { get; init; }
+    public Guid? OphthalId { get; init; }
+    public Guid? OrgId { get; init; }
 }
