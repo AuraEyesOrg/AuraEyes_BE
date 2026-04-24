@@ -24,6 +24,15 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     /// <summary>Status of this slot (Available or Blocked).</summary>
     public ScheduleStatus Status { get; private set; }
 
+    /// <summary>FK to the primary Ophthalmologist assigned to this slot (if any).</summary>
+    public Guid? OphthalId { get; private set; }
+
+    /// <summary>The cost/fee for this specific slot.</summary>
+    public decimal? Cost { get; private set; }
+
+    /// <summary>Optional timestamp for when a temporary reservation expires.</summary>
+    public DateTime? ReservationExpireAt { get; private set; }
+
     /// <summary>Slot creation source (staff or system).</summary>
     public int MaxCapacity { get; private set; }
 
@@ -149,6 +158,27 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
             throw new InvalidOperationException($"Cannot reduce capacity below current booked count ({BookedCount})");
 
         MaxCapacity = newCapacity;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateOphthalId(Guid? ophthalId)
+    {
+        OphthalId = ophthalId;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateCost(decimal? cost)
+    {
+        if (cost.HasValue && cost < 0)
+            throw new ArgumentException("Cost cannot be negative", nameof(cost));
+
+        Cost = cost;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateReservationExpireAt(DateTime? reservationExpireAt)
+    {
+        ReservationExpireAt = reservationExpireAt;
         UpdatedAt = DateTime.UtcNow;
     }
 }
