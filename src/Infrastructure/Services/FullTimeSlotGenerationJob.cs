@@ -1,4 +1,3 @@
-using Application.Scheduling.ScheduleTemplates.Interfaces;
 using Application.SystemSettings.Interfaces;
 using Domain.Entities.Scheduling;
 using Domain.Enums;
@@ -18,18 +17,15 @@ public class FullTimeSlotGenerationJob
     private const int DefaultRollingWindowDays = 14;
 
     private readonly ApplicationDbContext _context;
-    private readonly IFullTimeTemplateProvisioningService _fullTimeTemplateProvisioningService;
     private readonly ISystemSettingService _settingService;
     private readonly ILogger<FullTimeSlotGenerationJob> _logger;
 
     public FullTimeSlotGenerationJob(
         ApplicationDbContext context,
-        IFullTimeTemplateProvisioningService fullTimeTemplateProvisioningService,
         ISystemSettingService settingService,
         ILogger<FullTimeSlotGenerationJob> logger)
     {
         _context = context;
-        _fullTimeTemplateProvisioningService = fullTimeTemplateProvisioningService;
         _settingService = settingService;
         _logger = logger;
     }
@@ -40,13 +36,9 @@ public class FullTimeSlotGenerationJob
         var fromDate = DateOnly.FromDateTime(DateTime.UtcNow);
         var toDate = fromDate.AddDays(windowDays - 1);
 
-        // Ensure clinic-level templates exist for basic weekdays
-        var templatesEnsured = await _fullTimeTemplateProvisioningService
-            .EnsureClinicTemplatesAsync(cancellationToken);
-
         _logger.LogInformation(
-            "Starting clinic slot rolling-window generation. FromDate={FromDate}, ToDate={ToDate}, WindowDays={WindowDays}, TemplatesEnsured={TemplatesEnsured}",
-            fromDate, toDate, windowDays, templatesEnsured);
+            "Starting clinic slot rolling-window generation. FromDate={FromDate}, ToDate={ToDate}, WindowDays={WindowDays}",
+            fromDate, toDate, windowDays);
 
         // Get all active templates (usually SystemGenerated for rolling windows)
         var templates = await _context.ScheduleTemplates
