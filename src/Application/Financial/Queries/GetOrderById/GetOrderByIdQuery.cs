@@ -82,15 +82,11 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
                         await _unitOfWork.SaveChangesAsync(cancellationToken);
                         
                         // Trigger email logic if it's a clinic booking
-                        if (!string.IsNullOrEmpty(order.Description))
+                        if (order.AppointmentId.HasValue)
                         {
-                            var match = System.Text.RegularExpressions.Regex.Match(order.Description, @"\[Appt:([a-fA-F0-9\-]+)\]");
-                            if (match.Success && Guid.TryParse(match.Groups[1].Value, out var appointmentId))
-                            {
-                                await _mediator.Send(
-                                    new Application.Scheduling.Appointments.Commands.CreateClinicAppointment.SendClinicAppointmentConfirmationEmailCommand(appointmentId),
-                                    cancellationToken);
-                            }
+                            await _mediator.Send(
+                                new Application.Scheduling.Appointments.Commands.CreateClinicAppointment.SendClinicAppointmentConfirmationEmailCommand(order.AppointmentId.Value),
+                                cancellationToken);
                         }
                     }
                     else if (payOsStatus is "CANCELLED")
@@ -110,9 +106,9 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
         // Fetch patient name
         var user = await _identityService.GetUserByIdAsync(order.UserId, cancellationToken);
 
-        // Strip out the internal [Appt:...] tag from the description before sending to UI
+        // Strip out the internal [Appt:...] tag from the description before sending to UI (Legacy check)
         var displayDescription = order.Description;
-        if (!string.IsNullOrEmpty(displayDescription))
+        if (!string.IsNullOrEmpty(displayDescription) && displayDescription.Contains("[Appt:"))
         {
             displayDescription = System.Text.RegularExpressions.Regex.Replace(displayDescription, @"\s*\[Appt:[^\]]+\]", "").Trim();
         }

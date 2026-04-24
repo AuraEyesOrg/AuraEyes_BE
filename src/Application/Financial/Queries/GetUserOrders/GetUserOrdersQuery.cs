@@ -52,7 +52,7 @@ public class GetUserOrdersQueryHandler : IRequestHandler<GetUserOrdersQuery, Use
 
         var dtos = items.Select(order => {
             var displayDescription = order.Description;
-            if (!string.IsNullOrEmpty(displayDescription))
+            if (!string.IsNullOrEmpty(displayDescription) && displayDescription.Contains("[Appt:"))
             {
                 displayDescription = System.Text.RegularExpressions.Regex.Replace(displayDescription, @"\s*\[Appt:[^\]]+\]", "").Trim();
             }

@@ -144,15 +144,11 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
                 }
 
                 // If this is a clinic booking order, extract AppointmentId and send confirmation email
-                if (!string.IsNullOrEmpty(order.Description))
+                if (order.AppointmentId.HasValue)
                 {
-                    var match = System.Text.RegularExpressions.Regex.Match(order.Description, @"\[Appt:([a-fA-F0-9\-]+)\]");
-                    if (match.Success && Guid.TryParse(match.Groups[1].Value, out var appointmentId))
-                    {
-                        await _mediator.Send(
-                            new Application.Scheduling.Appointments.Commands.CreateClinicAppointment.SendClinicAppointmentConfirmationEmailCommand(appointmentId),
-                            cancellationToken);
-                    }
+                    await _mediator.Send(
+                        new Application.Scheduling.Appointments.Commands.CreateClinicAppointment.SendClinicAppointmentConfirmationEmailCommand(order.AppointmentId.Value),
+                        cancellationToken);
                 }
             }
         }

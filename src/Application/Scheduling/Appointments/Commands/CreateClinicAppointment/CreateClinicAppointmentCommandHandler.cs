@@ -213,14 +213,15 @@ public class CreateClinicAppointmentCommandHandler
             await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
 
             // ── 7. Create Order + Payment ─────────────────────────────────────
-            var typeLabel = isWalkIn ? "Walk-in" : "Đặt cọc";
-            var orderDescription = $"{typeLabel} khám {slot.Date:dd/MM} {slot.StartTime:HH:mm} [Appt:{appointment.Id}]";
+            var typeLabel = isWalkIn ? "Thanh toán đủ" : "Đặt cọc";
+            var orderDescription = $"{typeLabel} khám {slot.Date:dd/MM} {slot.StartTime:HH:mm}";
             
             var order = new Order(
                 targetUserId,
                 price,
                 depositAmount,
-                orderDescription);
+                orderDescription,
+                appointment.Id);
 
             await _orderRepository.AddAsync(order, cancellationToken);
 
