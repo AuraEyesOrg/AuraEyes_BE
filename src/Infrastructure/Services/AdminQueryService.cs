@@ -236,12 +236,10 @@ public class AdminQueryService : IAdminQueryService
                 EmailConfirmed = x.User != null && x.User.EmailConfirmed,
                 IsWalkIn = x.Patient.UserId == null,
                 PatientType = x.Patient.UserId == null ? "WalkIn" : "Registered",
-                LinkedOrganisationName =
-                    (from link in _context.OrganisationPatientLinks.AsNoTracking()
-                     join org in _context.Organisations.AsNoTracking() on link.OrganisationId equals org.Id
-                     where link.PatientId == x.Patient.Id
-                     orderby link.CreatedAt descending
-                     select org.Name)
+                LinkedOrganisationName = _context.Organisations
+                    .AsNoTracking()
+                    .OrderBy(org => org.CreatedAt)
+                    .Select(org => org.Name)
                     .FirstOrDefault(),
                 CreatedAt = x.Patient.CreatedAt,
                 LastLoginAt = x.User != null ? x.User.LastLoginAt : null

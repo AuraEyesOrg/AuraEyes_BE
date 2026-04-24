@@ -97,9 +97,6 @@ public class PatientVisit : BaseEntity, IAggregateRoot
         if (Status != PatientVisitStatus.CheckedIn)
             throw new InvalidOperationException($"Cannot start visit with status {Status}. Patient must be checked in first.");
 
-        if (!AssignedDoctorId.HasValue)
-            throw new InvalidOperationException("Cannot start visit without an assigned doctor.");
-
         Status = PatientVisitStatus.InProgress;
         StartedAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;

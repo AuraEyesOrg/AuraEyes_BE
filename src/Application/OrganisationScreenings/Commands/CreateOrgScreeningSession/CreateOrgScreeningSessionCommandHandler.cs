@@ -53,8 +53,6 @@ public class CreateOrgScreeningSessionCommandHandler
             return Result<CreateOrgScreeningSessionResponse>.Unauthorized("User not authenticated");
 
         var orgAdminUser = await _identityService.GetUserByIdAsync(userId.Value, cancellationToken);
-        if (orgAdminUser?.OrganizationId is null)
-            return Result<CreateOrgScreeningSessionResponse>.Forbidden("Organisation is not assigned for this account");
 
         // Verify patient exists
         var patient = await _patientRepository.GetByIdAsync(request.PatientId, cancellationToken);
@@ -77,9 +75,20 @@ public class CreateOrgScreeningSessionCommandHandler
             return Result<CreateOrgScreeningSessionResponse>.NotFound("Patient not found");
         }
 
-        var organisation = await _organisationRepository.GetByIdAsync(
-            orgAdminUser.OrganizationId.Value,
-            cancellationToken);
+        Organisation? organisation = null;
+
+        if (orgAdminUser?.OrganizationId is Guid userOrganisationId)
+        {
+            organisation = await _organisationRepository.GetByIdAsync(userOrganisationId, cancellationToken);
+        }
+
+        if (organisation is null)
+        {
+            var organisations = await _organisationRepository.FindAsync(o => !o.IsDeleted, cancellationToken);
+            organisation = organisations
+                .OrderBy(o => o.CreatedAt)
+                .FirstOrDefault();
+        }
 
         if (organisation is null)
             return Result<CreateOrgScreeningSessionResponse>.NotFound("Organisation not found");
@@ -91,7 +100,7 @@ public class CreateOrgScreeningSessionCommandHandler
         }
 
         // Create new screening session for the patient
-        var screening = new AiScreening(patient.Id, request.ModelVersion, orgAdminUser.OrganizationId.Value);
+        var screening = new AiScreening(patient.Id, request.ModelVersion, organisation.Id);
 
         // Organisation flow is performed by staff on behalf of the patient.
         // Record consent at session creation so the AI result persistence step remains valid.

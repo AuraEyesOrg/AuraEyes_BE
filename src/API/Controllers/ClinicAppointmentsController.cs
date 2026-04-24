@@ -1,8 +1,13 @@
 using Application.Common.Constants;
 using Application.Common.Models;
 using Application.Scheduling.Appointments.Commands.CancelClinicAppointment;
+using Application.Scheduling.Appointments.Commands.CheckInClinicAppointment;
+using Application.Scheduling.Appointments.Commands.CompleteClinicAppointment;
 using Application.Scheduling.Appointments.Commands.CreateClinicAppointment;
+using Application.Scheduling.Appointments.Commands.MarkClinicAppointmentNoShow;
+using Application.Scheduling.Appointments.Commands.StartClinicAppointment;
 using Application.Scheduling.Appointments.Common;
+using Application.Scheduling.Appointments.Queries.GetClinicAppointmentsByDate;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -52,6 +57,53 @@ public class ClinicAppointmentsController : BaseApiController
         return HandleResult(result);
     }
 
+    [HttpPut("{appointmentId:guid}/check-in")]
+    [AuthorizePermission(Permissions.AppointmentsManage)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CheckInClinicAppointment(Guid appointmentId)
+    {
+        var result = await _mediator.Send(new CheckInClinicAppointmentCommand(appointmentId));
+        return HandleResult(result);
+    }
+
+    [HttpPut("{appointmentId:guid}/start")]
+    [AuthorizePermission(Permissions.AppointmentsManage)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> StartClinicAppointment(Guid appointmentId)
+    {
+        var result = await _mediator.Send(new StartClinicAppointmentCommand(appointmentId));
+        return HandleResult(result);
+    }
+
+    [HttpPut("{appointmentId:guid}/complete")]
+    [AuthorizePermission(Permissions.AppointmentsManage)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CompleteClinicAppointment(
+        Guid appointmentId,
+        [FromBody] CompleteClinicAppointmentRequest? request = null)
+    {
+        var result = await _mediator.Send(
+            new CompleteClinicAppointmentCommand(appointmentId, request?.Notes));
+        return HandleResult(result);
+    }
+
+    [HttpPut("{appointmentId:guid}/no-show")]
+    [AuthorizePermission(Permissions.AppointmentsManage)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> MarkClinicAppointmentNoShow(Guid appointmentId)
+    {
+        var result = await _mediator.Send(new MarkClinicAppointmentNoShowCommand(appointmentId));
+        return HandleResult(result);
+    }
+
+    [HttpGet]
+    [AuthorizePermission(Permissions.AppointmentsRead)]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ClinicAppointmentDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetClinicAppointments([FromQuery] DateOnly? date = null)
+    {
+        var result = await _mediator.Send(new GetClinicAppointmentsByDateQuery(date));
+        return HandleResult(result);
+    }
 }
 
 public record CreateClinicAppointmentRequest
@@ -63,5 +115,10 @@ public record CreateClinicAppointmentRequest
 public record CancelClinicAppointmentRequest
 {
     public string? Reason { get; init; }
+}
+
+public record CompleteClinicAppointmentRequest
+{
+    public string? Notes { get; init; }
 }
 

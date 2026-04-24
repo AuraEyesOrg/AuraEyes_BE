@@ -22,27 +22,7 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         int take,
         CancellationToken cancellationToken = default)
     {
-        var appUser = await _context.Set<ApplicationUser>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Id == orgAdminUserId, cancellationToken);
-
-        if (appUser?.OrganizationId is null)
-            return Array.Empty<OrganisationRecentPatientReadModel>();
-
-        var organisationId = appUser.OrganizationId.Value;
         take = Math.Clamp(take, 1, 100);
-
-        var managedPatientIds = _context.Set<OrganisationPatientLink>()
-            .AsNoTracking()
-            .Where(link => link.OrganisationId == organisationId && !link.IsDeleted)
-            .Select(link => link.PatientId)
-            .Distinct();
-
-        var organisationScreeningIds = _context.Set<ConsultationSession>()
-            .AsNoTracking()
-            .Where(cs => cs.OrganisationId == organisationId && cs.AiScreeningId != null)
-            .Select(cs => cs.AiScreeningId!.Value)
-            .Distinct();
 
         // LEFT JOIN: walk-in patients have UserId=null, so u will be null for them
         var topPatients = await (
@@ -50,18 +30,16 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
             join u in _context.Set<ApplicationUser>().AsNoTracking()
                 on p.UserId equals u.Id into userGroup
             from u in userGroup.DefaultIfEmpty()
-            where managedPatientIds.Contains(p.Id) && !p.IsDeleted
+            where !p.IsDeleted
                   && (u == null || !u.IsDeleted)
             let latestScreeningId = (
                 from scr in _context.Set<AiScreening>().AsNoTracking()
-                join screeningId in organisationScreeningIds on scr.Id equals screeningId
                 where scr.PatientId == p.Id
                 orderby scr.CreatedAt descending
                 select (Guid?)scr.Id
             ).FirstOrDefault()
             let latestScreeningCreatedAt = (
                 from scr in _context.Set<AiScreening>().AsNoTracking()
-                join screeningId in organisationScreeningIds on scr.Id equals screeningId
                 where scr.PatientId == p.Id
                 orderby scr.CreatedAt descending
                 select (DateTime?)scr.CreatedAt
@@ -207,32 +185,7 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         int take,
         CancellationToken cancellationToken = default)
     {
-        var appUser = await _context.Set<ApplicationUser>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Id == orgAdminUserId, cancellationToken);
-
-        if (appUser?.OrganizationId is null)
-            return Array.Empty<OrganisationScreeningHistoryReadModel>();
-
-        var organisationId = appUser.OrganizationId.Value;
         take = Math.Clamp(take, 1, 100);
-
-        var managedPatientIds = _context.Set<OrganisationPatientLink>()
-            .AsNoTracking()
-            .Where(link => link.OrganisationId == organisationId && !link.IsDeleted)
-            .Select(link => link.PatientId)
-            .Distinct();
-
-        var organisationScreeningIds = _context.Set<ConsultationSession>()
-            .AsNoTracking()
-            .Where(cs => cs.OrganisationId == organisationId && cs.AiScreeningId != null && !cs.IsDeleted)
-            .Select(cs => cs.AiScreeningId!.Value)
-            .Distinct();
-
-        var organisationCreatorIds = _context.Set<ApplicationUser>()
-            .AsNoTracking()
-            .Where(u => u.OrganizationId == organisationId && !u.IsDeleted)
-            .Select(u => u.Id.ToString());
 
         // LEFT JOIN on ApplicationUser to include walk-in patients
         var screenings = await (
@@ -241,16 +194,7 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
             join u in _context.Set<ApplicationUser>().AsNoTracking()
                 on p.UserId equals u.Id into userGroup
             from u in userGroup.DefaultIfEmpty()
-            where managedPatientIds.Contains(p.Id) && !scr.IsDeleted && !p.IsDeleted
-                  && (
-                      scr.OrganisationId == organisationId
-                      || organisationScreeningIds.Contains(scr.Id)
-                      || (
-                          scr.OrganisationId == null
-                          && !string.IsNullOrWhiteSpace(scr.CreatedBy)
-                          && organisationCreatorIds.Contains(scr.CreatedBy)
-                      )
-                  )
+            where !scr.IsDeleted && !p.IsDeleted
                   && (u == null || !u.IsDeleted)
             orderby scr.CreatedAt descending
             select new
@@ -352,26 +296,11 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         Guid orgAdminUserId,
         CancellationToken cancellationToken = default)
     {
-        var appUser = await _context.Set<ApplicationUser>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Id == orgAdminUserId, cancellationToken);
-
-        if (appUser?.OrganizationId is null)
-            return new OrganisationScreeningReportReadModel();
-
-        var organisationId = appUser.OrganizationId.Value;
-
-        var managedPatientIds = _context.Set<OrganisationPatientLink>()
-            .AsNoTracking()
-            .Where(link => link.OrganisationId == organisationId && !link.IsDeleted)
-            .Select(link => link.PatientId)
-            .Distinct();
-
         // No need to join ApplicationUser here — we only need screening stats, not patient names
         var screeningEvents =
             from scr in _context.Set<AiScreening>().AsNoTracking()
             join p in _context.Set<Patient>().AsNoTracking() on scr.PatientId equals p.Id
-            where managedPatientIds.Contains(p.Id) && !p.IsDeleted && !scr.IsDeleted
+            where !p.IsDeleted && !scr.IsDeleted
             select new
             {
                 scr.CreatedAt,
@@ -462,21 +391,10 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         Guid patientId,
         CancellationToken cancellationToken = default)
     {
-        var organisationId = await _context.Set<ApplicationUser>()
-            .AsNoTracking()
-            .Where(u => u.Id == orgAdminUserId && !u.IsDeleted)
-            .Select(u => u.OrganizationId)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (!organisationId.HasValue)
-            return false;
-
-        return await _context.Set<OrganisationPatientLink>()
+        return await _context.Set<Patient>()
             .AsNoTracking()
             .AnyAsync(
-                link => link.OrganisationId == organisationId.Value
-                        && link.PatientId == patientId
-                        && !link.IsDeleted,
+                patient => patient.Id == patientId && !patient.IsDeleted,
                 cancellationToken);
     }
 
@@ -485,52 +403,10 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         Guid screeningId,
         CancellationToken cancellationToken = default)
     {
-        var organisationId = await _context.Set<ApplicationUser>()
-            .AsNoTracking()
-            .Where(u => u.Id == orgAdminUserId && !u.IsDeleted)
-            .Select(u => u.OrganizationId)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (!organisationId.HasValue)
-            return false;
-
-        var organisationIdValue = organisationId.Value;
-
-        var linkedByOrganisationSession = await _context.Set<ConsultationSession>()
+        return await _context.Set<AiScreening>()
             .AsNoTracking()
             .AnyAsync(
-                session => session.OrganisationId == organisationIdValue
-                           && session.AiScreeningId == screeningId
-                           && !session.IsDeleted,
-                cancellationToken);
-
-        if (linkedByOrganisationSession)
-            return true;
-
-        var screening = await _context.Set<AiScreening>()
-            .AsNoTracking()
-            .Where(s => s.Id == screeningId && !s.IsDeleted)
-            .Select(s => new { s.OrganisationId, s.CreatedBy })
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (screening is null)
-            return false;
-
-        if (screening.OrganisationId == organisationIdValue)
-            return true;
-
-        if (screening.OrganisationId is not null)
-            return false;
-
-        if (string.IsNullOrWhiteSpace(screening.CreatedBy))
-            return false;
-
-        return await _context.Set<ApplicationUser>()
-            .AsNoTracking()
-            .AnyAsync(
-                user => user.OrganizationId == organisationIdValue
-                        && !user.IsDeleted
-                        && user.Id.ToString() == screening.CreatedBy,
+                screening => screening.Id == screeningId && !screening.IsDeleted,
                 cancellationToken);
     }
 
@@ -539,27 +415,6 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
         Guid patientId,
         CancellationToken cancellationToken = default)
     {
-        var organisationId = await _context.Set<ApplicationUser>()
-            .AsNoTracking()
-            .Where(u => u.Id == orgAdminUserId && !u.IsDeleted)
-            .Select(u => u.OrganizationId)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (!organisationId.HasValue)
-            return null;
-
-        // First try: check if the patient is linked to this organisation
-        var isLinked = await _context.Set<OrganisationPatientLink>()
-            .AsNoTracking()
-            .AnyAsync(
-                link => link.OrganisationId == organisationId.Value
-                        && link.PatientId == patientId
-                        && !link.IsDeleted,
-                cancellationToken);
-
-        if (!isLinked)
-            return null;
-
         var patient = await _context.Set<Patient>()
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == patientId && !p.IsDeleted, cancellationToken);
@@ -602,7 +457,14 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
             .FirstOrDefaultAsync(cancellationToken);
 
         if (!organisationId.HasValue)
-            return null;
+        {
+            return await _context.Set<Organisation>()
+                .AsNoTracking()
+                .Where(o => !o.IsDeleted)
+                .OrderBy(o => o.CreatedAt)
+                .Select(o => o.Name)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
 
         return await _context.Set<Organisation>()
             .AsNoTracking()

@@ -9,27 +9,18 @@ namespace Application.OrganisationPatients.Commands.CreateWalkInPatient;
 public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPatientCommand, Guid>
 {
     private readonly IRepository<Patient> _patientRepository;
-    private readonly IRepository<OrganisationPatientLink> _organisationPatientLinkRepository;
-    private readonly IRepository<Organisation> _orgRepository;
     private readonly ICurrentUserService _currentUserService;
-    private readonly ICurrentUserOrganisationService _currentUserOrganisationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CreateWalkInPatientCommandHandler> _logger;
 
     public CreateWalkInPatientCommandHandler(
         IRepository<Patient> patientRepository,
-        IRepository<OrganisationPatientLink> organisationPatientLinkRepository,
-        IRepository<Organisation> orgRepository,
         ICurrentUserService currentUserService,
-        ICurrentUserOrganisationService currentUserOrganisationService,
         IUnitOfWork unitOfWork,
         ILogger<CreateWalkInPatientCommandHandler> logger)
     {
         _patientRepository = patientRepository;
-        _organisationPatientLinkRepository = organisationPatientLinkRepository;
-        _orgRepository = orgRepository;
         _currentUserService = currentUserService;
-        _currentUserOrganisationService = currentUserOrganisationService;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -40,21 +31,6 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
         if (adminId is null)
         {
             return Result<Guid>.Unauthorized("User not authenticated");
-        }
-
-        // Support both OrgAdmin (owner) and ClinicStaff (member) by resolving org via OrganizationId on the user
-        var organisationId = await _currentUserOrganisationService.GetOrganisationIdAsync(adminId.Value, cancellationToken);
-        if (organisationId is null)
-        {
-            return Result<Guid>.NotFound("Organisation not found");
-        }
-
-        var orgs = await _orgRepository.FindAsync(o => o.Id == organisationId.Value, cancellationToken);
-        var org = orgs.FirstOrDefault();
-
-        if (org is null)
-        {
-            return Result<Guid>.NotFound("Organisation not found");
         }
 
         // ── Normalise optional string fields ──
@@ -97,9 +73,6 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
                 address: address);
 
             await _patientRepository.AddAsync(patient, cancellationToken);
-            await _organisationPatientLinkRepository.AddAsync(
-                new OrganisationPatientLink(org.Id, patient.Id, "walk-in"),
-                cancellationToken);
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
