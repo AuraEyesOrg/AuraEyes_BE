@@ -12,6 +12,7 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
     private readonly IRepository<OrganisationPatientLink> _organisationPatientLinkRepository;
     private readonly IRepository<Organisation> _orgRepository;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ICurrentUserOrganisationService _currentUserOrganisationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CreateWalkInPatientCommandHandler> _logger;
 
@@ -20,6 +21,7 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
         IRepository<OrganisationPatientLink> organisationPatientLinkRepository,
         IRepository<Organisation> orgRepository,
         ICurrentUserService currentUserService,
+        ICurrentUserOrganisationService currentUserOrganisationService,
         IUnitOfWork unitOfWork,
         ILogger<CreateWalkInPatientCommandHandler> logger)
     {
@@ -27,6 +29,7 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
         _organisationPatientLinkRepository = organisationPatientLinkRepository;
         _orgRepository = orgRepository;
         _currentUserService = currentUserService;
+        _currentUserOrganisationService = currentUserOrganisationService;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -39,7 +42,14 @@ public class CreateWalkInPatientCommandHandler : ICommandHandler<CreateWalkInPat
             return Result<Guid>.Unauthorized("User not authenticated");
         }
 
-        var orgs = await _orgRepository.FindAsync(o => o.OwnerId == adminId.Value, cancellationToken);
+        // Support both OrgAdmin (owner) and ClinicStaff (member) by resolving org via OrganizationId on the user
+        var organisationId = await _currentUserOrganisationService.GetOrganisationIdAsync(adminId.Value, cancellationToken);
+        if (organisationId is null)
+        {
+            return Result<Guid>.NotFound("Organisation not found");
+        }
+
+        var orgs = await _orgRepository.FindAsync(o => o.Id == organisationId.Value, cancellationToken);
         var org = orgs.FirstOrDefault();
 
         if (org is null)

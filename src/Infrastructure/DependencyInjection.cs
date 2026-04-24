@@ -223,6 +223,9 @@ public static class DependencyInjection
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<IAuthService, AuthService>();
 
+        // Register organisation resolution service (supports both OrgAdmin and ClinicStaff)
+        services.AddScoped<ICurrentUserOrganisationService, CurrentUserOrganisationService>();
+
         // Register other services
         services.AddTransient<IDateTime, DateTimeService>();
         services.AddTransient<IEmailService, EmailService>();
