@@ -12,6 +12,8 @@ public record AppointmentSlotListDto
     public int MaxCapacity { get; init; }
     public int BookedCount { get; init; }
     public int AvailableCapacity { get; init; }
+    public string? OphthalFullName { get; init; }
+    public string? OphthalAvatarUrl { get; init; }
     public decimal? Cost { get; init; }
     public DateTime? ReservationExpireAt { get; init; }
     public DateTime CreatedAt { get; init; }
