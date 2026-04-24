@@ -48,17 +48,17 @@ public class DeleteScheduleTemplateCommandHandler : ICommandHandler<DeleteSchedu
                 if (slot.BookedCount == 0)
                 {
                     // No bookings: safe to soft-delete the slot
-                    await _appointmentSlotRepository.DeleteAsync(slot, cancellationToken);
+                    slot.SoftDelete();
                 }
                 else
                 {
                     // Has bookings: keep the slot but block it from further changes/bookings
-                    slot.Block();
+                    slot.ForceBlock();
                 }
             }
         }
 
-        await _scheduleTemplateRepository.DeleteAsync(template, cancellationToken);
+        template.SoftDelete();
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Schedule template {TemplateId} deleted", request.ScheduleTemplateId);

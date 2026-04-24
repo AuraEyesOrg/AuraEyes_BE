@@ -121,14 +121,20 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
-    /// <summary>
-    /// Block the slot (not available for booking).
-    /// </summary>
     public void Block()
     {
         if (BookedCount > 0)
             throw new InvalidOperationException("Cannot block a slot that has bookings. Cancel the bookings first.");
 
+        Status = ScheduleStatus.Blocked;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Force block the slot regardless of bookings (used for template deletion).
+    /// </summary>
+    public void ForceBlock()
+    {
         Status = ScheduleStatus.Blocked;
         UpdatedAt = DateTime.UtcNow;
     }
