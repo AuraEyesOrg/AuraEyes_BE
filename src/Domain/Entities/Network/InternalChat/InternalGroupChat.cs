@@ -65,6 +65,31 @@ public class InternalGroupChat : BaseEntity, IAggregateRoot
         }
     }
     
+    public void Rename(string name)
+    {
+        Name = name;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateMembers(IEnumerable<(Guid MemberId, AuthorType Type)> memberInfos)
+    {
+        var newMemberIds = memberInfos.Select(m => m.MemberId).ToHashSet();
+        
+        // Remove those not in the new list
+        _members.RemoveAll(m => !newMemberIds.Contains(m.MemberId));
+        
+        // Add those not already in the list
+        foreach (var (memberId, type) in memberInfos)
+        {
+            if (_members.All(m => m.MemberId != memberId))
+            {
+                _members.Add(new InternalGroupMember(Id, memberId, type));
+            }
+        }
+        
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void AddMessage(InternalGroupMessage message)
     {
         _messages.Add(message);
