@@ -52,5 +52,5 @@ public class CreateClinicAppointmentResult
     /// <summary>
     /// Deposit amount (30% of full slot price) the patient needs to pay.
     /// </summary>
-    public decimal DepositAmount { get; init; }
+    public decimal? DepositAmount { get; init; }
 }
