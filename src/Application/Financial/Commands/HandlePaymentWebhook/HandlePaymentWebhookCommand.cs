@@ -4,6 +4,7 @@ using Domain.Enums;
 using Domain.Repositories;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 namespace Application.Financial.Commands.HandlePaymentWebhook;
 
@@ -16,67 +17,154 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
     private readonly IOrderRepository _orderRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<HandlePaymentWebhookCommandHandler> _logger;
+    private readonly IMediator _mediator;
 
     public HandlePaymentWebhookCommandHandler(
         IPayOSService payOSService,
         IPaymentRepository paymentRepository,
         IOrderRepository orderRepository,
         IUnitOfWork unitOfWork,
-        ILogger<HandlePaymentWebhookCommandHandler> logger)
+        ILogger<HandlePaymentWebhookCommandHandler> logger,
+        IMediator mediator)
     {
         _payOSService = payOSService;
         _paymentRepository = paymentRepository;
         _orderRepository = orderRepository;
         _unitOfWork = unitOfWork;
         _logger = logger;
+        _mediator = mediator;
     }
 
     public async Task<bool> Handle(HandlePaymentWebhookCommand request, CancellationToken cancellationToken)
     {
-        // 1. Verify Signature
+        // 1. Verify signature
         var isValid = await _payOSService.VerifyWebhookSignatureAsync(request.Signature, request.Payload);
         if (!isValid)
         {
-            _logger.LogWarning("Invalid PayOS webhook signature");
+            _logger.LogWarning("Invalid PayOS webhook signature received.");
             return false;
         }
 
-        // 2. Parse Payload (simplification, real parsing needed)
-        // Assume we extracted orderCode and status from payload
-        // In a real implementation, use System.Text.Json to parse the payload
-        // For now, let's assume we have a helper or the payload is simple
-        
-        // This is a placeholder for real payload parsing
-        // var data = JsonSerializer.Deserialize<PayOSWebhookData>(request.Payload);
-        // var orderCode = data.OrderCode;
-        // var status = data.Status;
-        
-        // Let's use a dummy parsing for demonstration (you should implement real parsing)
-        // For the sake of this implementation, I'll just return true to indicate we'd handle it.
-        // But let's write the logic as if we parsed it.
+        // 2. Parse webhook payload
+        string? orderCode = null;
+        string? status = null;
+        string? txnRef = null;
 
-        /*
-        var payment = await _paymentRepository.GetByOrderCodeAsync(orderCode, cancellationToken);
-        if (payment == null) return false;
-
-        if (status == "PAID")
+        try
         {
-            payment.Complete(data.TxnRef, request.Payload);
-            
+            using var doc = JsonDocument.Parse(request.Payload);
+            var root = doc.RootElement;
+
+            // PayOS webhook root structure:
+            // { "code": "00", "desc": "success", "data": { "orderCode": 12345, "status": "PAID", "transactions": [...] } }
+
+            // Root-level code ("00" = success)
+            if (root.TryGetProperty("code", out var rootCode))
+            {
+                var code = rootCode.GetString();
+                if (code == "00") status = "PAID";
+                else if (code == "01" || code == "02") status = "CANCELLED";
+            }
+
+            // data node
+            if (root.TryGetProperty("data", out var data))
+            {
+                // orderCode in data (can be number or string)
+                if (data.TryGetProperty("orderCode", out var ocNode))
+                {
+                    orderCode = ocNode.ValueKind == JsonValueKind.Number
+                        ? ocNode.GetInt64().ToString()
+                        : ocNode.GetString();
+                }
+
+                // status override if present in data (e.g. "PAID", "CANCELLED")
+                if (data.TryGetProperty("status", out var dataStatus))
+                {
+                    var ds = dataStatus.GetString();
+                    if (!string.IsNullOrEmpty(ds))
+                        status = ds.ToUpperInvariant();
+                }
+
+                // Transaction reference
+                if (data.TryGetProperty("transactions", out var txnsNode)
+                    && txnsNode.ValueKind == JsonValueKind.Array
+                    && txnsNode.GetArrayLength() > 0)
+                {
+                    if (txnsNode[0].TryGetProperty("reference", out var refNode))
+                        txnRef = refNode.GetString();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to parse PayOS webhook payload.");
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(orderCode))
+        {
+            _logger.LogWarning("PayOS webhook missing orderCode in payload.");
+            return true; // Acknowledge to PayOS even if we can't find the order
+        }
+
+        _logger.LogInformation(
+            "PayOS webhook received: OrderCode={OrderCode}, Status={Status}, TxnRef={TxnRef}",
+            orderCode, status, txnRef);
+
+        // 3. Find payment by orderCode
+        var payment = await _paymentRepository.GetByOrderCodeAsync(orderCode, cancellationToken);
+        if (payment == null)
+        {
+            _logger.LogWarning("PayOS webhook: No payment found for OrderCode={OrderCode}", orderCode);
+            return true; // Acknowledge anyway
+        }
+
+        // 4. Update payment & order status
+        var isPaid = status is "PAID" or "00";
+
+        if (isPaid && payment.Status == PaymentStatus.Pending)
+        {
+            payment.Complete(txnRef, request.Payload);
+
             var order = await _orderRepository.GetByIdAsync(payment.OrderId, cancellationToken);
             if (order != null)
             {
-                order.Complete(); // Or Confirm() depending on business logic
+                order.Complete();
+                _logger.LogInformation(
+                    "Order {OrderId} completed via PayOS webhook. OrderCode={OrderCode}",
+                    order.Id, orderCode);
+
+                // If this is a clinic booking order, extract AppointmentId and send confirmation email
+                if (!string.IsNullOrEmpty(order.Description))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(order.Description, @"\[Appt:([a-fA-F0-9\-]+)\]");
+                    if (match.Success && Guid.TryParse(match.Groups[1].Value, out var appointmentId))
+                    {
+                        // Fire and forget, or await. We await to ensure it's sent.
+                        // We also need to add using Application.Scheduling.Appointments.Commands.CreateClinicAppointment; at the top
+                        // But we can just use the fully qualified name to avoid using issues.
+                        await _mediator.Send(
+                            new Application.Scheduling.Appointments.Commands.CreateClinicAppointment.SendClinicAppointmentConfirmationEmailCommand(appointmentId),
+                            cancellationToken);
+                    }
+                }
             }
         }
-        else if (status == "CANCELLED")
+        else if (status is "CANCELLED" && payment.Status == PaymentStatus.Pending)
         {
-            payment.Fail("Cancelled by user");
+            payment.Cancel();
+
+            var order = await _orderRepository.GetByIdAsync(payment.OrderId, cancellationToken);
+            order?.Cancel();
+        }
+        else
+        {
+            _logger.LogInformation(
+                "PayOS webhook: payment {PaymentId} already in status {Status}, no update needed.",
+                payment.Id, payment.Status);
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        */
-
         return true;
     }
 }

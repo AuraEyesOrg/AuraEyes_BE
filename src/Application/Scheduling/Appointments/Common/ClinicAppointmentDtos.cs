@@ -38,4 +38,19 @@ public class CreateClinicAppointmentResult
 {
     public Guid AppointmentId { get; init; }
     public AppointmentStatus Status { get; init; }
+
+    /// <summary>
+    /// PayOS checkout URL to redirect the patient for deposit payment (30% of slot price).
+    /// </summary>
+    public string? PaymentUrl { get; init; }
+
+    /// <summary>
+    /// The created Order ID associated with this booking deposit.
+    /// </summary>
+    public Guid? OrderId { get; init; }
+
+    /// <summary>
+    /// Deposit amount (30% of full slot price) the patient needs to pay.
+    /// </summary>
+    public decimal DepositAmount { get; init; }
 }
