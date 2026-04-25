@@ -114,26 +114,35 @@ public class SendToDoctorCommandHandler
 
         if (existingConsultation != null)
         {
+            existingConsultation.ShareScreeningDataWithDoctor();
+
             if (request.DoctorId.HasValue &&
                 existingConsultation.OphthalmologistId != request.DoctorId.Value)
             {
                 existingConsultation.AssignDoctor(request.DoctorId.Value);
                 visit.AssignDoctor(request.DoctorId.Value);
 
-                await _consultationSessionRepository.UpdateAsync(existingConsultation, cancellationToken);
                 await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
-                await _unitOfWork.SaveChangesAsync(cancellationToken);
 
                 await _notificationService.SendAsync(
                     userId: doctor!.UserId,
                     title: "New Case Assigned",
                     message: $"You have been assigned a new case for patient {visit.Patient?.FullName ?? "Unknown"}.",
                     type: NotificationType.NewConsultationRequest,
-                    payload: new { ConsultationSessionId = existingConsultation.Id, VisitId = visit.Id },
+                    payload: new
+                    {
+                        ConsultationSessionId = existingConsultation.Id,
+                        VisitId = visit.Id,
+                        ScreeningId = request.ScreeningId,
+                        RouteHint = $"/ophthalmologist/screenings/{request.ScreeningId}/review"
+                    },
                     cancellationToken: cancellationToken,
                     referenceId: existingConsultation.Id
                 );
             }
+
+            await _consultationSessionRepository.UpdateAsync(existingConsultation, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result<SendToDoctorResponse>.Success(new SendToDoctorResponse
             {
@@ -147,7 +156,9 @@ public class SendToDoctorCommandHandler
             patientId: visit.PatientId,
             aiScreeningId: request.ScreeningId,
             ophthalmologistId: request.DoctorId,
-            price: 0m
+            price: 0m,
+            shareRetinalImages: true,
+            shareAiResults: true
         );
 
         await _consultationSessionRepository.AddAsync(consultationSession, cancellationToken);
@@ -166,7 +177,13 @@ public class SendToDoctorCommandHandler
                 title: "New Case Assigned",
                 message: $"You have been assigned a new case for patient {visit.Patient?.FullName ?? "Unknown"}.",
                 type: NotificationType.NewConsultationRequest, // or ConsultationAssigned if it exists
-                payload: new { ConsultationSessionId = consultationSession.Id, VisitId = visit.Id },
+                payload: new
+                {
+                    ConsultationSessionId = consultationSession.Id,
+                    VisitId = visit.Id,
+                    ScreeningId = request.ScreeningId,
+                    RouteHint = $"/ophthalmologist/screenings/{request.ScreeningId}/review"
+                },
                 cancellationToken: cancellationToken,
                 referenceId: consultationSession.Id
             );
