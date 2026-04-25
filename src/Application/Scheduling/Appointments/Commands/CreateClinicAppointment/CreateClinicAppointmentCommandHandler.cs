@@ -18,6 +18,7 @@ public class CreateClinicAppointmentCommandHandler
 {
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IAppointmentRepository _appointmentRepository;
+    private readonly IPatientVisitRepository _patientVisitRepository;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IOrderRepository _orderRepository;
     private readonly IPaymentRepository _paymentRepository;
@@ -42,6 +43,7 @@ public class CreateClinicAppointmentCommandHandler
     public CreateClinicAppointmentCommandHandler(
         IAppointmentSlotRepository appointmentSlotRepository,
         IAppointmentRepository appointmentRepository,
+        IPatientVisitRepository patientVisitRepository,
         IRepository<Patient> patientRepository,
         IOrderRepository orderRepository,
         IPaymentRepository paymentRepository,
@@ -58,6 +60,7 @@ public class CreateClinicAppointmentCommandHandler
     {
         _appointmentSlotRepository = appointmentSlotRepository;
         _appointmentRepository = appointmentRepository;
+        _patientVisitRepository = patientVisitRepository;
         _patientRepository = patientRepository;
         _orderRepository = orderRepository;
         _paymentRepository = paymentRepository;
@@ -77,11 +80,6 @@ public class CreateClinicAppointmentCommandHandler
         CreateClinicAppointmentCommand request,
         CancellationToken cancellationToken)
     {
-        if (_currentUser.ProfileId is null)
-        {
-            return Result<CreateClinicAppointmentResult>.Unauthorized("Patient profile is required.");
-        }
-
         if (!_currentUser.UserId.HasValue)
         {
             return Result<CreateClinicAppointmentResult>.Forbidden(
@@ -94,11 +92,20 @@ public class CreateClinicAppointmentCommandHandler
         {
             // ── 1. Resolve Patient ──────────────────────────────────────────
             Guid targetPatientProfileId;
-            Guid targetUserId;
-            bool isWalkIn = false;
+            Guid orderUserId;
+            Guid? notificationUserId;
+            bool isStaffCreatedWalkIn = false;
 
             if (request.PatientId.HasValue)
             {
+                var isStaffBooking = await _identityService.IsInRoleAsync(_currentUser.UserId.Value, Roles.ClinicStaff) ||
+                                     await _identityService.IsInRoleAsync(_currentUser.UserId.Value, Roles.SystemAdmin);
+                if (!isStaffBooking)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.Forbidden("Only clinic staff can book for another patient.");
+                }
+
                 // Staff booking for another patient
                 var patient = await _patientRepository.GetByIdAsync(request.PatientId.Value, cancellationToken);
                 if (patient == null)
@@ -107,11 +114,9 @@ public class CreateClinicAppointmentCommandHandler
                     return Result<CreateClinicAppointmentResult>.NotFound($"Patient profile '{request.PatientId}' not found.");
                 }
                 targetPatientProfileId = patient.Id;
-                targetUserId = patient.UserId ?? Guid.Empty; // Should have a UserId from CreateUserWalkInPatientAsync
-                
-                // Check if current user is staff/admin
-                isWalkIn = await _identityService.IsInRoleAsync(_currentUser.UserId.Value, Roles.ClinicStaff) ||
-                           await _identityService.IsInRoleAsync(_currentUser.UserId.Value, Roles.SystemAdmin);
+                orderUserId = patient.UserId ?? _currentUser.UserId.Value;
+                notificationUserId = patient.UserId;
+                isStaffCreatedWalkIn = true;
             }
             else
             {
@@ -122,7 +127,8 @@ public class CreateClinicAppointmentCommandHandler
                     return Result<CreateClinicAppointmentResult>.Unauthorized("Patient profile is required for self-booking.");
                 }
                 targetPatientProfileId = _currentUser.ProfileId.Value;
-                targetUserId = _currentUser.UserId.Value;
+                orderUserId = _currentUser.UserId.Value;
+                notificationUserId = _currentUser.UserId.Value;
             }
 
             // ── 2. Validate slot ──────────────────────────────────────────────
@@ -195,7 +201,7 @@ public class CreateClinicAppointmentCommandHandler
             // ── 5. Calculate deposit ──────────────────────────────────────────
             // If it's a walk-in (staff booking), there is NO deposit (they pay 100% full amount).
             // For online bookings, we take 30% deposit.
-            decimal? depositAmount = isWalkIn ? null : Math.Round(price * DepositRatio, 0);
+            decimal? depositAmount = isStaffCreatedWalkIn ? null : Math.Round(price * DepositRatio, 0);
             if (depositAmount.HasValue && depositAmount.Value < 1) depositAmount = 1;
 
             // ── 6. Create Appointment ─────────────────────────────────────────
@@ -213,11 +219,11 @@ public class CreateClinicAppointmentCommandHandler
             await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
 
             // ── 7. Create Order + Payment ─────────────────────────────────────
-            var typeLabel = isWalkIn ? "Thanh toán đủ" : "Đặt cọc";
+            var typeLabel = isStaffCreatedWalkIn ? "Thanh toán đủ" : "Đặt cọc";
             var orderDescription = $"{typeLabel} khám {slot.Date:dd/MM} {slot.StartTime:HH:mm}";
             
             var order = new Order(
-                targetUserId,
+                orderUserId,
                 price,
                 depositAmount,
                 orderDescription,
@@ -226,7 +232,7 @@ public class CreateClinicAppointmentCommandHandler
             await _orderRepository.AddAsync(order, cancellationToken);
 
             string? paymentUrl = null;
-            if (!isWalkIn)
+            if (!isStaffCreatedWalkIn)
             {
                 // Create PayOS payment link for online deposit
                 var payment = new Payment(order.Id, depositAmount!.Value, PaymentMethod.PayOS, orderDescription);
@@ -259,13 +265,20 @@ public class CreateClinicAppointmentCommandHandler
                 await _paymentRepository.AddAsync(payment, cancellationToken);
             }
 
+            PatientVisit? visit = null;
+            if (isStaffCreatedWalkIn)
+            {
+                visit = PatientVisit.CreateFromAppointment(appointment);
+                await _patientVisitRepository.AddAsync(visit, cancellationToken);
+            }
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
             _logger.LogInformation(
                 "Created {Type} clinic appointment {AppointmentId} for patient {PatientId} at slot {SlotId}. " +
                 "FullPrice: {FullPrice} VND, Deposit: {DepositAmount} VND. Order {OrderId}",
-                isWalkIn ? "Walk-in" : "Online",
+                isStaffCreatedWalkIn ? "Walk-in" : "Online",
                 appointment.Id,
                 targetPatientProfileId,
                 request.SlotId,
@@ -274,12 +287,18 @@ public class CreateClinicAppointmentCommandHandler
                 order.Id);
 
             // ── 8. Post-commit: notifications ──────────────────────────
-            await SendBookingNotificationAsync(appointment, targetUserId, slot, request.VisitReason, isWalkIn, cancellationToken);
+            await SendBookingNotificationAsync(appointment, notificationUserId, slot, request.VisitReason, isStaffCreatedWalkIn, cancellationToken);
+
+            if (visit is not null)
+            {
+                await SendQueueNotificationAsync(appointment, visit, cancellationToken);
+            }
 
             return Result<CreateClinicAppointmentResult>.Success(new CreateClinicAppointmentResult
             {
                 AppointmentId = appointment.Id,
-                Status = appointment.Status,
+                VisitId = visit?.Id,
+                Status = visit?.Status.ToString() ?? appointment.Status.ToString(),
                 PaymentUrl = paymentUrl,
                 OrderId = order.Id,
                 DepositAmount = depositAmount,
@@ -307,12 +326,17 @@ public class CreateClinicAppointmentCommandHandler
 
     private async Task SendBookingNotificationAsync(
         Appointment appointment,
-        Guid targetUserId,
+        Guid? targetUserId,
         AppointmentSlot slot,
         string? visitReason,
         bool isWalkIn,
         CancellationToken cancellationToken)
     {
+        if (!targetUserId.HasValue)
+        {
+            return;
+        }
+
         try
         {
             var title = isWalkIn ? "Đặt lịch khám trực tiếp thành công" : "Đặt lịch khám thành công";
@@ -321,7 +345,7 @@ public class CreateClinicAppointmentCommandHandler
                 : $"Bạn đã đặt lịch thành công vào lúc {slot.StartTime:HH:mm}, ngày {slot.Date:dd/MM/yyyy}. Vui lòng hoàn tất thanh toán đặt cọc.";
 
             await _notificationService.SendAsync(
-                targetUserId,
+                targetUserId.Value,
                 title,
                 body,
                 NotificationType.NewAppointmentBooked,
@@ -339,6 +363,30 @@ public class CreateClinicAppointmentCommandHandler
                 ex,
                 "Failed to send appointment booking notification for appointment {AppointmentId}",
                 appointment.Id);
+        }
+    }
+
+    private async Task SendQueueNotificationAsync(
+        Appointment appointment,
+        PatientVisit visit,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _notificationService.SendToRoleAsync(
+                roleName: Roles.ClinicStaff,
+                title: "New Patient in Queue",
+                message: $"Patient {appointment.Patient?.FullName ?? "Unknown"} has been added to the clinic queue.",
+                type: NotificationType.SystemAlert,
+                payload: new { VisitId = visit.Id, PatientId = visit.PatientId },
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to send walk-in queue notification for visit {VisitId}",
+                visit.Id);
         }
     }
 }

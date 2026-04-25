@@ -13,7 +13,7 @@ public class ClinicAppointmentDto
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }
     public string? VisitReason { get; init; }
-    public AppointmentStatus Status { get; init; }
+    public string Status { get; init; } = string.Empty;
     public DateTime CreatedAt { get; init; }
 
     /// <summary>
@@ -45,7 +45,8 @@ public class OrganisationAvailableSlotDto
 public class CreateClinicAppointmentResult
 {
     public Guid AppointmentId { get; init; }
-    public AppointmentStatus Status { get; init; }
+    public Guid? VisitId { get; init; }
+    public string Status { get; init; } = string.Empty;
 
     /// <summary>
     /// PayOS checkout URL to redirect the patient for deposit payment (30% of slot price).

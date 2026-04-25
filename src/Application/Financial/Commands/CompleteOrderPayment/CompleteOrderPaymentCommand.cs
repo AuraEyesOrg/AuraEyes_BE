@@ -134,28 +134,31 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
 
     private async Task CompleteVisitIfAny(Order order, CancellationToken cancellationToken)
     {
+        if (order.AppointmentId.HasValue)
+        {
+            var appointmentVisit = await _patientVisitRepository.GetByAppointmentIdAsync(
+                order.AppointmentId.Value,
+                cancellationToken);
+
+            if (appointmentVisit != null && appointmentVisit.Status == PatientVisitStatus.WaitingForPayment)
+            {
+                appointmentVisit.Complete();
+                await _patientVisitRepository.UpdateAsync(appointmentVisit, cancellationToken);
+                return;
+            }
+        }
+
         var patient = await _patientRepository.Query()
             .FirstOrDefaultAsync(p => p.UserId == order.UserId, cancellationToken);
 
         if (patient != null)
         {
-            // First try by appointment ID if the order is linked to one
-            Domain.Entities.Scheduling.PatientVisit? visit = null;
-
-            if (order.AppointmentId.HasValue)
-            {
-                visit = await _patientVisitRepository.GetByAppointmentIdAsync(order.AppointmentId.Value, cancellationToken);
-            }
-
             // Fallback to finding any active visit waiting for payment for this patient
-            if (visit == null)
-            {
-                visit = await _patientVisitRepository.Query()
-                    .FirstOrDefaultAsync(v => 
-                        v.PatientId == patient.Id && 
-                        v.Status == PatientVisitStatus.WaitingForPayment, 
-                        cancellationToken);
-            }
+            var visit = await _patientVisitRepository.Query()
+                .FirstOrDefaultAsync(v => 
+                    v.PatientId == patient.Id && 
+                    v.Status == PatientVisitStatus.WaitingForPayment, 
+                    cancellationToken);
 
             if (visit != null && visit.Status == PatientVisitStatus.WaitingForPayment)
             {

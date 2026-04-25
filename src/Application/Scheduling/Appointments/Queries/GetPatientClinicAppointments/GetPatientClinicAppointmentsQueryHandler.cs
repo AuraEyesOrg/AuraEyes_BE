@@ -82,7 +82,7 @@ public class GetPatientClinicAppointmentsQueryHandler
                 StartTime = a.AppointmentSlot.StartTime,
                 EndTime = a.AppointmentSlot.EndTime,
                 VisitReason = a.VisitReason,
-                Status = a.Status,
+                Status = a.Status.ToString(),
                 CreatedAt = a.CreatedAt,
                 HasFeedback = feedbackAppointmentIds.Contains(a.Id)
             })
