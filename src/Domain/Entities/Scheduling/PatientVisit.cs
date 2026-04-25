@@ -103,15 +103,28 @@ public class PatientVisit : BaseEntity, IAggregateRoot
     }
 
     /// <summary>
-    /// Complete the visit.
+    /// Doctor finishes consultation, passing it to Cashier for payment.
+    /// </summary>
+    public void FinishConsultation(string? notes = null)
+    {
+        if (Status != PatientVisitStatus.InProgress)
+            throw new InvalidOperationException($"Cannot finish consultation with status {Status}. Visit must be in progress.");
+
+        Status = PatientVisitStatus.WaitingForPayment;
+        Notes = notes;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Complete the visit after payment.
     /// </summary>
     public void Complete(string? notes = null)
     {
-        if (Status != PatientVisitStatus.InProgress)
-            throw new InvalidOperationException($"Cannot complete visit with status {Status}. Visit must be in progress.");
+        if (Status != PatientVisitStatus.WaitingForPayment && Status != PatientVisitStatus.InProgress)
+            throw new InvalidOperationException($"Cannot complete visit with status {Status}.");
 
         Status = PatientVisitStatus.Completed;
-        Notes = notes;
+        if (notes != null) Notes = notes;
         CompletedAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
     }

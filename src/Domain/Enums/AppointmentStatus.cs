@@ -11,6 +11,15 @@ public enum AppointmentStatus
     /// <summary>Appointment confirmed by organisation.</summary>
     Confirmed = 2,
 
+    /// <summary>Patient has checked in at the clinic.</summary>
+    CheckedIn = 3,
+
+    /// <summary>Consultation with doctor is in progress.</summary>
+    InProgress = 4,
+
+    /// <summary>Visit completed successfully.</summary>
+    Completed = 5,
+
     /// <summary>Appointment cancelled by patient or organisation.</summary>
     Cancelled = 6,
 

@@ -441,21 +441,9 @@ if (app.Environment.IsDevelopment())
     app.UseHangfireDashboard("/hangfire");
 }
 
-var defaultQuotaResetCron = app.Environment.IsDevelopment()
-    ? "*/2 * * * *"
-    : "0 0 * * *";
 
-var quotaResetCron = Environment.GetEnvironmentVariable("HANGFIRE_DAILY_QUOTA_RESET_CRON");
-if (string.IsNullOrWhiteSpace(quotaResetCron))
-{
-    quotaResetCron = defaultQuotaResetCron;
-}
 
-var monthlyQuotaResetCron = Environment.GetEnvironmentVariable("HANGFIRE_MONTHLY_QUOTA_RESET_CRON");
-if (string.IsNullOrWhiteSpace(monthlyQuotaResetCron))
-{
-    monthlyQuotaResetCron = "0 0 1 * *";
-}
+
 
 var slotMaintenanceCron = Environment.GetEnvironmentVariable("HANGFIRE_SLOT_MAINTENANCE_CRON");
 if (string.IsNullOrWhiteSpace(slotMaintenanceCron))
@@ -483,6 +471,7 @@ if (enableHangfireServer)
     var legacyRecurringJobIds = new[]
     {
         "monthly-quota-reset",
+        "daily-quota-reset",
         "fulltime-slot-generation",
         "full-time-slot-generation",
         "fulltime-slot-generation-job",
@@ -493,20 +482,17 @@ if (enableHangfireServer)
 
     foreach (var recurringJobId in legacyRecurringJobIds)
     {
-        recurringJobManager.RemoveIfExists(recurringJobId);
+        try
+        {
+            recurringJobManager.RemoveIfExists(recurringJobId);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("Could not remove legacy job {JobId} due to lock or timeout: {Message}", recurringJobId, ex.Message);
+        }
     }
 
-    recurringJobManager.AddOrUpdate<DailyQuotaResetJob>(
-        "daily-quota-reset",
-        job => job.ExecuteAsync(),
-        quotaResetCron,
-        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
-    recurringJobManager.AddOrUpdate<MonthlyQuotaResetJob>(
-        "monthly-quota-reset",
-        job => job.ExecuteAsync(),
-        monthlyQuotaResetCron,
-        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
     recurringJobManager.AddOrUpdate<SlotMaintenanceJob>(
         "slot-maintenance-expire-unused",

@@ -2036,7 +2036,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("Status", "BookedCount", "MaxCapacity")
                         .HasDatabaseName("IX_AppointmentSlots_Capacity");
 
-                    b.HasIndex("ScheduleTemplateId", "Date", "StartTime", "EndTime")
+                    b.HasIndex("ScheduleTemplateId", "Date", "StartTime", "EndTime", "OphthalId")
                         .IsUnique()
                         .HasDatabaseName("UX_AppointmentSlots_TemplateDateTime")
                         .HasFilter("\"IsDeleted\" = false");

@@ -78,6 +78,16 @@ public class GetConsultationSessionQueryHandler
 
         var canViewRetinalImages = isAdmin || isPatient || session.IsRetinalImagesShared;
         var canViewAiResults = isAdmin || isPatient || session.IsAIResultShared;
+        var isAssignedDoctorOnInternalSession = _currentUser.ProfileId.HasValue
+            && session.OphthalmologistId == _currentUser.ProfileId.Value
+            && (session.Type == Domain.Enums.ConsultationSessionType.Verification
+                || session.Type == Domain.Enums.ConsultationSessionType.ClinicBooking);
+
+        if (isAssignedDoctorOnInternalSession)
+        {
+            canViewRetinalImages = true;
+            canViewAiResults = true;
+        }
 
         var caseSnapshot = await BuildCaseSnapshotAsync(
             session.AiScreeningId,

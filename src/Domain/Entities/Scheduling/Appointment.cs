@@ -81,6 +81,42 @@ public class Appointment : BaseEntity, IAggregateRoot
     }
 
     /// <summary>
+    /// Mark patient as checked in.
+    /// </summary>
+    public void CheckIn()
+    {
+        if (Status is not (AppointmentStatus.Pending or AppointmentStatus.Confirmed))
+            throw new InvalidOperationException($"Cannot check in appointment with status {Status}.");
+
+        Status = AppointmentStatus.CheckedIn;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Start the consultation.
+    /// </summary>
+    public void Start()
+    {
+        if (Status != AppointmentStatus.CheckedIn)
+            throw new InvalidOperationException($"Cannot start appointment with status {Status}. Patient must be checked in first.");
+
+        Status = AppointmentStatus.InProgress;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Complete the appointment.
+    /// </summary>
+    public void Complete()
+    {
+        if (Status != AppointmentStatus.InProgress)
+            throw new InvalidOperationException($"Cannot complete appointment with status {Status}. Visit must be in progress.");
+
+        Status = AppointmentStatus.Completed;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
     /// Cancel the appointment.
     /// </summary>
     public void Cancel(Guid cancelledBy, string? reason = null)

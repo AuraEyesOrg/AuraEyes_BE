@@ -248,8 +248,7 @@ public static class DependencyInjection
         services.AddHostedService<ConsultationStateWorker>();
 
         // Register Hangfire daily job
-        services.AddScoped<DailyQuotaResetJob>();
-        services.AddScoped<MonthlyQuotaResetJob>();
+
         services.AddScoped<SlotMaintenanceJob>();
         services.AddScoped<FullTimeSlotGenerationJob>();
         services.AddScoped<MonthlySalaryJob>();

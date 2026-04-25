@@ -39,4 +39,10 @@ public abstract class BaseEntity
     {
         _domainEvents.Clear();
     }
+
+    public void SoftDelete()
+    {
+        IsDeleted = true;
+        UpdatedAt = DateTime.UtcNow;
+    }
 }

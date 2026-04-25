@@ -13,15 +13,18 @@ public class GetPatientClinicAppointmentsQueryHandler
 
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IOrganisationFeedbackRepository _organisationFeedbackRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly ICurrentUserService _currentUser;
 
     public GetPatientClinicAppointmentsQueryHandler(
         IAppointmentRepository appointmentRepository,
         IOrganisationFeedbackRepository organisationFeedbackRepository,
+        IOphthalmologistRepository ophthalmologistRepository,
         ICurrentUserService currentUser)
     {
         _appointmentRepository = appointmentRepository;
         _organisationFeedbackRepository = organisationFeedbackRepository;
+        _ophthalmologistRepository = ophthalmologistRepository;
         _currentUser = currentUser;
     }
 
@@ -56,6 +59,7 @@ public class GetPatientClinicAppointmentsQueryHandler
             statuses,
             pageNumber,
             pageSize,
+            request.Tab == PatientAppointmentTab.Upcoming,
             cancellationToken);
 
         var appointmentIds = appointments
@@ -71,20 +75,37 @@ public class GetPatientClinicAppointmentsQueryHandler
                 appointmentIds,
                 cancellationToken);
 
+        // Fetch doctor names/avatars in batch
+        var doctorIds = appointments
+            .Where(a => a.AppointmentSlot?.OphthalId != null)
+            .Select(a => a.AppointmentSlot!.OphthalId!.Value)
+            .Distinct()
+            .ToList();
+
+        var doctorMap = await _ophthalmologistRepository.GetDoctorDetailsByIdsAsync(doctorIds, cancellationToken);
+
         var items = appointments
             .Where(a => a.AppointmentSlot is not null)
-            .Select(a => new ClinicAppointmentDto
+            .Select(a =>
             {
-                Id = a.Id,
-                PatientId = a.PatientId,
-                SlotId = a.AppointmentSlotId,
-                Date = a.AppointmentSlot!.Date,
-                StartTime = a.AppointmentSlot.StartTime,
-                EndTime = a.AppointmentSlot.EndTime,
-                VisitReason = a.VisitReason,
-                Status = a.Status,
-                CreatedAt = a.CreatedAt,
-                HasFeedback = feedbackAppointmentIds.Contains(a.Id)
+                doctorMap.TryGetValue(a.AppointmentSlot!.OphthalId ?? Guid.Empty, out var doc);
+
+                return new ClinicAppointmentDto
+                {
+                    Id = a.Id,
+                    PatientId = a.PatientId,
+                    SlotId = a.AppointmentSlotId,
+                    Date = a.AppointmentSlot!.Date,
+                    StartTime = a.AppointmentSlot.StartTime,
+                    EndTime = a.AppointmentSlot.EndTime,
+                    VisitReason = a.VisitReason,
+                    Status = a.Status.ToString(),
+                    CreatedAt = a.CreatedAt,
+                    HasFeedback = feedbackAppointmentIds.Contains(a.Id),
+                    OphthalId = a.AppointmentSlot.OphthalId,
+                    OphthalFullName = doc.FullName ?? "Clinic Doctor",
+                    OphthalAvatarUrl = doc.AvatarUrl
+                };
             })
             .ToList();
 
@@ -98,9 +119,14 @@ public class GetPatientClinicAppointmentsQueryHandler
             PatientAppointmentTab.Upcoming => new[]
             {
                 AppointmentStatus.Pending,
-                AppointmentStatus.Confirmed
+                AppointmentStatus.Confirmed,
+                AppointmentStatus.CheckedIn,
+                AppointmentStatus.InProgress
             },
-            PatientAppointmentTab.Completed => Array.Empty<AppointmentStatus>(), // Legacy UI tab. PatientVisits will handle actual completion logic.
+            PatientAppointmentTab.Completed => new[]
+            {
+                AppointmentStatus.Completed
+            },
             PatientAppointmentTab.Cancelled => new[]
             {
                 AppointmentStatus.Cancelled,

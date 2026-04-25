@@ -3,6 +3,7 @@ using Application.Common.Models;
 using Application.Scheduling.Appointments.Common;
 using Domain.Enums;
 using Domain.Repositories;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.Scheduling.Appointments.Queries.GetClinicAppointmentsByDate;
 
@@ -11,13 +12,16 @@ public class GetClinicAppointmentsByDateQueryHandler
 {
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IOrderRepository _orderRepository;
+    private readonly IPatientVisitRepository _patientVisitRepository;
 
     public GetClinicAppointmentsByDateQueryHandler(
         IAppointmentRepository appointmentRepository,
-        IOrderRepository orderRepository)
+        IOrderRepository orderRepository,
+        IPatientVisitRepository patientVisitRepository)
     {
         _appointmentRepository = appointmentRepository;
         _orderRepository = orderRepository;
+        _patientVisitRepository = patientVisitRepository;
     }
 
     public async Task<Result<IReadOnlyList<ClinicAppointmentDto>>> Handle(
@@ -34,11 +38,16 @@ public class GetClinicAppointmentsByDateQueryHandler
         var appointmentIds = appointments.Select(a => a.Id).ToList();
         var orders = await _orderRepository.GetByAppointmentIdsAsync(appointmentIds, cancellationToken);
         var orderMap = orders.ToDictionary(o => o.AppointmentId!.Value);
+        var visits = await _patientVisitRepository.Query()
+            .Where(v => v.AppointmentId.HasValue && appointmentIds.Contains(v.AppointmentId.Value))
+            .ToListAsync(cancellationToken);
+        var visitMap = visits.ToDictionary(v => v.AppointmentId!.Value);
 
         var items = appointments
             .Where(a => a.AppointmentSlot is not null)
             .Select(a => {
                 orderMap.TryGetValue(a.Id, out var order);
+                visitMap.TryGetValue(a.Id, out var visit);
                 
                 return new ClinicAppointmentDto
                 {
@@ -51,7 +60,7 @@ public class GetClinicAppointmentsByDateQueryHandler
                     StartTime = a.AppointmentSlot.StartTime,
                     EndTime = a.AppointmentSlot.EndTime,
                     VisitReason = a.VisitReason,
-                    Status = a.Status,
+                    Status = visit?.Status.ToString() ?? a.Status.ToString(),
                     CreatedAt = a.CreatedAt,
                     HasFeedback = false,
                     

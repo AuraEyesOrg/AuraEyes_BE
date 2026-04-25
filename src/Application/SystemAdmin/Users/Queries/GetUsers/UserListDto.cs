@@ -15,4 +15,6 @@ public class UserListDto
     public bool EmailConfirmed { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
+    public decimal? ConsultationFee { get; set; }
+    public Guid? OphthalmologistId { get; set; }
 }

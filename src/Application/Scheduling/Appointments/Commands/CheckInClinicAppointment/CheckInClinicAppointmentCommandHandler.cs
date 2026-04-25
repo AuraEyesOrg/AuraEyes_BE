@@ -4,6 +4,7 @@ using Domain.Common;
 using Domain.Entities.Scheduling;
 using Domain.Enums;
 using Domain.Repositories;
+using Application.Common.Constants;
 
 namespace Application.Scheduling.Appointments.Commands.CheckInClinicAppointment;
 
@@ -12,15 +13,18 @@ public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInCli
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IPatientVisitRepository _patientVisitRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService _notificationService;
 
     public CheckInClinicAppointmentCommandHandler(
         IAppointmentRepository appointmentRepository,
         IPatientVisitRepository patientVisitRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        INotificationService notificationService)
     {
         _appointmentRepository = appointmentRepository;
         _patientVisitRepository = patientVisitRepository;
         _unitOfWork = unitOfWork;
+        _notificationService = notificationService;
     }
 
     public async Task<Result> Handle(CheckInClinicAppointmentCommand request, CancellationToken cancellationToken)
@@ -45,12 +49,24 @@ public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInCli
         if (appointment.Status == AppointmentStatus.Pending)
         {
             appointment.Confirm();
-            await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
         }
+
+        appointment.CheckIn();
+        await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
 
         var visit = PatientVisit.CreateFromAppointment(appointment);
         await _patientVisitRepository.AddAsync(visit, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Notify Coordinator (ClinicStaff) that a patient has checked in
+        await _notificationService.SendToRoleAsync(
+            roleName: Roles.ClinicStaff,
+            title: "New Patient in Queue",
+            message: $"Patient {appointment.Patient?.FullName ?? "Unknown"} has checked in and is waiting for screening.",
+            type: NotificationType.SystemAlert,
+            payload: new { VisitId = visit.Id, PatientId = visit.PatientId },
+            cancellationToken: cancellationToken
+        );
 
         return Result.Success();
     }

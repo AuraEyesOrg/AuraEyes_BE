@@ -116,14 +116,15 @@ public class AppointmentRepository : Repository<Appointment>, IAppointmentReposi
 
     public async Task<(IReadOnlyList<Appointment> Items, int TotalCount)> GetPagedByPatientAsync(
         Guid patientId,
-        IReadOnlyCollection<AppointmentStatus>? statuses = null,
-        int pageNumber = 1,
-        int pageSize = 10,
+        IReadOnlyCollection<AppointmentStatus>? statuses,
+        int pageNumber,
+        int pageSize,
+        bool upcomingOnly = false,
         CancellationToken cancellationToken = default)
     {
         var query = _dbSet
             .Include(a => a.AppointmentSlot)
-            .Where(a => a.PatientId == patientId);
+            .Where(a => a.PatientId == patientId && a.AppointmentSlot != null);
 
         if (statuses is { Count: > 0 })
         {
@@ -133,14 +134,25 @@ public class AppointmentRepository : Repository<Appointment>, IAppointmentReposi
 
         var totalCount = await query.CountAsync(cancellationToken);
 
-        var pageIndex = pageNumber < 1 ? 0 : pageNumber - 1;
-        var safeSize = pageSize <= 0 ? 10 : pageSize;
+        // Define sort order based on tab context
+        if (upcomingOnly)
+        {
+            // Nearest upcoming first
+            query = query
+                .OrderBy(a => a.AppointmentSlot!.Date)
+                .ThenBy(a => a.AppointmentSlot!.StartTime);
+        }
+        else
+        {
+            // Most recent completed/cancelled/past first
+            query = query
+                .OrderByDescending(a => a.AppointmentSlot!.Date)
+                .ThenByDescending(a => a.AppointmentSlot!.StartTime);
+        }
 
         var items = await query
-            .OrderByDescending(a => a.AppointmentSlot!.Date)
-            .ThenByDescending(a => a.AppointmentSlot!.StartTime)
-            .Skip(pageIndex * safeSize)
-            .Take(safeSize)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
         return (items, totalCount);
