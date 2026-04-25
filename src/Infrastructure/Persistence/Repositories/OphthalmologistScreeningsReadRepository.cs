@@ -1,6 +1,7 @@
 using Domain.Entities.Consultation;
 using Domain.Entities.Screening;
 using Domain.Entities.Users;
+using Domain.Enums;
 using Domain.Repositories;
 using Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -39,13 +40,19 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
         var baseRows = await (
             from s in _context.Set<AiScreening>().AsNoTracking()
             join p in _context.Set<Patient>().AsNoTracking() on s.PatientId equals p.Id
-            join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
+            join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id into users
+            from u in users.DefaultIfEmpty()
             where screeningIds.Contains(s.Id)
             orderby s.CreatedAt descending
             select new
             {
                 Screening = s,
-                PatientName = u.FullName != null && u.FullName.Length > 0 ? u.FullName : (u.Email ?? "Patient")
+                PatientName =
+                    p.UserId == null
+                        ? p.FullName
+                        : (u != null && u.FullName != null && u.FullName.Length > 0
+                            ? u.FullName
+                            : (u != null ? u.Email : null)) ?? "Patient"
             }
         ).ToListAsync(cancellationToken);
 
@@ -119,12 +126,14 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
         Guid screeningId,
         CancellationToken cancellationToken = default)
     {
-        // Check access AND retrieve consent flags in single query
+        // Check access and read sharing metadata for this doctor-session link.
         var consultation = await _context.Set<ConsultationSession>()
             .AsNoTracking()
             .Where(cs => cs.OphthalmologistId == ophthalmologistProfileId && cs.AiScreeningId == screeningId)
             .Select(cs => new
             {
+                Type = cs.Type,
+                HasAssignedDoctor = cs.OphthalmologistId.HasValue,
                 IsAIResultShared = cs.IsAIResultShared,
                 IsRetinalImagesShared = cs.IsRetinalImagesShared
             })
@@ -133,21 +142,39 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
         // Access denied: no linked consultation
         if (consultation is null)
             return null;
+        
+        var bypassRedactionForAssignedDoctor =
+            consultation.HasAssignedDoctor &&
+            (consultation.Type == ConsultationSessionType.Verification ||
+             consultation.Type == ConsultationSessionType.ClinicBooking);
+
+        var canViewRetinalImages = bypassRedactionForAssignedDoctor || consultation.IsRetinalImagesShared;
+        var canViewAiResults = bypassRedactionForAssignedDoctor || consultation.IsAIResultShared;
 
         var row = await (
             from scr in _context.Set<AiScreening>().AsNoTracking()
             join p in _context.Set<Patient>().AsNoTracking() on scr.PatientId equals p.Id
-            join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id
+            join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id into users
+            from u in users.DefaultIfEmpty()
             where scr.Id == screeningId
-            select new { Screening = scr, PatientName = u.FullName != null && u.FullName.Length > 0 ? u.FullName : (u.Email ?? "Patient") }
+            select new
+            {
+                Screening = scr,
+                PatientName =
+                    p.UserId == null
+                        ? p.FullName
+                        : (u != null && u.FullName != null && u.FullName.Length > 0
+                            ? u.FullName
+                            : (u != null ? u.Email : null)) ?? "Patient"
+            }
         ).FirstOrDefaultAsync(cancellationToken);
 
         if (row is null)
             return null;
 
-        // Load images only if consent granted
+        // Assigned doctors on verification/clinic sessions always receive full screening data.
         IReadOnlyList<OphthalmologistRetinalImageReadModel> images = Array.Empty<OphthalmologistRetinalImageReadModel>();
-        if (consultation.IsRetinalImagesShared)
+        if (canViewRetinalImages)
         {
             images = await _context.Set<RetinalImage>()
                 .AsNoTracking()
@@ -165,9 +192,9 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
                 .ToListAsync(cancellationToken);
         }
 
-        // Load screening result only if consent granted
+        // Assigned doctors on verification/clinic sessions always receive full screening data.
         OphthalmologistScreeningResultReadModel? latest = null;
-        if (consultation.IsAIResultShared)
+        if (canViewAiResults)
         {
             latest = await _context.Set<ScreeningResult>()
                 .AsNoTracking()
@@ -200,11 +227,8 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
             ModelVersion = screening.ModelVersion,
             CreatedAt = screening.CreatedAt,
             ProcessedAt = screening.ProcessedAt,
-            // Only include RawJsonOutput if AI result is shared (consent given)
-            RawJsonOutput = consultation.IsAIResultShared ? screening.RawJsonOutput : null,
-            // Only include images if consent given
+            RawJsonOutput = canViewAiResults ? screening.RawJsonOutput : null,
             Images = images,
-            // Only include results if consent given
             LatestResult = latest,
             ReviewStatus = MapReviewStatus(latestDiagnosis)
         };
