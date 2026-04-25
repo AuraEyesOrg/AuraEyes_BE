@@ -8,6 +8,7 @@ using Domain.Entities.Screening;
 using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.ConsultationSessions.Commands.SubmitVerificationReport;
 
@@ -21,6 +22,7 @@ public class SubmitVerificationReportCommandHandler
     private readonly IRepository<Patient> _patientRepository;
     private readonly IPatientRoadmapGenerationService _roadmapGenerationService;
     private readonly INotificationService _notificationService;
+    private readonly IPatientVisitRepository _patientVisitRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public SubmitVerificationReportCommandHandler(
@@ -31,6 +33,7 @@ public class SubmitVerificationReportCommandHandler
         IRepository<Patient> patientRepository,
         IPatientRoadmapGenerationService roadmapGenerationService,
         INotificationService notificationService,
+        IPatientVisitRepository patientVisitRepository,
         IUnitOfWork unitOfWork)
     {
         _sessionRepository = sessionRepository;
@@ -40,6 +43,7 @@ public class SubmitVerificationReportCommandHandler
         _patientRepository = patientRepository;
         _roadmapGenerationService = roadmapGenerationService;
         _notificationService = notificationService;
+        _patientVisitRepository = patientVisitRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -53,10 +57,11 @@ public class SubmitVerificationReportCommandHandler
 
         var acceptsReport =
             session.Type == ConsultationSessionType.Verification ||
-            session.Type == ConsultationSessionType.VideoCall;
+            session.Type == ConsultationSessionType.VideoCall ||
+            session.Type == ConsultationSessionType.ClinicBooking;
 
         if (!acceptsReport)
-            return Result.Failure("Only verification or video call sessions accept reports.");
+            return Result.Failure("Only verification, video call, or clinic booking sessions accept reports.");
 
         if (session.OphthalmologistId.HasValue && session.OphthalmologistId.Value != request.DoctorId)
             return Result.Forbidden("You are not assigned to this session.");
@@ -145,10 +150,42 @@ public class SubmitVerificationReportCommandHandler
             session.OpenChat();
             await _sessionRepository.UpdateAsync(session, cancellationToken);
 
+            // Digital Clinic Flow: Update PatientVisit to WaitingForPayment
+            var visit = await _patientVisitRepository.Query()
+                .FirstOrDefaultAsync(v => 
+                    v.PatientId == session.PatientId && 
+                    (v.Status == PatientVisitStatus.CheckedIn ||
+                     v.Status == PatientVisitStatus.InProgress),
+                    cancellationToken);
+
+            var patient = await _patientRepository.GetByIdAsync(session.PatientId, cancellationToken);
+
+            var isFinalized = request.Status?.Equals("Finalized", StringComparison.OrdinalIgnoreCase) == true;
+
+            if (visit != null && isFinalized)
+            {
+                if (visit.Status == PatientVisitStatus.CheckedIn)
+                {
+                    visit.Start();
+                }
+
+                visit.FinishConsultation(clinicalFindings);
+                await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
+
+                // Notify Cashier (ClinicStaff)
+                await _notificationService.SendToRoleAsync(
+                    roleName: Application.Common.Constants.Roles.ClinicStaff,
+                    title: "Ready for Payment",
+                    message: $"Consultation finished. Patient {patient?.FullName ?? "Unknown"} is waiting for payment.",
+                    type: NotificationType.SystemAlert,
+                    payload: new { VisitId = visit.Id, PatientId = visit.PatientId },
+                    cancellationToken: cancellationToken
+                );
+            }
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
-            var patient = await _patientRepository.GetByIdAsync(session.PatientId, cancellationToken);
             if (patient is not null && patient.UserId.HasValue)
             {
                 // Send real-time notification to Patient [FR-46]
