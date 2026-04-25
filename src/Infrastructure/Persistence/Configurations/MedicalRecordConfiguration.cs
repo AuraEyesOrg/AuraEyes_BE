@@ -27,6 +27,7 @@ public class MedicalRecordConfiguration : IEntityTypeConfiguration<MedicalRecord
         builder.Property(x => x.PdfUrl)
             .HasMaxLength(1000);
 
+
         builder.Property(x => x.Status)
             .HasConversion<int>();
 

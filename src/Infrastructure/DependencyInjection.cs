@@ -201,6 +201,7 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
         services.AddScoped<ISlotAssignmentRepository, SlotAssignmentRepository>();
         services.AddScoped<IPatientVisitRepository, PatientVisitRepository>();
+        services.AddScoped<IHealthRoadmapRepository, HealthRoadmapRepository>();
         services.AddScoped<IConsultationSessionRepository, ConsultationSessionRepository>();
         services.AddScoped<IOrganisationFeedbackRepository, OrganisationFeedbackRepository>();
         services.AddScoped<IOphthalmologistFeedbackRepository, OphthalmologistFeedbackRepository>();
