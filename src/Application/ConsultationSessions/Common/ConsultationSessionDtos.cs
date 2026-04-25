@@ -49,6 +49,7 @@ public record ConsultationSessionListDto
     public Guid Id { get; init; }
     public Guid PatientId { get; init; }
     public Guid? OphthalmologistId { get; init; }
+    public Guid? AiScreeningId { get; init; }
     public string? PatientName { get; init; }
     public string? PatientAvatarUrl { get; init; }
     public string? OphthalmologistName { get; init; }

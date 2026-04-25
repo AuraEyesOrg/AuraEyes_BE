@@ -22,7 +22,7 @@ public sealed class GetOphthalmologistScreeningDetailQueryHandler
         GetOphthalmologistScreeningDetailQuery request,
         CancellationToken cancellationToken)
     {
-        // Delegate to repository (access control + consent-based filtering)
+        // Delegate to repository (access control + internal doctor visibility rules)
         var readModel = await _repository.GetDetailForOphthalmologistAsync(
             request.OphthalmologistProfileId,
             request.ScreeningId,

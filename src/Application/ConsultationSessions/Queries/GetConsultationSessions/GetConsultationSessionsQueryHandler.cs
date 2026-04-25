@@ -118,12 +118,18 @@ public class GetConsultationSessionsQueryHandler
         if (dtos.Count == 0) return dtos;
 
         var canAlwaysViewAi = isAdmin;
+        var hasCurrentProfile = currentProfileId.HasValue;
+        var currentProfile = currentProfileId.GetValueOrDefault();
         // Only load screenings for sessions the caller is authorized to view.
         var screeningIds = sessions
             .Where(s =>
                 s.AiScreeningId.HasValue &&
                 (canAlwaysViewAi ||
-                 (currentProfileId.HasValue && s.PatientId == currentProfileId.Value) ||
+                 (hasCurrentProfile && s.PatientId == currentProfile) ||
+                 (hasCurrentProfile &&
+                  s.OphthalmologistId == currentProfile &&
+                  (s.Type == Domain.Enums.ConsultationSessionType.Verification ||
+                   s.Type == Domain.Enums.ConsultationSessionType.ClinicBooking)) ||
                  s.IsAIResultShared))
             .Select(s => s.AiScreeningId!.Value)
             .Distinct()
@@ -147,9 +153,14 @@ public class GetConsultationSessionsQueryHandler
 
             if (!session.AiScreeningId.HasValue) continue;
 
-            // Patient can always view their AI; doctors require sharing.
-            var isPatient = currentProfileId.HasValue && session.PatientId == currentProfileId.Value;
-            var canViewAi = canAlwaysViewAi || isPatient || session.IsAIResultShared;
+            var isPatient = hasCurrentProfile && session.PatientId == currentProfile;
+            var isAssignedDoctorOnInternalSession =
+                hasCurrentProfile &&
+                session.OphthalmologistId == currentProfile &&
+                (session.Type == Domain.Enums.ConsultationSessionType.Verification ||
+                 session.Type == Domain.Enums.ConsultationSessionType.ClinicBooking);
+
+            var canViewAi = canAlwaysViewAi || isPatient || isAssignedDoctorOnInternalSession || session.IsAIResultShared;
             if (!canViewAi) continue;
 
             if (!screeningMap.TryGetValue(session.AiScreeningId.Value, out var screening)) continue;
