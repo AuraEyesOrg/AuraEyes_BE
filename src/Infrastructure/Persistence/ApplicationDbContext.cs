@@ -5,6 +5,7 @@ using Domain.Entities.Contracts;
 using Domain.Entities.Financial;
 using Domain.Entities.Network;
 using Domain.Entities.Network.InternalChat;
+using Domain.Entities.MedicalRecords;
 using Domain.Entities.Platform;
 using Domain.Entities.Scheduling;
 using Domain.Entities.Screening;
@@ -107,6 +108,9 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<InternalGroupChat> InternalGroupChats => Set<InternalGroupChat>();
     public DbSet<InternalGroupMember> InternalGroupMembers => Set<InternalGroupMember>();
     public DbSet<InternalGroupMessage> InternalGroupMessages => Set<InternalGroupMessage>();
+
+    // Medical Records
+    public DbSet<MedicalRecord> MedicalRecords => Set<MedicalRecord>();
 
     #endregion
 

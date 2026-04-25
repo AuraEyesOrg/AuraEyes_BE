@@ -187,6 +187,66 @@ public class InternalChatController : BaseApiController
         var result = await _mediator.Send(command);
         return HandleResult(result, "Meeting created successfully");
     }
+
+    /// <summary>
+    /// Rename an internal group chat.
+    /// </summary>
+    [HttpPut("groups/{groupId:guid}")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> RenameGroup(Guid groupId, [FromBody] RenameGroupRequest request)
+    {
+        var command = new Application.Network.InternalChat.Commands.UpdateGroupChat.UpdateInternalGroupChatCommand
+        {
+            GroupId = groupId,
+            Name = request.Name
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result, "Group renamed successfully");
+    }
+
+    /// <summary>
+    /// Delete an internal group chat.
+    /// </summary>
+    [HttpDelete("groups/{groupId:guid}")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> DeleteGroup(Guid groupId)
+    {
+        var command = new Application.Network.InternalChat.Commands.DeleteGroupChat.DeleteInternalGroupChatCommand
+        {
+            GroupId = groupId
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result, "Group deleted successfully");
+    }
+
+    /// <summary>
+    /// Update members of an internal group chat.
+    /// </summary>
+    [HttpPut("groups/{groupId:guid}/members")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateMembers(Guid groupId, [FromBody] UpdateMembersRequest request)
+    {
+        var command = new Application.Network.InternalChat.Commands.UpdateGroupMembers.UpdateInternalGroupMembersCommand
+        {
+            GroupId = groupId,
+            MemberIds = request.MemberIds
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result, "Group members updated successfully");
+    }
+}
+
+public class RenameGroupRequest
+{
+    public string Name { get; set; } = string.Empty;
+}
+
+public class UpdateMembersRequest
+{
+    public List<Guid> MemberIds { get; set; } = new();
 }
 
 public class CreateMeetingRequest
