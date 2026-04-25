@@ -192,7 +192,7 @@ public class InternalChatController : BaseApiController
     /// Rename an internal group chat.
     /// </summary>
     [HttpPut("groups/{groupId:guid}")]
-    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> RenameGroup(Guid groupId, [FromBody] RenameGroupRequest request)
     {
         var command = new Application.Network.InternalChat.Commands.UpdateGroupChat.UpdateInternalGroupChatCommand
@@ -209,7 +209,7 @@ public class InternalChatController : BaseApiController
     /// Delete an internal group chat.
     /// </summary>
     [HttpDelete("groups/{groupId:guid}")]
-    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> DeleteGroup(Guid groupId)
     {
         var command = new Application.Network.InternalChat.Commands.DeleteGroupChat.DeleteInternalGroupChatCommand
@@ -225,7 +225,7 @@ public class InternalChatController : BaseApiController
     /// Update members of an internal group chat.
     /// </summary>
     [HttpPut("groups/{groupId:guid}/members")]
-    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateMembers(Guid groupId, [FromBody] UpdateMembersRequest request)
     {
         var command = new Application.Network.InternalChat.Commands.UpdateGroupMembers.UpdateInternalGroupMembersCommand

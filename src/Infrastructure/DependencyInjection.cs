@@ -213,6 +213,7 @@ public static class DependencyInjection
         services.AddScoped<IOphthalmologistScreeningsReadRepository, OphthalmologistScreeningsReadRepository>();
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<IMedicalRecordRepository, MedicalRecordRepository>();
 
         // Register Identity Services
         services.AddScoped<IIdentityService, IdentityService>();
