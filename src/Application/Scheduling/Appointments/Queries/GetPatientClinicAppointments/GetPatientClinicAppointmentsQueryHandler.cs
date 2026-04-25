@@ -3,6 +3,7 @@ using Application.Common.Models;
 using Application.Scheduling.Appointments.Common;
 using Domain.Enums;
 using Domain.Repositories;
+using Domain.Common;
 
 namespace Application.Scheduling.Appointments.Queries.GetPatientClinicAppointments;
 
@@ -14,17 +15,23 @@ public class GetPatientClinicAppointmentsQueryHandler
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IOrganisationFeedbackRepository _organisationFeedbackRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IOrderRepository _orderRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
 
     public GetPatientClinicAppointmentsQueryHandler(
         IAppointmentRepository appointmentRepository,
         IOrganisationFeedbackRepository organisationFeedbackRepository,
         IOphthalmologistRepository ophthalmologistRepository,
+        IOrderRepository orderRepository,
+        IUnitOfWork unitOfWork,
         ICurrentUserService currentUser)
     {
         _appointmentRepository = appointmentRepository;
         _organisationFeedbackRepository = organisationFeedbackRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
+        _orderRepository = orderRepository;
+        _unitOfWork = unitOfWork;
         _currentUser = currentUser;
     }
 
@@ -84,6 +91,30 @@ public class GetPatientClinicAppointmentsQueryHandler
 
         var doctorMap = await _ophthalmologistRepository.GetDoctorDetailsByIdsAsync(doctorIds, cancellationToken);
 
+        // Fetch associated orders to populate OrderId/Billing info
+        var orders = await _orderRepository.GetByAppointmentIdsAsync(appointmentIds, cancellationToken);
+        var orderMap = orders.GroupBy(o => o.AppointmentId)
+            .ToDictionary(g => g.Key!.Value, g => g.OrderByDescending(o => o.CreatedAt).First());
+
+        // Proactive sync for data consistency
+        bool statusUpdated = false;
+        foreach (var appointment in appointments)
+        {
+            if (appointment.Status == AppointmentStatus.Pending && 
+                orderMap.TryGetValue(appointment.Id, out var ord) && 
+                (ord.Status == OrderStatus.Confirmed || ord.Status == OrderStatus.Completed))
+            {
+                appointment.Confirm();
+                await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
+                statusUpdated = true;
+            }
+        }
+
+        if (statusUpdated)
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
         var items = appointments
             .Where(a => a.AppointmentSlot is not null)
             .Select(a =>
@@ -104,7 +135,14 @@ public class GetPatientClinicAppointmentsQueryHandler
                     HasFeedback = feedbackAppointmentIds.Contains(a.Id),
                     OphthalId = a.AppointmentSlot.OphthalId,
                     OphthalFullName = doc.FullName ?? "Clinic Doctor",
-                    OphthalAvatarUrl = doc.AvatarUrl
+                    OphthalAvatarUrl = doc.AvatarUrl,
+                    
+                    // Billing info
+                    OrderId = orderMap.TryGetValue(a.Id, out var ord) ? ord.Id : null,
+                    OrderStatus = ord?.Status,
+                    TotalAmount = ord?.TotalAmount,
+                    DepositAmount = ord?.DepositAmount,
+                    IsPaidDeposit = ord?.Status == OrderStatus.Confirmed || ord?.Status == OrderStatus.Completed
                 };
             })
             .ToList();
@@ -118,7 +156,6 @@ public class GetPatientClinicAppointmentsQueryHandler
         {
             PatientAppointmentTab.Upcoming => new[]
             {
-                AppointmentStatus.Pending,
                 AppointmentStatus.Confirmed,
                 AppointmentStatus.CheckedIn,
                 AppointmentStatus.InProgress
