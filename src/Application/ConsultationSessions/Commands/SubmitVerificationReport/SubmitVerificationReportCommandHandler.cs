@@ -9,6 +9,7 @@ using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 
 namespace Application.ConsultationSessions.Commands.SubmitVerificationReport;
 
@@ -22,6 +23,7 @@ public class SubmitVerificationReportCommandHandler
     private readonly IRepository<Patient> _patientRepository;
     private readonly IPatientRoadmapGenerationService _roadmapGenerationService;
     private readonly INotificationService _notificationService;
+    private readonly IIdentityService _identityService;
     private readonly IPatientVisitRepository _patientVisitRepository;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -33,6 +35,7 @@ public class SubmitVerificationReportCommandHandler
         IRepository<Patient> patientRepository,
         IPatientRoadmapGenerationService roadmapGenerationService,
         INotificationService notificationService,
+        IIdentityService identityService,
         IPatientVisitRepository patientVisitRepository,
         IUnitOfWork unitOfWork)
     {
@@ -43,6 +46,7 @@ public class SubmitVerificationReportCommandHandler
         _patientRepository = patientRepository;
         _roadmapGenerationService = roadmapGenerationService;
         _notificationService = notificationService;
+        _identityService = identityService;
         _patientVisitRepository = patientVisitRepository;
         _unitOfWork = unitOfWork;
     }
@@ -77,6 +81,7 @@ public class SubmitVerificationReportCommandHandler
             ? request.DiagnosesText
             : request.ClinicalFindings;
         var isFinalized = request.Status?.Equals("Finalized", StringComparison.OrdinalIgnoreCase) == true;
+        var finalizedAtUtc = request.FinalizedAt ?? (isFinalized ? DateTime.UtcNow : null);
         var normalizedPrescriptionItems = (request.PrescriptionItems ?? Array.Empty<PrescriptionItemInput>())
             .Select(item => new
             {
@@ -116,12 +121,51 @@ public class SubmitVerificationReportCommandHandler
             })
             : null;
 
+        var doctorUser = await _identityService.GetUserByIdAsync(request.DoctorId, cancellationToken);
+        var doctorName = doctorUser?.FullName?.Trim();
+
+        var diagnosisSnapshot = new FinalizedDiagnosisSnapshot
+        {
+            DiagnosisCode = diagnosisCode?.Trim(),
+            CodingSystem = request.CodingSystem?.Trim(),
+            ClinicalFindings = clinicalFindings?.Trim(),
+            SeverityLevel = request.SeverityLevel?.Trim(),
+            PrescriptionItems = normalizedPrescriptionItems
+                .Select(item => new PrescriptionItemSnapshot
+                {
+                    MedicineName = item.MedicineName ?? string.Empty,
+                    Unit = item.Unit,
+                    Dosage = item.Dosage ?? string.Empty,
+                    Frequency = item.Frequency ?? string.Empty,
+                    Duration = item.Duration ?? string.Empty,
+                    Instruction = item.Instruction
+                })
+                .ToList(),
+            PrescriptionNote = request.PrescriptionNote?.Trim(),
+            NoMedicationPrescribed = request.NoMedicationPrescribed,
+            Recommendations = request.Recommendations?.Trim(),
+            FollowUpDate = request.FollowUpDate,
+            DiagnosedBy = new DiagnosedBySnapshot
+            {
+                DoctorId = request.DoctorId,
+                DoctorName = doctorName
+            },
+            FinalizedAt = finalizedAtUtc
+        };
+        var diagnosisSnapshotJson = JsonSerializer.Serialize(diagnosisSnapshot);
+
         var normalizedLifestyleAdvice = request.LifestyleAdvice?.Trim();
         if (!string.IsNullOrWhiteSpace(prescriptionSnapshot))
         {
             normalizedLifestyleAdvice = string.IsNullOrWhiteSpace(normalizedLifestyleAdvice)
                 ? $"PRESCRIPTION_JSON::{prescriptionSnapshot}"
                 : $"{normalizedLifestyleAdvice}\n\nPRESCRIPTION_JSON::{prescriptionSnapshot}";
+        }
+        if (isFinalized)
+        {
+            normalizedLifestyleAdvice = string.IsNullOrWhiteSpace(normalizedLifestyleAdvice)
+                ? $"DIAGNOSIS_SNAPSHOT_JSON::{diagnosisSnapshotJson}"
+                : $"{normalizedLifestyleAdvice}\n\nDIAGNOSIS_SNAPSHOT_JSON::{diagnosisSnapshotJson}";
         }
 
         var screening = await _screeningRepository.GetByIdAsync(session.AiScreeningId.Value, cancellationToken);
@@ -174,7 +218,7 @@ public class SubmitVerificationReportCommandHandler
                     request.Status,
                     request.FollowUpDate,
                     request.IsReferralNeeded,
-                    request.FinalizedAt);
+                    finalizedAtUtc);
 
             await _diagnosisRepository.AddAsync(diagnosis, cancellationToken);
 
@@ -223,7 +267,20 @@ public class SubmitVerificationReportCommandHandler
                     title: "Ready for Payment",
                     message: $"Consultation finished. Patient {patient?.FullName ?? "Unknown"} is waiting for payment.",
                     type: NotificationType.SystemAlert,
-                    payload: new { VisitId = visit.Id, PatientId = visit.PatientId },
+                    payload: new
+                    {
+                        Action = "cashier_payment_ready",
+                        VisitId = visit.Id,
+                        PatientId = visit.PatientId,
+                        ConsultationSessionId = session.Id,
+                        ScreeningId = session.AiScreeningId,
+                        DiagnosisId = diagnosis.Id,
+                        DoctorId = request.DoctorId,
+                        DoctorName = doctorName,
+                        HasPrescription = normalizedPrescriptionItems.Count > 0 && !request.NoMedicationPrescribed,
+                        NoMedicationPrescribed = request.NoMedicationPrescribed,
+                        FinalizedAt = finalizedAtUtc?.ToString("O", CultureInfo.InvariantCulture)
+                    },
                     cancellationToken: cancellationToken
                 );
             }
@@ -251,4 +308,35 @@ public class SubmitVerificationReportCommandHandler
             throw;
         }
     }
+}
+
+public sealed class FinalizedDiagnosisSnapshot
+{
+    public string? DiagnosisCode { get; init; }
+    public string? CodingSystem { get; init; }
+    public string? ClinicalFindings { get; init; }
+    public string? SeverityLevel { get; init; }
+    public IReadOnlyList<PrescriptionItemSnapshot> PrescriptionItems { get; init; } = Array.Empty<PrescriptionItemSnapshot>();
+    public string? PrescriptionNote { get; init; }
+    public bool NoMedicationPrescribed { get; init; }
+    public string? Recommendations { get; init; }
+    public DateTime? FollowUpDate { get; init; }
+    public DiagnosedBySnapshot DiagnosedBy { get; init; } = new();
+    public DateTime? FinalizedAt { get; init; }
+}
+
+public sealed class PrescriptionItemSnapshot
+{
+    public string MedicineName { get; init; } = string.Empty;
+    public string? Unit { get; init; }
+    public string Dosage { get; init; } = string.Empty;
+    public string Frequency { get; init; } = string.Empty;
+    public string Duration { get; init; } = string.Empty;
+    public string? Instruction { get; init; }
+}
+
+public sealed class DiagnosedBySnapshot
+{
+    public Guid DoctorId { get; init; }
+    public string? DoctorName { get; init; }
 }

@@ -1,5 +1,6 @@
 using Application.ClinicQueue.Commands.SendToDoctor;
 using Application.ClinicQueue.Queries.GetClinicQueue;
+using Application.ClinicQueue.Queries.GetPaymentContext;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
@@ -67,6 +68,24 @@ public class ClinicQueueController : BaseApiController
 
         var result = await _mediator.Send(command, cancellationToken);
         return HandleResult(result, "Case sent to doctor successfully");
+    }
+
+    /// <summary>
+    /// Get payment context for cashier after doctor finalization.
+    /// Includes diagnosis snapshot and prescription details.
+    /// </summary>
+    [HttpGet("{visitId:guid}/payment-context")]
+    [ProducesResponseType(typeof(ApiResponse<ClinicPaymentContextDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetPaymentContext(
+        [FromRoute] Guid visitId,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _mediator.Send(
+            new GetPaymentContextQuery { VisitId = visitId },
+            cancellationToken);
+
+        return HandleResult(result, "Payment context loaded successfully");
     }
 }
 

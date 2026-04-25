@@ -21,15 +21,19 @@ public class GetClinicQueueQueryHandler
     private readonly IPatientVisitRepository _patientVisitRepository;
     private readonly IRepository<AiScreening> _screeningRepository;
     private readonly IConsultationSessionRepository _consultationSessionRepository;
+    private readonly IIdentityService _identityService;
+
     public GetClinicQueueQueryHandler(
         IPatientVisitRepository patientVisitRepository,
         IRepository<AiScreening> screeningRepository,
-        IConsultationSessionRepository consultationSessionRepository
+        IConsultationSessionRepository consultationSessionRepository,
+        IIdentityService identityService
         )
     {
         _patientVisitRepository = patientVisitRepository;
         _screeningRepository = screeningRepository;
         _consultationSessionRepository = consultationSessionRepository;
+        _identityService = identityService;
     }
 
     public async Task<Result<IReadOnlyList<ClinicQueueItemDto>>> Handle(
@@ -76,6 +80,16 @@ public class GetClinicQueueQueryHandler
                 && !cs.IsDeleted)
             .ToListAsync(cancellationToken);
 
+        var doctorUserIds = visits
+            .Where(v => v.AssignedDoctor != null)
+            .Select(v => v.AssignedDoctor!.UserId)
+            .Distinct()
+            .ToList();
+        var doctorUsers = doctorUserIds.Count > 0
+            ? await _identityService.GetUsersByIdsAsync(doctorUserIds, cancellationToken)
+            : Array.Empty<UserDto>();
+        var doctorNameByUserId = doctorUsers.ToDictionary(u => u.Id, u => u.FullName?.Trim() ?? string.Empty);
+
         var queueItems = new List<ClinicQueueItemDto>();
 
         foreach (var visit in visits)
@@ -94,6 +108,10 @@ public class GetClinicQueueQueryHandler
             var latestResult = screening?.ScreeningResults
                 .OrderByDescending(r => r.CreatedAt)
                 .FirstOrDefault();
+            var assignedDoctorName = visit.AssignedDoctor is not null &&
+                                     doctorNameByUserId.TryGetValue(visit.AssignedDoctor.UserId, out var doctorName)
+                ? doctorName
+                : null;
 
             var item = new ClinicQueueItemDto
             {
@@ -109,7 +127,7 @@ public class GetClinicQueueQueryHandler
                 ConsultationSessionId = consultation?.Id,
                 ConsultationStatus = consultation?.Status.ToString(),
                 AssignedDoctorId = visit.AssignedDoctorId ?? consultation?.OphthalmologistId,
-                AssignedDoctorName = null, // TODO: Load doctor name from ApplicationUser via UserId
+                AssignedDoctorName = assignedDoctorName,
                 FlowState = DetermineFlowState(visit, screening, consultation)
             };
 
@@ -124,6 +142,11 @@ public class GetClinicQueueQueryHandler
         AiScreening? screening,
         ConsultationSession? consultation)
     {
+        // Doctor finalized and handed off to cashier.
+        // This is the canonical state for cashier intake.
+        if (visit.Status == PatientVisitStatus.WaitingForPayment)
+            return "Finalized";
+
         // If visit completed, flow is finalized
         if (visit.Status == PatientVisitStatus.Completed)
             return "Finalized";
