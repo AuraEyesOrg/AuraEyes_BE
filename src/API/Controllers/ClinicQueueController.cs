@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace API.Controllers;
 
 [Route("api/clinic-queue")]
-// [AuthorizePermission(Permissions.ScreeningRead)]
+[AuthorizePermission(Permissions.ScreeningRead)]
 public class ClinicQueueController : BaseApiController
 {
     private readonly IMediator _mediator;

@@ -218,6 +218,9 @@ public class ConsultationSessionsController : BaseApiController
             FollowUpDate = request.FollowUpDate,
             IsReferralNeeded = request.IsReferralNeeded,
             FinalizedAt = request.FinalizedAt,
+            PrescriptionItems = request.PrescriptionItems,
+            PrescriptionNote = request.PrescriptionNote,
+            NoMedicationPrescribed = request.NoMedicationPrescribed,
             DiagnosesCode = request.DiagnosesCode,
             DiagnosesText = request.DiagnosesText
         };
@@ -418,6 +421,9 @@ public record SubmitVerificationReportRequest
     public DateTime? FollowUpDate { get; init; }
     public bool IsReferralNeeded { get; init; }
     public DateTime? FinalizedAt { get; init; }
+    public IReadOnlyList<PrescriptionItemInput>? PrescriptionItems { get; init; }
+    public string? PrescriptionNote { get; init; }
+    public bool NoMedicationPrescribed { get; init; }
 
     // Backward-compatible aliases for older FE payloads.
     public string? DiagnosesCode { get; init; }

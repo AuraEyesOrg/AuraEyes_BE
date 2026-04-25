@@ -76,6 +76,53 @@ public class SubmitVerificationReportCommandHandler
         var clinicalFindings = string.IsNullOrWhiteSpace(request.ClinicalFindings)
             ? request.DiagnosesText
             : request.ClinicalFindings;
+        var isFinalized = request.Status?.Equals("Finalized", StringComparison.OrdinalIgnoreCase) == true;
+        var normalizedPrescriptionItems = (request.PrescriptionItems ?? Array.Empty<PrescriptionItemInput>())
+            .Select(item => new
+            {
+                MedicineName = item.MedicineName?.Trim(),
+                Unit = item.Unit?.Trim(),
+                Dosage = item.Dosage?.Trim(),
+                Frequency = item.Frequency?.Trim(),
+                Duration = item.Duration?.Trim(),
+                Instruction = item.Instruction?.Trim()
+            })
+            .Where(item =>
+                !string.IsNullOrWhiteSpace(item.MedicineName) ||
+                !string.IsNullOrWhiteSpace(item.Unit) ||
+                !string.IsNullOrWhiteSpace(item.Dosage) ||
+                !string.IsNullOrWhiteSpace(item.Frequency) ||
+                !string.IsNullOrWhiteSpace(item.Duration) ||
+                !string.IsNullOrWhiteSpace(item.Instruction))
+            .ToList();
+
+        if (isFinalized && !request.NoMedicationPrescribed && normalizedPrescriptionItems.Count == 0)
+            return Result.Failure("At least one prescription item is required to finalize this report.");
+
+        var hasInvalidPrescriptionRow = normalizedPrescriptionItems.Any(item =>
+            string.IsNullOrWhiteSpace(item.MedicineName) ||
+            string.IsNullOrWhiteSpace(item.Dosage) ||
+            string.IsNullOrWhiteSpace(item.Frequency) ||
+            string.IsNullOrWhiteSpace(item.Duration));
+        if (isFinalized && !request.NoMedicationPrescribed && hasInvalidPrescriptionRow)
+            return Result.Failure("Each prescription item must include medicine name, dosage, frequency, and duration.");
+
+        var prescriptionSnapshot = normalizedPrescriptionItems.Count > 0 || request.NoMedicationPrescribed || !string.IsNullOrWhiteSpace(request.PrescriptionNote)
+            ? JsonSerializer.Serialize(new
+            {
+                request.NoMedicationPrescribed,
+                PrescriptionNote = request.PrescriptionNote?.Trim(),
+                Items = normalizedPrescriptionItems
+            })
+            : null;
+
+        var normalizedLifestyleAdvice = request.LifestyleAdvice?.Trim();
+        if (!string.IsNullOrWhiteSpace(prescriptionSnapshot))
+        {
+            normalizedLifestyleAdvice = string.IsNullOrWhiteSpace(normalizedLifestyleAdvice)
+                ? $"PRESCRIPTION_JSON::{prescriptionSnapshot}"
+                : $"{normalizedLifestyleAdvice}\n\nPRESCRIPTION_JSON::{prescriptionSnapshot}";
+        }
 
         var screening = await _screeningRepository.GetByIdAsync(session.AiScreeningId.Value, cancellationToken);
         if (screening is null)
@@ -97,7 +144,7 @@ public class SubmitVerificationReportCommandHandler
                 ConfidenceLevel = request.ConfidenceLevel,
                 TreatmentPlan = request.TreatmentPlan,
                 Recommendations = request.Recommendations,
-                LifestyleAdvice = request.LifestyleAdvice,
+                LifestyleAdvice = normalizedLifestyleAdvice,
                 IsUrgent = request.IsUrgent,
                 Status = request.Status,
                 FollowUpDate = request.FollowUpDate,
@@ -122,7 +169,7 @@ public class SubmitVerificationReportCommandHandler
                     request.ConfidenceLevel,
                     request.TreatmentPlan,
                     request.Recommendations,
-                    request.LifestyleAdvice,
+                    normalizedLifestyleAdvice,
                     request.IsUrgent,
                     request.Status,
                     request.FollowUpDate,
@@ -159,8 +206,6 @@ public class SubmitVerificationReportCommandHandler
                     cancellationToken);
 
             var patient = await _patientRepository.GetByIdAsync(session.PatientId, cancellationToken);
-
-            var isFinalized = request.Status?.Equals("Finalized", StringComparison.OrdinalIgnoreCase) == true;
 
             if (visit != null && isFinalized)
             {
