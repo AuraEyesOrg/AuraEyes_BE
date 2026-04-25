@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Domain.Common;
 using Domain.Entities.Network.InternalChat;
 
 namespace Application.Network.InternalChat.Commands.UpdateGroupChat;

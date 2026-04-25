@@ -293,5 +293,20 @@ public class NotificationServiceTests
         public Task<(bool Succeeded, string[] Errors)> UpdateUserEmailAsync(Guid userId, string email, CancellationToken cancellationToken = default) => Task.FromResult((true, Array.Empty<string>()));
         public Task<IList<string>> GetUserPermissionsAsync(Guid userId) => Task.FromResult<IList<string>>(new List<string>());
         public Task SynchronizeRolesWithDefaultsAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<IReadOnlyList<UserDto>> GetUsersByIdsAsync(IEnumerable<Guid> userIds, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<(bool Succeeded, string[] Errors)> UpdateUserProfileAsync(Guid userId, string fullName, string? phone, DateTime? dateOfBirth, int? gender, string? address, string? citizenId, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<(bool Succeeded, string[] Errors)> SetStaffOnboardingStatusAsync(Guid userId)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
