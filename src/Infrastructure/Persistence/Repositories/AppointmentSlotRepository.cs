@@ -191,6 +191,21 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<AppointmentSlot>> GetUnbookedSlotsByDoctorAsync(
+        Guid doctorId,
+        DateOnly fromDate,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Where(s => s.OphthalId == doctorId)
+            .Where(s => s.Date >= fromDate)
+            .Where(s => s.Status == ScheduleStatus.Available)
+            .Where(s => s.BookedCount == 0)
+            .OrderBy(s => s.Date)
+            .ThenBy(s => s.StartTime)
+            .ToListAsync(cancellationToken);
+    }
+
     private static DateTime GetVietnamNow()
     {
         var utcNow = DateTime.UtcNow;

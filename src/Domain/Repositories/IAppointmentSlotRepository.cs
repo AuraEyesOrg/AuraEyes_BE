@@ -59,4 +59,9 @@ public interface IAppointmentSlotRepository : IRepository<AppointmentSlot>
         DateOnly fromDate,
         DateOnly toDate,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AppointmentSlot>> GetUnbookedSlotsByDoctorAsync(
+        Guid doctorId,
+        DateOnly fromDate,
+        CancellationToken cancellationToken = default);
 }
