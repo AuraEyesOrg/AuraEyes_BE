@@ -6,6 +6,8 @@ using Domain.Entities.Financial;
 using Domain.Repositories;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
+using Domain.Entities.Users;
 
 namespace Application.Financial.Commands.CompleteOrderPayment;
 
@@ -24,6 +26,8 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
     private readonly IPaymentRepository _paymentRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPayOSService _payOSService;
+    private readonly IPatientVisitRepository _patientVisitRepository;
+    private readonly IRepository<Patient> _patientRepository;
     private readonly ILogger<CompleteOrderPaymentCommandHandler> _logger;
 
     public CompleteOrderPaymentCommandHandler(
@@ -31,12 +35,16 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
         IPaymentRepository paymentRepository,
         IUnitOfWork unitOfWork,
         IPayOSService payOSService,
+        IPatientVisitRepository patientVisitRepository,
+        IRepository<Patient> patientRepository,
         ILogger<CompleteOrderPaymentCommandHandler> logger)
     {
         _orderRepository = orderRepository;
         _paymentRepository = paymentRepository;
         _unitOfWork = unitOfWork;
         _payOSService = payOSService;
+        _patientVisitRepository = patientVisitRepository;
+        _patientRepository = patientRepository;
         _logger = logger;
     }
 
@@ -58,6 +66,9 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
         if (remainingAmount <= 0)
         {
             order.Complete();
+
+            await CompleteVisitIfAny(order, cancellationToken);
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             return Result<CompleteOrderPaymentResponse>.Success(new CompleteOrderPaymentResponse(order.Id, Guid.Empty, PaymentStatus.Completed));
         }
@@ -74,6 +85,9 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
         {
             payment.Complete("CASH_PAYMENT", "Paid at counter");
             order.Complete();
+
+            await CompleteVisitIfAny(order, cancellationToken);
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             
             return Result<CompleteOrderPaymentResponse>.Success(new CompleteOrderPaymentResponse(
@@ -115,6 +129,39 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
         else
         {
             return Result<CompleteOrderPaymentResponse>.Failure($"Payment method {request.Method} is not supported via staff dashboard.");
+        }
+    }
+
+    private async Task CompleteVisitIfAny(Order order, CancellationToken cancellationToken)
+    {
+        var patient = await _patientRepository.Query()
+            .FirstOrDefaultAsync(p => p.UserId == order.UserId, cancellationToken);
+
+        if (patient != null)
+        {
+            // First try by appointment ID if the order is linked to one
+            Domain.Entities.Scheduling.PatientVisit? visit = null;
+
+            if (order.AppointmentId.HasValue)
+            {
+                visit = await _patientVisitRepository.GetByAppointmentIdAsync(order.AppointmentId.Value, cancellationToken);
+            }
+
+            // Fallback to finding any active visit waiting for payment for this patient
+            if (visit == null)
+            {
+                visit = await _patientVisitRepository.Query()
+                    .FirstOrDefaultAsync(v => 
+                        v.PatientId == patient.Id && 
+                        v.Status == PatientVisitStatus.WaitingForPayment, 
+                        cancellationToken);
+            }
+
+            if (visit != null && visit.Status == PatientVisitStatus.WaitingForPayment)
+            {
+                visit.Complete();
+                await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
+            }
         }
     }
 }
