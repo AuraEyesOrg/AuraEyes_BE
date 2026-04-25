@@ -59,6 +59,7 @@ public class GetPatientClinicAppointmentsQueryHandler
             statuses,
             pageNumber,
             pageSize,
+            request.Tab == PatientAppointmentTab.Upcoming,
             cancellationToken);
 
         var appointmentIds = appointments

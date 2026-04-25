@@ -39,26 +39,16 @@ public static class DatabaseSeeder
             logger?.LogInformation("No pending migrations. Database schema is up to date.");
         }
 
-        // Check if any roles exist - only seed if database is completely empty
-        var hasRoles = await roleManager.Roles.AnyAsync();
+        logger?.LogInformation("Ensuring initial data exists...");
 
-        if (!hasRoles)
-        {
-            logger?.LogInformation("No roles found in database. Starting initial seed...");
+        // Step 1: Seed roles first (idempotent)
+        await SeedRolesAsync(roleManager, logger);
 
-            // Step 1: Seed roles first
-            await SeedRolesAsync(roleManager, logger);
+        // Step 2: Seed default accounts (AspNetUsers + AspNetUserRoles) (idempotent)
+        await SeedDefaultAccountsAsync(userManager, configuration, logger);
 
-            // Step 2: Seed default accounts (AspNetUsers + AspNetUserRoles)
-            await SeedDefaultAccountsAsync(userManager, configuration, logger);
-
-            // Step 3: Seed domain entities (Organisation, Ophthalmologist, Patient)
-            await SeedDomainEntitiesAsync(context, userManager, logger);
-        }
-        else
-        {
-            logger?.LogInformation("Roles already exist. Skipping initial account seed.");
-        }
+        // Step 3: Seed domain entities (Organisation, Ophthalmologist, Patient) (idempotent)
+        await SeedDomainEntitiesAsync(context, userManager, logger);
 
         // Step 4: Ensure System Admin wallet exists with OwnerType = "System"
         await EnsureSystemAdminWalletAsync(context, userManager, logger);
@@ -71,10 +61,15 @@ public static class DatabaseSeeder
 
     private static async Task SeedRolesAsync(RoleManager<ApplicationRole> roleManager, ILogger? logger)
     {
-        logger?.LogInformation("Seeding Identity roles into AspNetRoles table...");
+        logger?.LogInformation("Ensuring Identity roles exist in AspNetRoles table...");
 
         foreach (var roleName in Roles.All)
         {
+            if (await roleManager.RoleExistsAsync(roleName))
+            {
+                continue;
+            }
+
             var role = new ApplicationRole(roleName)
             {
                 Description = GetRoleDescription(roleName)
@@ -93,7 +88,7 @@ public static class DatabaseSeeder
             }
         }
 
-        logger?.LogInformation("Role seeding completed. Total roles created: {Count}", Roles.All.Length);
+        logger?.LogInformation("Role verification completed.");
     }
 
     private static string GetRoleDescription(string roleName)
@@ -143,6 +138,22 @@ public static class DatabaseSeeder
 
         foreach (var (email, password, role, fullName) in defaultAccounts)
         {
+            var existingUser = await userManager.FindByEmailAsync(email);
+            if (existingUser != null)
+            {
+                // Ensure user is in the required role even if account already exists
+                if (!await userManager.IsInRoleAsync(existingUser, role))
+                {
+                    var roleResult = await userManager.AddToRoleAsync(existingUser, role);
+                    if (roleResult.Succeeded)
+                        logger?.LogInformation("✓ Assigned missing role {Role} to existing user {Email} → AspNetUserRoles", role, email);
+                    else
+                        logger?.LogError("✗ Failed to assign missing role {Role} to existing user {Email}: {Errors}",
+                            role, email, string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+                }
+                continue;
+            }
+
             var user = new ApplicationUser
             {
                 UserName = email,

@@ -42,6 +42,7 @@ public interface IAppointmentRepository : IRepository<Appointment>
         IReadOnlyCollection<AppointmentStatus>? statuses = null,
         int pageNumber = 1,
         int pageSize = 10,
+        bool upcomingOnly = false,
         CancellationToken cancellationToken = default);
 
     Task<Dictionary<AppointmentStatus, int>> GetPatientStatusCountsAsync(
