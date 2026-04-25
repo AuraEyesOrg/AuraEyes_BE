@@ -1,5 +1,6 @@
 using Domain.Common;
 using Domain.Entities.Authorization;
+using Domain.Entities.CarePlan;
 using Domain.Entities.Consultation;
 using Domain.Entities.Contracts;
 using Domain.Entities.Financial;
@@ -111,6 +112,10 @@ public class ApplicationDbContext : IdentityDbContext<
 
     // Medical Records
     public DbSet<MedicalRecord> MedicalRecords => Set<MedicalRecord>();
+
+    // Care Plan (Healthcare Roadmap)
+    public DbSet<HealthRoadmap> HealthRoadmaps => Set<HealthRoadmap>();
+    public DbSet<HealthRoadmapStep> HealthRoadmapSteps => Set<HealthRoadmapStep>();
 
     #endregion
 
