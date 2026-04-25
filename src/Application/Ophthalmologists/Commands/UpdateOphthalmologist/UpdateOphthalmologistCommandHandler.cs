@@ -15,17 +15,20 @@ public class UpdateOphthalmologistCommandHandler : ICommandHandler<UpdateOphthal
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IIdentityService _identityService;
     private readonly ISender _sender;
+    private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public UpdateOphthalmologistCommandHandler(
         IOphthalmologistRepository ophthalmologistRepository,
         IIdentityService identityService,
         ISender sender,
+        IAppointmentSlotRepository appointmentSlotRepository,
         IUnitOfWork unitOfWork)
     {
         _ophthalmologistRepository = ophthalmologistRepository;
         _identityService = identityService;
         _sender = sender;
+        _appointmentSlotRepository = appointmentSlotRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -53,9 +56,22 @@ public class UpdateOphthalmologistCommandHandler : ICommandHandler<UpdateOphthal
                 targetWorkingHours,
                 targetExpectedSalary);
 
-            if (request.ConsultationFee.HasValue)
+            if (request.ConsultationFee.HasValue && request.ConsultationFee.Value != ophthalmologist.ConsultationFee)
             {
                 ophthalmologist.UpdateConsultationFee(request.ConsultationFee.Value);
+
+                // Propagate fee change to all future unbooked slots for this doctor
+                var today = DateOnly.FromDateTime(DateTime.UtcNow); // Use UTC/Vietnam logic as needed
+                var unbookedSlots = await _appointmentSlotRepository.GetUnbookedSlotsByDoctorAsync(
+                    ophthalmologist.Id, 
+                    today, 
+                    cancellationToken);
+
+                foreach (var slot in unbookedSlots)
+                {
+                    slot.UpdateCost(request.ConsultationFee.Value);
+                    await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
+                }
             }
 
             if (request.UserId.HasValue)
