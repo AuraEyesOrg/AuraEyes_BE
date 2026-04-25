@@ -62,7 +62,9 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
         Guid patientId,
         Guid aiScreeningId,
         decimal price,
-        Guid? ophthalmologistId = null)
+        Guid? ophthalmologistId = null,
+        bool shareRetinalImages = false,
+        bool shareAiResults = false)
     {
         return new ConsultationSession
         {
@@ -73,6 +75,8 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
             Status = SessionStatus.Pending,
             ChatStatus = ChatStatus.Locked,
             Price = price,
+            IsRetinalImagesShared = shareRetinalImages,
+            IsAIResultShared = shareAiResults,
             LastActivityAt = DateTime.UtcNow
         };
     }
@@ -153,6 +157,16 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     public void AssignDoctor(Guid ophthalmologistId)
     {
         OphthalmologistId = ophthalmologistId;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void ShareScreeningDataWithDoctor()
+    {
+        if (!AiScreeningId.HasValue)
+            throw new InvalidOperationException("Cannot share screening data without a linked AI screening.");
+
+        IsRetinalImagesShared = true;
+        IsAIResultShared = true;
         UpdatedAt = DateTime.UtcNow;
     }
 
