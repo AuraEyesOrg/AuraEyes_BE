@@ -2,8 +2,8 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Patients.Queries.GetDashboardMetrics;
-using Application.Scheduling.Appointments.Common;
 using Application.Scheduling.Appointments.Queries.GetPatientClinicAppointments;
+using Application.MedicalRecords.Common;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -46,6 +46,15 @@ public class PatientsController : BaseApiController
     {
         var result = await _mediator.Send(
             new GetPatientClinicAppointmentsQuery(patientId, tab, pageNumber, pageSize));
+        return HandleResult(result);
+    }
+
+    [HttpGet("{patientId:guid}/medical-records")]
+    // [AuthorizePermission(Permissions.MedicalRecordsRead)]
+    [ProducesResponseType(typeof(ApiResponse<List<MedicalRecordDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPatientMedicalRecords(Guid patientId)
+    {
+        var result = await _mediator.Send(new Application.MedicalRecords.Queries.GetPatientMedicalRecords.GetPatientMedicalRecordsQuery(patientId));
         return HandleResult(result);
     }
 }

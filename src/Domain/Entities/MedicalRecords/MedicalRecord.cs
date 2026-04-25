@@ -7,7 +7,9 @@ public class MedicalRecord : BaseEntity, IAggregateRoot
 {
     public Guid PatientId { get; private set; }
     public Guid? ConsultationSessionId { get; private set; }
+    public Guid? PatientVisitId { get; private set; }
     public string MedicalRecordNumber { get; private set; } // Mã YT
+    public string? PdfUrl { get; private set; }
     public MedicalRecordStatus Status { get; private set; }
     
     // Administrative Data (Section I & II) - Stored as JSON for flexibility or flat fields
@@ -26,28 +28,50 @@ public class MedicalRecord : BaseEntity, IAggregateRoot
     {
         PatientId = patientId;
         MedicalRecordNumber = medicalRecordNumber;
-        Status = MedicalRecordStatus.Filling;
+        Status = MedicalRecordStatus.Draft;
+    }
+
+    private void EnsureNotLocked()
+    {
+        if (Status == MedicalRecordStatus.Locked)
+        {
+            throw new InvalidOperationException("Cannot modify a locked medical record.");
+        }
     }
 
     public void UpdateAdministrativeInfo(string jsonData)
     {
+        EnsureNotLocked();
         AdministrativeDataJson = jsonData;
     }
 
     public void UpdateClinicalInfo(string jsonData, string finalDiagnosis, string treatmentPlan)
     {
+        EnsureNotLocked();
         ClinicalDataJson = jsonData;
         FinalDiagnosis = finalDiagnosis;
         TreatmentPlan = treatmentPlan;
+        Status = MedicalRecordStatus.ClinicalFilled;
     }
 
     public void FinalizeRecord()
     {
-        Status = MedicalRecordStatus.Finalized;
+        EnsureNotLocked();
+        Status = MedicalRecordStatus.Locked;
     }
 
     public void LinkToConsultation(Guid sessionId)
     {
         ConsultationSessionId = sessionId;
+    }
+
+    public void LinkToPatientVisit(Guid visitId)
+    {
+        PatientVisitId = visitId;
+    }
+
+    public void UpdatePdfUrl(string url)
+    {
+        PdfUrl = url;
     }
 }
