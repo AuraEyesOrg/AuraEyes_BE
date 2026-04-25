@@ -66,6 +66,7 @@ public record ConsultationSessionListDto
     public string? MeetingLink { get; init; }
     public DateTime LastActivityAt { get; init; }
     public DateTime CreatedAt { get; init; }
+    public DateTime? ClosedAt { get; init; }
 
     // Consent flags
     public bool IsRetinalImagesShared { get; init; }
