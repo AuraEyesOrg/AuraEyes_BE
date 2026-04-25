@@ -952,6 +952,21 @@ public class IdentityService : IIdentityService
         return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
     }
 
+    public async Task<(bool Succeeded, string[] Errors)> ClearMustUpdateProfileFlagAsync(Guid userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null)
+        {
+            return (false, new[] { "User not found" });
+        }
+
+        user.MustUpdateProfile = false;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var result = await _userManager.UpdateAsync(user);
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
     public async Task SynchronizeRolesWithDefaultsAsync(CancellationToken cancellationToken = default)
     {
         // 1. Get current defined permissions from code

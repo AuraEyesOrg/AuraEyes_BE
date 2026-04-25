@@ -15,6 +15,8 @@ public class InternalGroupMessageDto
     public AuthorType SenderType { get; set; }
     public string Content { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
+    public string? SenderName { get; set; }
+    public string? SenderAvatar { get; set; }
 }
 
 public class GetInternalGroupMessagesQuery : IQuery<List<InternalGroupMessageDto>>
@@ -24,18 +26,21 @@ public class GetInternalGroupMessagesQuery : IQuery<List<InternalGroupMessageDto
 
 public class GetInternalGroupMessagesQueryHandler : IQueryHandler<GetInternalGroupMessagesQuery, List<InternalGroupMessageDto>>
 {
-    private readonly IRepository<InternalGroupMessage> _messageRepository;
     private readonly IRepository<InternalGroupChat> _groupChatRepository;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IIdentityService _identityService;
+    private readonly IRepository<InternalGroupMessage> _messageRepository;
 
     public GetInternalGroupMessagesQueryHandler(
         IRepository<InternalGroupMessage> messageRepository,
         IRepository<InternalGroupChat> groupChatRepository,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IIdentityService identityService)
     {
         _messageRepository = messageRepository;
         _groupChatRepository = groupChatRepository;
         _currentUserService = currentUserService;
+        _identityService = identityService;
     }
 
     public async Task<Result<List<InternalGroupMessageDto>>> Handle(GetInternalGroupMessagesQuery request, CancellationToken cancellationToken)
@@ -66,6 +71,19 @@ public class GetInternalGroupMessagesQueryHandler : IQueryHandler<GetInternalGro
                 CreatedAt = m.CreatedAt
             })
             .ToListAsync(cancellationToken);
+
+        var senderIds = messages.Select(m => m.SenderId).Distinct();
+        var users = await _identityService.GetUsersByIdsAsync(senderIds, cancellationToken);
+        var userDict = users.ToDictionary(u => u.Id);
+
+        foreach (var message in messages)
+        {
+            if (userDict.TryGetValue(message.SenderId, out var user))
+            {
+                message.SenderName = user.FullName;
+                message.SenderAvatar = user.AvatarUrl;
+            }
+        }
 
         return Result<List<InternalGroupMessageDto>>.Success(messages);
     }

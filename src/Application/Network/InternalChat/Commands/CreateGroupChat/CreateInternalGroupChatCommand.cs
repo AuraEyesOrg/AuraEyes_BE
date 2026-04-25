@@ -18,13 +18,18 @@ public class CreateInternalGroupChatCommandHandler : ICommandHandler<CreateInter
 {
     private readonly IRepository<InternalGroupChat> _groupChatRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IInternalChatHubService _chatHubService;
     private readonly ICurrentUserService _currentUserService;
-
-    public CreateInternalGroupChatCommandHandler(IRepository<InternalGroupChat> groupChatRepository, IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
+    public CreateInternalGroupChatCommandHandler(
+        IRepository<InternalGroupChat> groupChatRepository, 
+        IUnitOfWork unitOfWork, 
+        ICurrentUserService currentUserService,
+        IInternalChatHubService chatHubService)
     {
         _groupChatRepository = groupChatRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
+        _chatHubService = chatHubService;
     }
 
     public async Task<Result<Guid>> Handle(CreateInternalGroupChatCommand request, CancellationToken cancellationToken)
@@ -55,6 +60,8 @@ public class CreateInternalGroupChatCommandHandler : ICommandHandler<CreateInter
 
         await _groupChatRepository.AddAsync(group, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        await _chatHubService.BroadcastGroupUpdateAsync(group.Id, "GroupCreated", cancellationToken);
 
         return Result<Guid>.Success(group.Id);
     }

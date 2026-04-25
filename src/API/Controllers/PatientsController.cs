@@ -8,6 +8,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Infrastructure.Identity.Authorization;
+using Application.Scheduling.Appointments.Common;
 
 namespace API.Controllers;
 
@@ -55,6 +56,14 @@ public class PatientsController : BaseApiController
     public async Task<IActionResult> GetPatientMedicalRecords(Guid patientId)
     {
         var result = await _mediator.Send(new Application.MedicalRecords.Queries.GetPatientMedicalRecords.GetPatientMedicalRecordsQuery(patientId));
+        return HandleResult(result);
+    }
+
+    [HttpGet("medical-history/{mrn}")]
+    [ProducesResponseType(typeof(ApiResponse<Application.Patients.Queries.GetMedicalRecords.PatientMedicalHistoryDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPatientMedicalHistoryByMrn(string mrn)
+    {
+        var result = await _mediator.Send(new Application.Patients.Queries.GetMedicalRecords.GetPatientMedicalRecordsQuery { Mrn = mrn });
         return HandleResult(result);
     }
 }

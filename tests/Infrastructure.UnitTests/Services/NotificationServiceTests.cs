@@ -308,5 +308,10 @@ public class NotificationServiceTests
         {
             throw new NotImplementedException();
         }
+
+        public Task<(bool Succeeded, string[] Errors)> ClearMustUpdateProfileFlagAsync(Guid userId)
+        {
+            return Task.FromResult((true, Array.Empty<string>()));
+        }
     }
 }

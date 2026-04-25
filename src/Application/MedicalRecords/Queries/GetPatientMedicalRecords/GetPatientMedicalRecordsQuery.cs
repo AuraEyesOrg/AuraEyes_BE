@@ -1,8 +1,10 @@
 using Application.Common.Models;
 using Application.MedicalRecords.Common;
+using Domain.Entities.MedicalRecords;
 using Domain.Repositories;
 using MediatR;
 using AutoMapper;
+using Domain.Common;
 
 namespace Application.MedicalRecords.Queries.GetPatientMedicalRecords;
 
@@ -28,7 +30,7 @@ public class GetPatientMedicalRecordsQueryHandler : IRequestHandler<GetPatientMe
         // I saw IMedicalRecordRepository has GetByPatientIdAsync which returns a single record.
         // In this integrated flow, a patient might have multiple records over time.
         
-        var records = await _medicalRecordRepository.ListAsync(cancellationToken);
+        var records = await _medicalRecordRepository.GetAllAsync(cancellationToken);
         var patientRecords = records.Where(x => x.PatientId == request.PatientId && !x.IsDeleted)
                                     .OrderByDescending(x => x.CreatedAt)
                                     .ToList();

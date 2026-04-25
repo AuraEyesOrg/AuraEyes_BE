@@ -17,4 +17,12 @@ public class MedicalRecordDto
     public string FinalDiagnosis { get; set; } = string.Empty;
     public string TreatmentPlan { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
+    public PatientDto? Patient { get; set; }
 }
+
+public class PatientDto
+{
+    public string FullName { get; set; } = string.Empty;
+    public string Phone { get; set; } = string.Empty;
+}
+

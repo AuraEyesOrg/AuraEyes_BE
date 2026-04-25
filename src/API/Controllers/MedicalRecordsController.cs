@@ -3,9 +3,12 @@ using Application.Common.Models;
 using Application.MedicalRecords.Commands.CreateMedicalRecord;
 using Application.MedicalRecords.Commands.FinalizeMedicalRecord;
 using Application.MedicalRecords.Commands.UpdateMedicalRecordClinical;
+using Application.MedicalRecords.Commands.StartDoctorFilling;
+using Application.MedicalRecords.Commands.UpdateMedicalRecordAdministrative;
 using Application.MedicalRecords.Common;
 using Application.MedicalRecords.Queries.GetMedicalRecordById;
 using Application.MedicalRecords.Queries.GetMedicalRecords;
+using Domain.Entities.MedicalRecords;
 using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -14,7 +17,7 @@ namespace API.Controllers;
 
 /// <summary>
 /// EMR 23/BV-01 Medical Records management.
-/// Lifecycle: Draft (Reception) -> ClinicalFilled (Doctor) -> Locked (Cashier/Finalize).
+/// Lifecycle: Draft (Reception) -> ClinicFilling (Staff) -> DoctorFilling (Doctor) -> Completed -> Locked.
 /// </summary>
 public class MedicalRecordsController : BaseApiController
 {
@@ -36,6 +39,36 @@ public class MedicalRecordsController : BaseApiController
     {
         var result = await _mediator.Send(command);
         return HandleResult(result, "Medical record initialized successfully.");
+    }
+
+    /// <summary>
+    /// Update administrative data (Section I & II).
+    /// Called by Clinic Staff.
+    /// </summary>
+    [HttpPut("{id:guid}/administrative")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateAdministrative(Guid id, [FromBody] UpdateMedicalRecordAdministrativeRequest request)
+    {
+        var command = new UpdateMedicalRecordAdministrativeCommand
+        {
+            Id = id,
+            AdministrativeDataJson = request.AdministrativeDataJson
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result, "Administrative information updated.");
+    }
+
+    /// <summary>
+    /// Step 1.5: Transition record to DoctorFilling status.
+    /// Called when an ophthalmologist begins working on a record.
+    /// </summary>
+    [HttpPost("{id:guid}/start-consultation")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> StartDoctorFilling(Guid id)
+    {
+        var result = await _mediator.Send(new StartDoctorFillingCommand(id));
+        return HandleResult(result, "Medical record status updated to Doctor Filling.");
     }
 
     /// <summary>
@@ -114,6 +147,11 @@ public class MedicalRecordsController : BaseApiController
 }
 
 #region Request Models
+public record UpdateMedicalRecordAdministrativeRequest
+{
+    public string AdministrativeDataJson { get; init; } = string.Empty;
+}
+
 public record UpdateMedicalRecordClinicalRequest
 {
     public string ClinicalDataJson { get; init; } = string.Empty;

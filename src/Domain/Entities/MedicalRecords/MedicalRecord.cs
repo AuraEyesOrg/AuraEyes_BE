@@ -11,6 +11,9 @@ public class MedicalRecord : BaseEntity, IAggregateRoot
     public string MedicalRecordNumber { get; private set; } // Mã YT
     public string? PdfUrl { get; private set; }
     public MedicalRecordStatus Status { get; private set; }
+
+    // Navigation properties
+    public virtual Domain.Entities.Users.Patient Patient { get; private set; }
     
     // Administrative Data (Section I & II) - Stored as JSON for flexibility or flat fields
     public string AdministrativeDataJson { get; private set; }
@@ -43,6 +46,10 @@ public class MedicalRecord : BaseEntity, IAggregateRoot
     {
         EnsureNotLocked();
         AdministrativeDataJson = jsonData;
+        if (Status == MedicalRecordStatus.Draft)
+        {
+            Status = MedicalRecordStatus.ClinicFilling;
+        }
     }
 
     public void UpdateClinicalInfo(string jsonData, string finalDiagnosis, string treatmentPlan)
@@ -51,7 +58,16 @@ public class MedicalRecord : BaseEntity, IAggregateRoot
         ClinicalDataJson = jsonData;
         FinalDiagnosis = finalDiagnosis;
         TreatmentPlan = treatmentPlan;
-        Status = MedicalRecordStatus.ClinicalFilled;
+        Status = MedicalRecordStatus.Completed;
+    }
+
+    public void StartDoctorFilling()
+    {
+        EnsureNotLocked();
+        if (Status == MedicalRecordStatus.Draft || Status == MedicalRecordStatus.ClinicFilling)
+        {
+            Status = MedicalRecordStatus.DoctorFilling;
+        }
     }
 
     public void FinalizeRecord()

@@ -8,10 +8,14 @@ namespace Application.MedicalRecords.Commands.CreateMedicalRecord;
 public class CreateMedicalRecordCommandHandler : IRequestHandler<CreateMedicalRecordCommand, Result<Guid>>
 {
     private readonly IMedicalRecordRepository _medicalRecordRepository;
+    private readonly Domain.Common.IRepository<Domain.Entities.Users.Patient> _patientRepository;
 
-    public CreateMedicalRecordCommandHandler(IMedicalRecordRepository medicalRecordRepository)
+    public CreateMedicalRecordCommandHandler(
+        IMedicalRecordRepository medicalRecordRepository,
+        Domain.Common.IRepository<Domain.Entities.Users.Patient> patientRepository)
     {
         _medicalRecordRepository = medicalRecordRepository;
+        _patientRepository = patientRepository;
     }
 
     public async Task<Result<Guid>> Handle(CreateMedicalRecordCommand request, CancellationToken cancellationToken)
@@ -29,6 +33,14 @@ public class CreateMedicalRecordCommandHandler : IRequestHandler<CreateMedicalRe
         }
 
         await _medicalRecordRepository.AddAsync(record, cancellationToken);
+        
+        // Sync MRN to Patient level if not set
+        var patient = await _patientRepository.GetByIdAsync(request.PatientId, cancellationToken);
+        if (patient != null && string.IsNullOrEmpty(patient.MedicalRecordNumber))
+        {
+            patient.SetMedicalRecordNumber(request.MedicalRecordNumber);
+            await _patientRepository.UpdateAsync(patient, cancellationToken);
+        }
         
         return Result<Guid>.Success(record.Id);
     }

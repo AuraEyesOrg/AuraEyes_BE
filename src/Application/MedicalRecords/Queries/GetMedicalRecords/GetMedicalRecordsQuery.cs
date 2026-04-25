@@ -1,7 +1,11 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.MedicalRecords.Common;
+using AutoMapper;
+using Domain.Entities.MedicalRecords;
 using Domain.Enums;
+using Domain.Common;
+using Domain.Entities.Users;
 using Domain.Repositories;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -54,11 +58,12 @@ public class GetMedicalRecordsQueryHandler : IQueryHandler<GetMedicalRecordsQuer
         {
             query = query.Where(x => 
                 x.MedicalRecordNumber.Contains(request.SearchTerm) || 
-                x.Patient.FullName.Contains(request.SearchTerm));
+                (x.Patient != null && x.Patient.FullName.Contains(request.SearchTerm)));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
         var items = await query
+            .Include(x => x.Patient)
             .OrderByDescending(x => x.CreatedAt)
             .Skip((request.PageNumber - 1) * request.PageSize)
             .Take(request.PageSize)

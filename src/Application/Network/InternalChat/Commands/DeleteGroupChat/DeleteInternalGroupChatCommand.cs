@@ -13,12 +13,17 @@ public class DeleteInternalGroupChatCommand : ICommand
 public class DeleteInternalGroupChatCommandHandler : ICommandHandler<DeleteInternalGroupChatCommand>
 {
     private readonly IRepository<InternalGroupChat> _groupChatRepository;
+    private readonly IInternalChatHubService _chatHubService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public DeleteInternalGroupChatCommandHandler(IRepository<InternalGroupChat> groupChatRepository, IUnitOfWork unitOfWork)
+    public DeleteInternalGroupChatCommandHandler(
+        IRepository<InternalGroupChat> groupChatRepository, 
+        IUnitOfWork unitOfWork,
+        IInternalChatHubService chatHubService)
     {
         _groupChatRepository = groupChatRepository;
         _unitOfWork = unitOfWork;
+        _chatHubService = chatHubService;
     }
 
     public async Task<Result> Handle(DeleteInternalGroupChatCommand request, CancellationToken cancellationToken)
@@ -29,6 +34,8 @@ public class DeleteInternalGroupChatCommandHandler : ICommandHandler<DeleteInter
 
         await _groupChatRepository.DeleteAsync(group, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        await _chatHubService.BroadcastGroupUpdateAsync(group.Id, "GroupDeleted", cancellationToken);
 
         return Result.Success();
     }

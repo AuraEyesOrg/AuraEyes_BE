@@ -1,4 +1,5 @@
 using Application.Common.Models;
+using Domain.Common;
 using Domain.Repositories;
 using MediatR;
 

@@ -1,6 +1,10 @@
+using Application.Common.Interfaces;
 using Application.Common.Models;
+using Domain.Common;
+using Domain.Enums;
 using Domain.Repositories;
 using MediatR;
+using Microsoft.Extensions.Logging;
 
 namespace Application.MedicalRecords.Commands.FinalizeMedicalRecord;
 
@@ -13,7 +17,9 @@ public class FinalizeMedicalRecordCommandHandler : IRequestHandler<FinalizeMedic
     private readonly IFileStorageService _fileStorageService;
     private readonly IEmailService _emailService;
     private readonly INotificationService _notificationService;
+    private readonly IIdentityService _identityService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<FinalizeMedicalRecordCommandHandler> _logger;
 
     public FinalizeMedicalRecordCommandHandler(
         IMedicalRecordRepository medicalRecordRepository,
@@ -23,7 +29,9 @@ public class FinalizeMedicalRecordCommandHandler : IRequestHandler<FinalizeMedic
         IFileStorageService fileStorageService,
         IEmailService emailService,
         INotificationService notificationService,
-        IUnitOfWork unitOfWork)
+        IIdentityService identityService,
+        IUnitOfWork unitOfWork,
+        ILogger<FinalizeMedicalRecordCommandHandler> logger)
     {
         _medicalRecordRepository = medicalRecordRepository;
         _patientVisitRepository = patientVisitRepository;
@@ -32,7 +40,9 @@ public class FinalizeMedicalRecordCommandHandler : IRequestHandler<FinalizeMedic
         _fileStorageService = fileStorageService;
         _emailService = emailService;
         _notificationService = notificationService;
+        _identityService = identityService;
         _unitOfWork = unitOfWork;
+        _logger = logger;
     }
 
     public async Task<Result> Handle(FinalizeMedicalRecordCommand request, CancellationToken cancellationToken)
@@ -48,15 +58,46 @@ public class FinalizeMedicalRecordCommandHandler : IRequestHandler<FinalizeMedic
         {
             record.FinalizeRecord();
 
-            // 1. Generate PDF
+            // 1. Fetch Patient and Identity Data
             var patient = await _patientRepository.GetByIdAsync(record.PatientId, cancellationToken);
-            var pdfModel = new Application.Common.Interfaces.MedicalRecordPdfModel
+            if (patient == null)
+            {
+                return Result.NotFound("Patient profile not found.");
+            }
+
+            string? email = null;
+            string? gender = null;
+
+            if (patient.UserId.HasValue)
+            {
+                var userDetails = await _identityService.GetUserDetailsAsync(patient.UserId.Value, cancellationToken);
+                if (userDetails != null)
+                {
+                    email = userDetails.Email;
+                    gender = userDetails.Gender?.ToString();
+                }
+            }
+            else
+            {
+                // Walk-in patient logic
+                gender = patient.GenderId switch
+                {
+                    1 => "Male",
+                    2 => "Female",
+                    _ => "Other"
+                };
+                // Note: Walk-in patients might not have an email stored in the system yet.
+                // If PhoneNumber is used as identifier, we might skip email.
+            }
+
+            // 2. Generate PDF
+            var pdfModel = new MedicalRecordPdfModel
             {
                 MedicalRecordNumber = record.MedicalRecordNumber,
-                PatientName = patient?.FullName ?? "Unknown",
-                DateOfBirth = patient?.DateOfBirth?.ToString("dd/MM/yyyy"),
-                Gender = patient?.Gender.ToString(),
-                Address = patient?.Address,
+                PatientName = patient.FullName ?? "Unknown",
+                DateOfBirth = patient.DateOfBirth?.ToString("dd/MM/yyyy"),
+                Gender = gender,
+                Address = patient.Address,
                 CreatedAt = record.CreatedAt,
                 FinalDiagnosis = record.FinalDiagnosis,
                 TreatmentPlan = record.TreatmentPlan,
@@ -66,7 +107,7 @@ public class FinalizeMedicalRecordCommandHandler : IRequestHandler<FinalizeMedic
 
             var pdfBytes = _pdfService.GenerateMedicalRecordPdf(pdfModel);
 
-            // 2. Upload to Storage
+            // 3. Upload to Storage
             using var stream = new MemoryStream(pdfBytes);
             var fileName = $"EMR_{record.MedicalRecordNumber}.pdf";
             var relativePath = await _fileStorageService.SaveFileAsync(stream, fileName, $"medical-records/{record.PatientId}", cancellationToken);
@@ -74,7 +115,7 @@ public class FinalizeMedicalRecordCommandHandler : IRequestHandler<FinalizeMedic
 
             await _medicalRecordRepository.UpdateAsync(record, cancellationToken);
 
-            // 3. Update PatientVisit Status
+            // 4. Update PatientVisit Status
             if (record.PatientVisitId.HasValue)
             {
                 var visit = await _patientVisitRepository.GetByIdAsync(record.PatientVisitId.Value, cancellationToken);
@@ -87,8 +128,8 @@ public class FinalizeMedicalRecordCommandHandler : IRequestHandler<FinalizeMedic
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            // 4. Send Email to Patient
-            if (patient != null && !string.IsNullOrEmpty(patient.Email))
+            // 5. Send Email to Patient
+            if (!string.IsNullOrEmpty(email))
             {
                 var emailBody = $@"
                     <h3>Xin chào {patient.FullName},</h3>
@@ -99,37 +140,40 @@ public class FinalizeMedicalRecordCommandHandler : IRequestHandler<FinalizeMedic
                     <p>Trân trọng,<br/>Đội ngũ Aura Digital Clinic</p>";
 
                 await _emailService.SendWithAttachmentsAsync(
-                    patient.Email,
+                    email,
                     "Hồ sơ bệnh án điện tử - Aura Digital Clinic",
                     emailBody,
-                    new[] { new Application.Common.Interfaces.EmailAttachment(fileName, pdfBytes, "application/pdf") },
+                    new[] { new EmailAttachment(fileName, pdfBytes, "application/pdf") },
                     true,
                     cancellationToken);
             }
 
-            // 5. Send Notifications
-            // Notify Patient
-            await _notificationService.SendToUserAsync(
-                userId: record.PatientId,
-                title: "Hồ sơ bệnh án đã hoàn thành",
-                message: $"Hồ sơ {record.MedicalRecordNumber} đã sẵn sàng. Bạn có thể xem trên ứng dụng hoặc email.",
-                type: Application.Common.Interfaces.NotificationType.HealthUpdate,
-                payload: new { MedicalRecordId = record.Id, PdfUrl = relativePath },
-                cancellationToken: cancellationToken);
+            // 6. Send Notifications
+            if (patient.UserId.HasValue)
+            {
+                await _notificationService.SendAsync(
+                    userId: patient.UserId.Value,
+                    title: "Hồ sơ bệnh án đã hoàn thành",
+                    message: $"Hồ sơ {record.MedicalRecordNumber} đã sẵn sàng. Bạn có thể xem trên ứng dụng hoặc email.",
+                    type: NotificationType.ConsultationResultProvided, // Using existing type
+                    payload: new { MedicalRecordId = record.Id, PdfUrl = relativePath },
+                    cancellationToken: cancellationToken);
+            }
 
             // Notify Clinic Staff (Coordinator)
             await _notificationService.SendToRoleAsync(
                 roleName: Application.Common.Constants.Roles.ClinicStaff,
                 title: "Medical Record Finalized",
-                message: $"Patient {patient?.FullName}'s medical record ({record.MedicalRecordNumber}) has been locked and archived.",
-                type: Application.Common.Interfaces.NotificationType.SystemAlert,
+                message: $"Patient {patient.FullName}'s medical record ({record.MedicalRecordNumber}) has been locked and archived.",
+                type: NotificationType.SystemAlert,
                 payload: new { MedicalRecordId = record.Id, VisitId = record.PatientVisitId },
                 cancellationToken: cancellationToken);
 
             return Result.Success();
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Error finalizing medical record {RecordId}", request.Id);
             return Result.Failure(ex.Message);
         }
     }
