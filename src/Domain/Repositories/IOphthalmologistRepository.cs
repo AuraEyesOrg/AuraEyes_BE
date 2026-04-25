@@ -45,4 +45,11 @@ public interface IOphthalmologistRepository : IRepository<Ophthalmologist>
     Task<IReadOnlyDictionary<Guid, string>> GetDisplayNamesByIdsAsync(
         IReadOnlyCollection<Guid> ophthalmologistIds,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get doctor basic details (name, avatar) keyed by ophthalmologist ID.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, (string FullName, string? AvatarUrl)>> GetDoctorDetailsByIdsAsync(
+        IReadOnlyCollection<Guid> ophthalmologistIds,
+        CancellationToken cancellationToken = default);
 }
