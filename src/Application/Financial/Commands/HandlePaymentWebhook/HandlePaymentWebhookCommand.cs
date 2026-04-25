@@ -5,6 +5,8 @@ using Domain.Repositories;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using Domain.Entities.Scheduling;
+using Domain.Entities.Financial;
 
 namespace Application.Financial.Commands.HandlePaymentWebhook;
 
@@ -15,6 +17,8 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
     private readonly IPayOSService _payOSService;
     private readonly IPaymentRepository _paymentRepository;
     private readonly IOrderRepository _orderRepository;
+    private readonly IAppointmentRepository _appointmentRepository;
+    private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<HandlePaymentWebhookCommandHandler> _logger;
     private readonly IMediator _mediator;
@@ -23,6 +27,8 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
         IPayOSService payOSService,
         IPaymentRepository paymentRepository,
         IOrderRepository orderRepository,
+        IAppointmentRepository appointmentRepository,
+        IAppointmentSlotRepository appointmentSlotRepository,
         IUnitOfWork unitOfWork,
         ILogger<HandlePaymentWebhookCommandHandler> logger,
         IMediator mediator)
@@ -30,6 +36,8 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
         _payOSService = payOSService;
         _paymentRepository = paymentRepository;
         _orderRepository = orderRepository;
+        _appointmentRepository = appointmentRepository;
+        _appointmentSlotRepository = appointmentSlotRepository;
         _unitOfWork = unitOfWork;
         _logger = logger;
         _mediator = mediator;
@@ -134,6 +142,18 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
                 if (order.DepositAmount.HasValue && Math.Abs(payment.Amount - order.DepositAmount.Value) < 0.01m && order.Status == OrderStatus.Pending)
                 {
                     order.Confirm();
+
+            // Sync with Appointment if this is a clinic booking deposit
+            if (order.AppointmentId.HasValue)
+            {
+                var appointment = await _appointmentRepository.GetByIdAsync(order.AppointmentId.Value, cancellationToken);
+                if (appointment != null && appointment.Status == AppointmentStatus.Pending)
+                {
+                    appointment.Confirm();
+                    await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
+                    _logger.LogInformation("Appointment {AppointmentId} confirmed automatically via successful deposit for Order {OrderId}.", appointment.Id, order.Id);
+                }
+            }
                     _logger.LogInformation("Order {OrderId} confirmed (deposit received).", order.Id);
                 }
                 else
@@ -157,7 +177,30 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
             payment.Cancel();
 
             var order = await _orderRepository.GetByIdAsync(payment.OrderId, cancellationToken);
-            order?.Cancel();
+            if (order != null)
+            {
+                order.Cancel();
+
+                // If this is a clinic booking, we must also cancel the appointment and release the slot
+                if (order.AppointmentId.HasValue)
+                {
+                    var appointment = await _appointmentRepository.GetByIdAsync(order.AppointmentId.Value, cancellationToken);
+                    if (appointment != null && appointment.Status == AppointmentStatus.Pending)
+                    {
+                        appointment.Cancel(order.UserId, "Payment cancelled by user.");
+                        
+                        var slot = await _appointmentSlotRepository.GetByIdAsync(appointment.AppointmentSlotId, cancellationToken);
+                        if (slot != null)
+                        {
+                            slot.CancelBooking();
+                            await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
+                        }
+                        
+                        await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
+                        _logger.LogInformation("Appointment {AppointmentId} cancelled and slot {SlotId} released due to payment cancellation.", appointment.Id, appointment.AppointmentSlotId);
+                    }
+                }
+            }
         }
         else
         {

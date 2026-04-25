@@ -17,6 +17,8 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
     private readonly ICurrentUserService _currentUserService;
     private readonly IIdentityService _identityService;
     private readonly IPayOSService _payOSService;
+    private readonly IAppointmentRepository _appointmentRepository;
+    private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMediator _mediator;
     private readonly ILogger<GetOrderByIdQueryHandler> _logger;
@@ -26,6 +28,8 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
         ICurrentUserService currentUserService,
         IIdentityService identityService,
         IPayOSService payOSService,
+        IAppointmentRepository appointmentRepository,
+        IAppointmentSlotRepository appointmentSlotRepository,
         IUnitOfWork unitOfWork,
         IMediator mediator,
         ILogger<GetOrderByIdQueryHandler> logger)
@@ -34,6 +38,8 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
         _currentUserService = currentUserService;
         _identityService = identityService;
         _payOSService = payOSService;
+        _appointmentRepository = appointmentRepository;
+        _appointmentSlotRepository = appointmentSlotRepository;
         _unitOfWork = unitOfWork;
         _mediator = mediator;
         _logger = logger;
@@ -73,6 +79,18 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
                         if (order.DepositAmount.HasValue && Math.Abs(firstPayment.Amount - order.DepositAmount.Value) < 0.01m)
                         {
                             order.Confirm();
+                        
+                        // Sync with Appointment if this is a clinic booking deposit
+                        if (order.AppointmentId.HasValue)
+                        {
+                            var appointment = await _appointmentRepository.GetByIdAsync(order.AppointmentId.Value, cancellationToken);
+                            if (appointment != null && appointment.Status == AppointmentStatus.Pending)
+                            {
+                                appointment.Confirm();
+                                await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
+                                _logger.LogInformation("Appointment {AppointmentId} confirmed automatically via proactive status sync for Order {OrderId}.", appointment.Id, order.Id);
+                            }
+                        }
                         }
                         else
                         {
@@ -93,6 +111,27 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
                     {
                         firstPayment.Cancel();
                         order.Cancel();
+                        
+                        // If this is a clinic booking, we must also cancel the appointment and release the slot
+                        if (order.AppointmentId.HasValue)
+                        {
+                            var appointment = await _appointmentRepository.GetByIdAsync(order.AppointmentId.Value, cancellationToken);
+                            if (appointment != null && appointment.Status == AppointmentStatus.Pending)
+                            {
+                                appointment.Cancel(order.UserId, "Payment cancelled by user (Proactive Sync).");
+                                
+                                var slot = await _appointmentSlotRepository.GetByIdAsync(appointment.AppointmentSlotId, cancellationToken);
+                                if (slot != null)
+                                {
+                                    slot.CancelBooking();
+                                    await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
+                                }
+                                
+                                await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
+                                _logger.LogInformation("Appointment {AppointmentId} cancelled and slot {SlotId} released due to payment cancellation (Proactive Sync).", appointment.Id, appointment.AppointmentSlotId);
+                            }
+                        }
+                        
                         await _unitOfWork.SaveChangesAsync(cancellationToken);
                     }
                 }
