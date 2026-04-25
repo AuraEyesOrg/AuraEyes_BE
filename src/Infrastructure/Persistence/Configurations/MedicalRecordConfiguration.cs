@@ -15,10 +15,10 @@ public class MedicalRecordConfiguration : IEntityTypeConfiguration<MedicalRecord
             .HasMaxLength(50);
 
         builder.Property(x => x.AdministrativeDataJson)
-            .HasColumnType("nvarchar(max)");
+            .HasColumnType("text");
 
         builder.Property(x => x.ClinicalDataJson)
-            .HasColumnType("nvarchar(max)");
+            .HasColumnType("text");
 
         builder.Property(x => x.Status)
             .HasConversion<int>();
