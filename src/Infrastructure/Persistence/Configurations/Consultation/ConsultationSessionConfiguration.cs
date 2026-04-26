@@ -79,10 +79,7 @@ public class ConsultationSessionConfiguration : IEntityTypeConfiguration<Consult
             .HasForeignKey(e => e.OphthalmologistId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne<Organisation>()
-            .WithMany()
-            .HasForeignKey(e => e.OrganisationId)
-            .OnDelete(DeleteBehavior.Restrict);
+
 
         builder.HasOne<AiScreening>()
             .WithMany()
