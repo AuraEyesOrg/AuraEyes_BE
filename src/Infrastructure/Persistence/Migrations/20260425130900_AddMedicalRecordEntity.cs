@@ -1,3 +1,4 @@
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -10,31 +11,50 @@ namespace Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "MedicalRecords",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    PatientId = table.Column<Guid>(type: "uuid", nullable: false),
-                    ConsultationSessionId = table.Column<Guid>(type: "uuid", nullable: true),
-                    PatientVisitId = table.Column<Guid>(type: "uuid", nullable: true),
-                    MedicalRecordNumber = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    PdfUrl = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    Status = table.Column<int>(type: "integer", nullable: false),
-                    AdministrativeDataJson = table.Column<string>(type: "text", nullable: true),
-                    ClinicalDataJson = table.Column<string>(type: "text", nullable: true),
-                    FinalDiagnosis = table.Column<string>(type: "text", nullable: true),
-                    TreatmentPlan = table.Column<string>(type: "text", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    CreatedBy = table.Column<string>(type: "text", nullable: true),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    UpdatedBy = table.Column<string>(type: "text", nullable: true),
-                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_MedicalRecords", x => x.Id);
-                });
+            migrationBuilder.AddColumn<Guid>(
+                name: "PatientVisitId",
+                table: "MedicalRecords",
+                type: "uuid",
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "PdfUrl",
+                table: "MedicalRecords",
+                type: "character varying(1000)",
+                maxLength: 1000,
+                nullable: true);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "AdministrativeDataJson",
+                table: "MedicalRecords",
+                type: "text",
+                nullable: true,
+                oldClrType: typeof(string),
+                oldType: "text");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "ClinicalDataJson",
+                table: "MedicalRecords",
+                type: "text",
+                nullable: true,
+                oldClrType: typeof(string),
+                oldType: "text");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "FinalDiagnosis",
+                table: "MedicalRecords",
+                type: "text",
+                nullable: true,
+                oldClrType: typeof(string),
+                oldType: "text");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "TreatmentPlan",
+                table: "MedicalRecords",
+                type: "text",
+                nullable: true,
+                oldClrType: typeof(string),
+                oldType: "text");
 
             migrationBuilder.CreateIndex(
                 name: "IX_MedicalRecords_IsDeleted",
@@ -56,12 +76,97 @@ namespace Infrastructure.Persistence.Migrations
                 name: "IX_MedicalRecords_PatientVisitId",
                 table: "MedicalRecords",
                 column: "PatientVisitId");
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_MedicalRecords_PatientVisits_PatientVisitId",
+                table: "MedicalRecords",
+                column: "PatientVisitId",
+                principalTable: "PatientVisits",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.SetNull);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_MedicalRecords_Patients_PatientId",
+                table: "MedicalRecords",
+                column: "PatientId",
+                principalTable: "Patients",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "MedicalRecords");
+            migrationBuilder.DropForeignKey(
+                name: "FK_MedicalRecords_PatientVisits_PatientVisitId",
+                table: "MedicalRecords");
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_MedicalRecords_Patients_PatientId",
+                table: "MedicalRecords");
+
+            migrationBuilder.DropIndex(
+                name: "IX_MedicalRecords_IsDeleted",
+                table: "MedicalRecords");
+
+            migrationBuilder.DropIndex(
+                name: "IX_MedicalRecords_MedicalRecordNumber",
+                table: "MedicalRecords");
+
+            migrationBuilder.DropIndex(
+                name: "IX_MedicalRecords_PatientId",
+                table: "MedicalRecords");
+
+            migrationBuilder.DropIndex(
+                name: "IX_MedicalRecords_PatientVisitId",
+                table: "MedicalRecords");
+
+            migrationBuilder.DropColumn(
+                name: "PatientVisitId",
+                table: "MedicalRecords");
+
+            migrationBuilder.DropColumn(
+                name: "PdfUrl",
+                table: "MedicalRecords");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "AdministrativeDataJson",
+                table: "MedicalRecords",
+                type: "text",
+                nullable: false,
+                defaultValue: "",
+                oldClrType: typeof(string),
+                oldType: "text",
+                oldNullable: true);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "ClinicalDataJson",
+                table: "MedicalRecords",
+                type: "text",
+                nullable: false,
+                defaultValue: "",
+                oldClrType: typeof(string),
+                oldType: "text",
+                oldNullable: true);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "FinalDiagnosis",
+                table: "MedicalRecords",
+                type: "text",
+                nullable: false,
+                defaultValue: "",
+                oldClrType: typeof(string),
+                oldType: "text",
+                oldNullable: true);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "TreatmentPlan",
+                table: "MedicalRecords",
+                type: "text",
+                nullable: false,
+                defaultValue: "",
+                oldClrType: typeof(string),
+                oldType: "text",
+                oldNullable: true);
         }
     }
 }

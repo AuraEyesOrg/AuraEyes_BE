@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260426223345_AddPatientVisitIdToMedicalRecords")]
+    partial class AddPatientVisitIdToMedicalRecords
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -73,7 +76,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Permissions", (string)null);
+                    b.ToTable("Permissions");
                 });
 
             modelBuilder.Entity("Domain.Entities.Authorization.RolePermission", b =>
@@ -112,7 +115,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("RoleId", "PermissionId")
                         .IsUnique();
 
-                    b.ToTable("RolePermissions", (string)null);
+                    b.ToTable("RolePermissions");
                 });
 
             modelBuilder.Entity("Domain.Entities.Authorization.UserPermission", b =>
@@ -170,7 +173,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "PermissionId")
                         .IsUnique();
 
-                    b.ToTable("UserPermissions", (string)null);
+                    b.ToTable("UserPermissions");
                 });
 
             modelBuilder.Entity("Domain.Entities.CarePlan.HealthRoadmap", b =>
@@ -326,7 +329,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ConversationId");
 
-                    b.ToTable("ChatMessages", (string)null);
+                    b.ToTable("ChatMessages");
                 });
 
             modelBuilder.Entity("Domain.Entities.Consultation.ClinicFeedback", b =>
@@ -539,7 +542,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OphthalmologistId");
 
-                    b.ToTable("Conversations", (string)null);
+                    b.ToTable("Conversations");
                 });
 
             modelBuilder.Entity("Domain.Entities.Consultation.OphthalmologistFeedback", b =>
@@ -743,7 +746,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TemplateId");
 
-                    b.ToTable("Contracts", (string)null);
+                    b.ToTable("Contracts");
                 });
 
             modelBuilder.Entity("Domain.Entities.Contracts.ContractTemplate", b =>
@@ -805,7 +808,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("Type", "ContractVersion")
                         .IsUnique();
 
-                    b.ToTable("ContractTemplates", (string)null);
+                    b.ToTable("ContractTemplates");
                 });
 
             modelBuilder.Entity("Domain.Entities.Financial.DepositRequest", b =>
@@ -894,7 +897,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("WalletId");
 
-                    b.ToTable("DepositRequests", (string)null);
+                    b.ToTable("DepositRequests");
                 });
 
             modelBuilder.Entity("Domain.Entities.Financial.Order", b =>
@@ -942,7 +945,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Orders", (string)null);
+                    b.ToTable("Orders");
                 });
 
             modelBuilder.Entity("Domain.Entities.Financial.Payment", b =>
@@ -1007,7 +1010,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrderId");
 
-                    b.ToTable("Payments", (string)null);
+                    b.ToTable("Payments");
                 });
 
             modelBuilder.Entity("Domain.Entities.Financial.Wallet", b =>
@@ -1052,7 +1055,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Wallets", (string)null);
+                    b.ToTable("Wallets");
                 });
 
             modelBuilder.Entity("Domain.Entities.Financial.WalletTransaction", b =>
@@ -1107,7 +1110,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ReferenceType", "ReferenceId");
 
-                    b.ToTable("WalletTransactions", (string)null);
+                    b.ToTable("WalletTransactions");
                 });
 
             modelBuilder.Entity("Domain.Entities.Financial.WithdrawalRequest", b =>
@@ -1293,7 +1296,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("PatientVisitId")
                         .IsUnique();
 
-                    b.ToTable("MedicalRecords", (string)null);
+                    b.ToTable("MedicalRecords");
                 });
 
             modelBuilder.Entity("Domain.Entities.Network.InternalChat.InternalGroupChat", b =>
@@ -1341,7 +1344,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("InternalGroupChats", (string)null);
+                    b.ToTable("InternalGroupChats");
                 });
 
             modelBuilder.Entity("Domain.Entities.Network.InternalChat.InternalGroupMember", b =>
@@ -1378,7 +1381,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("GroupId");
 
-                    b.ToTable("InternalGroupMembers", (string)null);
+                    b.ToTable("InternalGroupMembers");
                 });
 
             modelBuilder.Entity("Domain.Entities.Network.InternalChat.InternalGroupMessage", b =>
@@ -1419,7 +1422,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("GroupId");
 
-                    b.ToTable("InternalGroupMessages", (string)null);
+                    b.ToTable("InternalGroupMessages");
                 });
 
             modelBuilder.Entity("Domain.Entities.Network.PostAttachment", b =>
@@ -1831,7 +1834,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AuditLogs", (string)null);
+                    b.ToTable("AuditLogs");
                 });
 
             modelBuilder.Entity("Domain.Entities.Platform.Notification", b =>
@@ -1892,7 +1895,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId", "IsRead");
 
-                    b.ToTable("Notifications", (string)null);
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("Domain.Entities.Platform.SystemSetting", b =>
@@ -1912,7 +1915,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Key");
 
-                    b.ToTable("SystemSettings", (string)null);
+                    b.ToTable("SystemSettings");
 
                     b.HasData(
                         new
@@ -2613,7 +2616,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PatientId");
 
-                    b.ToTable("AiScreenings", (string)null);
+                    b.ToTable("AiScreenings");
                 });
 
             modelBuilder.Entity("Domain.Entities.Screening.MedicalDiagnosis", b =>
@@ -2709,7 +2712,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ConsultationSessionId");
 
-                    b.ToTable("MedicalDiagnoses", (string)null);
+                    b.ToTable("MedicalDiagnoses");
                 });
 
             modelBuilder.Entity("Domain.Entities.Screening.PatientRoadmap", b =>
@@ -2852,7 +2855,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PatientId");
 
-                    b.ToTable("RetinalImages", (string)null);
+                    b.ToTable("RetinalImages");
                 });
 
             modelBuilder.Entity("Domain.Entities.Screening.ScreeningResult", b =>
@@ -2902,7 +2905,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("AiScreeningId");
 
-                    b.ToTable("ScreeningResults", (string)null);
+                    b.ToTable("ScreeningResults");
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.Certificate", b =>
@@ -3069,7 +3072,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PatientId");
 
-                    b.ToTable("Consents", (string)null);
+                    b.ToTable("Consents");
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.Ophthalmologist", b =>
@@ -3179,7 +3182,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Ophthalmologists", (string)null);
+                    b.ToTable("Ophthalmologists");
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.OphthalmologistEmploymentTypeChangeRequest", b =>
@@ -3338,7 +3341,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Organisations", (string)null);
+                    b.ToTable("Organisations");
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.OrganisationOnboardingRequest", b =>
@@ -3424,7 +3427,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ContactEmail", "Status");
 
-                    b.ToTable("OrganisationOnboardingRequests", (string)null);
+                    b.ToTable("OrganisationOnboardingRequests");
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.Patient", b =>
@@ -3497,7 +3500,7 @@ namespace Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("\"UserId\" IS NOT NULL");
 
-                    b.ToTable("Patients", (string)null);
+                    b.ToTable("Patients");
                 });
 
             modelBuilder.Entity("Infrastructure.Identity.ApplicationRole", b =>
