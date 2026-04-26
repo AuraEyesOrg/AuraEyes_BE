@@ -7,31 +7,30 @@ using Domain.Repositories;
 
 namespace Application.Feedback.Queries.GetOrganisationFeedback;
 
-public class GetOrganisationFeedbackQueryHandler : IQueryHandler<GetOrganisationFeedbackQuery, OrganisationFeedbackDto>
+public class GetOrganisationFeedbackQueryHandler : IQueryHandler<GetOrganisationFeedbackQuery, ClinicFeedbackDto>
 {
-    private readonly IOrganisationFeedbackRepository _organisationFeedbackRepository;
+    private readonly IClinicFeedbackRepository _clinicFeedbackRepository;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IIdentityService _identityService;
 
     public GetOrganisationFeedbackQueryHandler(
-        IOrganisationFeedbackRepository organisationFeedbackRepository,
+        IClinicFeedbackRepository clinicFeedbackRepository,
         IRepository<Patient> patientRepository,
         IIdentityService identityService)
     {
-        _organisationFeedbackRepository = organisationFeedbackRepository;
+        _clinicFeedbackRepository = clinicFeedbackRepository;
         _patientRepository = patientRepository;
         _identityService = identityService;
     }
 
-    public async Task<Result<OrganisationFeedbackDto>> Handle(GetOrganisationFeedbackQuery request, CancellationToken cancellationToken)
+    public async Task<Result<ClinicFeedbackDto>> Handle(GetOrganisationFeedbackQuery request, CancellationToken cancellationToken)
     {
-        var feedback = await _organisationFeedbackRepository.GetByIdForOrganisationAsync(
-            request.OrganisationId,
+        var feedback = await _clinicFeedbackRepository.GetByIdAsync(
             request.FeedbackId,
             cancellationToken);
 
         if (feedback is null)
-            return Result<OrganisationFeedbackDto>.NotFound($"Organisation feedback '{request.FeedbackId}' not found.");
+            return Result<ClinicFeedbackDto>.NotFound($"Clinic feedback '{request.FeedbackId}' not found.");
 
         var patientEntity = await _patientRepository.GetByIdAsync(feedback.PatientId, cancellationToken);
         string? patientFullName = null;
@@ -45,7 +44,7 @@ public class GetOrganisationFeedbackQueryHandler : IQueryHandler<GetOrganisation
             patientFullName = patientUser?.FullName;
         }
 
-        var dto = new OrganisationFeedbackDto
+        var dto = new ClinicFeedbackDto
         {
             Id = feedback.Id,
             PatientId = feedback.PatientId,
@@ -54,9 +53,11 @@ public class GetOrganisationFeedbackQueryHandler : IQueryHandler<GetOrganisation
             AppointmentId = feedback.AppointmentId,
             Rating = feedback.Rating,
             Comment = feedback.Comment,
+            DoctorId = feedback.DoctorId,
+            StaffId = feedback.StaffId,
             CreatedAt = feedback.CreatedAt
         };
 
-        return Result<OrganisationFeedbackDto>.Success(dto);
+        return Result<ClinicFeedbackDto>.Success(dto);
     }
 }

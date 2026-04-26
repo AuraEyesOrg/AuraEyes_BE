@@ -1,15 +1,11 @@
 using FluentValidation;
 
-namespace Application.Feedback.Commands.CreateOrganisationFeedback;
+namespace Application.Feedback.Commands.CreateClinicFeedback;
 
-public class CreateOrganisationFeedbackCommandValidator : AbstractValidator<CreateOrganisationFeedbackCommand>
+public class CreateClinicFeedbackCommandValidator : AbstractValidator<CreateClinicFeedbackCommand>
 {
-    public CreateOrganisationFeedbackCommandValidator()
+    public CreateClinicFeedbackCommandValidator()
     {
-        RuleFor(x => x.OrganisationId)
-            .NotEmpty()
-            .WithMessage("Organisation ID is required.");
-
         RuleFor(x => x.AppointmentId)
             .NotEmpty()
             .WithMessage("Appointment ID is required.");

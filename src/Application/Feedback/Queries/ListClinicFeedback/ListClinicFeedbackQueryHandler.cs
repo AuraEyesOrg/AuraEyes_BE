@@ -5,36 +5,35 @@ using Domain.Common;
 using Domain.Entities.Users;
 using Domain.Repositories;
 
-namespace Application.Feedback.Queries.ListOrganisationFeedback;
+namespace Application.Feedback.Queries.ListClinicFeedback;
 
-public class ListOrganisationFeedbackQueryHandler
-    : IQueryHandler<ListOrganisationFeedbackQuery, PagedResult<OrganisationFeedbackDto>>
+public class ListClinicFeedbackQueryHandler
+    : IQueryHandler<ListClinicFeedbackQuery, PagedResult<ClinicFeedbackDto>>
 {
-    private readonly IOrganisationFeedbackRepository _organisationFeedbackRepository;
+    private readonly IClinicFeedbackRepository _clinicFeedbackRepository;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IIdentityService _identityService;
 
-    public ListOrganisationFeedbackQueryHandler(
-        IOrganisationFeedbackRepository organisationFeedbackRepository,
+    public ListClinicFeedbackQueryHandler(
+        IClinicFeedbackRepository clinicFeedbackRepository,
         IRepository<Patient> patientRepository,
         IIdentityService identityService)
     {
-        _organisationFeedbackRepository = organisationFeedbackRepository;
+        _clinicFeedbackRepository = clinicFeedbackRepository;
         _patientRepository = patientRepository;
         _identityService = identityService;
     }
 
-    public async Task<Result<PagedResult<OrganisationFeedbackDto>>> Handle(
-        ListOrganisationFeedbackQuery request,
+    public async Task<Result<PagedResult<ClinicFeedbackDto>>> Handle(
+        ListClinicFeedbackQuery request,
         CancellationToken cancellationToken)
     {
-        var (items, totalCount) = await _organisationFeedbackRepository.GetPagedByOrganisationAsync(
-            request.OrganisationId,
+        var (items, totalCount) = await _clinicFeedbackRepository.GetPagedAsync(
             request.PageNumber,
             request.PageSize,
             cancellationToken);
 
-        var dtoList = new List<OrganisationFeedbackDto>();
+        var dtoList = new List<ClinicFeedbackDto>();
 
         foreach (var x in items)
         {
@@ -50,7 +49,7 @@ public class ListOrganisationFeedbackQueryHandler
                 patientFullName = patientUser?.FullName;
             }
 
-            dtoList.Add(new OrganisationFeedbackDto
+            dtoList.Add(new ClinicFeedbackDto
             {
                 Id = x.Id,
                 PatientId = x.PatientId,
@@ -59,16 +58,18 @@ public class ListOrganisationFeedbackQueryHandler
                 AppointmentId = x.AppointmentId,
                 Rating = x.Rating,
                 Comment = x.Comment,
+                DoctorId = x.DoctorId,
+                StaffId = x.StaffId,
                 CreatedAt = x.CreatedAt
             });
         }
 
-        var pagedResult = new PagedResult<OrganisationFeedbackDto>(
+        var pagedResult = new PagedResult<ClinicFeedbackDto>(
             dtoList,
             totalCount,
             request.PageNumber,
             request.PageSize);
 
-        return Result<PagedResult<OrganisationFeedbackDto>>.Success(pagedResult);
+        return Result<PagedResult<ClinicFeedbackDto>>.Success(pagedResult);
     }
 }
