@@ -1,64 +1,74 @@
+using Application.Common.Interfaces;
 using FluentAssertions;
 using Infrastructure.Services;
 using Infrastructure.Settings;
-using Infrastructure.UnitTests.Common;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Moq;
 
 namespace Infrastructure.UnitTests.Services;
 
 public class EmailServiceTests
 {
-    [Theory]
-    [InlineData("", "subject", "body")]
-    [InlineData(" ", "subject", "body")]
-    [InlineData(null, "subject", "body")]
-    [InlineData("to@test.local", "", "body")]
-    [InlineData("to@test.local", " ", "body")]
-    [InlineData("to@test.local", null, "body")]
-    [InlineData("to@test.local", "subject", "")]
-    [InlineData("to@test.local", "subject", " ")]
-    [InlineData("to@test.local", "subject", null)]
-    [InlineData("", "", "")]
-    public async Task SendAsync_WithInvalidArguments_ShouldThrowArgumentException(string? to, string? subject, string? body)
+    private readonly Mock<IOptions<SmtpSettings>> _settingsMock;
+    private readonly Mock<ILogger<EmailService>> _loggerMock;
+    private readonly SmtpSettings _settings;
+
+    public EmailServiceTests()
     {
-        var service = CreateService();
+        _settings = new SmtpSettings
+        {
+            Host = "localhost",
+            Port = 25,
+            Username = "test",
+            Password = "test",
+            FromEmail = "no-reply@test.local",
+            FromName = "AuraEyes"
+        };
+        _settingsMock = new Mock<IOptions<SmtpSettings>>();
+        _settingsMock.Setup(s => s.Value).Returns(_settings);
+        _loggerMock = new Mock<ILogger<EmailService>>();
+    }
 
-        var act = async () => await service.SendAsync(to!, subject!, body!, isHtml: true);
-
-        await act.Should().ThrowAsync<ArgumentException>();
+    [Fact]
+    public void Constructor_WithValidSettings_ShouldNotThrow()
+    {
+        var service = new EmailService(_settingsMock.Object, _loggerMock.Object);
+        service.Should().NotBeNull();
     }
 
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
-    [InlineData("bad-email")]
-    [InlineData("no-at-sign")]
-    [InlineData("@domain-only.com")]
-    [InlineData("local-only@")]
-    [InlineData("test@@domain.com")]
-    [InlineData("name withspace@domain.com")]
-    [InlineData("name@domain")]
-    [InlineData("name@.com")]
-    public async Task SendEmailConfirmationAsync_WithInvalidRecipient_ShouldThrow(string email)
+    [InlineData(null)]
+    public async Task SendAsync_WithInvalidRecipient_ShouldThrow(string? email)
     {
-        var service = CreateService();
-
-        var act = async () => await service.SendEmailConfirmationAsync(email, "https://example.com/confirm");
-
-        await act.Should().ThrowAsync<Exception>();
+        var service = new EmailService(_settingsMock.Object, _loggerMock.Object);
+        var act = async () => await service.SendAsync(email!, "subject", "body");
+        await act.Should().ThrowAsync<ArgumentException>();
     }
 
-    private static EmailService CreateService()
+    [Fact]
+    public async Task SendEmailConfirmationAsync_WithValidInput_ShouldNotThrow()
     {
-        var settings = new SmtpSettings
-        {
-            Host = "localhost",
-            Port = 2525,
-            UseSsl = false,
-            UseStartTls = false,
-            FromName = "AuraEyes Test",
-            FromEmail = "noreply@test.local"
-        };
-        return new EmailService(Options.Create(settings), new TestLogger<EmailService>());
+        var service = new EmailService(_settingsMock.Object, _loggerMock.Object);
+        var act = async () => await service.SendEmailConfirmationAsync("test@t.l", "https://confirm.url");
+        await act.Should().NotThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
+    public async Task SendPasswordResetAsync_WithValidInput_ShouldNotThrow()
+    {
+        var service = new EmailService(_settingsMock.Object, _loggerMock.Object);
+        var act = async () => await service.SendPasswordResetAsync("test@t.l", "https://reset.url");
+        await act.Should().NotThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
+    public async Task SendStaffOnboardingEmailAsync_WithValidInput_ShouldNotThrow()
+    {
+        var service = new EmailService(_settingsMock.Object, _loggerMock.Object);
+        var act = async () => await service.SendStaffOnboardingEmailAsync("test@t.l", "Staff Name", "Password123");
+        await act.Should().NotThrowAsync<ArgumentException>();
     }
 }

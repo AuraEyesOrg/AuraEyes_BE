@@ -9,8 +9,8 @@ using FluentAssertions;
 using Infrastructure.Identity;
 using Infrastructure.Persistence;
 using Infrastructure.Services;
-using Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
+using Infrastructure.UnitTests.Common;
 
 namespace Infrastructure.UnitTests.Services;
 
@@ -48,7 +48,7 @@ public class DashboardMetricsServiceTests
     {
         await using var context = CreateContext();
         var userId = Guid.NewGuid();
-        await context.Patients.AddAsync(new Patient(userId));
+        await context.Patients.AddAsync(Patient.CreateRegistered(userId));
         await context.SaveChangesAsync();
 
         var service = new DashboardMetricsService(
@@ -73,7 +73,7 @@ public class DashboardMetricsServiceTests
             FullName = "Patient One"
         };
         await context.Users.AddAsync(user);
-        var patient = new Patient(user.Id);
+        var patient = Patient.CreateRegistered(user.Id);
         await context.Patients.AddAsync(patient);
         await context.SaveChangesAsync();
 
@@ -102,7 +102,7 @@ public class DashboardMetricsServiceTests
             FullName = "Patient Two"
         };
         await context.Users.AddAsync(user);
-        var patient = new Patient(user.Id);
+        var patient = Patient.CreateRegistered(user.Id);
         await context.Patients.AddAsync(patient);
         await context.SaveChangesAsync();
 
@@ -136,7 +136,7 @@ public class DashboardMetricsServiceTests
             FullName = "Patient Three"
         };
         await context.Users.AddAsync(user);
-        var patient = new Patient(user.Id);
+        var patient = Patient.CreateRegistered(user.Id);
         await context.Patients.AddAsync(patient);
         await context.SaveChangesAsync();
 
@@ -207,7 +207,7 @@ public class DashboardMetricsServiceTests
             FullName = "Patient Org"
         };
         await context.Users.AddAsync(patientUser);
-        var patient = new Patient(patientUser.Id);
+        var patient = Patient.CreateRegistered(patientUser.Id);
         await context.Patients.AddAsync(patient);
 
         var template = new ScheduleTemplate(
@@ -224,9 +224,9 @@ public class DashboardMetricsServiceTests
         slot.BookWithCapacity();
         await context.AppointmentSlots.AddAsync(slot);
 
-        var appt1 = Appointment.CreateClinicVisit(patient.Id, slot.Id, org.Id);
+        var appt1 = new Appointment(patient.Id, slot.Id, 100000, PricingType.AutoAssign);
         appt1.Confirm();
-        var appt2 = Appointment.CreateClinicVisit(patient.Id, slot.Id, org.Id);
+        var appt2 = new Appointment(patient.Id, slot.Id, 100000, PricingType.AutoAssign);
         appt2.Cancel(Guid.NewGuid(), "cancelled");
         await context.Appointments.AddRangeAsync(appt1, appt2);
         await context.SaveChangesAsync();
@@ -278,7 +278,7 @@ public class DashboardMetricsServiceTests
         await context.SaveChangesAsync();
 
         var doctor = new Ophthalmologist(doctorUser.Id, yearsOfExperience: 6);
-        var patient = new Patient(patientUser.Id);
+        var patient = Patient.CreateRegistered(patientUser.Id);
         await context.Ophthalmologists.AddAsync(doctor);
         await context.Patients.AddAsync(patient);
         await context.SaveChangesAsync();
@@ -382,7 +382,7 @@ public class DashboardMetricsServiceTests
         await using var context = CreateContext();
         var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = "paging@test.local", Email = "paging@test.local", FullName = "Paging User" };
         await context.Users.AddAsync(user);
-        var patient = new Patient(user.Id);
+        var patient = Patient.CreateRegistered(user.Id);
         await context.Patients.AddAsync(patient);
         await context.SaveChangesAsync();
 
@@ -424,10 +424,10 @@ public class DashboardMetricsServiceTests
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var slot1 = new AppointmentSlot(template.Id, today, new TimeOnly(8, 0), new TimeOnly(8, 30), 4);
-        slot1.Book();
-        slot1.Book();
+        slot1.BookWithCapacity();
+        slot1.BookWithCapacity();
         var slot2 = new AppointmentSlot(template.Id, today, new TimeOnly(9, 0), new TimeOnly(9, 30), 4);
-        slot2.Book();
+        slot2.BookWithCapacity();
         await context.AppointmentSlots.AddRangeAsync(slot1, slot2);
         await context.SaveChangesAsync();
 
@@ -445,7 +445,7 @@ public class DashboardMetricsServiceTests
     {
         await using var context = CreateContext();
         var userId = Guid.NewGuid();
-        await context.Patients.AddAsync(new Patient(userId));
+        await context.Patients.AddAsync(Patient.CreateRegistered(userId));
         await context.SaveChangesAsync();
         var service = new DashboardMetricsService(
             context,
@@ -463,7 +463,7 @@ public class DashboardMetricsServiceTests
         await using var context = CreateContext();
         var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = "pm@test.local", Email = "pm@test.local", FullName = "Patient Metrics" };
         await context.Users.AddAsync(user);
-        var patient = new Patient(user.Id);
+        var patient = Patient.CreateRegistered(user.Id);
         await context.Patients.AddAsync(patient);
         await context.SaveChangesAsync();
 
@@ -480,8 +480,8 @@ public class DashboardMetricsServiceTests
         var orgId = Guid.NewGuid();
         var slot = new AppointmentSlot(Guid.NewGuid(), DateOnly.FromDateTime(DateTime.UtcNow), new TimeOnly(8, 0), new TimeOnly(8, 30), 2);
         await context.AppointmentSlots.AddAsync(slot);
-        var apptPending = Appointment.CreateClinicVisit(patient.Id, slot.Id, orgId);
-        var apptConfirmed = Appointment.CreateClinicVisit(patient.Id, slot.Id, orgId);
+        var apptPending = new Appointment(patient.Id, slot.Id, 100000, PricingType.AutoAssign);
+        var apptConfirmed = new Appointment(patient.Id, slot.Id, 100000, PricingType.AutoAssign);
         apptConfirmed.Confirm();
         await context.Appointments.AddRangeAsync(apptPending, apptConfirmed);
         await context.SaveChangesAsync();
@@ -598,7 +598,7 @@ public class DashboardMetricsServiceTests
             FullName = "No Risk User"
         };
         await context.Users.AddAsync(user);
-        var patient = new Patient(user.Id);
+        var patient = Patient.CreateRegistered(user.Id);
         await context.Patients.AddAsync(patient);
         await context.SaveChangesAsync();
 

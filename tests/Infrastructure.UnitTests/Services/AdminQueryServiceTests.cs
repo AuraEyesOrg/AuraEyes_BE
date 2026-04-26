@@ -33,14 +33,16 @@ public class AdminQueryServiceTests
             Id = Guid.NewGuid(),
             UserName = "approved-doc@test.local",
             Email = "approved-doc@test.local",
-            FullName = "Approved Doc"
+            FullName = "Approved Doc",
+            IsActive = true
         };
         var rejectedUser = new ApplicationUser
         {
             Id = Guid.NewGuid(),
             UserName = "rejected-doc@test.local",
             Email = "rejected-doc@test.local",
-            FullName = "Rejected Doc"
+            FullName = "Rejected Doc",
+            IsActive = true
         };
         await context.Users.AddRangeAsync(approvedUser, rejectedUser);
 
@@ -79,14 +81,14 @@ public class AdminQueryServiceTests
             UserName = "pending@test.local",
             Email = "pending@test.local",
             FullName = "Pending User",
-            IsActive = true,
+            IsActive = false,
             EmailConfirmed = false
         };
 
         await context.Users.AddRangeAsync(activeUser, pendingUser);
         await context.Patients.AddRangeAsync(
-            new Patient(activeUser.Id),
-            new Patient(pendingUser.Id));
+            Patient.CreateRegistered(activeUser.Id),
+            Patient.CreateRegistered(pendingUser.Id));
         await context.SaveChangesAsync();
 
         var service = new AdminQueryService(context);
@@ -117,12 +119,12 @@ public class AdminQueryServiceTests
             UserName = "pending2@test.local",
             Email = "pending2@test.local",
             FullName = "Pending User 2",
-            IsActive = true,
+            IsActive = false,
             EmailConfirmed = false
         };
 
         await context.Users.AddRangeAsync(activeUser, pendingUser);
-        await context.Patients.AddRangeAsync(new Patient(activeUser.Id), new Patient(pendingUser.Id));
+        await context.Patients.AddRangeAsync(Patient.CreateRegistered(activeUser.Id), Patient.CreateRegistered(pendingUser.Id));
         await context.SaveChangesAsync();
 
         var service = new AdminQueryService(context);
@@ -155,7 +157,7 @@ public class AdminQueryServiceTests
             EmailConfirmed = true
         };
         await context.Users.AddRangeAsync(suspended, active);
-        await context.Patients.AddRangeAsync(new Patient(suspended.Id), new Patient(active.Id));
+        await context.Patients.AddRangeAsync(Patient.CreateRegistered(suspended.Id), Patient.CreateRegistered(active.Id));
         await context.SaveChangesAsync();
 
         var service = new AdminQueryService(context);
@@ -269,7 +271,7 @@ public class AdminQueryServiceTests
             UserName = "mix-pending@test.local",
             Email = "mix-pending@test.local",
             FullName = "Mix Pending",
-            IsActive = true,
+            IsActive = false,
             EmailConfirmed = false
         };
         var suspendedUser = new ApplicationUser
@@ -283,9 +285,9 @@ public class AdminQueryServiceTests
         };
         await context.Users.AddRangeAsync(activeUser, pendingUser, suspendedUser);
         await context.Patients.AddRangeAsync(
-            new Patient(activeUser.Id),
-            new Patient(pendingUser.Id),
-            new Patient(suspendedUser.Id));
+            Patient.CreateRegistered(activeUser.Id),
+            Patient.CreateRegistered(pendingUser.Id),
+            Patient.CreateRegistered(suspendedUser.Id));
         await context.SaveChangesAsync();
 
         var service = new AdminQueryService(context);
@@ -302,7 +304,7 @@ public class AdminQueryServiceTests
         var u1 = new ApplicationUser { Id = Guid.NewGuid(), UserName = "all-1@test.local", Email = "all-1@test.local", FullName = "All One", IsActive = true, EmailConfirmed = true };
         var u2 = new ApplicationUser { Id = Guid.NewGuid(), UserName = "all-2@test.local", Email = "all-2@test.local", FullName = "All Two", IsActive = false, EmailConfirmed = false };
         await context.Users.AddRangeAsync(u1, u2);
-        await context.Patients.AddRangeAsync(new Patient(u1.Id), new Patient(u2.Id));
+        await context.Patients.AddRangeAsync(Patient.CreateRegistered(u1.Id), Patient.CreateRegistered(u2.Id));
         await context.SaveChangesAsync();
 
         var service = new AdminQueryService(context);
@@ -316,10 +318,12 @@ public class AdminQueryServiceTests
     public async Task GetPatientsAsync_ShouldExcludeDeletedUsers()
     {
         await using var context = CreateContext();
-        var alive = new ApplicationUser { Id = Guid.NewGuid(), UserName = "alive@test.local", Email = "alive@test.local", FullName = "Alive", IsDeleted = false };
-        var deleted = new ApplicationUser { Id = Guid.NewGuid(), UserName = "deleted@test.local", Email = "deleted@test.local", FullName = "Deleted", IsDeleted = true };
+        var aliveId = Guid.NewGuid();
+        var deletedId = Guid.NewGuid();
+        var alive = new ApplicationUser { Id = aliveId, UserName = "alive@test.local", Email = "alive@test.local", FullName = "Alive", IsDeleted = false };
+        var deleted = new ApplicationUser { Id = deletedId, UserName = "deleted@test.local", Email = "deleted@test.local", FullName = "Deleted", IsDeleted = true };
         await context.Users.AddRangeAsync(alive, deleted);
-        await context.Patients.AddRangeAsync(new Patient(alive.Id), new Patient(deleted.Id));
+        await context.Patients.AddRangeAsync(Patient.CreateRegistered(aliveId), Patient.CreateRegistered(deletedId));
         await context.SaveChangesAsync();
 
         var service = new AdminQueryService(context);
@@ -478,7 +482,7 @@ public class AdminQueryServiceTests
             UserName = "status-pending@test.local",
             Email = "status-pending@test.local",
             FullName = "Status Pending",
-            IsActive = true,
+            IsActive = false,
             EmailConfirmed = false
         };
         var suspendedUser = new ApplicationUser
@@ -492,9 +496,9 @@ public class AdminQueryServiceTests
         };
         await context.Users.AddRangeAsync(activeUser, pendingUser, suspendedUser);
         await context.Patients.AddRangeAsync(
-            new Patient(activeUser.Id),
-            new Patient(pendingUser.Id),
-            new Patient(suspendedUser.Id));
+            Patient.CreateRegistered(activeUser.Id),
+            Patient.CreateRegistered(pendingUser.Id),
+            Patient.CreateRegistered(suspendedUser.Id));
         await context.SaveChangesAsync();
 
         var service = new AdminQueryService(context);
@@ -584,7 +588,7 @@ public class AdminQueryServiceTests
     [InlineData("ACTIVE", 1)]
     [InlineData("PENDING", 1)]
     [InlineData("SUSPENDED", 1)]
-    [InlineData(" active ", 3)]
+    [InlineData(" active ", 1)]
     public async Task GetPatientsAsync_StatusFilter_WithWhitespaceAndNull_ShouldMatchServiceBehavior(string? status, int expectedCount)
     {
         await using var context = CreateContext();
@@ -603,7 +607,7 @@ public class AdminQueryServiceTests
             UserName = "ws-pending@test.local",
             Email = "ws-pending@test.local",
             FullName = "WS Pending",
-            IsActive = true,
+            IsActive = false,
             EmailConfirmed = false
         };
         var suspendedUser = new ApplicationUser
@@ -617,9 +621,9 @@ public class AdminQueryServiceTests
         };
         await context.Users.AddRangeAsync(activeUser, pendingUser, suspendedUser);
         await context.Patients.AddRangeAsync(
-            new Patient(activeUser.Id),
-            new Patient(pendingUser.Id),
-            new Patient(suspendedUser.Id));
+            Patient.CreateRegistered(activeUser.Id),
+            Patient.CreateRegistered(pendingUser.Id),
+            Patient.CreateRegistered(suspendedUser.Id));
         await context.SaveChangesAsync();
 
         var service = new AdminQueryService(context);

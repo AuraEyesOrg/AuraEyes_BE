@@ -5,15 +5,15 @@ using Domain.Common;
 using Domain.Entities.Users;
 using Domain.Repositories;
 
-namespace Application.Feedback.Queries.GetOrganisationFeedback;
+namespace Application.Feedback.Queries.GetClinicFeedback;
 
-public class GetOrganisationFeedbackQueryHandler : IQueryHandler<GetOrganisationFeedbackQuery, ClinicFeedbackDto>
+public class GetClinicFeedbackQueryHandler : IQueryHandler<GetClinicFeedbackQuery, ClinicFeedbackDto>
 {
     private readonly IClinicFeedbackRepository _clinicFeedbackRepository;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IIdentityService _identityService;
 
-    public GetOrganisationFeedbackQueryHandler(
+    public GetClinicFeedbackQueryHandler(
         IClinicFeedbackRepository clinicFeedbackRepository,
         IRepository<Patient> patientRepository,
         IIdentityService identityService)
@@ -23,7 +23,7 @@ public class GetOrganisationFeedbackQueryHandler : IQueryHandler<GetOrganisation
         _identityService = identityService;
     }
 
-    public async Task<Result<ClinicFeedbackDto>> Handle(GetOrganisationFeedbackQuery request, CancellationToken cancellationToken)
+    public async Task<Result<ClinicFeedbackDto>> Handle(GetClinicFeedbackQuery request, CancellationToken cancellationToken)
     {
         var feedback = await _clinicFeedbackRepository.GetByIdAsync(
             request.FeedbackId,
@@ -49,7 +49,6 @@ public class GetOrganisationFeedbackQueryHandler : IQueryHandler<GetOrganisation
             Id = feedback.Id,
             PatientId = feedback.PatientId,
             PatientFullName = patientFullName,
-            OrganisationId = feedback.OrganisationId,
             AppointmentId = feedback.AppointmentId,
             Rating = feedback.Rating,
             Comment = feedback.Comment,

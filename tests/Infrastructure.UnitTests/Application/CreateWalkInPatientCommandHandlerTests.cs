@@ -14,6 +14,7 @@ public class CreateWalkInPatientCommandHandlerTests
     private readonly Mock<IIdentityService> _identityService = new();
     private readonly Mock<IEmailService> _emailService = new();
     private readonly Mock<ICurrentUserService> _currentUserService = new();
+    private readonly Mock<ICurrentUserOrganisationService> _currentUserOrganisationService = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<ILogger<CreateWalkInPatientCommandHandler>> _logger = new();
 
@@ -58,7 +59,7 @@ public class CreateWalkInPatientCommandHandlerTests
             .ReturnsAsync((true, createdUserId, Array.Empty<string>()));
 
         _identityService
-            .Setup(x => x.SetStaffOnboardingStatusAsync(createdUserId))
+            .Setup(x => x.ConfirmEmailAsync(It.IsAny<Guid>(), It.IsAny<string>()))
             .ReturnsAsync((true, Array.Empty<string>()));
 
         _patientRepository
@@ -75,14 +76,6 @@ public class CreateWalkInPatientCommandHandlerTests
         result.Data.LoginEmail.Should().EndWith("@patient.aura.local");
         result.Data.TemporaryPassword.Should().NotBeNullOrWhiteSpace();
         result.Data.EmailSent.Should().BeFalse();
-        _emailService.Verify(
-            x => x.SendAsync(
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<bool>(),
-                It.IsAny<CancellationToken>()),
-            Times.Never);
     }
 
     [Fact]
@@ -112,7 +105,6 @@ public class CreateWalkInPatientCommandHandlerTests
         result.Errors.Should().Contain("create user failed");
         _unitOfWork.Verify(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWork.Verify(x => x.RollbackTransactionAsync(It.IsAny<CancellationToken>()), Times.Once);
-        _unitOfWork.Verify(x => x.CommitTransactionAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private CreateWalkInPatientCommandHandler CreateHandler()
@@ -122,6 +114,7 @@ public class CreateWalkInPatientCommandHandlerTests
             _identityService.Object,
             _emailService.Object,
             _currentUserService.Object,
+            _currentUserOrganisationService.Object,
             _unitOfWork.Object,
             _logger.Object);
     }

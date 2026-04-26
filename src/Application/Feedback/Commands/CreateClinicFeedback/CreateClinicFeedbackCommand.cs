@@ -4,7 +4,7 @@ namespace Application.Feedback.Commands.CreateClinicFeedback;
 
 /// <summary>
 /// CreateClinicFeedbackCommand - Submit feedback for a clinic visit.
-/// Renamed from OrganisationFeedback to match the new clinic-centric model.
+/// Clinic-centric feedback model.
 /// </summary>
 public record CreateClinicFeedbackCommand : ICommand<Guid>
 {
@@ -17,7 +17,4 @@ public record CreateClinicFeedbackCommand : ICommand<Guid>
 
     /// <summary>Optional staff member being specifically reviewed.</summary>
     public Guid? StaffId { get; init; }
-
-    /// <summary>Optional OrganisationId for legacy support, but no longer required.</summary>
-    public Guid? OrganisationId { get; init; }
 }

@@ -1,18 +1,22 @@
 using Application.Common.Constants;
 using Application.Common.Models;
-using Application.Feedback.Commands.CreateClinicFeedback;
 using Application.Feedback.Commands.CreateWebsiteFeedback;
 using Application.Feedback.Common;
 using Application.Feedback.Queries.GetOphthalmologistFeedback;
 using Application.Feedback.Queries.GetOphthalmologistRatingSummary;
-using Application.Feedback.Queries.GetClinicFeedback;
-using Application.Feedback.Queries.GetClinicRatingSummary;
 using Application.Feedback.Queries.GetWebsiteFeedback;
 using Application.Feedback.Queries.ListOphthalmologistFeedback;
 using Application.Feedback.Queries.ListClinicFeedback;
+using Application.Feedback.Queries.GetClinicRatingSummary;
+using Application.Feedback.Queries.GetClinicFeedback;
+using Application.Feedback.Commands.CreateOphthalmologistFeedback;
+
+
+
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Application.Feedback.Commands.CreateClinicFeedback;
 
 namespace API.Controllers;
 
@@ -130,7 +134,7 @@ public class FeedbackController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetClinicFeedback(Guid clinicId, Guid feedbackId)
     {
-        var result = await _mediator.Send(new GetClinicFeedbackQuery(clinicId, feedbackId));
+        var result = await _mediator.Send(new GetClinicFeedbackQuery(feedbackId));
         return HandleResult(result);
     }
 
