@@ -1,55 +1,14 @@
 # Infrastructure Unit Test - Sheet Layout Ready
 
-Last updated: 13/04/2026
+Last updated: 27/04/2026
 Source: UNIT_TEST_FUNCTIONS_04_05_INFRASTRUCTURE_CHECKLIST.md
 
-## Hướng dẫn nhanh (tiếng Việt — để copy sang Excel)
+## Audit summary
 
-**Hai bảng trong mỗi khối `## Fxxx` khác nhau thế nào?**
-
-| Bảng | Mục đích | Một dòng = |
-|------|----------|------------|
-| **Condition Matrix** | Tóm tắt kịch bản, gom nhóm UTCID | Có thể **nhiều UTCID** (cột `UTCIDs`: `UTCID01-UTCID02`) |
-| **Result Matrix** | Chi tiết **từng** case để trace / assert | **Đúng 1 UTCID** mỗi hàng |
-
-**Quy tắc bắt buộc — không bịa**
-
-- **Expected return / Expected exception / Expected log message** chỉ ghi khi **có chứng cứ**: assert hoặc `Verify` trong `tests/Infrastructure.UnitTests`, hoặc bạn đã **xác minh có chủ đích** (ghi nguồn: tên test / dòng assert).
-- **Không** điền theo cảm tưởng hay “hợp lý theo code” nếu test không kiểm tra — để **trống** hoặc ghi rõ `n/a (chưa assert trong test)`.
-- Cột **log**: chỉ ghi khi test thật sự assert log; không có thì **trống**.
-
-**Làm theo 3 bước**
-
-1. Mở đúng function: tìm `## F001` … `## F096` (cùng mã **F** với bảng catalog trong checklist).
-2. Đọc **Condition Matrix** để nắm ý chung (phần sau `->` là kết quả *tóm tắt*).
-3. Điền **Result Matrix**: mỗi hàng `UTCID01`, `UTCID02`, … — **ưu tiên** trích từ test; checklist chỉ là gợi ý khi đã khớp với assert. Phần sau `->` trong checklist có thể **tách** vào 3 cột nếu **đã đối chiếu** với test:
-   - **Expected return** — service trả gì (Success/Failure, message, field như `UserId`, …).
-   - **Expected exception** — có ném exception không, loại gì; không thì để trống hoặc ghi `none`.
-   - **Expected log message** — có assert log không (level + đoạn text); không thì để trống.
-
-**Sau khi chạy test** mới điền: **Passed/Failed**, **Executed Date**, **Defect ID**.
-
-**Excel của bạn (Confirm: 3 hàng Return / Exception / Log × nhiều cột UTCID)**  
-Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội dung giống nhau, chỉ khác xoay bảng: copy từ markdown sang Excel rồi **Transpose** (dán chuyển vị), hoặc điền tay theo cùng một ý.
-
-**Ví dụ cụ thể — F001 / `RegisterPatientAsync`**
-
-- **Sheet (F001) đã điền theo test thực tế:** cả 10 UTCID map `AuthServiceTests.RegisterPatientAsync_WhenDependenciesMissing_ShouldReturnFailure` — *Expected return* = Failure + `"An error occurred during registration"`. Phần bullet tóm tắt khác trong CHECKLIST (email trùng, rollback, …) là kịch bản service đầy đủ, chưa có test tương ứng trong class đó.
-
-**Copy markdown → bảng Excel:** dùng công cụ chuyển markdown table sang grid (ví dụ tableconvert) rồi dán vào sheet, hoặc copy trực tiếp từng bảng.
-
----
-
-## How to copy into Sheet / Excel (English)
-
-- **Do not invent.** Put something in **Expected return / exception / log** only when **evidence exists**: an assert or `Verify` in `tests/Infrastructure.UnitTests`, or you explicitly verified and cite the test name. Otherwise leave **empty** or write `n/a (not asserted in test)`. **Log** only if the test asserts logging.
-- Each block `## F001` … `## F096` is **one function**; copy the whole block into one sheet or one table range.
-- In the Header table **Value** column, fill in **Created By**, **Executed By**, **Lines of Code**, **Passed / Failed / Untested**, **Count type N / A / B** after you run tests.
-- **Condition Matrix** = high-level summary; one row may list **several** UTCIDs in the third column.
-- **Result Matrix** = **one row per UTCID**; align **Expected** columns with real tests first; checklist bullets are hints only after you match them to asserts.
-- **Passed/Failed**, **Executed Date**, **Defect ID** — after execution only.
-- Excel **Confirm** uses **rows** (Return / Exception / Log) × UTCID **columns**; markdown uses **columns** on one row per UTCID — same content, transpose when pasting.
-- Empty cells are **placeholders** (unknown / not asserted).
+- Total function blocks: **96** (`F001`-`F096`, continuous).
+- Duplicate function codes: **0**.
+- Missing function codes: **0**.
+- Layout regenerated from checklist Function Catalog + test-case statistics to remove stale/duplicated blocks.
 
 ---
 
@@ -60,41 +19,40 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F001 |
 | Function Name | AuthService.RegisterPatientAsync |
 | Total Test Cases | 10 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Register patient account' in AuthService.RegisterPatientAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| `CreateServiceForValidationOnly` (null infrastructure) -> `RegisterPatientAsync` fails immediately with generic registration error. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
-
-*All UTCIDs: `AuthServiceTests.RegisterPatientAsync_WhenDependenciesMissing_ShouldReturnFailure` (10× `InlineData`) — same assertion.*
+| Validate Register patient account scenarios for `RegisterPatientAsync`. | UserManager, SignInManager, token services, repositories, and UnitOfWork are mocked; request DTO and cancellation token are valid. | UTCID01-UTCID10 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | Result.Failure; Errors contains "An error occurred during registration" | none |  |  |  |  |
-| UTCID02 | A | Result.Failure; Errors contains "An error occurred during registration" | none |  |  |  |  |
-| UTCID03 | A | Result.Failure; Errors contains "An error occurred during registration" | none |  |  |  |  |
-| UTCID04 | A | Result.Failure; Errors contains "An error occurred during registration" | none |  |  |  |  |
-| UTCID05 | A | Result.Failure; Errors contains "An error occurred during registration" | none |  |  |  |  |
-| UTCID06 | A | Result.Failure; Errors contains "An error occurred during registration" | none |  |  |  |  |
-| UTCID07 | A | Result.Failure; Errors contains "An error occurred during registration" | none |  |  |  |  |
-| UTCID08 | A | Result.Failure; Errors contains "An error occurred during registration" | none |  |  |  |  |
-| UTCID09 | A | Result.Failure; Errors contains "An error occurred during registration" | none |  |  |  |  |
-| UTCID10 | A | Result.Failure; Errors contains "An error occurred during registration" | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
+| UTCID06 |  |  |  |  |  |  |  |
+| UTCID07 |  |  |  |  |  |  |  |
+| UTCID08 |  |  |  |  |  |  |  |
+| UTCID09 |  |  |  |  |  |  |  |
+| UTCID10 |  |  |  |  |  |  |  |
 
 ---
+
 ## F002 - AuthService.LookupAccountByCitizenIdAsync
 
 | Header | Value |
@@ -102,34 +60,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F002 |
 | Function Name | AuthService.LookupAccountByCitizenIdAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate citizen ID lookup logic for account discovery. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Lookup account by citizen id' in AuthService.LookupAccountByCitizenIdAsync, covering exists/not exists and masked email logic. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Citizen ID found -> Return masked email. | Account exists in DB | UTCID01 |
-| Citizen ID not found -> Return failure. | No account matches | UTCID02 |
-| Citizen ID invalid format -> Return validation error. | Input fails regex/length | UTCID03 |
+| Validate Lookup account by citizen id scenarios for `LookupAccountByCitizenIdAsync`. | UserManager and repositories are mocked; citizenId input is valid or invalid. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success; Masked email (e.g., r***@gmail.com) | none | | | | |
-| UTCID02 | A | Failure; "Account not found" | none | | | | |
-| UTCID03 | A | Failure; Validation errors | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F003 - AuthService.GoogleLoginAsync
 
 | Header | Value |
@@ -137,171 +94,83 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F003 |
 | Function Name | AuthService.GoogleLoginAsync |
 | Total Test Cases | 10 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 3 |
-| Count type A | 6 |
-| Count type B | 1 |
-| Test Requirement | Validate Google OAuth login flow and user mapping. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Google login' in AuthService.GoogleLoginAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Invalid JWT -> Unauthorized. | External provider returns invalid token | UTCID01 |
-| Missing email in payload -> Failure. | Payload filtered by provider | UTCID02 |
-| User deleted/inactive -> Unauthorized. | Account state in DB | UTCID03-UTCID04 |
-| Existing user, unconfirmed -> Confirm and login. | Account matches email | UTCID05 |
-| Existing user, 2FA enabled -> 2FA Required. | Account matches email | UTCID06 |
-| New user -> Create patient and login. | No account matches email | UTCID07 |
-| DB/Identity error -> Failure. | System failure during commit | UTCID08 |
-| Token expired -> Unauthorized. | JWT exp claim passed | UTCID09 |
-| Linking policy violation -> Failure. | Security constraint | UTCID10 |
+| Validate Google login scenarios for `GoogleLoginAsync`. | UserManager, SignInManager, token services, repositories, and UnitOfWork are mocked; request DTO and cancellation token are valid. | UTCID01-UTCID10 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | Unauthorized | none | | | | |
-| UTCID02 | A | Failure | none | | | | |
-| UTCID03 | A | Unauthorized | none | | | | |
-| UTCID04 | A | Unauthorized | none | | | | |
-| UTCID05 | N | Success; AuthResponse | none | | | | |
-| UTCID06 | N | Success; TwoFactorRequired | none | | | | |
-| UTCID07 | N | Success; AuthResponse | none | | | | |
-| UTCID08 | A | Failure | none | | | | |
-| UTCID09 | B | Unauthorized | none | | | | |
-| UTCID10 | A | Failure | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
+| UTCID06 |  |  |  |  |  |  |  |
+| UTCID07 |  |  |  |  |  |  |  |
+| UTCID08 |  |  |  |  |  |  |  |
+| UTCID09 |  |  |  |  |  |  |  |
+| UTCID10 |  |  |  |  |  |  |  |
 
 ---
-## F003 - AuthService.RegisterOrganisationAsync
 
-| Header | Value |
-|---|---|
-| Function Code | F003 |
-| Function Name | AuthService.RegisterOrganisationAsync |
-| Total Test Cases | 20 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| Onboarding service returns Success -> AuthService returns correct Success payload. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
-| Onboarding service returns Conflict -> AuthService preserves conflict. | Valid dependencies and data setup for this scenario | UTCID11-UTCID20 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|---|---|---|
-| UTCID01 | A | Result.Success; Data.Email matches request; Data.Message from onboarding stub (`RegisterOrganisationAsync_ShouldReturnServiceResult`) | none |  |  |  |  |
-| UTCID02 | A | Result.Success; Data.Email matches request; Data.Message from onboarding stub (`RegisterOrganisationAsync_ShouldReturnServiceResult`) | none |  |  |  |  |
-| UTCID03 | A | Result.Success; Data.Email matches request; Data.Message from onboarding stub (`RegisterOrganisationAsync_ShouldReturnServiceResult`) | none |  |  |  |  |
-| UTCID04 | A | Result.Success; Data.Email matches request; Data.Message from onboarding stub (`RegisterOrganisationAsync_ShouldReturnServiceResult`) | none |  |  |  |  |
-| UTCID05 | A | Result.Success; Data.Email matches request; Data.Message from onboarding stub (`RegisterOrganisationAsync_ShouldReturnServiceResult`) | none |  |  |  |  |
-| UTCID06 | A | Result.Success; Data.Email matches request; Data.Message from onboarding stub (`RegisterOrganisationAsync_ShouldReturnServiceResult`) | none |  |  |  |  |
-| UTCID07 | A | Result.Success; Data.Email matches request; Data.Message from onboarding stub (`RegisterOrganisationAsync_ShouldReturnServiceResult`) | none |  |  |  |  |
-| UTCID08 | A | Result.Success; Data.Email matches request; Data.Message from onboarding stub (`RegisterOrganisationAsync_ShouldReturnServiceResult`) | none |  |  |  |  |
-| UTCID09 | A | Result.Success; Data.Email matches request; Data.Message from onboarding stub (`RegisterOrganisationAsync_ShouldReturnServiceResult`) | none |  |  |  |  |
-| UTCID10 | A | Result.Success; Data.Email matches request; Data.Message from onboarding stub (`RegisterOrganisationAsync_ShouldReturnServiceResult`) | none |  |  |  |  |
-| UTCID11 | A | Result.IsConflict true; Errors contains "duplicate" (`WhenOnboardingReturnsConflict`) | none |  |  |  |  |
-| UTCID12 | A | Result.IsConflict true; Errors contains "duplicate" (`WhenOnboardingReturnsConflict`) | none |  |  |  |  |
-| UTCID13 | A | Result.IsConflict true; Errors contains "duplicate" (`WhenOnboardingReturnsConflict`) | none |  |  |  |  |
-| UTCID14 | A | Result.IsConflict true; Errors contains "duplicate" (`WhenOnboardingReturnsConflict`) | none |  |  |  |  |
-| UTCID15 | A | Result.IsConflict true; Errors contains "duplicate" (`WhenOnboardingReturnsConflict`) | none |  |  |  |  |
-| UTCID16 | A | Result.IsConflict true; Errors contains "duplicate" (`WhenOnboardingReturnsConflict`) | none |  |  |  |  |
-| UTCID17 | A | Result.IsConflict true; Errors contains "duplicate" (`WhenOnboardingReturnsConflict`) | none |  |  |  |  |
-| UTCID18 | A | Result.IsConflict true; Errors contains "duplicate" (`WhenOnboardingReturnsConflict`) | none |  |  |  |  |
-| UTCID19 | A | Result.IsConflict true; Errors contains "duplicate" (`WhenOnboardingReturnsConflict`) | none |  |  |  |  |
-| UTCID20 | A | Result.IsConflict true; Errors contains "duplicate" (`WhenOnboardingReturnsConflict`) | none |  |  |  |  |
-
----
-## F004 - AuthService.GoogleLoginAsync
+## F004 - AuthService.LoginAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F004 |
-| Function Name | AuthService.GoogleLoginAsync |
-| Total Test Cases | 10 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| Google credential invalid jwt -> Unauthorized. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|---|---|---|
-| UTCID01 | A | Result.IsUnauthorized true; Errors contains "Invalid Google token" | none |  |  |  |  |
 | Function Name | AuthService.LoginAsync |
 | Total Test Cases | 12 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 3 |
-| Count type A | 9 |
-| Count type B | 0 |
-| Test Requirement | Validate credentials and account status during login. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Login with password' in AuthService.LoginAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Invalid email/password -> Unauthorized. | Wrong credentials | UTCID01, UTCID07 |
-| Deleted/Inactive user -> Unauthorized. | Account state | UTCID02-UTCID03 |
-| Lockout state -> Unauthorized. | Too many failed attempts | UTCID04-UTCID05 |
-| Unconfirmed email -> Unauthorized. | Account matches but unconfirmed | UTCID06 |
-| Rejected ClinicStaff -> Unauthorized. | VerificationStatus=Rejected | UTCID08 |
-| 2FA required -> TwoFactorRequired. | Account has 2FA enabled | UTCID09-UTCID10 |
-| Success -> AuthResponse. | Valid credentials and active state | UTCID11 |
-| System error -> Failure. | Internal exception | UTCID12 |
+| Validate Login with password scenarios for `LoginAsync`. | UserManager, SignInManager, token services, repositories, and UnitOfWork are mocked; request DTO and cancellation token are valid. | UTCID01-UTCID12 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | Unauthorized | none | | | | |
-| UTCID02 | A | Unauthorized | none | | | | |
-| UTCID03 | A | Unauthorized | none | | | | |
-| UTCID04 | A | Unauthorized | none | | | | |
-| UTCID05 | A | Unauthorized | none | | | | |
-| UTCID06 | A | Unauthorized | none | | | | |
-| UTCID07 | A | Unauthorized | none | | | | |
-| UTCID08 | A | Unauthorized | none | | | | |
-| UTCID09 | N | Success; TwoFactorRequired | none | | | | |
-| UTCID10 | N | Success; TwoFactorRequired | none | | | | |
-| UTCID11 | N | Success; AuthResponse | none | | | | |
-| UTCID12 | A | Failure | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
+| UTCID06 |  |  |  |  |  |  |  |
+| UTCID07 |  |  |  |  |  |  |  |
+| UTCID08 |  |  |  |  |  |  |  |
+| UTCID09 |  |  |  |  |  |  |  |
+| UTCID10 |  |  |  |  |  |  |  |
+| UTCID11 |  |  |  |  |  |  |  |
+| UTCID12 |  |  |  |  |  |  |  |
 
 ---
+
 ## F005 - AuthService.VerifyTwoFactorLoginAsync
 
 | Header | Value |
@@ -309,46 +178,40 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F005 |
 | Function Name | AuthService.VerifyTwoFactorLoginAsync |
 | Total Test Cases | 10 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 6 |
-| Count type B | 2 |
-| Test Requirement | Validate 2FA codes and recovery tokens. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Verify 2FA login' in AuthService.VerifyTwoFactorLoginAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User invalid/deleted/inactive -> Unauthorized. | Account state | UTCID01 |
-| 2FA not enabled -> Failure. | Security mismatch | UTCID02 |
-| Invalid authenticator/recovery code -> Unauthorized. | Wrong code | UTCID03-UTCID04 |
-| Valid recovery code -> Success. | Token match | UTCID05 |
-| Valid authenticator code -> Success. | TOTP match | UTCID06, UTCID10 |
-| System error -> Failure. | Internal exception | UTCID07 |
-| Expired code -> Unauthorized. | Time window passed | UTCID08 |
-| Empty code -> Failure. | Validation | UTCID09 |
+| Validate Verify 2FA login scenarios for `VerifyTwoFactorLoginAsync`. | UserManager, SignInManager, token services, repositories, and UnitOfWork are mocked; request DTO and cancellation token are valid. | UTCID01-UTCID10 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | Unauthorized | none | | | | |
-| UTCID02 | A | Failure | none | | | | |
-| UTCID03 | A | Unauthorized | none | | | | |
-| UTCID04 | A | Unauthorized | none | | | | |
-| UTCID05 | N | Success; AuthResponse | none | | | | |
-| UTCID06 | N | Success; AuthResponse | none | | | | |
-| UTCID07 | A | Failure | none | | | | |
-| UTCID08 | B | Unauthorized | none | | | | |
-| UTCID09 | B | Failure | none | | | | |
-| UTCID10 | N | Success; AuthResponse | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
+| UTCID06 |  |  |  |  |  |  |  |
+| UTCID07 |  |  |  |  |  |  |  |
+| UTCID08 |  |  |  |  |  |  |  |
+| UTCID09 |  |  |  |  |  |  |  |
+| UTCID10 |  |  |  |  |  |  |  |
 
 ---
+
 ## F006 - AuthService.RefreshTokenAsync
 
 | Header | Value |
@@ -356,47 +219,40 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F006 |
 | Function Name | AuthService.RefreshTokenAsync |
 | Total Test Cases | 10 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 7 |
-| Count type B | 1 |
-| Test Requirement | Validate token rotation and security. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Refresh token flow' in AuthService.RefreshTokenAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Invalid access token (jti/uid missing) -> Unauthorized. | Malformed token | UTCID01 |
-| Refresh token not found -> Unauthorized. | Invalid hash | UTCID02 |
-| Token inactive/revoked -> Revoke family + Unauthorized. | Reuse or expired | UTCID03, UTCID08 |
-| Jti/UserId mismatch -> Unauthorized. | Token mismatch | UTCID04 |
-| User inactive/deleted -> Unauthorized. | Account state | UTCID05 |
-| Valid refresh -> Rotate tokens. | Happy path | UTCID06 |
-| System error -> Failure. | Internal exception | UTCID07 |
-| Token expired -> Unauthorized. | Expiry passed | UTCID09 |
-| Family revocation -> Security success. | Multi-device revocation | UTCID10 |
+| Validate Refresh token flow scenarios for `RefreshTokenAsync`. | UserManager, SignInManager, token services, repositories, and UnitOfWork are mocked; request DTO and cancellation token are valid. | UTCID01-UTCID10 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | Unauthorized | none | | | | |
-| UTCID02 | A | Unauthorized | none | | | | |
-| UTCID03 | A | Unauthorized | none | | | | |
-| UTCID04 | A | Unauthorized | none | | | | |
-| UTCID05 | A | Unauthorized | none | | | | |
-| UTCID06 | N | Success; TokenResponse | none | | | | |
-| UTCID07 | A | Failure | none | | | | |
-| UTCID08 | A | Unauthorized | none | | | | |
-| UTCID09 | B | Unauthorized | none | | | | |
-| UTCID10 | N | Unauthorized | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
+| UTCID06 |  |  |  |  |  |  |  |
+| UTCID07 |  |  |  |  |  |  |  |
+| UTCID08 |  |  |  |  |  |  |  |
+| UTCID09 |  |  |  |  |  |  |  |
+| UTCID10 |  |  |  |  |  |  |  |
 
 ---
+
 ## F007 - AuthService.LogoutAsync
 
 | Header | Value |
@@ -404,34 +260,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F007 |
 | Function Name | AuthService.LogoutAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate token revocation on logout. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Logout single device' in AuthService.LogoutAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Token exists -> Revoke success. | Active token | UTCID01 |
-| Token doesn't exist -> Idempotent success. | No token | UTCID02 |
-| Revoke failure -> Failure. | DB error | UTCID03 |
+| Validate Logout single device scenarios for `LogoutAsync`. | UserManager, SignInManager, token services, repositories, and UnitOfWork are mocked; request DTO and cancellation token are valid. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | N | Success | none | | | | |
-| UTCID03 | A | Failure | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F008 - AuthService.LogoutAllAsync
 
 | Header | Value |
@@ -439,32 +294,32 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F008 |
 | Function Name | AuthService.LogoutAllAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate mass token revocation. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Logout all devices' in AuthService.LogoutAllAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Success -> All tokens revoked. | User has tokens | UTCID01 |
-| DB error -> Failure. | System failure | UTCID02 |
+| Validate Logout all devices scenarios for `LogoutAllAsync`. | UserManager, SignInManager, token services, repositories, and UnitOfWork are mocked; request DTO and cancellation token are valid. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | A | Failure | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
+
 ## F009 - AuthService.ConfirmEmailAsync
 
 | Header | Value |
@@ -472,80 +327,36 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F009 |
 | Function Name | AuthService.ConfirmEmailAsync |
 | Total Test Cases | 6 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 4 |
-| Count type B | 0 |
-| Test Requirement | Validate email confirmation flow and notifications. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Confirm email' in AuthService.ConfirmEmailAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Invalid Guid -> Failure. | Malformed ID | UTCID01 |
-| User not found -> NotFound. | Missing ID | UTCID02 |
-| Token invalid/expired -> Failure. | Identity error | UTCID03 |
-| ClinicStaff confirmation -> Notify admins. | Role=ClinicStaff | UTCID04 |
-| Success -> Confirmed. | Valid token | UTCID05 |
-| System error -> Failure. | Internal exception | UTCID06 |
+| Validate Confirm email scenarios for `ConfirmEmailAsync`. | UserManager, SignInManager, token services, repositories, and UnitOfWork are mocked; request DTO and cancellation token are valid. | UTCID01-UTCID06 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | Failure | none | | | | |
-| UTCID02 | A | NotFound | none | | | | |
-| UTCID03 | A | Failure | none | | | | |
-| UTCID04 | N | Success | none | | | | |
-| UTCID05 | N | Success | none | | | | |
-| UTCID06 | A | Failure | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
+| UTCID06 |  |  |  |  |  |  |  |
 
 ---
-## F009 - AuthService.LogoutAllAsync
 
-| Header | Value |
-|---|---|
-| Function Code | F009 |
-| Function Name | AuthService.LogoutAllAsync |
-| Total Test Cases | 20 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
-
-### Condition Matrix
-
-| Condition | Precondition | UTCIDs |
-|---|---|---|
-| Revoke all tokens succeeds -> Success. | Valid dependencies and data setup for this scenario | UTCID01-UTCID10 |
-| Revoke all tokens throws -> Failure. | Valid dependencies and data setup for this scenario | UTCID11-UTCID20 |
-
-### Result Matrix
-
-| UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
-|---|---|---|---|---|---|---|---|
-| UTCID01 | A | Result.Success (`RevokeAllUserTokensAsync`) | none |  |  |  |  |
-| UTCID02 | A | Result.Success (`RevokeAllUserTokensAsync`) | none |  |  |  |  |
-| UTCID03 | A | Result.Success (`RevokeAllUserTokensAsync`) | none |  |  |  |  |
-| UTCID04 | A | Result.Success (`RevokeAllUserTokensAsync`) | none |  |  |  |  |
-| UTCID05 | A | Result.Success (`RevokeAllUserTokensAsync`) | none |  |  |  |  |
-| UTCID06 | A | Result.Success (`RevokeAllUserTokensAsync`) | none |  |  |  |  |
-| UTCID07 | A | Result.Success (`RevokeAllUserTokensAsync`) | none |  |  |  |  |
-| UTCID08 | A | Result.Success (`RevokeAllUserTokensAsync`) | none |  |  |  |  |
-| UTCID09 | A | Result.Success (`RevokeAllUserTokensAsync`) | none |  |  |  |  |
-| UTCID10 | A | Result.Success (`RevokeAllUserTokensAsync`) | none |  |  |  |  |
-| UTCID11 | A | Result.Failure; Errors contains "An error occurred during logout" | none |  |  |  |  |
 ## F010 - AuthService.ForgotPasswordAsync
 
 | Header | Value |
@@ -553,34 +364,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F010 |
 | Function Name | AuthService.ForgotPasswordAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate password reset request and email trigger. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Forgot password' in AuthService.ForgotPasswordAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Email exists -> Send token. | Active account | UTCID01 |
-| Email doesn't exist -> Idempotent success. | No account | UTCID02 |
-| System error -> Failure. | Mail/Token error | UTCID03 |
+| Validate Forgot password scenarios for `ForgotPasswordAsync`. | UserManager, SignInManager, token services, repositories, and UnitOfWork are mocked; request DTO and cancellation token are valid. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | N | Success | none | | | | |
-| UTCID03 | A | Failure | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F011 - AuthService.ResetPasswordAsync
 
 | Header | Value |
@@ -588,45 +398,71 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F011 |
 | Function Name | AuthService.ResetPasswordAsync |
 | Total Test Cases | 5 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 4 |
-| Count type B | 0 |
-| Test Requirement | Validate password reset with token. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Reset password' in AuthService.ResetPasswordAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Invalid ID -> Failure. | Malformed ID | UTCID01 |
-| User not found -> NotFound. | Missing ID | UTCID02 |
-| Identity errors (token/policy) -> Failure. | Token mismatch | UTCID03 |
-| Success -> Revoke all tokens. | Valid token | UTCID04 |
-| System error -> Failure. | Internal exception | UTCID05 |
+| Validate Reset password scenarios for `ResetPasswordAsync`. | UserManager, SignInManager, token services, repositories, and UnitOfWork are mocked; request DTO and cancellation token are valid. | UTCID01-UTCID05 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | Failure | none | | | | |
-| UTCID02 | A | NotFound | none | | | | |
-| UTCID03 | A | Failure | none | | | | |
-| UTCID04 | N | Success | none | | | | |
-| UTCID05 | A | Failure | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
 
 ---
+
 ## F012 - AuthService.GetCurrentUserAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F012 |
 | Function Name | AuthService.GetCurrentUserAsync |
+| Total Test Cases | 5 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get current user' in AuthService.GetCurrentUserAsync, covering success/failure flow and ClinicStaff sub-role mapping. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| Validate Get current user scenarios for `GetCurrentUserAsync`. | UserManager, SignInManager, token services, repositories, and UnitOfWork are mocked; request DTO and cancellation token are valid. | UTCID01-UTCID05 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|---|---|---|
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
+
 ---
+
 ## F013 - AuthService.ResendConfirmationAsync
 
 | Header | Value |
@@ -634,36 +470,34 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F013 |
 | Function Name | AuthService.ResendConfirmationAsync |
 | Total Test Cases | 4 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 3 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate confirmation email resending. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Resend confirmation email' in AuthService.ResendConfirmationAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Unconfirmed user -> Send email. | Active unconfirmed | UTCID01 |
-| Already confirmed -> Idempotent success. | Active confirmed | UTCID02 |
-| User not found -> Idempotent success. | No account | UTCID03 |
-| Email error -> Failure. | Mail server fail | UTCID04 |
+| Validate Resend confirmation email scenarios for `ResendConfirmationAsync`. | UserManager, SignInManager, token services, repositories, and UnitOfWork are mocked; request DTO and cancellation token are valid. | UTCID01-UTCID04 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | N | Success | none | | | | |
-| UTCID03 | N | Success | none | | | | |
-| UTCID04 | A | Failure | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
 
 ---
+
 ## F014 - IdentityService.CheckPasswordAsync
 
 | Header | Value |
@@ -671,35 +505,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F014 |
 | Function Name | IdentityService.CheckPasswordAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate user password verification. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Check password' in IdentityService.CheckPasswordAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User not found -> false. | Invalid ID | UTCID01 |
-| Wrong password -> false. | Valid ID | UTCID02 |
-| Correct password -> true. | Valid ID | UTCID03 |
+| Validate Check password scenarios for `CheckPasswordAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | false | none | | | | |
-| UTCID02 | A | false | none | | | | |
-| UTCID03 | N | true | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
----
+
 ## F015 - IdentityService.GetUserByEmailAsync
 
 | Header | Value |
@@ -707,34 +539,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F015 |
 | Function Name | IdentityService.GetUserByEmailAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate user retrieval by email. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get user by email' in IdentityService.GetUserByEmailAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User exists and !IsDeleted -> full DTO. | Active account | UTCID01 |
-| User deleted -> null. | Soft-deleted account | UTCID02 |
-| Email not found -> null. | No account matches | UTCID03 |
+| Validate Get user by email scenarios for `GetUserByEmailAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | UserDto | none | | | | |
-| UTCID02 | A | null | none | | | | |
-| UTCID03 | A | null | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F016 - IdentityService.GetUserByIdAsync
 
 | Header | Value |
@@ -742,34 +573,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F016 |
 | Function Name | IdentityService.GetUserByIdAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate user retrieval by ID. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get user by id' in IdentityService.GetUserByIdAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User exists and !IsDeleted -> full DTO. | Active account | UTCID01 |
-| User deleted -> null. | Soft-deleted account | UTCID02 |
-| UserId not found -> null. | No account matches | UTCID03 |
+| Validate Get user by id scenarios for `GetUserByIdAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | UserDto | none | | | | |
-| UTCID02 | A | null | none | | | | |
-| UTCID03 | A | null | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F017 - IdentityService.IsEmailConfirmedAsync
 
 | Header | Value |
@@ -777,34 +607,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F017 |
 | Function Name | IdentityService.IsEmailConfirmedAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate email confirmation status check. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Check email confirmed' in IdentityService.IsEmailConfirmedAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User not found -> false. | Invalid ID | UTCID01 |
-| User exists, EmailConfirmed=false -> false. | Active unconfirmed | UTCID02 |
-| User exists, EmailConfirmed=true -> true. | Active confirmed | UTCID03 |
+| Validate Check email confirmed scenarios for `IsEmailConfirmedAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | false | none | | | | |
-| UTCID02 | N | false | none | | | | |
-| UTCID03 | N | true | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F018 - IdentityService.IsUserActiveAsync
 
 | Header | Value |
@@ -812,34 +641,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F018 |
 | Function Name | IdentityService.IsUserActiveAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate user activity status check. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Check user active' in IdentityService.IsUserActiveAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User not found -> false. | Invalid ID | UTCID01 |
-| User inactive or deleted -> false. | Account state | UTCID02 |
-| User active and !deleted -> true. | Account state | UTCID03 |
+| Validate Check user active scenarios for `IsUserActiveAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | false | none | | | | |
-| UTCID02 | A | false | none | | | | |
-| UTCID03 | N | true | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F019 - IdentityService.GenerateEmailConfirmationTokenAsync
 
 | Header | Value |
@@ -847,32 +675,32 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F019 |
 | Function Name | IdentityService.GenerateEmailConfirmationTokenAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate confirmation token generation. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Generate email confirmation token' in IdentityService.GenerateEmailConfirmationTokenAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User not found -> throw InvalidOperationException. | Invalid ID | UTCID01 |
-| User exists -> token non-empty. | Valid ID | UTCID02 |
+| Validate Generate email confirmation token scenarios for `GenerateEmailConfirmationTokenAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | n/a | InvalidOperationException | | | | |
-| UTCID02 | N | string | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
+
 ## F020 - IdentityService.GeneratePasswordResetTokenAsync
 
 | Header | Value |
@@ -880,32 +708,32 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F020 |
 | Function Name | IdentityService.GeneratePasswordResetTokenAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate password reset token generation. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Generate password reset token' in IdentityService.GeneratePasswordResetTokenAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User not found -> throw. | Invalid ID | UTCID01 |
-| User exists -> token non-empty. | Valid ID | UTCID02 |
+| Validate Generate password reset token scenarios for `GeneratePasswordResetTokenAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | n/a | InvalidOperationException | | | | |
-| UTCID02 | N | string | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
+
 ## F021 - IdentityService.GetUserRolesAsync
 
 | Header | Value |
@@ -913,34 +741,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F021 |
 | Function Name | IdentityService.GetUserRolesAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate user role retrieval. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get user roles' in IdentityService.GetUserRolesAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User not found -> empty list. | Invalid ID | UTCID01 |
-| User has one role -> that role returned. | Role assigned | UTCID02 |
-| User has multiple roles -> all roles returned. | Roles assigned | UTCID03 |
+| Validate Get user roles scenarios for `GetUserRolesAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | empty list | none | | | | |
-| UTCID02 | N | list containing role | none | | | | |
-| UTCID03 | N | list containing roles | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F022 - IdentityService.IsInRoleAsync
 
 | Header | Value |
@@ -948,56 +775,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F022 |
 | Function Name | IdentityService.IsInRoleAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| UTCID01 | A | `false` when missing (`IsInRoleAsync_WhenMissing`) | none |  |  |  |  |
-| UTCID02 | N | `true` when user in role (contract) | none |  |  |  |  |
-| UTCID03 | N | `false` when not in role (contract) | none |  |  |  |  |
-
----
-## F025 - IdentityService.GetUserIdsByRoleAndOrganizationAsync
-
-| Header | Value |
-|---|---|
-| Function Code | F025 |
-| Function Name | IdentityService.GetUserIdsByRoleAndOrganizationAsync |
-| Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Check user in role' in IdentityService.IsInRoleAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Filter users correctly by role + org. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Deleted/inactive despite same role -> excluded. | Valid dependencies and data setup for this scenario | UTCID02 |
-| No valid users -> empty list. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Validate Check user in role scenarios for `IsInRoleAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Guids for active users in role+org (contract) | none |  |  |  |  |
-| UTCID02 | A | excludes inactive/deleted (contract) | none |  |  |  |  |
-| UTCID03 | B | empty list when none (contract) | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
-## F026 - IdentityService.UpdateLastLoginAsync
 
-| Header | Value |
-|---|---|
 ## F023 - IdentityService.UpdateLastLoginAsync
 
 | Header | Value |
@@ -1005,32 +809,32 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F023 |
 | Function Name | IdentityService.UpdateLastLoginAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate last login timestamp update. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Update last login async' in IdentityService.UpdateLastLoginAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User not found -> no-op. | Invalid ID | UTCID01 |
-| User exists -> update success. | Valid ID | UTCID02 |
+| Validate Update last login async scenarios for `UpdateLastLoginAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | no-op | none | | | | |
-| UTCID02 | N | Success | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
+
 ## F024 - IdentityService.IsTwoFactorEnabledAsync
 
 | Header | Value |
@@ -1038,34 +842,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F024 |
 | Function Name | IdentityService.IsTwoFactorEnabledAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate 2FA status check. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Check 2FA enabled' in IdentityService.IsTwoFactorEnabledAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User not found -> false. | Invalid ID | UTCID01 |
-| User 2FA=false -> false. | 2FA disabled | UTCID02 |
-| User 2FA=true -> true. | 2FA enabled | UTCID03 |
+| Validate Check 2FA enabled scenarios for `IsTwoFactorEnabledAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | false | none | | | | |
-| UTCID02 | N | false | none | | | | |
-| UTCID03 | N | true | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F025 - IdentityService.GetAuthenticatorKeyAsync
 
 | Header | Value |
@@ -1073,32 +876,32 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F025 |
 | Function Name | IdentityService.GetAuthenticatorKeyAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate authenticator key retrieval. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get authenticator key' in IdentityService.GetAuthenticatorKeyAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User not found -> null. | Invalid ID | UTCID01 |
-| User exists -> return key. | Key present | UTCID02 |
+| Validate Get authenticator key scenarios for `GetAuthenticatorKeyAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | null | none | | | | |
-| UTCID02 | N | string | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
+
 ## F026 - IdentityService.GetOrCreateAuthenticatorKeyAsync
 
 | Header | Value |
@@ -1106,32 +909,32 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F026 |
 | Function Name | IdentityService.GetOrCreateAuthenticatorKeyAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate lazy authenticator key creation. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get or create authenticator key' in IdentityService.GetOrCreateAuthenticatorKeyAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User not found -> throw. | Invalid ID | UTCID01 |
-| User exists -> key returned. | Valid ID | UTCID02 |
+| Validate Get or create authenticator key scenarios for `GetOrCreateAuthenticatorKeyAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | n/a | InvalidOperationException | | | | |
-| UTCID02 | N | string | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
+
 ## F027 - IdentityService.VerifyTwoFactorCodeAsync
 
 | Header | Value |
@@ -1139,34 +942,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F027 |
 | Function Name | IdentityService.VerifyTwoFactorCodeAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate 2FA TOTP verification. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Verify 2FA code' in IdentityService.VerifyTwoFactorCodeAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User not found -> false. | Invalid ID | UTCID01 |
-| Code sai -> false. | Invalid code | UTCID02 |
-| Code dung -> true. | Valid code | UTCID03 |
+| Validate Verify 2FA code scenarios for `VerifyTwoFactorCodeAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | false | none | | | | |
-| UTCID02 | A | false | none | | | | |
-| UTCID03 | N | true | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F028 - IdentityService.GenerateNewRecoveryCodesAsync
 
 | Header | Value |
@@ -1174,32 +976,32 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F028 |
 | Function Name | IdentityService.GenerateNewRecoveryCodesAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate recovery code regeneration. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Generate recovery codes' in IdentityService.GenerateNewRecoveryCodesAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User not found -> throw. | Invalid ID | UTCID01 |
-| User exists -> codes returned. | Valid ID | UTCID02 |
+| Validate Generate recovery codes scenarios for `GenerateNewRecoveryCodesAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | n/a | InvalidOperationException | | | | |
-| UTCID02 | N | string[] | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
+
 ## F029 - IdentityService.GetRecoveryCodesCountAsync
 
 | Header | Value |
@@ -1207,32 +1009,32 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F029 |
 | Function Name | IdentityService.GetRecoveryCodesCountAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate recovery codes counting. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get recovery code count' in IdentityService.GetRecoveryCodesCountAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User not found -> 0. | Invalid ID | UTCID01 |
-| User exists -> count returned. | Valid ID | UTCID02 |
+| Validate Get recovery code count scenarios for `GetRecoveryCodesCountAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | 0 | none | | | | |
-| UTCID02 | N | int | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
+
 ## F030 - IdentityService.GenerateAuthenticatorUri
 
 | Header | Value |
@@ -1240,32 +1042,32 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F030 |
 | Function Name | IdentityService.GenerateAuthenticatorUri |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 0 |
-| Count type B | 1 |
-| Test Requirement | Validate TOTP URI formatting. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Generate authenticator URI' in IdentityService.GenerateAuthenticatorUri, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Valid email + key -> URI schema ok. | Inputs present | UTCID01 |
-| Special characters -> encoded. | Edge case email | UTCID02 |
+| Validate Generate authenticator URI scenarios for `GenerateAuthenticatorUri`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | string (otpauth://) | none | | | | |
-| UTCID02 | B | string (encoded) | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
+
 ## F031 - IdentityService.FormatAuthenticatorKey
 
 | Header | Value |
@@ -1273,32 +1075,66 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F031 |
 | Function Name | IdentityService.FormatAuthenticatorKey |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 0 |
-| Count type B | 1 |
-| Test Requirement | Validate key block formatting. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Format authenticator key' in IdentityService.FormatAuthenticatorKey, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Long key -> 4-char blocks. | Input length > 4 | UTCID01 |
-| Short key -> no blocks. | Input length <= 4 | UTCID02 |
+| Validate Format authenticator key scenarios for `FormatAuthenticatorKey`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | string (formatted) | none | | | | |
-| UTCID02 | B | string (uppercase) | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
+
+## F032 - IdentityService.GetUserMetricsAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F032 |
+| Function Name | IdentityService.GetUserMetricsAsync |
+| Total Test Cases | 3 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get user metrics' in IdentityService.GetUserMetricsAsync, covering success/failure flow, response contract, and logging behavior. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| Validate Get user metrics scenarios for `GetUserMetricsAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID03 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|---|---|---|
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+
+---
+
 ## F033 - IdentityService.GetUsersInRoleCountAsync
 
 | Header | Value |
@@ -1306,34 +1142,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F033 |
 | Function Name | IdentityService.GetUsersInRoleCountAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 0 |
-| Count type B | 1 |
-| Test Requirement | Validate role-based user counting. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get users in role count' in IdentityService.GetUsersInRoleCountAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| activeOnly=true -> filtered. | Data mixed | UTCID01 |
-| activeOnly=false -> total. | Data mixed | UTCID02 |
-| Role has no users -> 0. | Role empty | UTCID03 |
+| Validate Get users in role count scenarios for `GetUsersInRoleCountAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | int | none | | | | |
-| UTCID02 | N | int | none | | | | |
-| UTCID03 | B | 0 | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F034 - IdentityService.GetPendingApprovalsCountAsync
 
 | Header | Value |
@@ -1341,32 +1176,32 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F034 |
 | Function Name | IdentityService.GetPendingApprovalsCountAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 0 |
-| Count type B | 1 |
-| Test Requirement | Validate pending user counting. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get pending approvals count' in IdentityService.GetPendingApprovalsCountAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Pending exists -> count ok. | Filter active | UTCID01 |
-| No pending -> 0. | Filter empty | UTCID02 |
+| Validate Get pending approvals count scenarios for `GetPendingApprovalsCountAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | int | none | | | | |
-| UTCID02 | B | 0 | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
+
 ## F035 - IdentityService.GetUserDetailsAsync
 
 | Header | Value |
@@ -1374,34 +1209,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F035 |
 | Function Name | IdentityService.GetUserDetailsAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate detailed profile retrieval. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get user details' in IdentityService.GetUserDetailsAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User not found -> null. | Invalid ID | UTCID01 |
-| User deleted -> null. | Soft-deleted | UTCID02 |
-| User valid -> DTO ok. | Active account | UTCID03 |
+| Validate Get user details scenarios for `GetUserDetailsAsync`. | UserManager and RoleManager are mocked with user/role seed data matching each scenario. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | null | none | | | | |
-| UTCID02 | A | null | none | | | | |
-| UTCID03 | N | UserDetailsDto | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F036 - RefreshTokenService.CreateRefreshTokenAsync
 
 | Header | Value |
@@ -1409,34 +1243,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F036 |
 | Function Name | RefreshTokenService.CreateRefreshTokenAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 3 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate refresh token creation. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Create refresh token record' in RefreshTokenService.CreateRefreshTokenAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Valid data -> token created. | Success DB | UTCID01 |
-| Data fields correct. | Success DB | UTCID02 |
-| Initial state active. | New token | UTCID03 |
+| Validate Create refresh token record scenarios for `CreateRefreshTokenAsync`. | Refresh-token repository/DbContext is seeded; token hash, jwtId, and userId are valid; persistence context is ready. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Guid | none | | | | |
-| UTCID02 | N | Success | none | | | | |
-| UTCID03 | N | Success | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F037 - RefreshTokenService.GetByTokenHashAsync
 
 | Header | Value |
@@ -1444,34 +1277,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F037 |
 | Function Name | RefreshTokenService.GetByTokenHashAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate token retrieval by hash. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get refresh token by hash' in RefreshTokenService.GetByTokenHashAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Hash not found -> null. | Missing hash | UTCID01 |
-| Hash exists -> DTO ok. | Valid hash | UTCID02 |
-| Inactive token -> DTO ok. | Revoked token | UTCID03 |
+| Validate Get refresh token by hash scenarios for `GetByTokenHashAsync`. | Refresh-token repository/DbContext is seeded; token hash, jwtId, and userId are valid; persistence context is ready. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | null | none | | | | |
-| UTCID02 | N | RefreshTokenDto | none | | | | |
-| UTCID03 | N | RefreshTokenDto | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F038 - RefreshTokenService.RotateRefreshTokenAsync
 
 | Header | Value |
@@ -1479,34 +1311,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F038 |
 | Function Name | RefreshTokenService.RotateRefreshTokenAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate refresh token rotation. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Rotate refresh token' in RefreshTokenService.RotateRefreshTokenAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Old token missing -> throw. | Invalid ID | UTCID01 |
-| Old token valid -> new created. | Valid ID | UTCID02 |
-| Old marked as used. | Rotation link | UTCID03 |
+| Validate Rotate refresh token scenarios for `RotateRefreshTokenAsync`. | Refresh-token repository/DbContext is seeded; token hash, jwtId, and userId are valid; persistence context is ready. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | n/a | InvalidOperationException | | | | |
-| UTCID02 | N | Guid | none | | | | |
-| UTCID03 | N | Success | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F039 - RefreshTokenService.RevokeTokenAsync
 
 | Header | Value |
@@ -1514,32 +1345,32 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F039 |
 | Function Name | RefreshTokenService.RevokeTokenAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate single token revocation. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Revoke token by hash' in RefreshTokenService.RevokeTokenAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Token exists -> revoked. | Valid ID | UTCID01 |
-| Token not found -> no-op. | Invalid ID | UTCID02 |
+| Validate Revoke token by hash scenarios for `RevokeTokenAsync`. | Refresh-token repository/DbContext is seeded; token hash, jwtId, and userId are valid; persistence context is ready. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | N | Success | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
+
 ## F040 - RefreshTokenService.RevokeAllUserTokensAsync
 
 | Header | Value |
@@ -1547,32 +1378,32 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F040 |
 | Function Name | RefreshTokenService.RevokeAllUserTokensAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 0 |
-| Count type B | 1 |
-| Test Requirement | Validate mass token revocation. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Revoke all user tokens' in RefreshTokenService.RevokeAllUserTokensAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Active tokens -> all revoked. | User has tokens | UTCID01 |
-| No active tokens -> safe. | Empty list | UTCID02 |
+| Validate Revoke all user tokens scenarios for `RevokeAllUserTokensAsync`. | Refresh-token repository/DbContext is seeded; token hash, jwtId, and userId are valid; persistence context is ready. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | B | Success | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
+
 ## F041 - RefreshTokenService.RevokeTokenFamilyAsync
 
 | Header | Value |
@@ -1580,49 +1411,66 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F041 |
 | Function Name | RefreshTokenService.RevokeTokenFamilyAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-
----
-## F045 - RefreshTokenService.CleanupExpiredTokensAsync
-
-| Header | Value |
-|---|---|
-| Function Code | F045 |
-| Function Name | RefreshTokenService.CleanupExpiredTokensAsync |
-| Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Revoke token family' in RefreshTokenService.RevokeTokenFamilyAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Token expired past cutoff -> deleted. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Token revoked past cutoff -> deleted. | Valid dependencies and data setup for this scenario | UTCID02 |
-| No tokens to delete -> return 0. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Validate Revoke token family scenarios for `RevokeTokenFamilyAsync`. | Refresh-token repository/DbContext is seeded; token hash, jwtId, and userId are valid; persistence context is ready. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | deleted count matches expired+old revoked (`CleanupExpiredTokensAsync_ShouldDeleteExpiredAndOldRevoked`) | none |  |  |  |  |
-| UTCID02 | N | 0 deleted when only fresh tokens (`CleanupExpiredTokensAsync_WithDifferentRetentionDays`) | none |  |  |  |  |
-| UTCID03 | B | boundary cases per keepDays (`CleanupExpiredTokensAsync_ShouldDeleteByCutoffBoundary` theory) | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
+
+## F042 - RefreshTokenService.CleanupExpiredTokensAsync
+
+| Header | Value |
+|---|---|
+| Function Code | F042 |
+| Function Name | RefreshTokenService.CleanupExpiredTokensAsync |
+| Total Test Cases | 3 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Cleanup expired tokens' in RefreshTokenService.CleanupExpiredTokensAsync, covering success/failure flow, response contract, and logging behavior. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| Validate Cleanup expired tokens scenarios for `CleanupExpiredTokensAsync`. | Refresh-token repository/DbContext is seeded; token hash, jwtId, and userId are valid; persistence context is ready. | UTCID01-UTCID03 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|---|---|---|
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+
+---
+
 ## F043 - TokenService.GenerateAccessTokenAsync
 
 | Header | Value |
@@ -1630,36 +1478,34 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F043 |
 | Function Name | TokenService.GenerateAccessTokenAsync |
 | Total Test Cases | 4 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 3 |
-| Count type A | 0 |
-| Count type B | 1 |
-| Test Requirement | Validate access token generation and claims. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Generate access token' in TokenService.GenerateAccessTokenAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Required claims present. | Inputs valid | UTCID01 |
-| Role claims mapped. | Roles present | UTCID02 |
-| Custom claims added. | Extra data | UTCID03 |
-| Expiry matches config. | Settings ok | UTCID04 |
+| Validate Generate access token scenarios for `GenerateAccessTokenAsync`. | JWT settings (secret, issuer, audience) are valid; token/claims inputs are prepared for valid and invalid paths. | UTCID01-UTCID04 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | string | none | | | | |
-| UTCID02 | N | string | none | | | | |
-| UTCID03 | N | string | none | | | | |
-| UTCID04 | B | string | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
 
 ---
+
 ## F044 - TokenService.GenerateRefreshToken
 
 | Header | Value |
@@ -1667,34 +1513,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F044 |
 | Function Name | TokenService.GenerateRefreshToken |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 0 |
-| Count type B | 1 |
-| Test Requirement | Validate refresh token entropy. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Generate refresh token string' in TokenService.GenerateRefreshToken, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Non-empty base64 string. | Random gen | UTCID01 |
-| Unique across calls. | Random gen | UTCID02 |
-| Decodes to 64 bytes. | Length check | UTCID03 |
+| Validate Generate refresh token string scenarios for `GenerateRefreshToken`. | JWT settings (secret, issuer, audience) are valid; token/claims inputs are prepared for valid and invalid paths. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | string | none | | | | |
-| UTCID02 | N | string | none | | | | |
-| UTCID03 | B | string | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F045 - TokenService.ValidateToken
 
 | Header | Value |
@@ -1702,34 +1547,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F045 |
 | Function Name | TokenService.ValidateToken |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate token signature and algo. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Validate token' in TokenService.ValidateToken, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Valid token -> Principal ok. | Signature match | UTCID01 |
-| Invalid signature -> null. | Mismatch | UTCID02 |
-| Wrong algorithm -> null. | Alg mismatch | UTCID03 |
+| Validate Validate token scenarios for `ValidateToken`. | JWT settings (secret, issuer, audience) are valid; token/claims inputs are prepared for valid and invalid paths. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | ClaimsPrincipal | none | | | | |
-| UTCID02 | A | null | none | | | | |
-| UTCID03 | A | null | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F046 - TokenService.GetUserIdFromToken
 
 | Header | Value |
@@ -1737,34 +1581,33 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F046 |
 | Function Name | TokenService.GetUserIdFromToken |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate UID extraction from JWT. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get user id from token' in TokenService.GetUserIdFromToken, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| sub claim present -> Guid. | Valid JWT | UTCID01 |
-| uid fallback -> Guid. | sub missing | UTCID02 |
-| Parse failure -> null. | Bad Guid | UTCID03 |
+| Validate Get user id from token scenarios for `GetUserIdFromToken`. | JWT settings (secret, issuer, audience) are valid; token/claims inputs are prepared for valid and invalid paths. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Guid | none | | | | |
-| UTCID02 | N | Guid | none | | | | |
-| UTCID03 | A | null | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F047 - TokenService.GetJtiFromToken
 
 | Header | Value |
@@ -1772,32 +1615,32 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F047 |
 | Function Name | TokenService.GetJtiFromToken |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate JTI extraction from JWT. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get jti from token' in TokenService.GetJtiFromToken, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Valid token -> JTI string. | JTI present | UTCID01 |
-| Invalid token -> null. | Claim missing | UTCID02 |
+| Validate Get jti from token scenarios for `GetJtiFromToken`. | JWT settings (secret, issuer, audience) are valid; token/claims inputs are prepared for valid and invalid paths. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | string | none | | | | |
-| UTCID02 | A | null | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
+
 ## F048 - TokenService.HashToken
 
 | Header | Value |
@@ -1805,1584 +1648,1639 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F048 |
 | Function Name | TokenService.HashToken |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 0 |
-| Count type B | 1 |
-| Test Requirement | Validate deterministic token hashing. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Hash token' in TokenService.HashToken, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Same input -> same hash. | Determ. check | UTCID01 |
-| Different input -> diff hash. | Collision check | UTCID02 |
-| Empty input -> non-null hash. | Boundary check | UTCID03 |
+| Validate Hash token scenarios for `HashToken`. | JWT settings (secret, issuer, audience) are valid; token/claims inputs are prepared for valid and invalid paths. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | string | none | | | | |
-| UTCID02 | N | string | none | | | | |
-| UTCID03 | B | string | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
-## F049 - LocalFileStorageService.SaveFileAsync
+
+## F049 - AdminQueryService.GetOphthalmologistsAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F049 |
-| Function Name | LocalFileStorageService.SaveFileAsync |
-| Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate local file saving. |
+| Function Name | AdminQueryService.GetOphthalmologistsAsync |
+| Total Test Cases | 5 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get ophthalmologists query' in AdminQueryService.GetOphthalmologistsAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Null stream -> throw. | Invalid input | UTCID01 |
-| Success -> return path. | Valid stream | UTCID02 |
-| IO error -> throw. | Disk failure | UTCID03 |
+| Validate Get ophthalmologists query scenarios for `GetOphthalmologistsAsync`. | ApplicationDbContext is seeded; filter, sort, and paging inputs are valid. | UTCID01-UTCID05 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | n/a | ArgumentNullException | | | | |
-| UTCID02 | N | string (path) | none | | | | |
-| UTCID03 | A | n/a | IOException | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
 
 ---
-## F050 - LocalFileStorageService.DeleteFileAsync
+
+## F050 - AdminQueryService.GetPatientsAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F050 |
-| Function Name | LocalFileStorageService.DeleteFileAsync |
-| Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate local file deletion. |
+| Function Name | AdminQueryService.GetPatientsAsync |
+| Total Test Cases | 4 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get patients query' in AdminQueryService.GetPatientsAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| File exists -> deleted. | File present | UTCID01 |
-| File missing -> no-op. | File absent | UTCID02 |
-| Path invalid -> no-op. | Bad path string | UTCID03 |
+| Validate Get patients query scenarios for `GetPatientsAsync`. | ApplicationDbContext is seeded; filter, sort, and paging inputs are valid. | UTCID01-UTCID04 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | N | Success | none | | | | |
-| UTCID03 | A | Success | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
 
 ---
-## F051 - AdminQueryService.GetOphthalmologistsAsync
+
+## F051 - AdminQueryService.GetAuditLogsAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F051 |
-| Function Name | AdminQueryService.GetOphthalmologistsAsync |
+| Function Name | AdminQueryService.GetAuditLogsAsync |
 | Total Test Cases | 5 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 4 |
-| Count type A | 0 |
-| Count type B | 1 |
-| Test Requirement | Validate admin list query for doctors. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get audit logs query' in AdminQueryService.GetAuditLogsAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| No filter -> CreatedAt desc. | Data present | UTCID01 |
-| SearchTerm matches ILike. | Query string | UTCID02 |
-| Status filter union. | Comma values | UTCID03 |
-| Certificates mapped correctly. | Certs present | UTCID04 |
-| Invalid status -> skipped. | Bad token | UTCID05 |
+| Validate Get audit logs query scenarios for `GetAuditLogsAsync`. | ApplicationDbContext is seeded; filter, sort, and paging inputs are valid. | UTCID01-UTCID05 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | PagedList | none | | | | |
-| UTCID02 | N | PagedList | none | | | | |
-| UTCID03 | N | PagedList | none | | | | |
-| UTCID04 | N | PagedList | none | | | | |
-| UTCID05 | B | PagedList | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
 
 ---
-## F052 - AdminQueryService.GetPatientsAsync
+
+## F052 - AiQuotaService.GetQuotaAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F052 |
-| Function Name | AdminQueryService.GetPatientsAsync |
-| Total Test Cases | 4 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
+| Function Name | AiQuotaService.GetQuotaAsync |
+| Total Test Cases | 5 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get AI quota' in AiQuotaService.GetQuotaAsync, covering success/failure flow, response contract, and logging behavior. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| Validate Get AI quota scenarios for `GetQuotaAsync`. | ApplicationDbContext and system-setting dependency are seeded with quota data; user context is valid. | UTCID01-UTCID05 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | SearchTerm on name/email (contract; tests cover status filters) | none |  |  |  |  |
-| UTCID02 | N | active/pending/suspended filters (`GetPatientsAsync_With*Status`) | none |  |  |  |  |
-| UTCID03 | N | Paging totals (`GetPatientsAsync_WithPaging` / related) | none |  |  |  |  |
-| UTCID04 | A | Deleted users excluded (`GetPatientsAsync_ShouldExcludeDeletedUsers`) | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
 
 ---
-## F053 - AdminQueryService.GetClinicStaffAsync
+
+## F053 - AiQuotaService.HasAvailableQuotaAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F053 |
-| Function Name | AdminQueryService.GetClinicStaffAsync |
-| Total Test Cases | 4 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 3 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate admin staff list query. |
+| Function Name | AiQuotaService.HasAvailableQuotaAsync |
+| Total Test Cases | 2 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Check AI quota available' in AiQuotaService.HasAvailableQuotaAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| SearchTerm fullName/phone ok. | Query string | UTCID01 |
-| SubRole filtering ok. | Enum match | UTCID02 |
-| Paging metadata correct. | Multi-page | UTCID03 |
-| Non-staff users hidden. | Filter check | UTCID04 |
+| Validate Check AI quota available scenarios for `HasAvailableQuotaAsync`. | ApplicationDbContext and system-setting dependency are seeded with quota data; user context is valid. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | PagedList | none | | | | |
-| UTCID02 | N | PagedList | none | | | | |
-| UTCID03 | N | PagedList | none | | | | |
-| UTCID04 | A | PagedList | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
-## F054 - AiQuotaService.CheckQuotaAsync
+
+## F054 - AiQuotaService.DeductQuotaAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F054 |
-| Function Name | AiQuotaService.CheckQuotaAsync |
-| Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 0 |
-| Count type B | 1 |
-| Test Requirement | Validate quota availability check. |
+| Function Name | AiQuotaService.DeductQuotaAsync |
+| Total Test Cases | 4 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Deduct AI quota' in AiQuotaService.DeductQuotaAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Remaining > 0 -> true. | Success | UTCID01 |
-| Remaining = 0 -> false. | Exhausted | UTCID02 |
+| Validate Deduct AI quota scenarios for `DeductQuotaAsync`. | ApplicationDbContext and system-setting dependency are seeded with quota data; user context is valid. | UTCID01-UTCID04 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | true | none | | | | |
-| UTCID02 | B | false | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
 
 ---
-## F055 - AiQuotaService.GetQuotaStatusAsync
+
+## F055 - AiQuotaService.AddPurchasedQuotaAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F055 |
-| Function Name | AiQuotaService.GetQuotaStatusAsync |
-| Total Test Cases | 5 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 3 |
-| Count type B | 0 |
-| Test Requirement | Validate quota status summary. |
+| Function Name | AiQuotaService.AddPurchasedQuotaAsync |
+| Total Test Cases | 4 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Add purchased AI quota' in AiQuotaService.AddPurchasedQuotaAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Patient with profile -> ok. | Valid user | UTCID01 |
-| Patient without profile -> free fallback. | Missing data | UTCID02 |
-| Clinic staff -> clinic quota. | Staff role | UTCID03 |
-| Role but no link -> None. | Mismatch | UTCID04 |
-| Unknown role -> None. | Invalid role | UTCID05 |
+| Validate Add purchased AI quota scenarios for `AddPurchasedQuotaAsync`. | ApplicationDbContext and system-setting dependency are seeded with quota data; user context is valid. | UTCID01-UTCID04 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | AiQuotaDto | none | | | | |
-| UTCID02 | A | AiQuotaDto | none | | | | |
-| UTCID03 | N | AiQuotaDto | none | | | | |
-| UTCID04 | A | AiQuotaDto | none | | | | |
-| UTCID05 | A | AiQuotaDto | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
 
 ---
-## F056 - DashboardService.GetAdminDashboardDataAsync
+
+## F056 - BetterStackHeartbeatService.GetEmbedUrl
 
 | Header | Value |
 |---|---|
 | Function Code | F056 |
-| Function Name | DashboardService.GetAdminDashboardDataAsync |
+| Function Name | BetterStackHeartbeatService.GetEmbedUrl |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate admin dashboard metrics. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get BetterStack embed URL' in BetterStackHeartbeatService.GetEmbedUrl, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Success -> return summary data. | Data ok | UTCID01 |
-| Empty DB -> return zeroed data. | No data | UTCID02 |
+| Validate Get BetterStack embed URL scenarios for `GetEmbedUrl`. | Heartbeat/monitor configuration is valid; client and logger are initialized. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | AdminDashboardDto | none | | | | |
-| UTCID02 | N | AdminDashboardDto | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
-## F057 - DashboardService.GetOphthalmologistDashboardDataAsync
+
+## F057 - BetterStackHeartbeatService.GetMonitorDescriptors
 
 | Header | Value |
 |---|---|
 | Function Code | F057 |
-| Function Name | DashboardService.GetOphthalmologistDashboardDataAsync |
+| Function Name | BetterStackHeartbeatService.GetMonitorDescriptors |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate doctor dashboard metrics. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get BetterStack monitor descriptors' in BetterStackHeartbeatService.GetMonitorDescriptors, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Success -> return relevant counts. | Data ok | UTCID01 |
-| No patients -> zeroed data. | No data | UTCID02 |
+| Validate Get BetterStack monitor descriptors scenarios for `GetMonitorDescriptors`. | Heartbeat/monitor configuration is valid; client and logger are initialized. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | DoctorDashboardDto | none | | | | |
-| UTCID02 | N | DoctorDashboardDto | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
-## F058 - DashboardService.GetPatientDashboardDataAsync
+
+## F058 - BetterStackHeartbeatService.NotifyStartedAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F058 |
-| Function Name | DashboardService.GetPatientDashboardDataAsync |
-| Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate patient dashboard metrics. |
+| Function Name | BetterStackHeartbeatService.NotifyStartedAsync |
+| Total Test Cases | 3 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Notify monitor started' in BetterStackHeartbeatService.NotifyStartedAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Success -> return history/quota. | Data ok | UTCID01 |
-| New user -> zeroed data. | No data | UTCID02 |
+| Validate Notify monitor started scenarios for `NotifyStartedAsync`. | Heartbeat/monitor configuration is valid; client and logger are initialized. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | PatientDashboardDto | none | | | | |
-| UTCID02 | N | PatientDashboardDto | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
-## F059 - DashboardService.GetStaffDashboardDataAsync
+
+## F059 - BetterStackHeartbeatService.NotifySucceededAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F059 |
-| Function Name | DashboardService.GetStaffDashboardDataAsync |
+| Function Name | BetterStackHeartbeatService.NotifySucceededAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate staff dashboard metrics. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Notify monitor succeeded' in BetterStackHeartbeatService.NotifySucceededAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Success -> return pending visits. | Data ok | UTCID01 |
-| No visits -> zeroed data. | No data | UTCID02 |
+| Validate Notify monitor succeeded scenarios for `NotifySucceededAsync`. | Heartbeat/monitor configuration is valid; client and logger are initialized. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | StaffDashboardDto | none | | | | |
-| UTCID02 | N | StaffDashboardDto | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
-## F060 - DateTimeService.Now
+
+## F060 - BetterStackHeartbeatService.NotifyFailedAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F060 |
-| Function Name | DateTimeService.Now |
-| Total Test Cases | 1 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate system clock wrapper. |
+| Function Name | BetterStackHeartbeatService.NotifyFailedAsync |
+| Total Test Cases | 2 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Notify monitor failed' in BetterStackHeartbeatService.NotifyFailedAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Success -> return current time. | Always | UTCID01 |
+| Validate Notify monitor failed scenarios for `NotifyFailedAsync`. | Heartbeat/monitor configuration is valid; client and logger are initialized. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | DateTime | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
-## F061 - EmailService.SendEmailAsync
+
+## F061 - DashboardMetricsService.GetSystemAdminMetricsAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F061 |
-| Function Name | EmailService.SendEmailAsync |
-| Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate generic email sending. |
+| Function Name | DashboardMetricsService.GetSystemAdminMetricsAsync |
+| Total Test Cases | 6 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get system admin metrics' in DashboardMetricsService.GetSystemAdminMetricsAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Valid input -> SMTP success. | Config ok | UTCID01 |
-| Invalid recipient -> throw. | Bad email | UTCID02 |
-| SMTP server down -> throw. | Network fail | UTCID03 |
+| Validate Get system admin metrics scenarios for `GetSystemAdminMetricsAsync`. | ApplicationDbContext is seeded with metrics data; time-range and paging inputs are valid. | UTCID01-UTCID06 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | A | n/a | ArgumentException | | | | |
-| UTCID03 | A | n/a | SmtpException | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
+| UTCID06 |  |  |  |  |  |  |  |
 
 ---
-## F062 - EmailService.SendTemplateEmailAsync
+
+## F062 - DashboardMetricsService.GetRecentScreeningsAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F062 |
-| Function Name | EmailService.SendTemplateEmailAsync |
-| Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate template-based email sending. |
+| Function Name | DashboardMetricsService.GetRecentScreeningsAsync |
+| Total Test Cases | 4 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get recent screenings' in DashboardMetricsService.GetRecentScreeningsAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Template valid -> merge success. | Template exists | UTCID01 |
-| Template missing -> throw. | Invalid template | UTCID02 |
+| Validate Get recent screenings scenarios for `GetRecentScreeningsAsync`. | ApplicationDbContext is seeded with metrics data; time-range and paging inputs are valid. | UTCID01-UTCID04 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | A | n/a | FileNotFoundException | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
 
 ---
-## F063 - GoogleMeetService.CreateMeetingAsync
+
+## F063 - DashboardMetricsService.GetScreeningVolumeTrendsAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F063 |
-| Function Name | GoogleMeetService.CreateMeetingAsync |
+| Function Name | DashboardMetricsService.GetScreeningVolumeTrendsAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate Google Calendar API integration. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get screening volume trends' in DashboardMetricsService.GetScreeningVolumeTrendsAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Valid event -> returns link. | API Auth ok | UTCID01 |
-| Auth expired -> throw. | Token invalid | UTCID02 |
-| API quota exceeded -> throw. | Rate limited | UTCID03 |
+| Validate Get screening volume trends scenarios for `GetScreeningVolumeTrendsAsync`. | ApplicationDbContext is seeded with metrics data; time-range and paging inputs are valid. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | string (url) | none | | | | |
-| UTCID02 | A | n/a | UnauthorizedAccessException | | | | |
-| UTCID03 | A | n/a | HttpRequestException | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
-## F064 - NotificationService.SendNotificationAsync
+
+## F064 - DashboardMetricsService.GetPopulationRiskAnalysisAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F064 |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+| Function Name | DashboardMetricsService.GetPopulationRiskAnalysisAsync |
+| Total Test Cases | 3 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get population risk analysis' in DashboardMetricsService.GetPopulationRiskAnalysisAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Totals doctor/org/patient and growth % correct. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Revenue by payment method + percentage correct. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Monthly/Daily revenue mapped fully for period. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Pending actions (verification/withdraw/onboarding) correct. | Valid dependencies and data setup for this scenario | UTCID04 |
-| Top doctor by consultation revenue + top org by rating correct. | Valid dependencies and data setup for this scenario | UTCID05 |
-| BetterStack monitors mapped into response correctly. | Valid dependencies and data setup for this scenario | UTCID06 |
+| Validate Get population risk analysis scenarios for `GetPopulationRiskAnalysisAsync`. | ApplicationDbContext is seeded with metrics data; time-range and paging inputs are valid. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | SystemAdmin metrics shape; zeros when empty DB (`GetSystemAdminMetricsAsync_WhenNoData`) | none |  |  |  |  |
-| UTCID02 | N | SystemAdmin metrics shape; zeros when empty DB (`GetSystemAdminMetricsAsync_WhenNoData`) | none |  |  |  |  |
-| UTCID03 | N | SystemAdmin metrics shape; zeros when empty DB (`GetSystemAdminMetricsAsync_WhenNoData`) | none |  |  |  |  |
-| UTCID04 | N | SystemAdmin metrics shape; zeros when empty DB (`GetSystemAdminMetricsAsync_WhenNoData`) | none |  |  |  |  |
-| UTCID05 | N | SystemAdmin metrics shape; zeros when empty DB (`GetSystemAdminMetricsAsync_WhenNoData`) | none |  |  |  |  |
-| UTCID06 | N | SystemAdmin metrics shape; zeros when empty DB (`GetSystemAdminMetricsAsync_WhenNoData`) | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
-## F065 - DashboardMetricsService.GetRecentScreeningsAsync
+
+## F065 - DashboardMetricsService.GetSystemHealthAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F065 |
-| Function Name | DashboardMetricsService.GetRecentScreeningsAsync |
-| Total Test Cases | 4 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+| Function Name | DashboardMetricsService.GetSystemHealthAsync |
+| Total Test Cases | 2 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get system health' in DashboardMetricsService.GetSystemHealthAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Paging total/items correct. | Valid dependencies and data setup for this scenario | UTCID01 |
-| RiskLevel and `IsCritical` mapped correctly. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Status `Completed/Analyzing` mapped from `ProcessedAt`. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Screening without risk result -> risk null still maps. | Valid dependencies and data setup for this scenario | UTCID04 |
+| Validate Get system health scenarios for `GetSystemHealthAsync`. | ApplicationDbContext is seeded with metrics data; time-range and paging inputs are valid. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | paging (`GetRecentScreeningsAsync_WithPaging`) | none |  |  |  |  |
-| UTCID02 | N | risk + critical flag (`ShouldMapStatusAndCriticalFlag` / without result theory) | none |  |  |  |  |
-| UTCID03 | N | status from ProcessedAt | none |  |  |  |  |
-| UTCID04 | B | null risk still maps | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
-## F066 - DashboardMetricsService.GetScreeningVolumeTrendsAsync
+
+## F066 - DashboardMetricsService.GetOphthalmologistMetricsAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F066 |
-| Function Name | DashboardMetricsService.GetScreeningVolumeTrendsAsync |
-| Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+| Function Name | DashboardMetricsService.GetOphthalmologistMetricsAsync |
+| Total Test Cases | 4 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get ophthalmologist metrics' in DashboardMetricsService.GetOphthalmologistMetricsAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| `weekly` -> group by week start, label dd MMM. | Valid dependencies and data setup for this scenario | UTCID01 |
-| `monthly` -> group by month, label MMM yyyy. | Valid dependencies and data setup for this scenario | UTCID02 |
-| `timeRange` empty -> fallback monthly. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Validate Get ophthalmologist metrics scenarios for `GetOphthalmologistMetricsAsync`. | ApplicationDbContext is seeded with metrics data; time-range and paging inputs are valid. | UTCID01-UTCID04 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | weekly grouping (`GetScreeningVolumeTrendsAsync_Weekly`) | none |  |  |  |  |
-| UTCID02 | N | monthly grouping | none |  |  |  |  |
-| UTCID03 | B | unknown range -> monthly fallback | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
 
 ---
-## F067 - DashboardMetricsService.GetPopulationRiskAnalysisAsync
+
+## F067 - DashboardMetricsService.GetPatientMetricsAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F067 |
-| Function Name | DashboardMetricsService.GetPopulationRiskAnalysisAsync |
+| Function Name | DashboardMetricsService.GetPatientMetricsAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get patient metrics' in DashboardMetricsService.GetPatientMetricsAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Total `TotalPatients` correct. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Skip RiskLevel.None in output list. | Valid dependencies and data setup for this scenario | UTCID02 |
-| No results -> percentage=0. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Validate Get patient metrics scenarios for `GetPatientMetricsAsync`. | ApplicationDbContext is seeded with metrics data; time-range and paging inputs are valid. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | totals correct | none |  |  |  |  |
-| UTCID02 | N | excludes RiskLevel.None (`GetPopulationRiskAnalysisAsync`) | none |  |  |  |  |
-| UTCID03 | B | 0% when empty | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
-## F068 - DashboardMetricsService.GetSystemHealthAsync
+
+## F068 - DateTimeService.Now (property)
 
 | Header | Value |
 |---|---|
 | Function Code | F068 |
-| Function Name | DashboardMetricsService.GetSystemHealthAsync |
+| Function Name | DateTimeService.Now (property) |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get local now' in DateTimeService.Now (property), covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Payload has Database/AI/Notifications components. | Valid dependencies and data setup for this scenario | UTCID01 |
-| `AllSystemsOperational=true` and health fields complete. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Validate Get local now scenarios for `Now (property)`. | Service is instantiated directly; no external dependency is required. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | components populated (`GetSystemHealthAsync_ShouldReturnOperationalPayload`) | none |  |  |  |  |
-| UTCID02 | N | AllSystemsOperational true in happy path | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
-## F069 - DashboardMetricsService.GetOphthalmologistMetricsAsync
+
+## F069 - DateTimeService.UtcNow (property)
 
 | Header | Value |
 |---|---|
 | Function Code | F069 |
-| Function Name | DashboardMetricsService.GetOphthalmologistMetricsAsync |
-| Total Test Cases | 4 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+| Function Name | DateTimeService.UtcNow (property) |
+| Total Test Cases | 2 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get UTC now' in DateTimeService.UtcNow (property), covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| UserId maps to no doctor -> empty DTO. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Pending reviews and urgent cases counted correctly. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Completed today counted correctly. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Open slots today calculated correctly per template/org. | Valid dependencies and data setup for this scenario | UTCID04 |
+| Validate Get UTC now scenarios for `UtcNow (property)`. | Service is instantiated directly; no external dependency is required. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | default/empty dto when no doctor (`GetOphthalmologistMetricsAsync_WhenNoDoctor`) | none |  |  |  |  |
-| UTCID02 | N | pending/urgent counts (`WithPendingUrgentData`) | none |  |  |  |  |
-| UTCID03 | N | completed today | none |  |  |  |  |
-| UTCID04 | N | open slots | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
-## F070 - DashboardMetricsService.GetOrganisationMetricsAsync
+
+## F070 - EmailService.SendEmailConfirmationAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F070 |
-| Function Name | DashboardMetricsService.GetOrganisationMetricsAsync |
-| Total Test Cases | 4 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+| Function Name | EmailService.SendEmailConfirmationAsync |
+| Total Test Cases | 2 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Send email confirmation' in EmailService.SendEmailConfirmationAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| User has no organisation -> empty DTO. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Total appointments + status breakdown counted correctly. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Utilization rate by booked/capacity correct. | Valid dependencies and data setup for this scenario | UTCID03 |
-| Remaining AI quota from `AiQuotaService` correct. | Valid dependencies and data setup for this scenario | UTCID04 |
+| Validate Send email confirmation scenarios for `SendEmailConfirmationAsync`. | SMTP settings are valid; recipient and template/content inputs are valid; transport can be mocked. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | default when no org (`GetOrganisationMetricsAsync_WhenNoOrganisation`) | none |  |  |  |  |
-| UTCID02 | N | appointments breakdown (`WithOrganisation`) | none |  |  |  |  |
-| UTCID03 | N | utilization (`ShouldComputeUtilizationRateFromSlots`) | none |  |  |  |  |
-| UTCID04 | N | remaining quota from AiQuota mock | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
-## F071 - DashboardMetricsService.GetPatientMetricsAsync
+
+## F071 - EmailService.SendPasswordResetAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F071 |
-| Function Name | DashboardMetricsService.GetPatientMetricsAsync |
-| Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+| Function Name | EmailService.SendPasswordResetAsync |
+| Total Test Cases | 2 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Send password reset email' in EmailService.SendPasswordResetAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Patient profile not found -> empty DTO. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Completed screenings / total reports counted correctly. | Valid dependencies and data setup for this scenario | UTCID02 |
-| Upcoming appointments + remaining quota counted correctly. | Valid dependencies and data setup for this scenario | UTCID03 |
+| Validate Send password reset email scenarios for `SendPasswordResetAsync`. | SMTP settings are valid; recipient and template/content inputs are valid; transport can be mocked. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | A | default dto when patient missing (`GetPatientMetricsAsync_WhenPatientMissing`) | none |  |  |  |  |
-| UTCID02 | N | completed reports (`ShouldComputeCompletedReportsAndUpcomingAppointments`) | none |  |  |  |  |
-| UTCID03 | N | upcoming + remaining quota (`ShouldMapRemainingQuotaFromService`) | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
-## F072 - DateTimeService.Now
+
+## F072 - EmailService.SendWelcomeEmailAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F072 |
-| Function Name | DateTimeService.Now |
+| Function Name | EmailService.SendWelcomeEmailAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Send welcome email' in EmailService.SendWelcomeEmailAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| `Now` value close to `DateTime.Now`. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Each call may differ with real time. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Validate Send welcome email scenarios for `SendWelcomeEmailAsync`. | SMTP settings are valid; recipient and template/content inputs are valid; transport can be mocked. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | DateTime close to DateTime.Now; Kind local/unspecified (`Now_ShouldReturnLocalTime_CloseToSystemNow`) | none |  |  |  |  |
-| UTCID02 | B | monotonic non-decreasing across reads (theories) | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
-## F073 - DateTimeService.UtcNow
+
+## F073 - EmailService.SendAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F073 |
-| Function Name | DateTimeService.UtcNow |
-| Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+| Function Name | EmailService.SendAsync |
+| Total Test Cases | 4 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Send generic email' in EmailService.SendAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| `UtcNow` value close to `DateTime.UtcNow`. | Valid dependencies and data setup for this scenario | UTCID01 |
-| `Kind` of value is UTC. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Validate Send generic email scenarios for `SendAsync`. | SMTP settings are valid; recipient and template/content inputs are valid; transport can be mocked. | UTCID01-UTCID04 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Utc close to DateTime.UtcNow (`UtcNow_ShouldReturnUtcTime_CloseToSystemUtcNow`) | none |  |  |  |  |
-| UTCID02 | B | Kind=Utc (`UtcNow_ShouldHaveUtcKind`) | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
 
 ---
-## F074 - EmailService.SendEmailConfirmationAsync
+
+## F074 - GoogleMeetService.CreateMeetingAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F074 |
-| Function Name | EmailService.SendEmailConfirmationAsync |
-| Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+| Function Name | GoogleMeetService.CreateMeetingAsync |
+| Total Test Cases | 5 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Create Google Meet meeting' in GoogleMeetService.CreateMeetingAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Correct subject/template for confirmation email. | Valid dependencies and data setup for this scenario | UTCID01 |
-| Calls `SendAsync` with `isHtml=true`. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Validate Create Google Meet meeting scenarios for `CreateMeetingAsync`. | Google credentials and service configuration are valid; meeting request inputs are valid. | UTCID01-UTCID05 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | n/a | Exception for invalid email (`SendEmailConfirmationAsync_WithInvalidRecipient_ShouldThrow`) |  |  |  |  |
-| UTCID02 | N | valid path builds message and calls SendAsync (contract; no happy-path unit test) | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
 
 ---
-## F075 - EmailService.SendPasswordResetAsync
+
+## F075 - GoogleMeetService.DeleteMeetingAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F075 |
-| Function Name | EmailService.SendPasswordResetAsync |
+| Function Name | GoogleMeetService.DeleteMeetingAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | |
-| Count type A | |
-| Count type B | |
-| Test Requirement | Validate service/function behavior with realistic success, failure, and boundary conditions. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Delete Google Meet meeting' in GoogleMeetService.DeleteMeetingAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Correct subject/template for password reset. | Valid dependencies and data setup for this scenario | UTCID01 |
-| `SendAsync` succeeds. | Valid dependencies and data setup for this scenario | UTCID02 |
+| Validate Delete Google Meet meeting scenarios for `DeleteMeetingAsync`. | Google credentials and service configuration are valid; meeting request inputs are valid. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | reset email template + SendAsync (contract; no dedicated test) | none |  |  |  |  |
-| UTCID02 | N | SendAsync success path (contract) | none |  |  |  |  |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
-## F076 - SystemSettingsService.UpdateSettingsAsync
+
+## F076 - GoogleMeetService.Dispose
 
 | Header | Value |
 |---|---|
 | Function Code | F076 |
-| Function Name | SystemSettingsService.UpdateSettingsAsync |
-| Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate mass settings update. |
+| Function Name | GoogleMeetService.Dispose |
+| Total Test Cases | 1 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Dispose Google Meet service' in GoogleMeetService.Dispose, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Valid DTO -> DB updated. | Auth Admin | UTCID01 |
-| Null DTO -> throw. | Invalid input | UTCID02 |
-| Save fail -> throw. | DB error | UTCID03 |
+| Validate Dispose Google Meet service scenarios for `Dispose`. | Google credentials and service configuration are valid; meeting request inputs are valid. | UTCID01 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | A | n/a | ArgumentNullException | | | | |
-| UTCID03 | A | n/a | DbUpdateException | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
 
 ---
-## F077 - SystemSettingsService.GetMaintenanceModeAsync
+
+## F077 - NotificationService.SendAsync (typed)
 
 | Header | Value |
 |---|---|
 | Function Code | F077 |
-| Function Name | SystemSettingsService.GetMaintenanceModeAsync |
-| Total Test Cases | 1 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate maintenance mode flag retrieval. |
+| Function Name | NotificationService.SendAsync (typed) |
+| Total Test Cases | 4 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Send typed notification' in NotificationService.SendAsync (typed), covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Success -> return bool. | Always | UTCID01 |
+| Validate Send typed notification scenarios for `SendAsync (typed)`. | Notification repository, UnitOfWork, and hub service are mocked; user/message/type payload is prepared. | UTCID01-UTCID04 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | bool | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
 
 ---
-## F078 - SystemSettingsService.SetMaintenanceModeAsync
+
+## F078 - NotificationService.SendAsync (legacy)
 
 | Header | Value |
 |---|---|
 | Function Code | F078 |
-| Function Name | SystemSettingsService.SetMaintenanceModeAsync |
+| Function Name | NotificationService.SendAsync (legacy) |
 | Total Test Cases | 1 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate maintenance mode flag update. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Send legacy notification' in NotificationService.SendAsync (legacy), covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Success -> persisted. | Auth Admin | UTCID01 |
+| Validate Send legacy notification scenarios for `SendAsync (legacy)`. | Notification repository, UnitOfWork, and hub service are mocked; user/message/type payload is prepared. | UTCID01 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
 
 ---
-## F079 - SystemSettingsService.GetAiSettingsAsync
+
+## F079 - PatientRoadmapGenerationService.GenerateFromDiagnosisAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F079 |
-| Function Name | SystemSettingsService.GetAiSettingsAsync |
-| Total Test Cases | 1 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate AI config retrieval. |
+| Function Name | PatientRoadmapGenerationService.GenerateFromDiagnosisAsync |
+| Total Test Cases | 6 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Generate roadmap from diagnosis' in PatientRoadmapGenerationService.GenerateFromDiagnosisAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Success -> return DTO. | Always | UTCID01 |
+| Validate Generate roadmap from diagnosis scenarios for `GenerateFromDiagnosisAsync`. | Diagnosis input and roadmap rules/mapping are prepared. | UTCID01-UTCID06 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | AiSettingsDto | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
+| UTCID06 |  |  |  |  |  |  |  |
 
 ---
-## F080 - SystemSettingsService.UpdateAiSettingsAsync
+
+## F080 - PayOSService.CreatePaymentLinkAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F080 |
-| Function Name | SystemSettingsService.UpdateAiSettingsAsync |
-| Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate AI config update. |
+| Function Name | PayOSService.CreatePaymentLinkAsync |
+| Total Test Cases | 5 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Create PayOS payment link' in PayOSService.CreatePaymentLinkAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Valid DTO -> Success. | Auth Admin | UTCID01 |
-| Invalid DTO -> throw. | Validation fail | UTCID02 |
+| Validate Create PayOS payment link scenarios for `CreatePaymentLinkAsync`. | PayOS settings are valid (clientId, apiKey, checksumKey); payment payload inputs are valid. | UTCID01-UTCID05 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | A | n/a | ValidationException | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
 
 ---
-## F081 - SystemSettingsService.GetPaymentSettingsAsync
+
+## F081 - PayOSService.GetPaymentStatusAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F081 |
-| Function Name | SystemSettingsService.GetPaymentSettingsAsync |
-| Total Test Cases | 1 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate payment config retrieval. |
+| Function Name | PayOSService.GetPaymentStatusAsync |
+| Total Test Cases | 3 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get PayOS payment status' in PayOSService.GetPaymentStatusAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Success -> return DTO. | Always | UTCID01 |
+| Validate Get PayOS payment status scenarios for `GetPaymentStatusAsync`. | PayOS settings are valid (clientId, apiKey, checksumKey); payment payload inputs are valid. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | PaymentSettingsDto | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
-## F082 - SystemSettingsService.UpdatePaymentSettingsAsync
+
+## F082 - PayOSService.VerifyWebhookSignatureAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F082 |
-| Function Name | SystemSettingsService.UpdatePaymentSettingsAsync |
+| Function Name | PayOSService.VerifyWebhookSignatureAsync |
 | Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate payment config update. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Verify PayOS webhook signature' in PayOSService.VerifyWebhookSignatureAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Valid DTO -> Success. | Auth Admin | UTCID01 |
-| Missing fields -> throw. | Validation fail | UTCID02 |
+| Validate Verify PayOS webhook signature scenarios for `VerifyWebhookSignatureAsync`. | PayOS settings are valid (clientId, apiKey, checksumKey); payment payload inputs are valid. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | A | n/a | ValidationException | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
-## F083 - SystemSettingsService.GetEmailSettingsAsync
+
+## F083 - PayOSService.CancelPaymentAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F083 |
-| Function Name | SystemSettingsService.GetEmailSettingsAsync |
-| Total Test Cases | 1 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate email config retrieval. |
+| Function Name | PayOSService.CancelPaymentAsync |
+| Total Test Cases | 3 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Cancel PayOS payment' in PayOSService.CancelPaymentAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Success -> return DTO. | Always | UTCID01 |
+| Validate Cancel PayOS payment scenarios for `CancelPaymentAsync`. | PayOS settings are valid (clientId, apiKey, checksumKey); payment payload inputs are valid. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | EmailSettingsDto | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
-## F084 - SystemSettingsService.UpdateEmailSettingsAsync
+
+## F084 - SupabaseStorageService.SaveFileAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F084 |
-| Function Name | SystemSettingsService.UpdateEmailSettingsAsync |
-| Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate email config update. |
+| Function Name | SupabaseStorageService.SaveFileAsync |
+| Total Test Cases | 5 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Save file to Supabase' in SupabaseStorageService.SaveFileAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Valid DTO -> Success. | Auth Admin | UTCID01 |
-| Invalid DTO -> throw. | Validation fail | UTCID02 |
+| Validate Save file to Supabase scenarios for `SaveFileAsync`. | Supabase storage settings are valid; stream/path inputs are valid; network calls can be mocked. | UTCID01-UTCID05 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | A | n/a | ValidationException | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
+| UTCID05 |  |  |  |  |  |  |  |
 
 ---
-## F085 - SystemSettingsService.GetGeneralSettingsAsync
+
+## F085 - SupabaseStorageService.DeleteFile
 
 | Header | Value |
 |---|---|
 | Function Code | F085 |
-| Function Name | SystemSettingsService.GetGeneralSettingsAsync |
-| Total Test Cases | 1 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate general config retrieval. |
+| Function Name | SupabaseStorageService.DeleteFile |
+| Total Test Cases | 3 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Delete file from Supabase' in SupabaseStorageService.DeleteFile, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Success -> return DTO. | Always | UTCID01 |
+| Validate Delete file from Supabase scenarios for `DeleteFile`. | Supabase storage settings are valid; stream/path inputs are valid; network calls can be mocked. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | GeneralSettingsDto | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
-## F086 - SystemSettingsService.UpdateGeneralSettingsAsync
+
+## F086 - SupabaseStorageService.FileExists
 
 | Header | Value |
 |---|---|
 | Function Code | F086 |
-| Function Name | SystemSettingsService.UpdateGeneralSettingsAsync |
-| Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate general config update. |
+| Function Name | SupabaseStorageService.FileExists |
+| Total Test Cases | 3 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Check Supabase file exists' in SupabaseStorageService.FileExists, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Valid DTO -> Success. | Auth Admin | UTCID01 |
-| Invalid DTO -> throw. | Validation fail | UTCID02 |
+| Validate Check Supabase file exists scenarios for `FileExists`. | Supabase storage settings are valid; stream/path inputs are valid; network calls can be mocked. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | A | n/a | ValidationException | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
-## F087 - SystemSettingsService.GetSecuritySettingsAsync
+
+## F087 - SystemSettingService.GetSettingAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F087 |
-| Function Name | SystemSettingsService.GetSecuritySettingsAsync |
-| Total Test Cases | 1 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate security config retrieval. |
+| Function Name | SystemSettingService.GetSettingAsync |
+| Total Test Cases | 2 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get setting by key' in SystemSettingService.GetSettingAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Success -> return DTO. | Always | UTCID01 |
+| Validate Get setting by key scenarios for `GetSettingAsync`. | System-setting repository and UnitOfWork are seeded with valid key/value data. | UTCID01-UTCID02 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | SecuritySettingsDto | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
-## F088 - SystemSettingsService.UpdateSecuritySettingsAsync
+
+## F088 - SystemSettingService.GetAllSettingsAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F088 |
-| UTCID01 | N | status dto mapped (contract) | none |  |  |  |  |
-| UTCID02 | A | n/a | throws "Payment not found" when null (contract) |  |  |  |  |
-| UTCID03 | A | n/a | wrapped exception from SDK (contract) |  |  |  |  |
+| Function Name | SystemSettingService.GetAllSettingsAsync |
+| Total Test Cases | 2 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get all settings' in SystemSettingService.GetAllSettingsAsync, covering success/failure flow, response contract, and logging behavior. |
+
+### Condition Matrix
+
+| Condition | Precondition | UTCIDs |
+|---|---|---|
+| Validate Get all settings scenarios for `GetAllSettingsAsync`. | System-setting repository and UnitOfWork are seeded with valid key/value data. | UTCID01-UTCID02 |
+
+### Result Matrix
+
+| UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
+|---|---|---|---|---|---|---|---|
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
 
 ---
----
-## F089 - AppointmentService.GetAvailableSlotsAsync
+
+## F089 - SystemSettingService.UpdateSettingsAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F089 |
-| Function Name | AppointmentService.GetAvailableSlotsAsync |
-| Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate appointment slot availability logic. |
+| Function Name | SystemSettingService.UpdateSettingsAsync |
+| Total Test Cases | 4 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Update settings' in SystemSettingService.UpdateSettingsAsync, covering success/failure flow, response contract, and logging behavior. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Slots free -> returns list. | Template exists | UTCID01 |
-| Slots booked -> filtered out. | Bookings exist | UTCID02 |
+| Validate Update settings scenarios for `UpdateSettingsAsync`. | System-setting repository and UnitOfWork are seeded with valid key/value data. | UTCID01-UTCID04 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | List<SlotDto> | none | | | | |
-| UTCID02 | N | List<SlotDto> | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
 
 ---
-## F090 - ClinicVisitService.ProcessPaymentAsync
+
+## F090 - ClinicVisitService.ProcessPaymentCompletionAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F090 |
-| Function Name | ClinicVisitService.ProcessPaymentAsync |
-| Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate visit payment processing. |
+| Function Name | ClinicVisitService.ProcessPaymentCompletionAsync |
+| Total Test Cases | 4 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Process payment completion' in ClinicVisitService.ProcessPaymentCompletionAsync, covering appointment completion and session creation. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Valid Visit -> Success. | Visit exists | UTCID01 |
-| Visit missing -> throw. | Invalid ID | UTCID02 |
-| Already paid -> throw. | Status=PAID | UTCID03 |
+| Validate Process payment completion scenarios for `ProcessPaymentCompletionAsync`. | Repositories and UnitOfWork are mocked; order and payment data are valid. | UTCID01-UTCID04 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | A | n/a | NotFoundException | | | | |
-| UTCID03 | A | n/a | InvalidOperationException | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+| UTCID04 |  |  |  |  |  |  |  |
 
 ---
-## F091 - PayOSPayoutService.DisburseToClinicAsync
+
+## F091 - PayOSPayoutService.CreatePayoutAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F091 |
-| Function Name | PayOSPayoutService.DisburseToClinicAsync |
+| Function Name | PayOSPayoutService.CreatePayoutAsync |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate PayOS disbursement. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Create PayOS payout' in PayOSPayoutService.CreatePayoutAsync, covering request validation, signature generation, and API call. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Valid request -> Success. | API Auth ok | UTCID01 |
-| Insufficient balance -> throw. | Low funds | UTCID02 |
-| Invalid bank account -> throw. | Bad account | UTCID03 |
+| Validate Create PayOS payout scenarios for `CreatePayoutAsync`. | PayOS settings and HTTP client are prepared; request payload is valid. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | A | n/a | PayOSException | | | | |
-| UTCID03 | A | n/a | PayOSException | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
-## F092 - PayOSPayoutService.GetPayoutHistoryAsync
+
+## F092 - PayOSPayoutService.GetPayoutAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F092 |
-| Function Name | PayOSPayoutService.GetPayoutHistoryAsync |
-| Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 2 |
-| Count type A | 0 |
-| Count type B | 0 |
-| Test Requirement | Validate disbursement history retrieval. |
+| Function Name | PayOSPayoutService.GetPayoutAsync |
+| Total Test Cases | 3 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get PayOS payout details' in PayOSPayoutService.GetPayoutAsync, covering response mapping and error handling. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Has history -> returns list. | Data ok | UTCID01 |
-| No history -> empty list. | No data | UTCID02 |
+| Validate Get PayOS payout details scenarios for `GetPayoutAsync`. | PayOS settings and HTTP client are prepared; payout ID is valid. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | List<PayoutDto> | none | | | | |
-| UTCID02 | N | List<PayoutDto> | none | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
-## F093 - PayOSPayoutService.GetPayoutStatusAsync
+
+## F093 - PayOSPayoutService.GetPayoutsAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F093 |
-| Function Name | PayOSPayoutService.GetPayoutStatusAsync |
-| Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate disbursement status check. |
+| Function Name | PayOSPayoutService.GetPayoutsAsync |
+| Total Test Cases | 3 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get all PayOS payouts' in PayOSPayoutService.GetPayoutsAsync, covering pagination and list mapping. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Payout found -> returns status. | Valid ID | UTCID01 |
-| Payout missing -> throw. | Invalid ID | UTCID02 |
+| Validate Get all PayOS payouts scenarios for `GetPayoutsAsync`. | PayOS settings and HTTP client are prepared. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | PayoutStatusDto | none | | | | |
-| UTCID02 | A | n/a | PayOSException | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
-## F094 - PayOSPayoutService.CancelPayoutAsync
+
+## F094 - PayOSPayoutService.EstimateCreditAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F094 |
-| Function Name | PayOSPayoutService.CancelPayoutAsync |
-| Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate disbursement cancellation. |
+| Function Name | PayOSPayoutService.EstimateCreditAsync |
+| Total Test Cases | 3 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Estimate payout credit' in PayOSPayoutService.EstimateCreditAsync, covering calculation logic. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Pending -> Cancelled. | Status=PENDING | UTCID01 |
-| Processed -> throw. | Status=COMPLETED | UTCID02 |
+| Validate Estimate payout credit scenarios for `EstimateCreditAsync`. | PayOS settings and HTTP client are prepared; amount is valid. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | A | n/a | PayOSException | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
-## F095 - PayOSPayoutService.ConfirmPayoutWebhookAsync
+
+## F095 - PayOSPayoutService.GetPayoutAccountBalanceAsync
 
 | Header | Value |
 |---|---|
 | Function Code | F095 |
-| Function Name | PayOSPayoutService.ConfirmPayoutWebhookAsync |
-| Total Test Cases | 2 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 1 |
-| Count type B | 0 |
-| Test Requirement | Validate disbursement webhook confirmation. |
+| Function Name | PayOSPayoutService.GetPayoutAccountBalanceAsync |
+| Total Test Cases | 3 |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Get payout account balance' in PayOSPayoutService.GetPayoutAccountBalanceAsync, covering response mapping. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Valid sig -> confirmed. | Success | UTCID01 |
-| Invalid sig -> throw. | Tampered | UTCID02 |
+| Validate Get payout account balance scenarios for `GetPayoutAccountBalanceAsync`. | PayOS settings and HTTP client are prepared. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | Success | none | | | | |
-| UTCID02 | A | n/a | PayOSException | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
 
 ---
+
 ## F096 - PatientScreeningPdfService.GenerateScreeningReportPdf
 
 | Header | Value |
@@ -3390,31 +3288,30 @@ Trong file markdown là **3 cột** trên **một hàng** (một UTCID). Nội d
 | Function Code | F096 |
 | Function Name | PatientScreeningPdfService.GenerateScreeningReportPdf |
 | Total Test Cases | 3 |
-| Created By | |
-| Executed By | |
-| Lines of Code | |
-| Passed | |
-| Failed | |
-| Untested | |
-| Count type N | 1 |
-| Count type A | 2 |
-| Count type B | 0 |
-| Test Requirement | Validate PDF report generation. |
+| Created By |  |
+| Executed By |  |
+| Lines of Code |  |
+| Passed |  |
+| Failed |  |
+| Untested |  |
+| Count type N |  |
+| Count type A |  |
+| Count type B |  |
+| Test Requirement | Validate 'Generate patient screening PDF' in PatientScreeningPdfService.GenerateScreeningReportPdf, covering PDF layout and data population. |
 
 ### Condition Matrix
 
 | Condition | Precondition | UTCIDs |
 |---|---|---|
-| Valid data -> returns byte[]. | QuestPDF ok | UTCID01 |
-| Missing results -> throw. | Data incomplete | UTCID02 |
-| Layout error -> throw. | PDF Engine fail | UTCID03 |
+| Validate Generate patient screening PDF scenarios for `GenerateScreeningReportPdf`. | QuestPDF library is initialized; screening data is valid. | UTCID01-UTCID03 |
 
 ### Result Matrix
 
 | UTCID | Type (N/A/B) | Expected return | Expected exception | Expected log message | Passed/Failed | Executed Date | Defect ID |
 |---|---|---|---|---|---|---|---|
-| UTCID01 | N | byte[] | none | | | | |
-| UTCID02 | A | n/a | InvalidOperationException | | | | |
-| UTCID03 | A | n/a | PdfGenerationException | | | | |
+| UTCID01 |  |  |  |  |  |  |  |
+| UTCID02 |  |  |  |  |  |  |  |
+| UTCID03 |  |  |  |  |  |  |  |
+
 ---
 
