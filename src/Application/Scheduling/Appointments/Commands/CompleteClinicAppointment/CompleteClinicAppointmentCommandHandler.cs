@@ -51,10 +51,18 @@ public class CompleteClinicAppointmentCommandHandler : ICommandHandler<CompleteC
 
         try
         {
-            visit.Complete(request.Notes);
-            appointment.Complete();
+            // Transition visit to WaitingForPayment instead of Completed
+            // The actual Completion will happen after the financial system confirms payment
+            visit.FinishConsultation(request.Notes);
+            
+            // Appointment can be marked as InProgress or stay as is, 
+            // but we'll mark it as Completed when the Visit is truly done after payment.
+            // For now, let's keep it InProgress to indicate it's not archived yet.
+            // Actually, appointment.Complete() is fine if we consider 'Appointment' the booking part.
+            // But let's keep it consistent with the Visit status.
             
             await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
+            // appointment.Complete(); // Don't complete appointment yet if visit is not done
             await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
 
             // ── 8. Create Consultation Chat Session ───────────────────────────
@@ -63,15 +71,11 @@ public class CompleteClinicAppointmentCommandHandler : ICommandHandler<CompleteC
             {
                 var session = ConsultationSession.CreateClinicBooking(
                     appointment.PatientId,
-                    appointment.AppointmentSlot.ScheduleTemplate.OrgId.GetValueOrDefault(),
                     0, // Clinic sessions are already paid or handled at clinic
                     DateTime.UtcNow,
                     visit.AssignedDoctorId.GetValueOrDefault());
 
                 session.OpenChat();
-                
-                // We end it immediately so it follows the "COMPLETED" flow with 14-day history access
-                session.EndSession(visit.AssignedDoctorId ?? Guid.Empty, "ClinicVisitCompleted");
                 
                 await _sessionRepository.AddAsync(session, cancellationToken);
 

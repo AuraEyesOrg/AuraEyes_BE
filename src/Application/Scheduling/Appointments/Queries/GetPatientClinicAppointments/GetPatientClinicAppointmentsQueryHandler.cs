@@ -2,8 +2,9 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Scheduling.Appointments.Common;
 using Domain.Enums;
-using Domain.Repositories;
 using Domain.Common;
+using Domain.Entities.Users;
+using Domain.Repositories;
 
 namespace Application.Scheduling.Appointments.Queries.GetPatientClinicAppointments;
 
@@ -13,24 +14,30 @@ public class GetPatientClinicAppointmentsQueryHandler
     private const int MaxPageSize = 50;
 
     private readonly IAppointmentRepository _appointmentRepository;
-    private readonly IOrganisationFeedbackRepository _organisationFeedbackRepository;
+    private readonly IClinicFeedbackRepository _clinicFeedbackRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IOrderRepository _orderRepository;
+    private readonly IRepository<Organisation> _organisationRepository;
+    private readonly IClinicStaffRepository _staffRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
 
     public GetPatientClinicAppointmentsQueryHandler(
         IAppointmentRepository appointmentRepository,
-        IOrganisationFeedbackRepository organisationFeedbackRepository,
+        IClinicFeedbackRepository clinicFeedbackRepository,
         IOphthalmologistRepository ophthalmologistRepository,
         IOrderRepository orderRepository,
+        IRepository<Organisation> organisationRepository,
+        IClinicStaffRepository staffRepository,
         IUnitOfWork unitOfWork,
         ICurrentUserService currentUser)
     {
         _appointmentRepository = appointmentRepository;
-        _organisationFeedbackRepository = organisationFeedbackRepository;
+        _clinicFeedbackRepository = clinicFeedbackRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _orderRepository = orderRepository;
+        _organisationRepository = organisationRepository;
+        _staffRepository = staffRepository;
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
     }
@@ -77,7 +84,7 @@ public class GetPatientClinicAppointmentsQueryHandler
         // Batch feedback presence check in a single query (avoids N+1 round-trips).
         IReadOnlySet<Guid> feedbackAppointmentIds = appointmentIds.Length == 0
             ? new HashSet<Guid>()
-            : await _organisationFeedbackRepository.GetAppointmentIdsWithFeedbackAsync(
+            : await _clinicFeedbackRepository.GetAppointmentIdsWithFeedbackAsync(
                 request.PatientId,
                 appointmentIds,
                 cancellationToken);
@@ -96,8 +103,19 @@ public class GetPatientClinicAppointmentsQueryHandler
         var orderMap = orders.GroupBy(o => o.AppointmentId)
             .ToDictionary(g => g.Key!.Value, g => g.OrderByDescending(o => o.CreatedAt).First());
 
-        // Proactive sync removed: We keep appointment status as Pending even if paid
-        // until the patient physically checks in at the clinic.
+        // Fetch Organisation names
+        var orgIds = appointments
+            .Where(a => a.AppointmentSlot?.ScheduleTemplate?.OrgId != null)
+            .Select(a => a.AppointmentSlot!.ScheduleTemplate!.OrgId!.Value)
+            .Distinct()
+            .ToList();
+
+        var organisationMap = (await _organisationRepository.GetAllAsync(cancellationToken))
+            .Where(o => orgIds.Contains(o.Id))
+            .ToDictionary(o => o.Id, o => o.Name);
+
+        // In a real scenario, we'd link a staff member to the appointment lifecycle (confirmed by, etc.)
+        // For now, we don't have a direct StaffId in Appointment entity.
 
         var items = appointments
             .Where(a => a.AppointmentSlot is not null)
@@ -105,6 +123,8 @@ public class GetPatientClinicAppointmentsQueryHandler
             {
                 doctorMap.TryGetValue(a.AppointmentSlot!.OphthalId ?? Guid.Empty, out var doc);
 
+                organisationMap.TryGetValue(a.AppointmentSlot.ScheduleTemplate?.OrgId ?? Guid.Empty, out var orgName);
+                
                 return new ClinicAppointmentDto
                 {
                     Id = a.Id,
@@ -117,9 +137,13 @@ public class GetPatientClinicAppointmentsQueryHandler
                     Status = a.Status.ToString(),
                     CreatedAt = a.CreatedAt,
                     HasFeedback = feedbackAppointmentIds.Contains(a.Id),
+                    OrganisationId = a.AppointmentSlot.ScheduleTemplate?.OrgId,
+                    OrganisationName = orgName ?? "Aura Clinic",
                     OphthalId = a.AppointmentSlot.OphthalId,
                     OphthalFullName = doc.FullName ?? "Clinic Doctor",
                     OphthalAvatarUrl = doc.AvatarUrl,
+                    StaffId = null, // No specific staff linked yet
+                    StaffName = null,
                     
                     // Billing info
                     OrderId = orderMap.TryGetValue(a.Id, out var ord) ? ord.Id : null,
