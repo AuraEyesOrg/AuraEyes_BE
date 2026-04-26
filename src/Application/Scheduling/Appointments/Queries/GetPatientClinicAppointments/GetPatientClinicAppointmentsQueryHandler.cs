@@ -96,24 +96,8 @@ public class GetPatientClinicAppointmentsQueryHandler
         var orderMap = orders.GroupBy(o => o.AppointmentId)
             .ToDictionary(g => g.Key!.Value, g => g.OrderByDescending(o => o.CreatedAt).First());
 
-        // Proactive sync for data consistency
-        bool statusUpdated = false;
-        foreach (var appointment in appointments)
-        {
-            if (appointment.Status == AppointmentStatus.Pending && 
-                orderMap.TryGetValue(appointment.Id, out var ord) && 
-                (ord.Status == OrderStatus.Confirmed || ord.Status == OrderStatus.Completed))
-            {
-                appointment.Confirm();
-                await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
-                statusUpdated = true;
-            }
-        }
-
-        if (statusUpdated)
-        {
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-        }
+        // Proactive sync removed: We keep appointment status as Pending even if paid
+        // until the patient physically checks in at the clinic.
 
         var items = appointments
             .Where(a => a.AppointmentSlot is not null)
@@ -156,6 +140,7 @@ public class GetPatientClinicAppointmentsQueryHandler
         {
             PatientAppointmentTab.Upcoming => new[]
             {
+                AppointmentStatus.Pending,
                 AppointmentStatus.Confirmed,
                 AppointmentStatus.CheckedIn,
                 AppointmentStatus.InProgress
