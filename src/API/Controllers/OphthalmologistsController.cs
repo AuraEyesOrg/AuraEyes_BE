@@ -10,6 +10,7 @@ using Application.Ophthalmologists.Commands.UploadCredentials;
 using Application.Ophthalmologists.Common;
 using Application.Patients.Commands.UploadAvatar;
 using Application.Ophthalmologists.Queries.GetDashboardMetrics;
+using Application.Ophthalmologists.Queries.GetReviewQueue;
 using Application.Ophthalmologists.Queries.GetOphthalmologist;
 using Application.Ophthalmologists.Queries.GetOphthalmologists;
 using Application.Ophthalmologists.LeaveRequests.Commands.CancelLeaveRequest;
@@ -602,6 +603,18 @@ public class OphthalmologistsController : BaseApiController
             return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
 
         var result = await _mediator.Send(new GetDashboardMetricsQuery(_currentUserService.UserId.Value));
+        return HandleResult(result);
+    }
+
+    [HttpGet("review-queue")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<List<ReviewQueueItemDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetReviewQueue()
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
+
+        var result = await _mediator.Send(new GetReviewQueueQuery(_currentUserService.UserId.Value));
         return HandleResult(result);
     }
 
