@@ -251,6 +251,7 @@ public class NotificationServiceTests
         public Task<(bool Succeeded, Guid? UserId, string[] Errors)> CreateUserWalkInPatientAsync(string email, string password, string fullName, string role, Guid? organizationId = null, UserProfileWalkInDto? userProfile = null, CancellationToken cancellationToken = default) => Task.FromResult((true, (Guid?)Guid.NewGuid(), Array.Empty<string>()));
         public Task<bool> CheckPasswordAsync(Guid userId, string password) => Task.FromResult(false);
         public Task<UserDto?> GetUserByEmailAsync(string email, CancellationToken cancellationToken = default) => Task.FromResult<UserDto?>(null);
+        public Task<UserDto?> GetUserByCitizenIdAsync(string citizenId, CancellationToken cancellationToken = default) => Task.FromResult<UserDto?>(null);
         public Task<UserDto?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult<UserDto?>(null);
         public Task<bool> IsPhoneNumberInUseByOrganizationAsync(Guid organizationId, string phoneNumber, CancellationToken cancellationToken = default) => Task.FromResult(false);
         public Task<bool> IsCitizenIdInUseByOrganizationAsync(Guid organizationId, string citizenId, CancellationToken cancellationToken = default) => Task.FromResult(false);

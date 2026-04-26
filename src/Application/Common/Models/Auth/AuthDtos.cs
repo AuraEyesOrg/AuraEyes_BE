@@ -23,6 +23,19 @@ public record LoginRequest
     public string? DeviceInfo { get; init; }
 }
 
+public record LookupAccountByCitizenIdRequest
+{
+    [Required]
+    [MinLength(6)]
+    public string CitizenId { get; init; } = string.Empty;
+}
+
+public record LookupAccountByCitizenIdResponse
+{
+    public bool Exists { get; init; }
+    public string? MaskedEmail { get; init; }
+}
+
 /// <summary>
 /// Register patient request DTO.
 /// </summary>
@@ -44,11 +57,19 @@ public record RegisterPatientRequest
     [MaxLength(200)]
     public string FullName { get; init; } = string.Empty;
 
+    [MaxLength(500)]
     public string? Address { get; init; }
 
     public DateTime? DateOfBirth { get; init; }
 
     public int? Gender { get; init; }
+
+    [Phone]
+    [MaxLength(20)]
+    public string? PhoneNumber { get; init; }
+
+    [MaxLength(20)]
+    public string? CitizenId { get; init; }
 }
 
 /// <summary>

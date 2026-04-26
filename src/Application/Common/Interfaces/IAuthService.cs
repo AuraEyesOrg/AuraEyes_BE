@@ -44,6 +44,10 @@ public interface IAuthService
         string? ipAddress,
         CancellationToken cancellationToken = default);
 
+    Task<Result<LookupAccountByCitizenIdResponse>> LookupAccountByCitizenIdAsync(
+        string citizenId,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Complete login after 2FA verification.
     /// </summary>

@@ -84,6 +84,10 @@ public sealed class FakeEmailService : IEmailService
 
     public Task SendStaffOnboardingEmailAsync(string email, string fullName, string temporaryPassword, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        _logger.LogInformation(
+            "[FAKE EMAIL] Staff onboarding email captured for {Email} ({FullName}). Temporary password issued.",
+            email,
+            fullName);
+        return Task.CompletedTask;
     }
 }
