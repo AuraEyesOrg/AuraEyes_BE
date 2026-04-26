@@ -1,4 +1,5 @@
 using Domain.Common;
+using Domain.Entities.MedicalRecords;
 using Domain.Entities.Users;
 using Domain.Enums;
 
@@ -36,6 +37,7 @@ public class PatientVisit : BaseEntity, IAggregateRoot
     public string? Notes { get; private set; }
 
     // Navigation properties
+    public MedicalRecord? MedicalRecord { get; private set; }
     public Appointment? Appointment { get; private set; }
     public Patient? Patient { get; private set; }
     public Ophthalmologist? AssignedDoctor { get; private set; }

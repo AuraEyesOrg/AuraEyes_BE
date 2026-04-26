@@ -1,6 +1,7 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
+using Domain.Entities.MedicalRecords;
 using Domain.Entities.Scheduling;
 using Domain.Enums;
 using Domain.Repositories;
@@ -12,17 +13,20 @@ public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInCli
 {
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IPatientVisitRepository _patientVisitRepository;
+    private readonly IMedicalRecordRepository _medicalRecordRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
 
     public CheckInClinicAppointmentCommandHandler(
         IAppointmentRepository appointmentRepository,
         IPatientVisitRepository patientVisitRepository,
+        IMedicalRecordRepository medicalRecordRepository,
         IUnitOfWork unitOfWork,
         INotificationService notificationService)
     {
         _appointmentRepository = appointmentRepository;
         _patientVisitRepository = patientVisitRepository;
+        _medicalRecordRepository = medicalRecordRepository;
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
     }
@@ -56,6 +60,18 @@ public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInCli
 
         var visit = PatientVisit.CreateFromAppointment(appointment);
         await _patientVisitRepository.AddAsync(visit, cancellationToken);
+
+        // Create initial empty Medical Record (Step 1 requirement)
+        var medicalRecordNumber = $"MT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}";
+        var medicalRecord = new Domain.Entities.MedicalRecords.MedicalRecord(visit.PatientId, medicalRecordNumber);
+        medicalRecord.LinkToPatientVisit(visit.Id);
+        
+        // Pre-fill administrative data if possible (e.g., from patient profile)
+        // For now, initialized with empty JSON as required
+        medicalRecord.UpdateAdministrativeInfo("{}"); 
+        
+        await _medicalRecordRepository.AddAsync(medicalRecord, cancellationToken);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         // Notify Coordinator (ClinicStaff) that a patient has checked in
