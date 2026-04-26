@@ -157,16 +157,10 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
                 {
                     order.Confirm();
 
-            // Sync with Appointment if this is a clinic booking deposit
+            // Log deposit received but keep appointment status as Pending
             if (order.AppointmentId.HasValue)
             {
-                var appointment = await _appointmentRepository.GetByIdAsync(order.AppointmentId.Value, cancellationToken);
-                if (appointment != null && appointment.Status == AppointmentStatus.Pending)
-                {
-                    appointment.Confirm();
-                    await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
-                    _logger.LogInformation("Appointment {AppointmentId} confirmed automatically via successful deposit for Order {OrderId}.", appointment.Id, order.Id);
-                }
+                _logger.LogInformation("Deposit paid for Appointment {AppointmentId}. Status remains Pending until check-in.", order.AppointmentId.Value);
             }
                     _logger.LogInformation("Order {OrderId} confirmed (deposit received).", order.Id);
                 }
