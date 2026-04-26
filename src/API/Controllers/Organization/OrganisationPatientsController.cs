@@ -5,12 +5,8 @@ using Application.OrganisationPatients;
 using Application.OrganisationPatients.Commands.UpdateOrganisationPatientContact;
 using Application.OrganisationPatients.Queries.GetOrganisationRecentPatients;
 using Application.OrganisationPatients.Commands.CreateWalkInPatient;
-using MediatR;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-
 using Infrastructure.Identity.Authorization;
-using Microsoft.AspNetCore.Authorization;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers.Organization;
@@ -21,13 +17,16 @@ public class OrganisationPatientsController : BaseApiController
 {
     private readonly IMediator _mediator;
     private readonly ICurrentUserService _currentUser;
+    private readonly string _frontendUrl;
 
     public OrganisationPatientsController(
         IMediator mediator,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        IConfiguration configuration)
     {
         _mediator = mediator;
         _currentUser = currentUser;
+        _frontendUrl = (configuration["FrontendUrl"] ?? "http://localhost:3000").TrimEnd('/');
     }
 
     [HttpGet]
@@ -49,14 +48,26 @@ public class OrganisationPatientsController : BaseApiController
 
     [HttpPost("walk-in")]
     [AuthorizePermission(Permissions.PatientsCreate)]
-    [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<CreateWalkInPatientResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateWalkInPatient(
-        [FromBody] CreateWalkInPatientCommand command,
+        [FromBody] CreateWalkInPatientRequest request,
         CancellationToken cancellationToken = default)
     {
         if (_currentUser.UserId is null)
             return Unauthorized(ApiResponseFactory.Unauthorized("Unable to resolve current user."));
+
+        var command = new CreateWalkInPatientCommand
+        {
+            FullName = request.FullName,
+            DateOfBirth = request.DateOfBirth,
+            Gender = request.Gender,
+            Address = request.Address,
+            PhoneNumber = request.PhoneNumber,
+            CitizenId = request.CitizenId,
+            Email = request.Email,
+            ConfirmationUrlBase = $"{_frontendUrl}/confirm-email"
+        };
 
         var result = await _mediator.Send(command, cancellationToken);
         return HandleResult(result, "Walk-in patient created successfully");

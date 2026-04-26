@@ -23,6 +23,7 @@ public abstract class BaseEntity
     {
         Id = id;
         CreatedAt = DateTime.UtcNow;
+        IsDeleted = false;
     }
 
     public void AddDomainEvent(IDomainEvent domainEvent)
