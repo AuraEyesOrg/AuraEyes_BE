@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260426214404_AddClinicFeedback")]
+    partial class AddClinicFeedback
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1261,14 +1264,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("PatientVisitId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("PdfUrl")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -1283,17 +1278,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("IsDeleted");
-
-                    b.HasIndex("MedicalRecordNumber")
-                        .IsUnique();
-
-                    b.HasIndex("PatientId");
-
-                    b.HasIndex("PatientVisitId")
-                        .IsUnique();
-
 
                     b.ToTable("MedicalRecords");
                 });
@@ -3470,9 +3454,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("MedicalRecordNumber")
-                        .HasColumnType("text");
-
                     b.Property<string>("PhoneNumber")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
@@ -4055,22 +4036,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Navigation("Wallet");
                 });
 
-            modelBuilder.Entity("Domain.Entities.MedicalRecords.MedicalRecord", b =>
-                {
-                    b.HasOne("Domain.Entities.Users.Patient", "Patient")
-                        .WithMany()
-                        .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Entities.Scheduling.PatientVisit", null)
-                        .WithOne("MedicalRecord")
-                        .HasForeignKey("Domain.Entities.MedicalRecords.MedicalRecord", "PatientVisitId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Patient");
-                });
-
             modelBuilder.Entity("Domain.Entities.Network.InternalChat.InternalGroupMember", b =>
                 {
                     b.HasOne("Domain.Entities.Network.InternalChat.InternalGroupChat", "Group")
@@ -4457,11 +4422,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Navigation("Appointments");
 
                     b.Navigation("SlotAssignments");
-                });
-
-            modelBuilder.Entity("Domain.Entities.Scheduling.PatientVisit", b =>
-                {
-                    b.Navigation("MedicalRecord");
                 });
 
             modelBuilder.Entity("Domain.Entities.Scheduling.ScheduleTemplate", b =>

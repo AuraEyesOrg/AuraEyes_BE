@@ -68,7 +68,6 @@ public class FeedbackController : BaseApiController
     {
         var command = new CreateClinicFeedbackCommand
         {
-            OrganisationId = clinicId,
             AppointmentId = request.AppointmentId,
             Rating = request.Rating,
             Comment = request.Comment,
@@ -158,7 +157,6 @@ public class FeedbackController : BaseApiController
     {
         var result = await _mediator.Send(new ListClinicFeedbackQuery
         {
-            OrganisationId = clinicId,
             PageNumber = pageNumber,
             PageSize = pageSize
         });
@@ -190,7 +188,7 @@ public class FeedbackController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetClinicRatingSummary(Guid clinicId)
     {
-        var result = await _mediator.Send(new GetClinicRatingSummaryQuery(clinicId));
+        var result = await _mediator.Send(new GetClinicRatingSummaryQuery());
         return HandleResult(result);
     }
 
