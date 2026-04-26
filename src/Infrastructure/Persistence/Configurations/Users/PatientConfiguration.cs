@@ -40,6 +40,9 @@ public class PatientConfiguration : IEntityTypeConfiguration<Patient>
         builder.Property(e => e.UsedAiQuota)
             .HasDefaultValue(0);
 
+        builder.Property(e => e.MedicalRecordNumber)
+            .HasMaxLength(50);
+
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
