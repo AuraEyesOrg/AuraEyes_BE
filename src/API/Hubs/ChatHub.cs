@@ -39,9 +39,21 @@ public class ChatHub : Hub
     {
         var userId = Context.UserIdentifier;
         _logger.LogInformation(
-            "ChatHub client connected: ConnectionId={ConnectionId}, UserId={UserId}",
+            "ChatHub client connected: ConnectionId={ConnectionId}, UserId={UserId}, UserIdentifier={UserIdentifier}",
             Context.ConnectionId,
-            userId);
+            userId,
+            Context.UserIdentifier);
+            
+        // Add to role-based groups [FR-47]
+        if (Context.User?.Identity?.IsAuthenticated == true)
+        {
+            var roles = Context.User.FindAll(System.Security.Claims.ClaimTypes.Role).Select(c => c.Value);
+            foreach (var role in roles)
+            {
+                await Groups.AddToGroupAsync(Context.ConnectionId, role);
+                _logger.LogDebug("User {UserId} added to SignalR group {Role}", userId, role);
+            }
+        }
 
         await base.OnConnectedAsync();
     }
@@ -60,6 +72,41 @@ public class ChatHub : Hub
         }
 
         await base.OnDisconnectedAsync(exception);
+    }
+
+    /// <summary>
+    /// Joins a specific consultation session group for realtime updates.
+    /// </summary>
+    public async Task JoinSession(Guid sessionId)
+    {
+        var senderProfileIdRaw = Context.User?.FindFirst("profile_id")?.Value;
+        if (!Guid.TryParse(senderProfileIdRaw, out var senderProfileId))
+        {
+            return;
+        }
+
+        var session = await _sessionRepository.GetByIdAsync(sessionId, Context.ConnectionAborted);
+        if (session is null) return;
+
+        // Verify participation
+        bool isPatient = senderProfileId == session.PatientId;
+        bool isDoctor = session.OphthalmologistId.HasValue
+                && senderProfileId == session.OphthalmologistId.Value;
+
+        if (!isPatient && !isDoctor)
+        {
+            _logger.LogWarning(
+                "User {UserId} attempted to join session {SessionId} without participation rights.",
+                Context.UserIdentifier, sessionId);
+            return;
+        }
+
+        var groupName = $"session_{sessionId}";
+        await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+        
+        _logger.LogInformation(
+            "User {UserId} joined SignalR group {GroupName}",
+            Context.UserIdentifier, groupName);
     }
 
     /// <summary>
