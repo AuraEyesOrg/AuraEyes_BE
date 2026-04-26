@@ -172,7 +172,12 @@ public class ApplicationDbContext : IdentityDbContext<
 
         foreach (var entry in entries)
         {
-            if (entry.State == EntityState.Deleted)
+            if (entry.State == EntityState.Added)
+            {
+                entry.Property(nameof(BaseEntity.IsDeleted)).CurrentValue = false;
+                entry.Property(nameof(BaseEntity.CreatedAt)).CurrentValue = DateTime.UtcNow;
+            }
+            else if (entry.State == EntityState.Deleted)
             {
                 // For all other BaseEntity types: convert hard delete → soft delete.
                 entry.State = EntityState.Modified;
@@ -188,6 +193,12 @@ public class ApplicationDbContext : IdentityDbContext<
                 if (entry.Property(nameof(BaseEntity.CreatedAt)).IsModified)
                 {
                     entry.State = EntityState.Added;
+                    // Re-applying IsDeleted = false after the state transition is critical.
+                    // Changing entry.State to Added can cause EF Core to lose current
+                    // property values (resetting them to CLR defaults, i.e. null for
+                    // nullable-annotated booleans in shadow state), which would violate
+                    // the NOT NULL constraint on the "IsDeleted" column.
+                    entry.Property(nameof(BaseEntity.IsDeleted)).CurrentValue = false;
                     continue;
                 }
 

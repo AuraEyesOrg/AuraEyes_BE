@@ -282,7 +282,7 @@ public static class DatabaseSeeder
 
             if (existingPatient == null)
             {
-                var patient = new Patient(userId: patientUser.Id);
+                var patient = Patient.CreateRegistered(userId: patientUser.Id);
                 await context.Patients.AddAsync(patient);
                 await context.SaveChangesAsync();
 

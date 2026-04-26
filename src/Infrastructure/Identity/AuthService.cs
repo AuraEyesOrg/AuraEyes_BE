@@ -11,6 +11,7 @@ using Domain.Repositories;
 using Google.Apis.Auth;
 using Infrastructure.Settings;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -107,7 +108,9 @@ public class AuthService : IAuthService
                 FullName = request.FullName,
                 Address = request.Address,
                 DateOfBirth = request.DateOfBirth,
-                Gender = request.Gender.HasValue ? (Gender)request.Gender.Value : null
+                Gender = request.Gender.HasValue ? (Gender)request.Gender.Value : null,
+                PhoneNumber = request.PhoneNumber,
+                CitizenId = request.CitizenId
             };
 
             var createResult = await _userManager.CreateAsync(user, request.Password);
@@ -120,8 +123,8 @@ public class AuthService : IAuthService
             // Add to Patient role
             await _identityService.AddToRoleAsync(user.Id, Roles.Patient);
 
-            // Create Patient profile using Repository pattern
-            var patient = new Patient(user.Id, null);
+            // Create Patient profile using factory method (ensures IsDeleted = false)
+            var patient = Patient.CreateRegistered(user.Id);
             await _patientRepository.AddAsync(patient, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -607,7 +610,7 @@ public class AuthService : IAuthService
 
             await _identityService.AddToRoleAsync(newUser.Id, Roles.Patient);
 
-            var patient = new Patient(newUser.Id, null);
+            var patient = Patient.CreateRegistered(newUser.Id);
             await _patientRepository.AddAsync(patient, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
@@ -700,6 +703,35 @@ public class AuthService : IAuthService
         }
     }
 
+    public async Task<Result<LookupAccountByCitizenIdResponse>> LookupAccountByCitizenIdAsync(
+        string citizenId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(citizenId))
+        {
+            return Result<LookupAccountByCitizenIdResponse>.Failure("Citizen ID is required.");
+        }
+
+        var normalizedCitizenId = citizenId.Trim();
+        var user = await _userManager.Users
+            .FirstOrDefaultAsync(u => u.CitizenId == normalizedCitizenId && !u.IsDeleted, cancellationToken);
+
+        if (user == null)
+        {
+            return Result<LookupAccountByCitizenIdResponse>.Success(new LookupAccountByCitizenIdResponse
+            {
+                Exists = false,
+                MaskedEmail = null
+            });
+        }
+
+        return Result<LookupAccountByCitizenIdResponse>.Success(new LookupAccountByCitizenIdResponse
+        {
+            Exists = true,
+            MaskedEmail = MaskEmailForLookup(user.Email)
+        });
+    }
+
     /// <inheritdoc />
     public async Task<Result<AuthResponse>> VerifyTwoFactorLoginAsync(
         VerifyTwoFactorRequest request,
@@ -749,6 +781,29 @@ public class AuthService : IAuthService
             _logger.LogError(ex, "Error during 2FA verification for user: {UserId}", request.UserId);
             return Result<AuthResponse>.Failure("An error occurred during verification");
         }
+    }
+
+    private static string? MaskEmailForLookup(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return null;
+        }
+
+        var parts = email.Split('@');
+        if (parts.Length != 2)
+        {
+            return null;
+        }
+
+        var local = parts[0];
+        var domain = parts[1];
+        if (local.Length <= 2)
+        {
+            return $"**@{domain}";
+        }
+
+        return $"{local[..2]}***@{domain}";
     }
 
     /// <summary>
