@@ -33,9 +33,9 @@ public class PatientConfiguration : IEntityTypeConfiguration<Patient>
 
         builder.Property(e => e.DiseaseHistory)
             .HasMaxLength(1000);
+        builder.Property(e => e.MedicalRecordNumber)
+            .HasMaxLength(50);
 
-        // Removed HasDefaultValue for Quotas and IsDeleted to force EF Core to always send them during INSERT.
-        // This prevents the PostgreSQL NOT NULL constraint violations if the DB schema is missing DEFAULT constraints.
 
         // UserId unique index — only for registered patients (non-null UserId)
         builder.HasIndex(e => e.UserId)

@@ -14,12 +14,17 @@ public class UpdateInternalGroupChatCommand : ICommand
 public class UpdateInternalGroupChatCommandHandler : ICommandHandler<UpdateInternalGroupChatCommand>
 {
     private readonly IRepository<InternalGroupChat> _groupChatRepository;
+    private readonly IInternalChatHubService _chatHubService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public UpdateInternalGroupChatCommandHandler(IRepository<InternalGroupChat> groupChatRepository, IUnitOfWork unitOfWork)
+    public UpdateInternalGroupChatCommandHandler(
+        IRepository<InternalGroupChat> groupChatRepository, 
+        IUnitOfWork unitOfWork,
+        IInternalChatHubService chatHubService)
     {
         _groupChatRepository = groupChatRepository;
         _unitOfWork = unitOfWork;
+        _chatHubService = chatHubService;
     }
 
     public async Task<Result> Handle(UpdateInternalGroupChatCommand request, CancellationToken cancellationToken)
@@ -32,6 +37,8 @@ public class UpdateInternalGroupChatCommandHandler : ICommandHandler<UpdateInter
         
         await _groupChatRepository.UpdateAsync(group, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        await _chatHubService.BroadcastGroupUpdateAsync(group.Id, "GroupRenamed", cancellationToken);
 
         return Result.Success();
     }

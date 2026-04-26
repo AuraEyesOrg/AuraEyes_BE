@@ -52,6 +52,7 @@ public class GetClinicQueueQueryHandler
                 .ThenInclude(a => a!.AppointmentSlot)
                     .ThenInclude(s => s!.ScheduleTemplate)
             .Include(v => v.AssignedDoctor)
+            .Include(v => v.MedicalRecord)
             .Where(v =>
                 v.Appointment != null &&
                 v.Appointment.AppointmentSlot != null &&
@@ -128,6 +129,8 @@ public class GetClinicQueueQueryHandler
                 ConsultationStatus = consultation?.Status.ToString(),
                 AssignedDoctorId = visit.AssignedDoctorId ?? consultation?.OphthalmologistId,
                 AssignedDoctorName = assignedDoctorName,
+                MedicalRecordId = visit.MedicalRecord?.Id,
+
                 FlowState = DetermineFlowState(visit, screening, consultation)
             };
 
@@ -190,5 +193,6 @@ public class ClinicQueueItemDto
     public string? ConsultationStatus { get; set; }
     public Guid? AssignedDoctorId { get; set; }
     public string? AssignedDoctorName { get; set; }
+    public Guid? MedicalRecordId { get; set; }
     public string FlowState { get; set; } = string.Empty;
 }

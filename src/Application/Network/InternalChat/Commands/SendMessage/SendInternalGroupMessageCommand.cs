@@ -20,19 +20,22 @@ public class SendInternalGroupMessageCommandHandler : ICommandHandler<SendIntern
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
     private readonly IInternalChatHubService _chatHubService;
+    private readonly IIdentityService _identityService;
 
     public SendInternalGroupMessageCommandHandler(
         IRepository<InternalGroupChat> groupChatRepository,
         IRepository<InternalGroupMessage> messageRepository,
         IUnitOfWork unitOfWork,
         ICurrentUserService currentUserService,
-        IInternalChatHubService chatHubService)
+        IInternalChatHubService chatHubService,
+        IIdentityService identityService)
     {
         _groupChatRepository = groupChatRepository;
         _messageRepository = messageRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
         _chatHubService = chatHubService;
+        _identityService = identityService;
     }
 
     public async Task<Result<Guid>> Handle(SendInternalGroupMessageCommand request, CancellationToken cancellationToken)
@@ -70,6 +73,8 @@ public class SendInternalGroupMessageCommandHandler : ICommandHandler<SendIntern
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         // Broadcast realtime message
+        var sender = await _identityService.GetUserByIdAsync(currentUserId, cancellationToken);
+
         var messageDto = new Application.Network.InternalChat.Queries.GetMessages.InternalGroupMessageDto
         {
             Id = message.Id,
@@ -77,7 +82,9 @@ public class SendInternalGroupMessageCommandHandler : ICommandHandler<SendIntern
             SenderId = message.SenderId,
             SenderType = message.SenderType,
             Content = message.Content,
-            CreatedAt = message.CreatedAt
+            CreatedAt = message.CreatedAt,
+            SenderName = sender?.FullName,
+            SenderAvatar = sender?.AvatarUrl
         };
         
         await _chatHubService.BroadcastMessageAsync(group.Id, messageDto, cancellationToken);
@@ -85,4 +92,3 @@ public class SendInternalGroupMessageCommandHandler : ICommandHandler<SendIntern
         return Result<Guid>.Success(message.Id);
     }
 }
-

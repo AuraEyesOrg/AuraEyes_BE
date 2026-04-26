@@ -239,6 +239,7 @@ public static class DependencyInjection
         services.AddScoped<ISystemSettingService, SystemSettingService>();
         services.AddScoped<IOrganisationScreeningPdfService, OrganisationScreeningPdfService>();
         services.AddScoped<IPatientScreeningPdfService, PatientScreeningPdfService>();
+        services.AddScoped<IMedicalRecordPdfService, MedicalRecordPdfService>();
         services.AddScoped<IOphthalmologistContractProvisioningService, OphthalmologistContractProvisioningService>();
         services.AddSingleton<IAiAssetBaseUrlProvider, AiAssetBaseUrlProvider>();
         services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();

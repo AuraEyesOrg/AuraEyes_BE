@@ -805,6 +805,11 @@ public class AuthServiceTests
         {
             throw new NotImplementedException();
         }
+
+        public Task<(bool Succeeded, string[] Errors)> ClearMustUpdateProfileFlagAsync(Guid userId)
+        {
+            return Task.FromResult((true, Array.Empty<string>()));
+        }
     }
 
     private sealed class FakeTokenService : ITokenService

@@ -150,14 +150,14 @@ public class UsersController : BaseApiController
     }
 
     /// <summary>
-    /// Onboard a new staff member (SystemAdmin, Ophthalmologist, or ClinicStaff)
+    /// Create a new account for Ophthalmologist or ClinicStaff
     /// </summary>
-    /// <param name="command">Onboarding data</param>
-    [HttpPost("onboard")]
+    /// <param name="command">Account creation data</param>
+    [HttpPost("accounts")]
     [AuthorizePermission(Permissions.UsersCreate)]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> OnboardStaff([FromBody] Application.SystemAdmin.Users.Commands.OnboardStaff.OnboardStaffCommand command)
+    public async Task<IActionResult> CreateAccount([FromBody] Application.SystemAdmin.Users.Commands.OnboardStaff.OnboardStaffCommand command)
     {
         var result = await _mediator.Send(command);
         if (result.IsSuccess)

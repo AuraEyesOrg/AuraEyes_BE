@@ -33,7 +33,7 @@ public class InternalChatHubService : IInternalChatHubService
             // Broadcast to the SignalR group corresponding to the chat group
             await _hubContext.Clients
                 .Group(groupId.ToString())
-                .SendAsync("ReceiveInternalMessage", message, cancellationToken);
+                .SendAsync("ReceiveMessage", message, cancellationToken);
 
             _logger.LogInformation(
                 "Internal group message broadcast to group {GroupId}, MessageId={MessageId}",
