@@ -4,15 +4,20 @@ using Application.Common.Helpers;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Ophthalmologists.Queries.GetDashboardMetrics;
+using Application.Ophthalmologists.Queries.GetReviewQueue;
 using Application.Organisations.Queries.GetDashboardMetrics;
 using Application.Patients.Queries.GetDashboardMetrics;
 using Application.SystemAdmin.Dashboard.Queries.GetDashboardMetrics;
 using Application.SystemAdmin.Dashboard.Queries.GetDoctorWorkload;
 using Application.SystemAdmin.Dashboard.Queries.GetDoctorWorkloads;
+using Application.SystemAdmin.Dashboard.Queries.GetDoctorStatus;
+using Application.SystemAdmin.Dashboard.Queries.GetLiveQueue;
 using Application.SystemAdmin.Dashboard.Queries.GetPopulationRiskAnalysis;
 using Application.SystemAdmin.Dashboard.Queries.GetRecentScreenings;
 using Application.SystemAdmin.Dashboard.Queries.GetScreeningVolumeTrends;
 using Application.SystemAdmin.Dashboard.Queries.GetSystemHealth;
+using Application.SystemAdmin.Dashboard.Queries.GetSlotUtilization;
+using Application.SystemAdmin.Dashboard.Queries.GetTodaySummary;
 using Domain.Enums;
 using Domain.Entities.Users;
 using Infrastructure.Persistence;
@@ -888,6 +893,87 @@ public class DashboardMetricsService : IDashboardMetricsService
         };
     }
 
+    public async Task<List<ReviewQueueItemDto>> GetReviewQueueAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var doctorId = await _context.Ophthalmologists
+            .Where(o => o.UserId == userId)
+            .Select(o => (Guid?)o.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!doctorId.HasValue)
+            return new List<ReviewQueueItemDto>();
+
+        var nowUtc = DateTime.UtcNow;
+
+        var rawItems = await (
+            from session in _context.ConsultationSessions
+            join patient in _context.Patients on session.PatientId equals patient.Id
+            join user in _context.Users on patient.UserId equals user.Id
+            join screening in _context.AiScreenings on session.AiScreeningId equals screening.Id into screeningJoin
+            from screening in screeningJoin.DefaultIfEmpty()
+            join result in _context.ScreeningResults on screening.Id equals result.AiScreeningId into resultJoin
+            from result in resultJoin.DefaultIfEmpty()
+            where session.OphthalmologistId == doctorId
+                  && (session.Status == SessionStatus.Pending || session.Status == SessionStatus.Confirmed)
+            select new
+            {
+                SessionId = session.Id,
+                ScreeningId = screening != null ? screening.Id : Guid.Empty,
+                session.PatientId,
+                PatientName = user.FullName,
+                RiskLevel = result != null ? result.RiskLevel : RiskLevel.None,
+                ConfidenceScore = result != null ? result.ConfidenceScore : 0m,
+                AiSummary = result != null ? result.Summary : null,
+                session.AppointmentTime,
+                session.StartTime,
+                session.CreatedAt,
+            }
+        ).ToListAsync(cancellationToken);
+
+        var screeningIds = rawItems
+            .Where(x => x.ScreeningId != Guid.Empty)
+            .Select(x => x.ScreeningId)
+            .Distinct()
+            .ToList();
+
+        var thumbnails = screeningIds.Count > 0
+            ? await _context.RetinalImages
+                .Where(img => img.AiScreeningId.HasValue && screeningIds.Contains(img.AiScreeningId.Value))
+                .GroupBy(img => img.AiScreeningId!.Value)
+                .Select(g => new { ScreeningId = g.Key, ThumbnailUrl = g.OrderBy(i => i.CapturedAt).Select(i => i.ImageUrl).FirstOrDefault() })
+                .ToDictionaryAsync(x => x.ScreeningId, x => x.ThumbnailUrl, cancellationToken)
+            : new Dictionary<Guid, string?>();
+
+        var items = rawItems
+            .GroupBy(x => x.SessionId)
+            .Select(g =>
+            {
+                var first = g.First();
+                thumbnails.TryGetValue(first.ScreeningId, out var thumbUrl);
+                return new ReviewQueueItemDto
+                {
+                    ScreeningId = first.ScreeningId,
+                    ConsultationSessionId = first.SessionId,
+                    PatientId = first.PatientId,
+                    PatientName = first.PatientName,
+                    RiskLevel = first.RiskLevel.ToString(),
+                    ConfidenceScore = first.ConfidenceScore,
+                    AiSummary = first.AiSummary,
+                    ThumbnailUrl = thumbUrl,
+                    ReviewStatus = first.StartTime.HasValue ? "IN_PROGRESS" : "READY_FOR_REVIEW",
+                    WaitingMinutes = (int)(nowUtc - first.CreatedAt).TotalMinutes,
+                    AppointmentTime = first.AppointmentTime,
+                    CreatedAt = first.CreatedAt,
+                };
+            })
+            .OrderByDescending(item => item.RiskLevel == "Critical")
+            .ThenByDescending(item => item.RiskLevel == "High")
+            .ThenByDescending(item => item.WaitingMinutes)
+            .ToList();
+
+        return items;
+    }
+
     public async Task<PatientDashboardMetricsDto> GetPatientMetricsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var patient = await _context.Patients.FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
@@ -1161,4 +1247,205 @@ public class DashboardMetricsService : IDashboardMetricsService
         DateTime StartUtc,
         DateTime EndUtcExclusive,
         DateTime EndUtcInclusive);
+
+    // ─── Real-time Clinic Operations Dashboard Methods ──────────────────────────
+
+    public async Task<TodaySummaryDto> GetTodaySummaryAsync(CancellationToken cancellationToken = default)
+    {
+        var today = GetVietnamToday();
+        var todayStart = today.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var tomorrowStart = today.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+
+        var totalAppointments = await _context.Appointments
+            .AsNoTracking()
+            .Where(a => a.AppointmentSlot != null && a.AppointmentSlot.Date == today)
+            .Where(a => a.Status != AppointmentStatus.Cancelled)
+            .CountAsync(cancellationToken);
+
+        var checkedInAppointments = await _context.Appointments
+            .AsNoTracking()
+            .Where(a => a.AppointmentSlot != null && a.AppointmentSlot.Date == today)
+            .Where(a => a.Status == AppointmentStatus.CheckedIn || a.Status == AppointmentStatus.InProgress || a.Status == AppointmentStatus.Completed)
+            .CountAsync(cancellationToken);
+
+        var completedVisits = await _context.PatientVisits
+            .AsNoTracking()
+            .Where(v => v.Status == PatientVisitStatus.Completed)
+            .Where(v => v.CompletedAt >= todayStart && v.CompletedAt < tomorrowStart)
+            .CountAsync(cancellationToken);
+
+        var noShowCount = await _context.Appointments
+            .AsNoTracking()
+            .Where(a => a.AppointmentSlot != null && a.AppointmentSlot.Date == today)
+            .Where(a => a.Status == AppointmentStatus.NoShow)
+            .CountAsync(cancellationToken);
+
+        return new TodaySummaryDto
+        {
+            TotalAppointments = totalAppointments,
+            CheckedInPatients = checkedInAppointments,
+            CompletedVisits = completedVisits,
+            NoShowCount = noShowCount
+        };
+    }
+
+    public async Task<SlotUtilizationDto> GetSlotUtilizationAsync(CancellationToken cancellationToken = default)
+    {
+        var today = GetVietnamToday();
+
+        var todaySlots = await _context.AppointmentSlots
+            .AsNoTracking()
+            .Where(s => s.Date == today)
+            .Select(s => new { s.MaxCapacity, s.BookedCount })
+            .ToListAsync(cancellationToken);
+
+        var totalCapacity = todaySlots.Sum(s => s.MaxCapacity);
+        var booked = todaySlots.Sum(s => s.BookedCount);
+        var remaining = totalCapacity - booked;
+        var utilizationRate = totalCapacity <= 0
+            ? 0m
+            : Math.Round((decimal)booked / totalCapacity * 100m, 1);
+
+        return new SlotUtilizationDto
+        {
+            TotalSlots = totalCapacity,
+            BookedSlots = booked,
+            RemainingCapacity = Math.Max(0, remaining),
+            UtilizationRate = utilizationRate
+        };
+    }
+
+    public async Task<IReadOnlyList<LiveQueueItemDto>> GetLiveQueueAsync(CancellationToken cancellationToken = default)
+    {
+        var today = GetVietnamToday();
+        var todayStart = today.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var tomorrowStart = today.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var now = DateTime.UtcNow;
+
+        var visits = await _context.PatientVisits
+            .AsNoTracking()
+            .Where(v => v.CheckedInAt >= todayStart && v.CheckedInAt < tomorrowStart)
+            .Where(v => v.Status != PatientVisitStatus.Completed)
+            .OrderBy(v => v.CheckedInAt)
+            .ToListAsync(cancellationToken);
+
+        var patientIds = visits.Select(v => v.PatientId).Distinct().ToList();
+        var patients = await _context.Patients
+            .AsNoTracking()
+            .Where(p => patientIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, cancellationToken);
+
+        var userIds = patients.Values.Where(p => p.UserId.HasValue).Select(p => p.UserId.Value).Distinct().ToList();
+        var users = await _context.Users.AsNoTracking()
+            .Where(u => userIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, cancellationToken);
+
+        var doctorIds = visits.Where(v => v.AssignedDoctorId.HasValue).Select(v => v.AssignedDoctorId.Value).Distinct().ToList();
+        var doctors = await _context.Ophthalmologists.AsNoTracking()
+            .Where(o => doctorIds.Contains(o.Id))
+            .ToDictionaryAsync(o => o.Id, cancellationToken);
+
+        var doctorUserIds = doctors.Values.Select(o => o.UserId).Distinct().ToList();
+        var doctorUsers = await _context.Users.AsNoTracking()
+            .Where(u => doctorUserIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, cancellationToken);
+
+        var result = visits.Select(v =>
+        {
+            var waitingMinutes = v.CheckedInAt.HasValue
+                ? (int)(now - v.CheckedInAt.Value).TotalMinutes
+                : 0;
+
+            var statusLabel = v.Status switch
+            {
+                PatientVisitStatus.CheckedIn => "WAITING",
+                PatientVisitStatus.InProgress => "IN_PROGRESS",
+                PatientVisitStatus.WaitingForPayment => "WAITING_PAYMENT",
+                _ => v.Status.ToString().ToUpperInvariant()
+            };
+
+            var patientName = "Unknown";
+            if (patients.TryGetValue(v.PatientId, out var patient))
+            {
+                if (!string.IsNullOrWhiteSpace(patient.FullName))
+                    patientName = patient.FullName;
+                else if (patient.UserId.HasValue && users.TryGetValue(patient.UserId.Value, out var user))
+                    patientName = user.FullName ?? user.Email ?? "Unknown";
+            }
+
+            var assignedDoctorName = (string?)null;
+            if (v.AssignedDoctorId.HasValue && doctors.TryGetValue(v.AssignedDoctorId.Value, out var doctor))
+            {
+                if (doctorUsers.TryGetValue(doctor.UserId, out var dUser))
+                    assignedDoctorName = dUser.FullName;
+            }
+
+            return new LiveQueueItemDto
+            {
+                VisitId = v.Id,
+                PatientName = patientName,
+                Status = statusLabel,
+                AssignedDoctorName = assignedDoctorName,
+                WaitingTimeMinutes = Math.Max(0, waitingMinutes),
+                CheckedInAt = v.CheckedInAt
+            };
+        }).ToList();
+
+        return result;
+    }
+
+    public async Task<IReadOnlyList<DoctorStatusDto>> GetDoctorStatusAsync(CancellationToken cancellationToken = default)
+    {
+        var today = GetVietnamToday();
+        var todayStart = today.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var tomorrowStart = today.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+
+        var doctors = await (
+            from ophthal in _context.Ophthalmologists.AsNoTracking()
+            join user in _context.Users.AsNoTracking() on ophthal.UserId equals user.Id
+            where !user.IsDeleted
+            select new { ophthal.Id, Name = user.FullName }
+        ).ToListAsync(cancellationToken);
+
+        var todayVisits = await _context.PatientVisits
+            .AsNoTracking()
+            .Where(v => v.CheckedInAt >= todayStart && v.CheckedInAt < tomorrowStart)
+            .Select(v => new { v.AssignedDoctorId, v.Status })
+            .ToListAsync(cancellationToken);
+
+        var result = doctors.Select(d =>
+        {
+            var doctorVisits = todayVisits.Where(v => v.AssignedDoctorId == d.Id).ToList();
+            var activeLoad = doctorVisits.Count(v => v.Status == PatientVisitStatus.InProgress);
+            var patientsHandledToday = doctorVisits.Count(v =>
+                v.Status == PatientVisitStatus.Completed || v.Status == PatientVisitStatus.WaitingForPayment);
+
+            var currentStatus = activeLoad > 0 ? "In consultation" : "Available";
+
+            return new DoctorStatusDto
+            {
+                DoctorId = d.Id,
+                DoctorName = d.Name ?? "Unknown",
+                CurrentStatus = currentStatus,
+                PatientsHandledToday = patientsHandledToday,
+                ActiveLoad = activeLoad
+            };
+        }).ToList();
+
+        return result;
+    }
+
+    private static DateOnly GetVietnamToday()
+    {
+        var utcNow = DateTime.UtcNow;
+        try
+        {
+            var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(utcNow, VietnamTimeZoneResolver.TimeZone);
+            return DateOnly.FromDateTime(vietnamNow);
+        }
+        catch
+        {
+            return DateOnly.FromDateTime(utcNow.AddHours(7));
+        }
+    }
 }

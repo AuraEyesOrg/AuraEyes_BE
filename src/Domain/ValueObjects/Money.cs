@@ -5,7 +5,7 @@ namespace Domain.ValueObjects;
 public class Money : ValueObject
 {
     public decimal Amount { get; private set; }
-    public string Currency { get; private set; }
+    public string Currency { get; private set; } = default!;
 
     private Money() { } // EF Core
 
