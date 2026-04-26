@@ -65,6 +65,13 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         if (session.ChatStatus == ChatStatus.Archived)
             return Result.Failure("Session has been archived. No new messages allowed.");
 
+        // Enforce 14-day chat lock after completion/closure
+        var referenceDate = session.ClosedAt ?? session.EndTime;
+        if (referenceDate.HasValue && DateTime.UtcNow > referenceDate.Value.AddDays(14))
+        {
+            return Result.Failure("Chat is locked as the 14-day grace period after consultation has expired.");
+        }
+
         if (session.ChatStatus == ChatStatus.MemoOnly
             && isDoctor)
         {

@@ -87,6 +87,25 @@ public class ClinicQueueController : BaseApiController
 
         return HandleResult(result, "Payment context loaded successfully");
     }
+
+    /// <summary>
+    /// Create a payment order for clinic medicines and services.
+    /// Generates a PayOS payment link.
+    /// </summary>
+    [HttpPost("{visitId:guid}/payment")]
+    [AuthorizePermission(Permissions.ScreeningCreate)]
+    [ProducesResponseType(typeof(ApiResponse<Application.Financial.Commands.CreateClinicOrder.CreateClinicOrderResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CreatePayment(
+        [FromRoute] Guid visitId,
+        [FromBody] Application.Financial.Commands.CreateClinicOrder.CreateClinicOrderCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        if (visitId != command.VisitId)
+            return BadRequest(ApiResponseFactory.BadRequest("VisitId mismatch"));
+
+        var result = await _mediator.Send(command, cancellationToken);
+        return HandleResult(result, "Payment link generated successfully");
+    }
 }
 
 public record SendToDoctorRequest
