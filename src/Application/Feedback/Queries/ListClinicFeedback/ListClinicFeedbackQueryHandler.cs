@@ -54,7 +54,6 @@ public class ListClinicFeedbackQueryHandler
                 Id = x.Id,
                 PatientId = x.PatientId,
                 PatientFullName = patientFullName,
-                OrganisationId = x.OrganisationId,
                 AppointmentId = x.AppointmentId,
                 Rating = x.Rating,
                 Comment = x.Comment,

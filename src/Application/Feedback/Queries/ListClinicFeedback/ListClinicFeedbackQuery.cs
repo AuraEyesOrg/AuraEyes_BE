@@ -6,7 +6,6 @@ namespace Application.Feedback.Queries.ListClinicFeedback;
 
 public record ListClinicFeedbackQuery : IQuery<PagedResult<ClinicFeedbackDto>>
 {
-    public Guid? OrganisationId { get; init; }
     public Guid? DoctorId { get; init; }
     public Guid? StaffId { get; init; }
     public int PageNumber { get; init; } = 1;

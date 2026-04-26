@@ -24,7 +24,7 @@ public class GetClinicRatingSummaryQueryHandler : IQueryHandler<GetClinicRatingS
 
         return Result<FeedbackRatingSummaryDto>.Success(new FeedbackRatingSummaryDto
         {
-            EntityId = Guid.Empty, // No specific organisation ID needed anymore
+            EntityId = Guid.Empty,
             RatingAverage = ratingAverage,
             RatingCount = ratingCount,
             Distribution = distribution

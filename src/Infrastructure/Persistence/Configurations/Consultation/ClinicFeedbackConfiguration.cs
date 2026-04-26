@@ -11,7 +11,7 @@ public class ClinicFeedbackConfiguration : IEntityTypeConfiguration<ClinicFeedba
     public void Configure(EntityTypeBuilder<ClinicFeedback> builder)
     {
         builder.ToTable("ClinicFeedback", tableBuilder =>
-            tableBuilder.HasCheckConstraint("CK_ClinicFeedback_Rating", "rating >= 1 AND rating <= 5"));
+            tableBuilder.HasCheckConstraint("CK_ClinicFeedback_Rating", "\"Rating\" >= 1 AND \"Rating\" <= 5"));
 
         builder.HasKey(e => e.Id);
 
@@ -47,11 +47,6 @@ public class ClinicFeedbackConfiguration : IEntityTypeConfiguration<ClinicFeedba
             .WithMany()
             .HasForeignKey(e => e.StaffId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne<Organisation>()
-            .WithMany()
-            .HasForeignKey(e => e.OrganisationId)
-            .OnDelete(DeleteBehavior.SetNull); // Keep if needed for legacy data
 
         // Indexes
         builder.HasIndex(e => e.PatientId);
