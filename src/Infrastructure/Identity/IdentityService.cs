@@ -881,7 +881,7 @@ public class IdentityService : IIdentityService
         var rolePermissions = await (from rp in _context.RolePermissions
                                      join r in _roleManager.Roles on rp.RoleId equals r.Id
                                      join p in _context.Permissions on rp.PermissionId equals p.Id
-                                     where userRoles.Contains(r.Name)
+                                     where userRoles.Contains(r.Name!)
                                      select p.Name).ToListAsync();
 
         // 2. Get direct user overrides

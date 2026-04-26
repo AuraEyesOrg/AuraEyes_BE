@@ -125,6 +125,6 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
         return rows
             .ToDictionary(
                 x => x.Id,
-                x => (FullName: x.FullName ?? "Unknown", AvatarUrl: x.AvatarUrl));
+                x => (FullName: x.FullName ?? "Unknown", AvatarUrl: (string?)x.AvatarUrl));
     }
 }

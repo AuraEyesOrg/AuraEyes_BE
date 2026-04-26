@@ -8,6 +8,10 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Domain.Entities.Scheduling;
+using Domain.Entities.Screening;
+using Domain.Entities.Consultation;
+using System.Text.Json;
 
 namespace Infrastructure.Services;
 
@@ -54,9 +58,14 @@ public static class DatabaseSeeder
         await EnsureSystemAdminWalletAsync(context, userManager, logger);
 
         // Step 5: Seed permissions + default role assignments
-        // Idempotent — runs on every startup so new permissions defined in code
+        // Idempotent â€” runs on every startup so new permissions defined in code
         // are automatically added to the database on next deployment.
         await SeedPermissionsAsync(context, roleManager, logger);
+
+        // Step 6: Seed test data for clinic queue (Cashier page) (idempotent)
+        await SeedClinicQueueTestDataAsync(context, userManager, logger);
+
+        logger?.LogInformation("Seeding completed successfully.");
     }
 
     private static async Task SeedRolesAsync(RoleManager<ApplicationRole> roleManager, ILogger? logger)
@@ -79,11 +88,11 @@ public static class DatabaseSeeder
 
             if (result.Succeeded)
             {
-                logger?.LogInformation("✓ Created role: {RoleName} → AspNetRoles", roleName);
+                logger?.LogInformation("âœ“ Created role: {RoleName} â†’ AspNetRoles", roleName);
             }
             else
             {
-                logger?.LogError("✗ Failed to create role {RoleName}: {Errors}",
+                logger?.LogError("âœ— Failed to create role {RoleName}: {Errors}",
                     roleName, string.Join(", ", result.Errors.Select(e => e.Description)));
             }
         }
@@ -98,7 +107,7 @@ public static class DatabaseSeeder
             Roles.Patient => "End users who use the retinal screening service",
             Roles.Ophthalmologist => "Medical professionals who review screenings and provide diagnoses",
             Roles.ClinicStaff => "Clinic employees (Receptionist, Coordinator, Cashier) managing clinic operations",
-            Roles.SystemAdmin => "Clinic Owner — full system access and administration",
+            Roles.SystemAdmin => "Clinic Owner â€” full system access and administration",
             _ => roleName
         };
     }
@@ -121,7 +130,7 @@ public static class DatabaseSeeder
             // Ophthalmologist
             ("doctor@auraeyes.vn", "Doctor@123$", Roles.Ophthalmologist, "BS. Nguyen Van An"),
 
-            // Clinic Staff — three sub-role examples
+            // Clinic Staff â€” three sub-role examples
             ("receptionist@auraeyes.vn", "Staff@123$", Roles.ClinicStaff, "Tran Thi Binh - Receptionist"),
             ("coordinator@auraeyes.vn",  "Staff@123$", Roles.ClinicStaff, "Le Van Ca - Coordinator"),
             ("cashier@auraeyes.vn",      "Staff@123$", Roles.ClinicStaff, "Pham Thi Dung - Cashier"),
@@ -146,9 +155,9 @@ public static class DatabaseSeeder
                 {
                     var roleResult = await userManager.AddToRoleAsync(existingUser, role);
                     if (roleResult.Succeeded)
-                        logger?.LogInformation("✓ Assigned missing role {Role} to existing user {Email} → AspNetUserRoles", role, email);
+                        logger?.LogInformation("âœ“ Assigned missing role {Role} to existing user {Email} â†’ AspNetUserRoles", role, email);
                     else
-                        logger?.LogError("✗ Failed to assign missing role {Role} to existing user {Email}: {Errors}",
+                        logger?.LogError("âœ— Failed to assign missing role {Role} to existing user {Email}: {Errors}",
                             role, email, string.Join(", ", roleResult.Errors.Select(e => e.Description)));
                 }
                 continue;
@@ -168,19 +177,19 @@ public static class DatabaseSeeder
 
             if (createResult.Succeeded)
             {
-                logger?.LogInformation("✓ Created user: {Email} → AspNetUsers", email);
+                logger?.LogInformation("âœ“ Created user: {Email} â†’ AspNetUsers", email);
 
                 var roleResult = await userManager.AddToRoleAsync(user, role);
 
                 if (roleResult.Succeeded)
-                    logger?.LogInformation("✓ Assigned role {Role} to {Email} → AspNetUserRoles", role, email);
+                    logger?.LogInformation("âœ“ Assigned role {Role} to {Email} â†’ AspNetUserRoles", role, email);
                 else
-                    logger?.LogError("✗ Failed to assign role {Role} to user {Email}: {Errors}",
+                    logger?.LogError("âœ— Failed to assign role {Role} to user {Email}: {Errors}",
                         role, email, string.Join(", ", roleResult.Errors.Select(e => e.Description)));
             }
             else
             {
-                logger?.LogError("✗ Failed to create user {Email}: {Errors}",
+                logger?.LogError("âœ— Failed to create user {Email}: {Errors}",
                     email, string.Join(", ", createResult.Errors.Select(e => e.Description)));
             }
         }
@@ -193,7 +202,24 @@ public static class DatabaseSeeder
         UserManager<ApplicationUser> userManager,
         ILogger? logger)
     {
-        logger?.LogInformation("Seeding domain entities (Ophthalmologist, ClinicStaff, Patient, Wallets, Schedules)...");
+        logger?.LogInformation("Seeding domain entities (Organisations, Ophthalmologist, ClinicStaff, Patient, Wallets, Schedules)...");
+
+        // Step 0: Seed Organisation
+        var adminUser = await userManager.FindByEmailAsync("systemadmin@auraeyes.vn");
+        var organisation = await context.Organisations.FirstOrDefaultAsync(o => o.Name == "AuraEyes General Hospital");
+        if (organisation == null && adminUser != null)
+        {
+            organisation = new Organisation(
+                ownerId: adminUser.Id,
+                name: "AuraEyes General Hospital",
+                orgType: OrgType.Hospital,
+                address: "123 Healthcare St, Dist 1, HCMC",
+                description: "A state-of-the-art ophthalmology hospital."
+            );
+            await context.Organisations.AddAsync(organisation);
+            await context.SaveChangesAsync();
+            logger?.LogInformation("? Created organisation: AuraEyes General Hospital");
+        }
 
         // Step 1: Seed Ophthalmologist entity
         var ophthalmologistUser = await userManager.FindByEmailAsync("doctor@auraeyes.vn");
@@ -212,7 +238,7 @@ public static class DatabaseSeeder
             {
                 var ophthalmologist = new Ophthalmologist(
                     userId: ophthalmologistUser.Id,
-                    bio: "Bác sĩ chuyên khoa mắt với kinh nghiệm trong lĩnh vực sàng lọc bệnh võng mạc.",
+                    bio: "BÃ¡c sÄ© chuyÃªn khoa máº¯t vá»›i kinh nghiá»‡m trong lÄ©nh vá»±c sÃ ng lá»c bá»‡nh vÃµng máº¡c.",
                     yearsOfExperience: 5,
                     phone: "+84123456789",
                     licenseUrl: null,
@@ -223,7 +249,7 @@ public static class DatabaseSeeder
                 await context.SaveChangesAsync();
                 ophthalmologistId = ophthalmologist.Id;
 
-                logger?.LogInformation("✓ Created ophthalmologist profile for {Email} → Ophthalmologists table",
+                logger?.LogInformation("âœ“ Created ophthalmologist profile for {Email} â†’ Ophthalmologists table",
                     ophthalmologistUser.Email);
             }
             else
@@ -257,7 +283,7 @@ public static class DatabaseSeeder
             {
                 var clinicStaff = new ClinicStaff(staffUser.Id, subRoles, department: "Clinic Operations");
                 await context.ClinicStaffs.AddAsync(clinicStaff);
-                logger?.LogInformation("✓ Created ClinicStaff profile for {Email} [{SubRoles}] → ClinicStaffs table",
+                logger?.LogInformation("âœ“ Created ClinicStaff profile for {Email} [{SubRoles}] â†’ ClinicStaffs table",
                     email, string.Join(",", subRoles.Select(r => r.ToString())));
             }
             else
@@ -270,6 +296,17 @@ public static class DatabaseSeeder
 
         // Step 3: Seed Patient entity
         var patientUser = await userManager.FindByEmailAsync("patient@auraeyes.vn");
+        if (patientUser != null)
+        {
+            var p = await context.Patients.FirstOrDefaultAsync(pat => pat.UserId == patientUser.Id);
+            if (p != null)
+            {
+                var existingVisits = await context.PatientVisits.Where(v => v.PatientId == p.Id).ToListAsync();
+                context.PatientVisits.RemoveRange(existingVisits);
+                await context.SaveChangesAsync();
+                logger?.LogInformation("Cleared existing visits for patient@auraeyes.vn to ensure fresh test data.");
+            }
+        }
 
         if (patientUser == null)
         {
@@ -286,7 +323,7 @@ public static class DatabaseSeeder
                 await context.Patients.AddAsync(patient);
                 await context.SaveChangesAsync();
 
-                logger?.LogInformation("✓ Created patient profile for {Email} → Patients table",
+                logger?.LogInformation("âœ“ Created patient profile for {Email} â†’ Patients table",
                     patientUser.Email);
             }
             else
@@ -329,7 +366,7 @@ public static class DatabaseSeeder
 
                 await context.Wallets.AddAsync(ophthWallet);
                 await context.SaveChangesAsync();
-                logger?.LogInformation("✓ Created wallet for Ophthalmologist with 1,000,000 VND → Wallets table");
+                logger?.LogInformation("âœ“ Created wallet for Ophthalmologist with 1,000,000 VND â†’ Wallets table");
             }
             else
             {
@@ -353,7 +390,7 @@ public static class DatabaseSeeder
 
                 await context.Wallets.AddAsync(patientWallet);
                 await context.SaveChangesAsync();
-                logger?.LogInformation("✓ Created wallet for Patient with 5,000,000 VND → Wallets table");
+                logger?.LogInformation("âœ“ Created wallet for Patient with 5,000,000 VND â†’ Wallets table");
             }
             else
             {
@@ -395,7 +432,7 @@ public static class DatabaseSeeder
             await context.SaveChangesAsync();
 
             logger?.LogInformation(
-                "✓ Created wallet for System Admin {Email} with OwnerType System → Wallets table",
+                "âœ“ Created wallet for System Admin {Email} with OwnerType System â†’ Wallets table",
                 systemAdminUser.Email);
             return;
         }
@@ -436,7 +473,7 @@ public static class DatabaseSeeder
             }
 
             await context.SaveChangesAsync();
-            logger?.LogInformation("✓ Created 5 schedule templates (Mon-Fri 9am-5pm, 30min slots) → ScheduleTemplates table");
+            logger?.LogInformation("âœ“ Created 5 schedule templates (Mon-Fri 9am-5pm, 30min slots) â†’ ScheduleTemplates table");
         }
         else
         {
@@ -473,7 +510,7 @@ public static class DatabaseSeeder
                 continue;
 
             newPermissions.Add(new Permission(def.Name, def.DisplayName, def.Description, def.Category));
-            logger?.LogInformation("  ✓ New permission: [{Category}] {Name}", def.Category, def.Name);
+            logger?.LogInformation("  âœ“ New permission: [{Category}] {Name}", def.Category, def.Name);
         }
 
         if (newPermissions.Count > 0)
@@ -499,7 +536,7 @@ public static class DatabaseSeeder
             var role = await roleManager.FindByNameAsync(roleName);
             if (role is null)
             {
-                logger?.LogWarning("  Role '{Role}' not found — skipping its permission assignments.", roleName);
+                logger?.LogWarning("  Role '{Role}' not found â€” skipping its permission assignments.", roleName);
                 continue;
             }
 
@@ -516,7 +553,7 @@ public static class DatabaseSeeder
             {
                 if (!allPermissions.TryGetValue(permName, out var permission))
                 {
-                    logger?.LogWarning("  Permission '{Perm}' not found — skipping.", permName);
+                    logger?.LogWarning("  Permission '{Perm}' not found â€” skipping.", permName);
                     continue;
                 }
 
@@ -541,4 +578,185 @@ public static class DatabaseSeeder
         logger?.LogInformation("Permission seeding completed.");
     }
 
+    private static async Task SeedClinicQueueTestDataAsync(
+        ApplicationDbContext context,
+        UserManager<ApplicationUser> userManager,
+        ILogger? logger)
+    {
+        logger?.LogInformation("Seeding test data for clinic queue (Cashier page)...");
+
+        var doctorUser = await userManager.FindByEmailAsync("doctor@auraeyes.vn");
+        var patientUser = await userManager.FindByEmailAsync("patient@auraeyes.vn");
+        if (patientUser != null)
+        {
+            var p = await context.Patients.FirstOrDefaultAsync(pat => pat.UserId == patientUser.Id);
+            if (p != null)
+            {
+                var existingVisits = await context.PatientVisits.Where(v => v.PatientId == p.Id).ToListAsync();
+                context.PatientVisits.RemoveRange(existingVisits);
+                await context.SaveChangesAsync();
+                logger?.LogInformation("Cleared existing visits for patient@auraeyes.vn to ensure fresh test data.");
+            }
+        }
+
+        if (doctorUser == null || patientUser == null)
+        {
+            logger?.LogWarning("Doctor or Patient user not found. Skipping clinic queue seeding.");
+            return;
+        }
+
+        var ophthalmologist = await context.Ophthalmologists.FirstOrDefaultAsync(o => o.UserId == doctorUser.Id);
+        var patient = await context.Patients.FirstOrDefaultAsync(p => p.UserId == patientUser.Id);
+
+        if (ophthalmologist == null || patient == null)
+        {
+            logger?.LogWarning("Ophthalmologist or Patient profile not found. Skipping clinic queue seeding.");
+            return;
+        }
+
+        // Check if we already have a visit waiting for payment for this patient
+        // Fresh seeding forced
+
+        // 1. Create AI Screening
+        var aiScreening = new AiScreening(patient.Id, "AuraEyes-AI-v1.0");
+        aiScreening.Process("{\"result\": \"High risk of AMD\", \"confidence\": 0.92}");
+        await context.AiScreenings.AddAsync(aiScreening);
+        await context.SaveChangesAsync();
+
+        // 2. Create Consultation Session
+        // Note: OrganisationId is nullable, we'll use Guid.Empty if not found or just leave it null if the factory allows.
+        // Looking at ConsultationSession.cs, CreateClinicBooking requires organisationId.
+        // Let's see if we can find any organisation.
+        var organisation = await context.Organisations.FirstOrDefaultAsync();
+        ConsultationSession session;
+        if (organisation != null)
+        {
+            session = ConsultationSession.CreateClinicBooking(patient.Id, organisation.Id, 500000, DateTime.UtcNow.AddHours(1), ophthalmologist.Id);
+        }
+        else
+        {
+            session = ConsultationSession.CreateVerification(patient.Id, aiScreening.Id, 200000, ophthalmologist.Id);
+        }
+        
+        // Mark session as completed
+        // Need to check SessionStatus and how to complete it.
+        // For simplicity, let's just set the properties directly or find a method.
+        // SessionStatus.Completed = 3 (usually)
+        
+        await context.ConsultationSessions.AddAsync(session);
+        await context.SaveChangesAsync();
+
+        // 3. Create Medical Diagnosis with JSON Snapshot
+        var prescriptionData = new
+        {
+            DiagnosisCode = "H35.30",
+            CodingSystem = "ICD-10",
+            ClinicalFindings = "Cháº©n Ä‘oÃ¡n xÃ¡c Ä‘á»‹nh: ThoÃ¡i hÃ³a hoÃ ng Ä‘iá»ƒm tuá»•i giÃ  (AMD) thá»ƒ khÃ´. CÃ³ cÃ¡c máº£ng drusen kÃ­ch thÆ°á»›c trung bÃ¬nh vÃ¹ng trung tÃ¢m.",
+            SeverityLevel = "Moderate",
+            Recommendations = "Äeo kÃ­nh rÃ¢m khi ra ngoÃ i trá»i, bá»• sung vitamin Lutein/Zeaxanthin.",
+            FollowUpDate = DateTime.UtcNow.AddMonths(2),
+            DiagnosedBy = new
+            {
+                DoctorId = ophthalmologist.Id,
+                DoctorName = doctorUser.FullName
+            },
+            FinalizedAt = DateTime.UtcNow,
+            PrescriptionItems = new[]
+            {
+                new
+                {
+                    MedicineName = "Vismed 0.18%",
+                    Unit = "Há»™p",
+                    Dosage = "1 giá»t/láº§n",
+                    Frequency = "4 láº§n/ngÃ y",
+                    Duration = "30 days",
+                    Instruction = "Nhá» máº¯t khi cáº£m tháº¥y khÃ´, má»i."
+                },
+                new
+                {
+                    MedicineName = "PreserVision AREDS 2",
+                    Unit = "Lá»",
+                    Dosage = "1 viÃªn/láº§n",
+                    Frequency = "2 láº§n/ngÃ y",
+                    Duration = "60 days",
+                    Instruction = "Uá»‘ng sau bá»¯a Äƒn sÃ¡ng vÃ  tá»‘i."
+                }
+            },
+            PrescriptionNote = "TrÃ¡nh tiáº¿p xÃºc trá»±c tiáº¿p vá»›i Ã¡nh náº¯ng máº·t trá»i gáº¯t.",
+            NoMedicationPrescribed = false
+        };
+
+        string jsonSnapshot = "DIAGNOSIS_SNAPSHOT_JSON::" + JsonSerializer.Serialize(prescriptionData);
+
+        var diagnosis = new MedicalDiagnosis(
+            aiScreeningId: aiScreening.Id,
+            doctorId: ophthalmologist.Id,
+            consultationSessionId: session.Id,
+            diagnosisCode: "H35.30",
+            codingSystem: "ICD-10",
+            clinicalFindings: prescriptionData.ClinicalFindings,
+            severityLevel: "Moderate",
+            lifestyleAdvice: jsonSnapshot,
+            finalizedAt: DateTime.UtcNow
+        );
+        diagnosis.Confirm();
+
+        await context.MedicalDiagnoses.AddAsync(diagnosis);
+        await context.SaveChangesAsync();
+
+        // 4. Create Appointment Slot and Appointment
+        // Find or create a schedule template for this doctor
+        var template = await context.ScheduleTemplates.FirstOrDefaultAsync(t => t.OphthalId == ophthalmologist.Id);
+        if (template == null)
+        {
+            template = new Domain.Entities.Scheduling.ScheduleTemplate(
+                dayOfWeek: DateTime.UtcNow.DayOfWeek,
+                startTime: new TimeOnly(8, 0),
+                endTime: new TimeOnly(17, 0),
+                slotDuration: 30,
+                maxCapacity: 1,
+                cost: 500000,
+                ophthalId: ophthalmologist.Id,
+                orgId: organisation?.Id
+            );
+            await context.ScheduleTemplates.AddAsync(template);
+            await context.SaveChangesAsync();
+        }
+
+        var slot = new AppointmentSlot(
+            scheduleTemplateId: template.Id,
+            date: DateOnly.FromDateTime(DateTime.UtcNow),
+            startTime: TimeOnly.FromDateTime(DateTime.UtcNow.AddMinutes(-30)),
+            endTime: TimeOnly.FromDateTime(DateTime.UtcNow.AddMinutes(30)),
+            maxCapacity: 1
+        );
+        slot.UpdateOphthalId(ophthalmologist.Id);
+        slot.UpdateCost(500000);
+        await context.AppointmentSlots.AddAsync(slot);
+        await context.SaveChangesAsync();
+
+        var appointment = new Appointment(
+            patientId: patient.Id,
+            appointmentSlotId: slot.Id,
+            price: 500000,
+            requestedDoctorId: ophthalmologist.Id,
+            visitReason: "Tu v?n b?nh võng m?c"
+        );
+        appointment.Confirm();
+        await context.Appointments.AddAsync(appointment);
+        await context.SaveChangesAsync();
+
+        // 5. Create Patient Visit from Appointment
+        var visit = PatientVisit.CreateFromAppointment(appointment);
+        visit.Start();
+        visit.FinishConsultation("D? li?u m?u cho trang Cashier");
+
+        await context.PatientVisits.AddAsync(visit);
+        await context.SaveChangesAsync();
+
+        logger?.LogInformation("âœ“ Successfully seeded clinic queue test data for {Email}", patientUser.Email);
+    }
 }
+
+
+

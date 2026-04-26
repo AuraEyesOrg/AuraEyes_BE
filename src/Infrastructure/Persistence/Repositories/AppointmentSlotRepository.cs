@@ -182,7 +182,7 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
 
         if (organisationId != Guid.Empty)
         {
-            query = query.Where(s => s.ScheduleTemplate.OrgId == organisationId);
+            query = query.Where(s => s.ScheduleTemplate!.OrgId == organisationId);
         }
 
         return await query
