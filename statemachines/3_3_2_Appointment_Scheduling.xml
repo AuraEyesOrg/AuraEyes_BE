@@ -1,0 +1,62 @@
+<mxGraphModel dx="3427" dy="2004" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+    <mxCell id="cell_1" parent="1" style="ellipse;html=1;shape=startState;fillColor=#000000;strokeColor=#ff0000;" value="" vertex="1">
+      <mxGeometry height="30" width="30" x="375" y="90" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Pending" vertex="1">
+      <mxGeometry height="60" width="120" x="330" y="180" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Confirmed" vertex="1">
+      <mxGeometry height="60" width="120" x="330" y="290" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="CheckedIn" vertex="1">
+      <mxGeometry height="60" width="120" x="330" y="400" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="InProgress" vertex="1">
+      <mxGeometry height="60" width="120" x="330" y="510" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Completed" vertex="1">
+      <mxGeometry height="60" width="120" x="330" y="620" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_8" parent="1" style="ellipse;html=1;shape=endState;fillColor=#000000;strokeColor=#ff0000;" value="" vertex="1">
+      <mxGeometry height="30" width="30" x="375" y="745" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_2" edge="1" parent="1" source="cell_1" style="edgeStyle=orthogonalEdgeStyle;html=1;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#000000;rounded=0;" value="">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="390" y="180" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="cell_9" edge="1" parent="1" source="cell_3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;endArrow=open;endFill=0;" target="cell_4">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_10" parent="1" style="text;whiteSpace=wrap;html=1;" value="clinic confirms" vertex="1">
+      <mxGeometry height="30" width="150" x="460" y="250" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_11" edge="1" parent="1" source="cell_4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;endArrow=open;endFill=0;" target="cell_5">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_12" parent="1" style="text;whiteSpace=wrap;html=1;" value="patient checks in" vertex="1">
+      <mxGeometry height="30" width="150" x="460" y="360" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_13" edge="1" parent="1" source="cell_5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;endArrow=open;endFill=0;" target="cell_6">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_14" parent="1" style="text;whiteSpace=wrap;html=1;" value="consultation starts" vertex="1">
+      <mxGeometry height="30" width="150" x="460" y="470" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_15" edge="1" parent="1" source="cell_6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;endArrow=open;endFill=0;" target="cell_7">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_16" parent="1" style="text;whiteSpace=wrap;html=1;" value="consultation ends" vertex="1">
+      <mxGeometry height="30" width="150" x="460" y="580" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_17" edge="1" parent="1" source="cell_7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;endArrow=open;endFill=0;" target="cell_8">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="cell_18" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" value="state machine for appointment scheduling" vertex="1">
+      <mxGeometry height="30" width="60" x="360" y="815" as="geometry" />
+    </mxCell>
+  </root>
+</mxGraphModel>

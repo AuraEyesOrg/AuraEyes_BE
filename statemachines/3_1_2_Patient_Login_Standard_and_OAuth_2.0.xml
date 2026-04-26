@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-04-26T12:00:00.000Z" agent="AuraEyes State Machine Generator" version="21.0.0" type="device">
+  <diagram name="3.1.2 Patient Login (Standard &amp; OAuth 2.0)" id="3_1_2">
+    <mxGraphModel dx="1434" dy="796" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        
+        <!-- Start state -->
+        <mxCell id="3_1_2_start" value="" style="ellipse;html=1;shape=startState;fillColor=#000000;strokeColor=#ff0000;" vertex="1" parent="1">
+          <mxGeometry x="375" y="90" width="30" height="30" as="geometry"/>
+        </mxCell>
+        
+        <!-- Unauthenticated state -->
+        <mxCell id="3_1_2_state_0" value="Unauthenticated" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="180" width="120" height="60" as="geometry"/>
+        </mxCell>
+        
+        <!-- Authenticating state -->
+        <mxCell id="3_1_2_state_1" value="Authenticating" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="290" width="120" height="60" as="geometry"/>
+        </mxCell>
+        
+        <!-- Authenticated state -->
+        <mxCell id="3_1_2_state_2" value="Authenticated" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="400" width="120" height="60" as="geometry"/>
+        </mxCell>
+        
+        <!-- SessionActive state -->
+        <mxCell id="3_1_2_state_3" value="SessionActive" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="510" width="120" height="60" as="geometry"/>
+        </mxCell>
+        
+        <!-- End state -->
+        <mxCell id="3_1_2_end" value="" style="ellipse;html=1;shape=endState;fillColor=#000000;strokeColor=#ff0000;" vertex="1" parent="1">
+          <mxGeometry x="375" y="635" width="30" height="30" as="geometry"/>
+        </mxCell>
+        
+        <!-- Start to first state -->
+        <mxCell id="3_1_2_edge_0" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#000000;rounded=0;" edge="1" parent="1" source="3_1_2_start" target="3_1_2_state_0">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <!-- Unauthenticated to Authenticating -->
+        <mxCell id="3_1_2_edge_1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;endArrow=open;endFill=0;" edge="1" parent="1" source="3_1_2_state_0" target="3_1_2_state_1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <!-- Label for Unauthenticated to Authenticating -->
+        <mxCell id="3_1_2_label_1" value="submit credentials" style="text;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="250" width="150" height="30" as="geometry"/>
+        </mxCell>
+        
+        <!-- Authenticating to Authenticated -->
+        <mxCell id="3_1_2_edge_2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;endArrow=open;endFill=0;" edge="1" parent="1" source="3_1_2_state_1" target="3_1_2_state_2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <!-- Label for Authenticating to Authenticated -->
+        <mxCell id="3_1_2_label_2" value="credentials valid" style="text;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="360" width="150" height="30" as="geometry"/>
+        </mxCell>
+        
+        <!-- Authenticating to Unauthenticated -->
+        <mxCell id="3_1_2_edge_3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;endArrow=open;endFill=0;" edge="1" parent="1" source="3_1_2_state_1" target="3_1_2_state_0">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <!-- Label for Authenticating to Unauthenticated -->
+        <mxCell id="3_1_2_label_3" value="credentials invalid" style="text;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="360" width="150" height="30" as="geometry"/>
+        </mxCell>
+        
+        <!-- Authenticated to SessionActive -->
+        <mxCell id="3_1_2_edge_4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;endArrow=open;endFill=0;" edge="1" parent="1" source="3_1_2_state_2" target="3_1_2_state_3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <!-- Label for Authenticated to SessionActive -->
+        <mxCell id="3_1_2_label_4" value="create session" style="text;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="470" width="150" height="30" as="geometry"/>
+        </mxCell>
+        
+        <!-- SessionActive to Unauthenticated -->
+        <mxCell id="3_1_2_edge_5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;endArrow=open;endFill=0;" edge="1" parent="1" source="3_1_2_state_3" target="3_1_2_state_0">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <!-- Label for SessionActive to Unauthenticated -->
+        <mxCell id="3_1_2_label_5" value="logout / session expired" style="text;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="580" width="150" height="30" as="geometry"/>
+        </mxCell>
+        
+        <!-- Last state to end -->
+        <mxCell id="3_1_2_edge_6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;endArrow=open;endFill=0;" edge="1" parent="1" source="3_1_2_state_3" target="3_1_2_end">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
