@@ -32,6 +32,7 @@ public interface IIdentityService
     Task<bool> CheckPasswordAsync(Guid userId, string password);
 
     Task<UserDto?> GetUserByEmailAsync(string email, CancellationToken cancellationToken = default);
+    Task<UserDto?> GetUserByCitizenIdAsync(string citizenId, CancellationToken cancellationToken = default);
 
     Task<UserDto?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UserDto>> GetUsersByIdsAsync(IEnumerable<Guid> userIds, CancellationToken cancellationToken = default);

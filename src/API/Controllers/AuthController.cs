@@ -191,6 +191,18 @@ public class AuthController : BaseApiController
         return OkResponse(loginResponse.AuthResponse, "Login successful");
     }
 
+    [HttpPost("lookup-account")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<LookupAccountByCitizenIdResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> LookupAccountByCitizenId(
+        [FromBody] LookupAccountByCitizenIdRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _authService.LookupAccountByCitizenIdAsync(request.CitizenId, cancellationToken);
+        return HandleResult(result, "Lookup completed");
+    }
+
     /// <summary>
     /// Complete login after 2FA verification.
     /// </summary>

@@ -161,6 +161,20 @@ public class IdentityService : IIdentityService
         return user == null ? null : await MapToDtoAsync(user);
     }
 
+    public async Task<UserDto?> GetUserByCitizenIdAsync(string citizenId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(citizenId))
+        {
+            return null;
+        }
+
+        var normalizedCitizenId = citizenId.Trim();
+        var user = await _userManager.Users
+            .FirstOrDefaultAsync(u => u.CitizenId == normalizedCitizenId && !u.IsDeleted, cancellationToken);
+
+        return user == null ? null : await MapToDtoAsync(user);
+    }
+
     public async Task<UserDto?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var user = await _userManager.Users

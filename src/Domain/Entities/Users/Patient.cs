@@ -50,13 +50,14 @@ public class Patient : BaseEntity, IAggregateRoot
     private readonly List<AiScreening> _aiScreenings = new();
     public IReadOnlyCollection<AiScreening> AiScreenings => _aiScreenings.AsReadOnly();
 
-    private Patient() { } // EF Core
+    // EF Core constructor — private, do not use from application code
+    private Patient() { }
 
     // ── Factory methods ──
 
     /// <summary>
-    /// Create a registered patient backed by an Identity user.
-    /// Profile data (name, phone, etc.) lives in the Identity system.
+    /// Create a patient backed by an Identity user (registered flow + walk-in-with-account flow).
+    /// Profile data (name, phone, etc.) lives in the ApplicationUser / Identity system.
     /// </summary>
     public static Patient CreateRegistered(Guid userId, decimal? bmi = null, string? diseaseHistory = null)
     {
@@ -67,13 +68,15 @@ public class Patient : BaseEntity, IAggregateRoot
         {
             UserId = userId,
             BMI = bmi,
-            DiseaseHistory = diseaseHistory
+            DiseaseHistory = diseaseHistory,
+            IsDeleted = false
         };
     }
 
     /// <summary>
-    /// Create a walk-in patient with no Identity account.
-    /// All profile data is stored directly on the entity.
+    /// Create a pure walk-in patient with NO Identity account.
+    /// All profile data is stored directly on this entity.
+    /// Only use when you intentionally do NOT create an ApplicationUser.
     /// </summary>
     public static Patient CreateWalkIn(
         string fullName,
@@ -94,17 +97,9 @@ public class Patient : BaseEntity, IAggregateRoot
             CitizenId = citizenId?.Trim(),
             DateOfBirth = dateOfBirth,
             GenderId = genderId,
-            Address = address?.Trim()
+            Address = address?.Trim(),
+            IsDeleted = false
         };
-    }
-
-    // ── Backward-compatible constructor for existing registration flows ──
-
-    public Patient(Guid userId, decimal? bmi = null, string? diseaseHistory = null)
-    {
-        UserId = userId;
-        BMI = bmi;
-        DiseaseHistory = diseaseHistory;
     }
 
     // ── Mutators ──
