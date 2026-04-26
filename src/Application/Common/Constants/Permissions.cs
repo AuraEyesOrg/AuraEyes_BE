@@ -64,6 +64,12 @@ public static class Permissions
     public const string VisitsRead   = "visits:read";
     public const string VisitsManage = "visits:manage";
 
+    // ─── Medical Records (EMR 23/BV-01) ──────────────────────────────────────────
+    public const string MedicalRecordsRead     = "medical-records:read";
+    public const string MedicalRecordsCreate   = "medical-records:create";
+    public const string MedicalRecordsUpdate   = "medical-records:update";
+    public const string MedicalRecordsFinalize = "medical-records:finalize";
+
     // â”€â”€â”€ Orders & Billing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public const string OrdersRead   = "orders:read";
     public const string OrdersManage = "orders:manage";
@@ -222,6 +228,12 @@ public static class Permissions
 
         // Audit
         new(AuditLogsRead, "Read Audit Logs", "View system audit trail", "Audit"),
+        
+        // Medical Records
+        new(MedicalRecordsRead,     "Read Medical Records",     "View EMR 23/BV-01 patient records",           "MedicalRecords"),
+        new(MedicalRecordsCreate,   "Create Medical Records",   "Initialize new 23/BV-01 medical records",     "MedicalRecords"),
+        new(MedicalRecordsUpdate,   "Update Medical Records",   "Fill clinical pathology and diagnosis",       "MedicalRecords"),
+        new(MedicalRecordsFinalize, "Finalize Medical Records", "Lock records for billing and legal archiving","MedicalRecords"),
 
         // Dashboard
         new(DashboardRead, "Read Dashboard", "View dashboard metrics and analytics", "Dashboard"),
@@ -246,6 +258,7 @@ public static class Permissions
             AppointmentsRead, AppointmentsCreate, AppointmentsManage,
             ApptSlotsManage, SchedulesManage,
             VisitsRead, VisitsManage,
+            MedicalRecordsRead, MedicalRecordsCreate, MedicalRecordsUpdate, MedicalRecordsFinalize,
             OrdersRead, OrdersManage,
             PaymentsRead, PaymentsManage,
             QuotasRead, QuotasBuy,
@@ -270,6 +283,7 @@ public static class Permissions
             AppointmentsRead, AppointmentsCreate,
             SchedulesManage, ApptSlotsManage,
             VisitsRead,
+            MedicalRecordsRead, MedicalRecordsUpdate,
             ContractsRead,
             WalletsRead, WalletsWithdraw, WalletsHistory,
             SettingsRead,
@@ -289,6 +303,7 @@ public static class Permissions
             ScreeningRead, ScreeningCreate,
             OrdersRead, OrdersManage,
             PaymentsRead, PaymentsManage,
+            MedicalRecordsRead, MedicalRecordsCreate, MedicalRecordsFinalize,
             SettingsRead,
         ],
 

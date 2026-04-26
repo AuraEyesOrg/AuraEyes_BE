@@ -73,7 +73,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Permissions");
+                    b.ToTable("Permissions", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Authorization.RolePermission", b =>
@@ -112,7 +112,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("RoleId", "PermissionId")
                         .IsUnique();
 
-                    b.ToTable("RolePermissions");
+                    b.ToTable("RolePermissions", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Authorization.UserPermission", b =>
@@ -170,7 +170,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "PermissionId")
                         .IsUnique();
 
-                    b.ToTable("UserPermissions");
+                    b.ToTable("UserPermissions", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.CarePlan.HealthRoadmap", b =>
@@ -326,7 +326,63 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ConversationId");
 
-                    b.ToTable("ChatMessages");
+                    b.ToTable("ChatMessages", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Consultation.ClinicFeedback", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AppointmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("DoctorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("StaffId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId");
+
+                    b.HasIndex("DoctorId");
+
+                    b.HasIndex("PatientId");
+
+                    b.HasIndex("StaffId");
+
+                    b.ToTable("ClinicFeedback", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ClinicFeedback_Rating", "\"Rating\" >= 1 AND \"Rating\" <= 5");
+                        });
                 });
 
             modelBuilder.Entity("Domain.Entities.Consultation.ConsultationSession", b =>
@@ -400,9 +456,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("OphthalmologistId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("OrganisationId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid");
 
@@ -436,8 +489,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("AppointmentSlotId");
 
                     b.HasIndex("OphthalmologistId");
-
-                    b.HasIndex("OrganisationId");
 
                     b.HasIndex("PatientId");
 
@@ -488,7 +539,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OphthalmologistId");
 
-                    b.ToTable("Conversations");
+                    b.ToTable("Conversations", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Consultation.OphthalmologistFeedback", b =>
@@ -556,74 +607,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.ToTable("OphthalmologistFeedback", null, t =>
                         {
                             t.HasCheckConstraint("CK_OphthalmologistFeedback_Rating", "rating >= 1 AND rating <= 5");
-                        });
-                });
-
-            modelBuilder.Entity("Domain.Entities.Consultation.OrganisationFeedback", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("AppointmentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("appointment_id");
-
-                    b.Property<string>("Comment")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("comment");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("created_by");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_deleted");
-
-                    b.Property<Guid>("OrganisationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("organisation_id");
-
-                    b.Property<Guid>("PatientId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("patient_id");
-
-                    b.Property<int>("Rating")
-                        .HasColumnType("integer")
-                        .HasColumnName("rating");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("updated_by");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AppointmentId");
-
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("OrganisationId");
-
-                    b.HasIndex("PatientId", "AppointmentId")
-                        .IsUnique();
-
-                    b.ToTable("OrganisationFeedback", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_OrganisationFeedback_Rating", "rating >= 1 AND rating <= 5");
                         });
                 });
 
@@ -760,7 +743,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TemplateId");
 
-                    b.ToTable("Contracts");
+                    b.ToTable("Contracts", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Contracts.ContractTemplate", b =>
@@ -822,7 +805,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("Type", "ContractVersion")
                         .IsUnique();
 
-                    b.ToTable("ContractTemplates");
+                    b.ToTable("ContractTemplates", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Financial.DepositRequest", b =>
@@ -911,7 +894,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("WalletId");
 
-                    b.ToTable("DepositRequests");
+                    b.ToTable("DepositRequests", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Financial.Order", b =>
@@ -959,7 +942,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Orders");
+                    b.ToTable("Orders", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Financial.Payment", b =>
@@ -1024,7 +1007,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrderId");
 
-                    b.ToTable("Payments");
+                    b.ToTable("Payments", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Financial.Wallet", b =>
@@ -1069,7 +1052,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Wallets");
+                    b.ToTable("Wallets", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Financial.WalletTransaction", b =>
@@ -1124,7 +1107,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ReferenceType", "ReferenceId");
 
-                    b.ToTable("WalletTransactions");
+                    b.ToTable("WalletTransactions", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Financial.WithdrawalRequest", b =>
@@ -1248,11 +1231,11 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.Property<string>("AdministrativeDataJson")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("ClinicalDataJson")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<Guid?>("ConsultationSessionId")
                         .HasColumnType("uuid");
@@ -1278,6 +1261,13 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("PatientVisitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PdfUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -1293,7 +1283,17 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("MedicalRecords");
+                    b.HasIndex("IsDeleted");
+
+                    b.HasIndex("MedicalRecordNumber")
+                        .IsUnique();
+
+                    b.HasIndex("PatientId");
+
+                    b.HasIndex("PatientVisitId")
+                        .IsUnique();
+
+                    b.ToTable("MedicalRecords", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Network.InternalChat.InternalGroupChat", b =>
@@ -1341,7 +1341,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("InternalGroupChats");
+                    b.ToTable("InternalGroupChats", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Network.InternalChat.InternalGroupMember", b =>
@@ -1378,7 +1378,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("GroupId");
 
-                    b.ToTable("InternalGroupMembers");
+                    b.ToTable("InternalGroupMembers", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Network.InternalChat.InternalGroupMessage", b =>
@@ -1419,7 +1419,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("GroupId");
 
-                    b.ToTable("InternalGroupMessages");
+                    b.ToTable("InternalGroupMessages", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Network.PostAttachment", b =>
@@ -1831,7 +1831,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AuditLogs");
+                    b.ToTable("AuditLogs", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Platform.Notification", b =>
@@ -1892,7 +1892,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId", "IsRead");
 
-                    b.ToTable("Notifications");
+                    b.ToTable("Notifications", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Platform.SystemSetting", b =>
@@ -1912,7 +1912,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Key");
 
-                    b.ToTable("SystemSettings");
+                    b.ToTable("SystemSettings", (string)null);
 
                     b.HasData(
                         new
@@ -2613,7 +2613,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PatientId");
 
-                    b.ToTable("AiScreenings");
+                    b.ToTable("AiScreenings", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Screening.MedicalDiagnosis", b =>
@@ -2709,7 +2709,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ConsultationSessionId");
 
-                    b.ToTable("MedicalDiagnoses");
+                    b.ToTable("MedicalDiagnoses", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Screening.PatientRoadmap", b =>
@@ -2852,7 +2852,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PatientId");
 
-                    b.ToTable("RetinalImages");
+                    b.ToTable("RetinalImages", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Screening.ScreeningResult", b =>
@@ -2902,7 +2902,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("AiScreeningId");
 
-                    b.ToTable("ScreeningResults");
+                    b.ToTable("ScreeningResults", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.Certificate", b =>
@@ -3069,7 +3069,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PatientId");
 
-                    b.ToTable("Consents");
+                    b.ToTable("Consents", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.Ophthalmologist", b =>
@@ -3179,7 +3179,7 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Ophthalmologists");
+                    b.ToTable("Ophthalmologists", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.OphthalmologistEmploymentTypeChangeRequest", b =>
@@ -3338,7 +3338,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Organisations");
+                    b.ToTable("Organisations", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.OrganisationOnboardingRequest", b =>
@@ -3424,7 +3424,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ContactEmail", "Status");
 
-                    b.ToTable("OrganisationOnboardingRequests");
+                    b.ToTable("OrganisationOnboardingRequests", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.Patient", b =>
@@ -3466,18 +3466,18 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("MedicalRecordNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("PhoneNumber")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
                     b.Property<int>("PurchasedAiQuota")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3486,9 +3486,7 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("text");
 
                     b.Property<int>("UsedAiQuota")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
+                        .HasColumnType("integer");
 
                     b.Property<Guid?>("UserId")
                         .HasColumnType("uuid");
@@ -3499,7 +3497,7 @@ namespace Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("\"UserId\" IS NOT NULL");
 
-                    b.ToTable("Patients");
+                    b.ToTable("Patients", (string)null);
                 });
 
             modelBuilder.Entity("Infrastructure.Identity.ApplicationRole", b =>
@@ -3909,6 +3907,31 @@ namespace Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Domain.Entities.Consultation.ClinicFeedback", b =>
+                {
+                    b.HasOne("Domain.Entities.Scheduling.Appointment", null)
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Users.Ophthalmologist", null)
+                        .WithMany()
+                        .HasForeignKey("DoctorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Entities.Users.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Users.ClinicStaff", null)
+                        .WithMany()
+                        .HasForeignKey("StaffId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("Domain.Entities.Consultation.ConsultationSession", b =>
                 {
                     b.HasOne("Domain.Entities.Screening.AiScreening", null)
@@ -3924,11 +3947,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasOne("Domain.Entities.Users.Ophthalmologist", null)
                         .WithMany()
                         .HasForeignKey("OphthalmologistId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Domain.Entities.Users.Organisation", null)
-                        .WithMany()
-                        .HasForeignKey("OrganisationId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Domain.Entities.Users.Patient", null)
@@ -3966,27 +3984,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasOne("Domain.Entities.Users.Ophthalmologist", null)
                         .WithMany()
                         .HasForeignKey("OphthalmologistId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Entities.Users.Patient", null)
-                        .WithMany()
-                        .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Domain.Entities.Consultation.OrganisationFeedback", b =>
-                {
-                    b.HasOne("Domain.Entities.Scheduling.Appointment", null)
-                        .WithMany()
-                        .HasForeignKey("AppointmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Entities.Users.Organisation", null)
-                        .WithMany()
-                        .HasForeignKey("OrganisationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -4055,6 +4052,22 @@ namespace Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Wallet");
+                });
+
+            modelBuilder.Entity("Domain.Entities.MedicalRecords.MedicalRecord", b =>
+                {
+                    b.HasOne("Domain.Entities.Users.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Scheduling.PatientVisit", null)
+                        .WithOne("MedicalRecord")
+                        .HasForeignKey("Domain.Entities.MedicalRecords.MedicalRecord", "PatientVisitId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Patient");
                 });
 
             modelBuilder.Entity("Domain.Entities.Network.InternalChat.InternalGroupMember", b =>
@@ -4443,6 +4456,11 @@ namespace Infrastructure.Persistence.Migrations
                     b.Navigation("Appointments");
 
                     b.Navigation("SlotAssignments");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Scheduling.PatientVisit", b =>
+                {
+                    b.Navigation("MedicalRecord");
                 });
 
             modelBuilder.Entity("Domain.Entities.Scheduling.ScheduleTemplate", b =>

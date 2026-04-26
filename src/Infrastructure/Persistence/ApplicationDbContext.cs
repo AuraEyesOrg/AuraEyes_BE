@@ -60,7 +60,7 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
     public DbSet<WebsiteFeedback> WebsiteFeedbacks => Set<WebsiteFeedback>();
-    public DbSet<OrganisationFeedback> OrganisationFeedbacks => Set<OrganisationFeedback>();
+    public DbSet<ClinicFeedback> ClinicFeedbacks => Set<ClinicFeedback>();
     public DbSet<OphthalmologistFeedback> OphthalmologistFeedbacks => Set<OphthalmologistFeedback>();
 
     // Scheduling

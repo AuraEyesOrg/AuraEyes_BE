@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Infrastructure.Services;
 using Infrastructure.Settings;
+using Application.Common.Models;
 using Infrastructure.UnitTests.Common;
 using System.Net;
 using System.Text;

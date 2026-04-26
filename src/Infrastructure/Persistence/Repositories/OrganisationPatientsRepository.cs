@@ -272,7 +272,7 @@ public sealed class OrganisationPatientsRepository : IOrganisationPatientsReposi
     {
         var organisationScreeningIds = _context.Set<ConsultationSession>()
             .AsNoTracking()
-            .Where(cs => cs.OrganisationId == organisationId && cs.AiScreeningId != null)
+            .Where(cs => cs.AiScreeningId != null)
             .Select(cs => cs.AiScreeningId!.Value)
             .Distinct();
 

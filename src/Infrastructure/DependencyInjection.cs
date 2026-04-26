@@ -1,4 +1,5 @@
 using System.Text;
+using Application.Common.Models;
 using Application.AiQuota.Interfaces;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
@@ -203,7 +204,7 @@ public static class DependencyInjection
         services.AddScoped<IPatientVisitRepository, PatientVisitRepository>();
         services.AddScoped<IHealthRoadmapRepository, HealthRoadmapRepository>();
         services.AddScoped<IConsultationSessionRepository, ConsultationSessionRepository>();
-        services.AddScoped<IOrganisationFeedbackRepository, OrganisationFeedbackRepository>();
+        services.AddScoped<IClinicFeedbackRepository, ClinicFeedbackRepository>();
         services.AddScoped<IOphthalmologistFeedbackRepository, OphthalmologistFeedbackRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IContractTemplateRepository, ContractTemplateRepository>();
@@ -228,6 +229,7 @@ public static class DependencyInjection
         // Register other services
         services.AddTransient<IDateTime, DateTimeService>();
         services.AddTransient<IEmailService, EmailService>();
+        services.AddScoped<IClinicVisitService, ClinicVisitService>();
         services.AddScoped<IOrganisationOnboardingService, OrganisationOnboardingService>();
         services.AddScoped<IFileStorageService, CloudinaryStorageService>();
         services.AddScoped<INotificationService, NotificationService>();
@@ -239,6 +241,7 @@ public static class DependencyInjection
         services.AddScoped<ISystemSettingService, SystemSettingService>();
         services.AddScoped<IOrganisationScreeningPdfService, OrganisationScreeningPdfService>();
         services.AddScoped<IPatientScreeningPdfService, PatientScreeningPdfService>();
+        services.AddScoped<IMedicalRecordPdfService, MedicalRecordPdfService>();
         services.AddScoped<IOphthalmologistContractProvisioningService, OphthalmologistContractProvisioningService>();
         services.AddSingleton<IAiAssetBaseUrlProvider, AiAssetBaseUrlProvider>();
         services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();

@@ -51,6 +51,7 @@ public class InternalChatController : BaseApiController
     /// Create a new internal group chat.
     /// </summary>
     [HttpPost("groups")]
+    [Authorize(Roles = Roles.SystemAdmin)]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
     public async Task<IActionResult> CreateGroup([FromBody] CreateInternalGroupChatCommand command)
     {
@@ -192,6 +193,7 @@ public class InternalChatController : BaseApiController
     /// Rename an internal group chat.
     /// </summary>
     [HttpPut("groups/{groupId:guid}")]
+    [Authorize(Roles = Roles.SystemAdmin)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> RenameGroup(Guid groupId, [FromBody] RenameGroupRequest request)
     {
@@ -209,6 +211,7 @@ public class InternalChatController : BaseApiController
     /// Delete an internal group chat.
     /// </summary>
     [HttpDelete("groups/{groupId:guid}")]
+    [Authorize(Roles = Roles.SystemAdmin)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> DeleteGroup(Guid groupId)
     {
@@ -225,6 +228,7 @@ public class InternalChatController : BaseApiController
     /// Update members of an internal group chat.
     /// </summary>
     [HttpPut("groups/{groupId:guid}/members")]
+    [Authorize(Roles = Roles.SystemAdmin)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateMembers(Guid groupId, [FromBody] UpdateMembersRequest request)
     {

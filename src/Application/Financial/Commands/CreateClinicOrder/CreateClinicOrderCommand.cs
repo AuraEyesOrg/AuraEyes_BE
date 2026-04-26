@@ -40,6 +40,8 @@ public class CreateClinicOrderCommandHandler : ICommandHandler<CreateClinicOrder
     private readonly IRepository<Domain.Entities.Screening.MedicalDiagnosis> _diagnosisRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IIdentityService _identityService;
+    private readonly ICurrentUserService _currentUser;
+    private readonly PayOSSettings _payOSSettings;
 
     public CreateClinicOrderCommandHandler(
         IPatientVisitRepository patientVisitRepository,
@@ -49,7 +51,9 @@ public class CreateClinicOrderCommandHandler : ICommandHandler<CreateClinicOrder
         IConsultationSessionRepository consultationSessionRepository,
         IRepository<Domain.Entities.Screening.MedicalDiagnosis> diagnosisRepository,
         IUnitOfWork unitOfWork,
-        IIdentityService identityService)
+        IIdentityService identityService,
+        ICurrentUserService currentUser,
+        Microsoft.Extensions.Options.IOptions<PayOSSettings> payOSSettings)
     {
         _patientVisitRepository = patientVisitRepository;
         _orderRepository = orderRepository;
@@ -59,6 +63,8 @@ public class CreateClinicOrderCommandHandler : ICommandHandler<CreateClinicOrder
         _diagnosisRepository = diagnosisRepository;
         _unitOfWork = unitOfWork;
         _identityService = identityService;
+        _currentUser = currentUser;
+        _payOSSettings = payOSSettings.Value;
     }
 
     public async Task<Result<CreateClinicOrderResponse>> Handle(CreateClinicOrderCommand request, CancellationToken cancellationToken)
@@ -104,20 +110,23 @@ public class CreateClinicOrderCommandHandler : ICommandHandler<CreateClinicOrder
         var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
         
         string patientName = visit.Patient?.FullName ?? "Patient";
-        string shortDescription = $"Thanh toan tien thuoc - BN: {patientName} - BS: {doctorName}";
+        string shortDescription = $"Thanh toán thuốc & dịch vụ - BN: {patientName} - BS: {doctorName}";
         string fullDescription = $"METADATA:{metadataJson} | {shortDescription}";
-
-        // Ensure description isn't too long for PayOS (usually 25 characters, but we can use more in our internal description)
-        // PayOS description field is limited, but the one we send to CreatePaymentLinkAsync will be used.
-        // Let's use a cleaner one for PayOS display and keep metadata for our DB description.
-        string payosDisplayDesc = $"Thanh toan {visit.Id.ToString().Substring(0, 8)}";
+        
+        // PayOS display description (clean and short)
+        // PayOS has 25 char limit. Use "Thuoc [ShortName]"
+        string shortName = patientName.Split(' ').LastOrDefault() ?? "BN";
+        string payosDisplayDesc = $"Thuoc {shortName} {visit.Id.ToString().Substring(0, 5)}";
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
             // 1. Create Order
+            // FIX: Use UserId from patient, or fallback to current staff if walk-in
+            var orderUserId = visit.Patient?.UserId ?? _currentUser.UserId.Value;
+
             var order = new Order(
-                visit.PatientId, 
+                orderUserId, 
                 totalAmount, 
                 null, 
                 fullDescription, 
@@ -141,8 +150,8 @@ public class CreateClinicOrderCommandHandler : ICommandHandler<CreateClinicOrder
                 payment.Id,
                 totalAmount,
                 payosDisplayDesc,
-                request.ReturnUrl,
-                request.CancelUrl);
+                string.IsNullOrWhiteSpace(request.ReturnUrl) ? _payOSSettings.DefaultReturnUrl : request.ReturnUrl,
+                string.IsNullOrWhiteSpace(request.CancelUrl) ? _payOSSettings.DefaultCancelUrl : request.CancelUrl);
 
             payment.SetPaymentLink(paymentUrl, orderCode);
             await _paymentRepository.UpdateAsync(payment, cancellationToken);

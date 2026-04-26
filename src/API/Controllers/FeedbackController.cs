@@ -1,19 +1,22 @@
 using Application.Common.Constants;
 using Application.Common.Models;
-using Application.Feedback.Commands.CreateOphthalmologistFeedback;
-using Application.Feedback.Commands.CreateOrganisationFeedback;
 using Application.Feedback.Commands.CreateWebsiteFeedback;
 using Application.Feedback.Common;
 using Application.Feedback.Queries.GetOphthalmologistFeedback;
 using Application.Feedback.Queries.GetOphthalmologistRatingSummary;
-using Application.Feedback.Queries.GetOrganisationFeedback;
-using Application.Feedback.Queries.GetOrganisationRatingSummary;
 using Application.Feedback.Queries.GetWebsiteFeedback;
 using Application.Feedback.Queries.ListOphthalmologistFeedback;
-using Application.Feedback.Queries.ListOrganisationFeedback;
+using Application.Feedback.Queries.ListClinicFeedback;
+using Application.Feedback.Queries.GetClinicRatingSummary;
+using Application.Feedback.Queries.GetClinicFeedback;
+using Application.Feedback.Commands.CreateOphthalmologistFeedback;
+
+
+
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Application.Feedback.Commands.CreateClinicFeedback;
 
 namespace API.Controllers;
 
@@ -53,31 +56,32 @@ public class FeedbackController : BaseApiController
         return HandleResult(result);
     }
 
-    [HttpPost("organisations/{organisationId:guid}")]
+    [HttpPost("clinics/{clinicId:guid}")]
     [Authorize(Policy = Policies.PatientOnly)]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CreateOrganisationFeedback(
-        Guid organisationId,
-        [FromBody] CreateOrganisationFeedbackRequest request)
+    public async Task<IActionResult> CreateClinicFeedback(
+        Guid clinicId,
+        [FromBody] CreateClinicFeedbackRequest request)
     {
-        var command = new CreateOrganisationFeedbackCommand
+        var command = new CreateClinicFeedbackCommand
         {
-            OrganisationId = organisationId,
             AppointmentId = request.AppointmentId,
             Rating = request.Rating,
-            Comment = request.Comment
+            Comment = request.Comment,
+            DoctorId = request.DoctorId,
+            StaffId = request.StaffId
         };
 
         var result = await _mediator.Send(command);
         if (result.IsSuccess)
         {
             return CreatedAtAction(
-                nameof(GetOrganisationFeedback),
-                new { organisationId, feedbackId = result.Data },
-                ApiResponseFactory.Success(result.Data, "Organisation feedback created successfully."));
+                nameof(GetClinicFeedback),
+                new { clinicId, feedbackId = result.Data },
+                ApiResponseFactory.Success(result.Data, "Clinic feedback created successfully."));
         }
 
         return HandleResult(result);
@@ -123,13 +127,13 @@ public class FeedbackController : BaseApiController
         return HandleResult(result);
     }
 
-    [HttpGet("organisations/{organisationId:guid}/items/{feedbackId:guid}")]
+    [HttpGet("clinics/{clinicId:guid}/items/{feedbackId:guid}")]
     [Authorize]
-    [ProducesResponseType(typeof(ApiResponse<OrganisationFeedbackDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<ClinicFeedbackDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetOrganisationFeedback(Guid organisationId, Guid feedbackId)
+    public async Task<IActionResult> GetClinicFeedback(Guid clinicId, Guid feedbackId)
     {
-        var result = await _mediator.Send(new GetOrganisationFeedbackQuery(organisationId, feedbackId));
+        var result = await _mediator.Send(new GetClinicFeedbackQuery(feedbackId));
         return HandleResult(result);
     }
 
@@ -143,17 +147,16 @@ public class FeedbackController : BaseApiController
         return HandleResult(result);
     }
 
-    [HttpGet("organisations/{organisationId:guid}/items")]
+    [HttpGet("clinics/{clinicId:guid}/items")]
     [Authorize]
-    [ProducesResponseType(typeof(ApiResponse<PagedResult<OrganisationFeedbackDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> ListOrganisationFeedback(
-        Guid organisationId,
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<ClinicFeedbackDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListClinicFeedback(
+        Guid clinicId,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10)
     {
-        var result = await _mediator.Send(new ListOrganisationFeedbackQuery
+        var result = await _mediator.Send(new ListClinicFeedbackQuery
         {
-            OrganisationId = organisationId,
             PageNumber = pageNumber,
             PageSize = pageSize
         });
@@ -179,13 +182,13 @@ public class FeedbackController : BaseApiController
         return HandleResult(result);
     }
 
-    [HttpGet("organisations/{organisationId:guid}/rating")]
+    [HttpGet("clinics/{clinicId:guid}/rating")]
     [Authorize]
     [ProducesResponseType(typeof(ApiResponse<FeedbackRatingSummaryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetOrganisationRatingSummary(Guid organisationId)
+    public async Task<IActionResult> GetClinicRatingSummary(Guid clinicId)
     {
-        var result = await _mediator.Send(new GetOrganisationRatingSummaryQuery(organisationId));
+        var result = await _mediator.Send(new GetClinicRatingSummaryQuery());
         return HandleResult(result);
     }
 
@@ -209,11 +212,13 @@ public record CreateWebsiteFeedbackRequest
     public string? Comment { get; init; }
 }
 
-public record CreateOrganisationFeedbackRequest
+public record CreateClinicFeedbackRequest
 {
     public Guid AppointmentId { get; init; }
     public int Rating { get; init; }
     public string? Comment { get; init; }
+    public Guid? DoctorId { get; init; }
+    public Guid? StaffId { get; init; }
 }
 
 public record CreateOphthalmologistFeedbackRequest

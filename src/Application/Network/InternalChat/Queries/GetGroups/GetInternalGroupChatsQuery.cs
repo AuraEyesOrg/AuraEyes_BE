@@ -17,6 +17,7 @@ public class InternalGroupChatDto
     public Guid CreatorId { get; set; }
     public DateTime CreatedAt { get; set; }
     public List<Guid> MemberIds { get; set; } = new();
+    public int MemberCount { get; set; }
 }
 
 public class GetInternalGroupChatsQuery : IQuery<List<InternalGroupChatDto>>
@@ -51,7 +52,8 @@ public class GetInternalGroupChatsQueryHandler : IQueryHandler<GetInternalGroupC
                 CalendarEventId = g.CalendarEventId,
                 CreatorId = g.CreatorId,
                 CreatedAt = g.CreatedAt,
-                MemberIds = g.Members.Select(m => m.MemberId).ToList()
+                MemberIds = g.Members.Select(m => m.MemberId).ToList(),
+                MemberCount = g.Members.Count
             })
             .OrderByDescending(g => g.CreatedAt)
             .ToListAsync(cancellationToken);

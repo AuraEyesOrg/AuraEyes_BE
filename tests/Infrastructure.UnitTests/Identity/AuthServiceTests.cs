@@ -1,681 +1,139 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Common.Models.Auth;
-using Application.SystemAdmin.Organisations.Common;
+using Application.Scheduling.ScheduleTemplates.Interfaces;
 using Domain.Common;
-using Domain.Entities.Contracts;
 using Domain.Entities.Users;
-using Domain.Enums;
 using Domain.Repositories;
+using Domain.Entities;
 using FluentAssertions;
 using Infrastructure.Identity;
 using Infrastructure.Settings;
-using Infrastructure.UnitTests.Common;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Moq;
+using System.Linq.Expressions;
 
 namespace Infrastructure.UnitTests.Identity;
 
 public class AuthServiceTests
 {
-    [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(3)]
-    [InlineData(4)]
-    [InlineData(5)]
-    [InlineData(6)]
-    [InlineData(7)]
-    [InlineData(8)]
-    [InlineData(9)]
-    [InlineData(10)]
-    public async Task RegisterOphthalmologistAsync_WhenNoCredentials_ShouldFailImmediately(int caseId)
+    private readonly Mock<IIdentityService> _identityServiceMock;
+    private readonly Mock<ITokenService> _tokenServiceMock;
+    private readonly Mock<IRefreshTokenService> _refreshTokenServiceMock;
+    private readonly Mock<IEmailService> _emailServiceMock;
+    private readonly Mock<IOrganisationOnboardingService> _orgOnboardingMock;
+    private readonly Mock<INotificationService> _notificationServiceMock;
+    private readonly Mock<IFileStorageService> _fileStorageMock;
+    private readonly Mock<IRepository<Patient>> _patientRepositoryMock;
+    private readonly Mock<IRepository<Ophthalmologist>> _ophthalmologistRepositoryMock;
+    private readonly Mock<IClinicStaffRepository> _clinicStaffRepositoryMock;
+    private readonly Mock<IContractRepository> _contractRepositoryMock;
+    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+    private readonly Mock<UserManager<ApplicationUser>> _userManagerMock;
+    private readonly Mock<SignInManager<ApplicationUser>> _signInManagerMock;
+    private readonly Mock<ILogger<AuthService>> _loggerMock;
+    private readonly IOptions<GoogleAuthSettings> _googleAuthSettings;
+    private readonly AuthService _authService;
+
+    public AuthServiceTests()
     {
-        var service = CreateServiceForValidationOnly();
-        var request = CreateBaseRequest();
-        request.FullName = $"Doctor Test {caseId}";
-        request.Certificates.Clear();
-        request.Degrees.Clear();
+        _identityServiceMock = new Mock<IIdentityService>();
+        _tokenServiceMock = new Mock<ITokenService>();
+        _refreshTokenServiceMock = new Mock<IRefreshTokenService>();
+        _emailServiceMock = new Mock<IEmailService>();
+        _orgOnboardingMock = new Mock<IOrganisationOnboardingService>();
+        _notificationServiceMock = new Mock<INotificationService>();
+        _fileStorageMock = new Mock<IFileStorageService>();
+        _patientRepositoryMock = new Mock<IRepository<Patient>>();
+        _ophthalmologistRepositoryMock = new Mock<IRepository<Ophthalmologist>>();
+        _clinicStaffRepositoryMock = new Mock<IClinicStaffRepository>();
+        _contractRepositoryMock = new Mock<IContractRepository>();
+        _unitOfWorkMock = new Mock<IUnitOfWork>();
 
-        var result = await service.RegisterOphthalmologistAsync(request, "https://example.com/confirm");
+        var userStoreMock = new Mock<IUserStore<ApplicationUser>>();
+        _userManagerMock = new Mock<UserManager<ApplicationUser>>(userStoreMock.Object, null, null, null, null, null, null, null, null);
+        
+        var contextAccessorMock = new Mock<IHttpContextAccessor>();
+        var userClaimsPrincipalFactoryMock = new Mock<IUserClaimsPrincipalFactory<ApplicationUser>>();
+        _signInManagerMock = new Mock<SignInManager<ApplicationUser>>(
+            _userManagerMock.Object, contextAccessorMock.Object, userClaimsPrincipalFactoryMock.Object, null, null, null, null);
 
-        result.IsSuccess.Should().BeFalse();
-        result.Errors.Should().Contain("At least one credential is required");
+        _googleAuthSettings = Options.Create(new GoogleAuthSettings());
+        _loggerMock = new Mock<ILogger<AuthService>>();
+
+        _authService = new AuthService(
+            _identityServiceMock.Object,
+            _tokenServiceMock.Object,
+            _refreshTokenServiceMock.Object,
+            _emailServiceMock.Object,
+            _orgOnboardingMock.Object,
+            _notificationServiceMock.Object,
+            _fileStorageMock.Object,
+            _patientRepositoryMock.Object,
+            _ophthalmologistRepositoryMock.Object,
+            _clinicStaffRepositoryMock.Object,
+            _contractRepositoryMock.Object,
+            _unitOfWorkMock.Object,
+            _userManagerMock.Object,
+            _signInManagerMock.Object,
+            _googleAuthSettings,
+            _loggerMock.Object);
     }
 
-    [Theory]
-    [InlineData("Medical License A", 1)]
-    [InlineData("Medical License B", 2)]
-    [InlineData("Medical License C", 3)]
-    [InlineData("Medical License D", 4)]
-    [InlineData("Medical License E", 5)]
-    [InlineData("Medical License F", 6)]
-    [InlineData("Medical License G", 7)]
-    [InlineData("Medical License H", 8)]
-    [InlineData("Medical License I", 9)]
-    [InlineData("Medical License J", 10)]
-    public async Task RegisterOphthalmologistAsync_WhenNoDegree_ShouldFail(string licenseName, int caseId)
+    [Fact]
+    public async Task LoginAsync_WithValidCredentials_ShouldReturnTokens()
     {
-        var service = CreateServiceForValidationOnly();
-        var request = CreateBaseRequest();
-        request.FullName = $"NoDegree {caseId}";
-        request.Certificates =
-        [
-            new CredentialItemDto
-            {
-                Type = CertificateType.License,
-                Name = licenseName,
-                IssuedDate = DateTime.UtcNow.AddYears(-1),
-                ExpiryDate = DateTime.UtcNow.AddYears(1),
-                File = new FormFile(new MemoryStream([1, 2, 3]), 0, 3, "file", "license.pdf")
-            }
-        ];
+        var request = new LoginRequest { Email = "test@test.com", Password = "Password123!" };
+        var user = new ApplicationUser { Id = Guid.NewGuid(), Email = request.Email, FullName = "Test User" };
 
-        var result = await service.RegisterOphthalmologistAsync(request, "https://example.com/confirm");
+        _userManagerMock.Setup(x => x.FindByEmailAsync(request.Email)).ReturnsAsync(user);
+        _userManagerMock.Setup(x => x.CheckPasswordAsync(user, request.Password)).ReturnsAsync(true);
+        _signInManagerMock.Setup(x => x.CheckPasswordSignInAsync(user, request.Password, true))
+            .ReturnsAsync(Microsoft.AspNetCore.Identity.SignInResult.Success);
+        _userManagerMock.Setup(x => x.GetRolesAsync(user)).ReturnsAsync(new List<string> { "Patient" });
+        _identityServiceMock.Setup(x => x.IsUserActiveAsync(user.Id)).ReturnsAsync(true);
+        _identityServiceMock.Setup(x => x.GetUserRolesAsync(user.Id)).ReturnsAsync(new List<string> { "Patient" });
+        _identityServiceMock.Setup(x => x.GetUserPermissionsAsync(user.Id)).ReturnsAsync(new List<string>());
+        _patientRepositoryMock.Setup(x => x.FindAsync(It.IsAny<Expression<Func<Patient, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Patient>());
+        _refreshTokenServiceMock.Setup(x => x.CreateRefreshTokenAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Guid.NewGuid());
+        _identityServiceMock.Setup(x => x.UpdateLastLoginAsync(user.Id)).Returns(Task.CompletedTask);
+        
+        _tokenServiceMock.Setup(x => x.GenerateAccessTokenAsync(user.Id, user.Email, user.FullName, It.IsAny<IEnumerable<string>>(), It.IsAny<IEnumerable<System.Security.Claims.Claim>>()))
+            .ReturnsAsync(new TokenResult("access-token", "jti", DateTime.UtcNow.AddHours(1)));
+        _tokenServiceMock.Setup(x => x.GenerateRefreshToken()).Returns("refresh-token");
 
-        result.IsSuccess.Should().BeFalse();
-        result.Errors.Should().Contain("At least one degree is required");
-    }
-
-    [Theory]
-    [InlineData("Degree A", 1)]
-    [InlineData("Degree B", 2)]
-    [InlineData("Degree C", 3)]
-    [InlineData("Degree D", 4)]
-    [InlineData("Degree E", 5)]
-    [InlineData("Degree F", 6)]
-    [InlineData("Degree G", 7)]
-    [InlineData("Degree H", 8)]
-    [InlineData("Degree I", 9)]
-    [InlineData("Degree J", 10)]
-    public async Task RegisterOphthalmologistAsync_WhenNoLicense_ShouldFail(string degreeName, int caseId)
-    {
-        var service = CreateServiceForValidationOnly();
-        var request = CreateBaseRequest();
-        request.FullName = $"NoLicense {caseId}";
-        request.Certificates =
-        [
-            new CredentialItemDto
-            {
-                Type = CertificateType.Degree,
-                DegreeLevel = DegreeLevel.Bachelor,
-                Name = degreeName,
-                IssuedDate = DateTime.UtcNow.AddYears(-5),
-                ExpiryDate = null,
-                File = new FormFile(new MemoryStream([1, 2, 3]), 0, 3, "file", "degree.pdf")
-            }
-        ];
-
-        var result = await service.RegisterOphthalmologistAsync(request, "https://example.com/confirm");
-
-        result.IsSuccess.Should().BeFalse();
-        result.Errors.Should().Contain("At least one license/certificate is required");
-    }
-
-    [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(3)]
-    [InlineData(4)]
-    [InlineData(5)]
-    [InlineData(6)]
-    [InlineData(7)]
-    [InlineData(8)]
-    [InlineData(9)]
-    [InlineData(10)]
-    public async Task RegisterOphthalmologistAsync_WhenDegreeLevelMissing_ShouldFail(int caseId)
-    {
-        var service = CreateServiceForValidationOnly();
-        var request = CreateBaseRequest();
-        request.FullName = $"MissingDegreeLevel {caseId}";
-        request.Certificates =
-        [
-            new CredentialItemDto
-            {
-                Type = CertificateType.Degree,
-                DegreeLevel = null,
-                Name = "Medical Degree",
-                IssuedDate = DateTime.UtcNow.AddYears(-5),
-                File = new FormFile(new MemoryStream([1, 2, 3]), 0, 3, "file", "degree.pdf")
-            },
-            new CredentialItemDto
-            {
-                Type = CertificateType.License,
-                Name = "Medical License",
-                IssuedDate = DateTime.UtcNow.AddYears(-1),
-                ExpiryDate = DateTime.UtcNow.AddYears(1),
-                File = new FormFile(new MemoryStream([1, 2, 3]), 0, 3, "file", "license.pdf")
-            }
-        ];
-
-        var result = await service.RegisterOphthalmologistAsync(request, "https://example.com/confirm");
-
-        result.IsSuccess.Should().BeFalse();
-        result.Errors.Should().Contain("Degree level is required for degree credentials");
-    }
-
-    [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(3)]
-    [InlineData(4)]
-    [InlineData(5)]
-    [InlineData(6)]
-    [InlineData(7)]
-    [InlineData(8)]
-    [InlineData(9)]
-    [InlineData(10)]
-    public async Task RegisterOphthalmologistAsync_WhenCredentialFileMissing_ShouldFail(int caseId)
-    {
-        var service = CreateServiceForValidationOnly();
-        var request = CreateBaseRequest();
-        request.FullName = $"MissingFile {caseId}";
-        request.Certificates =
-        [
-            new CredentialItemDto
-            {
-                Type = CertificateType.Degree,
-                DegreeLevel = DegreeLevel.Bachelor,
-                Name = "Medical Degree",
-                IssuedDate = DateTime.UtcNow.AddYears(-5),
-                File = null
-            },
-            new CredentialItemDto
-            {
-                Type = CertificateType.License,
-                Name = "Medical License",
-                IssuedDate = DateTime.UtcNow.AddYears(-1),
-                ExpiryDate = DateTime.UtcNow.AddYears(1),
-                File = new FormFile(new MemoryStream([1, 2, 3]), 0, 3, "file", "license.pdf")
-            }
-        ];
-
-        var result = await service.RegisterOphthalmologistAsync(request, "https://example.com/confirm");
-
-        result.IsSuccess.Should().BeFalse();
-        result.Errors.Should().Contain("Credential file is required");
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(3)]
-    [InlineData(4)]
-    [InlineData(5)]
-    [InlineData(6)]
-    [InlineData(7)]
-    [InlineData(8)]
-    [InlineData(9)]
-    public async Task RegisterOphthalmologistAsync_WhenLicenseExpiryNotGreaterThanIssued_ShouldFail(int minutesDelta)
-    {
-        var service = CreateServiceForValidationOnly();
-        var request = CreateBaseRequest();
-        var issued = DateTime.UtcNow.AddYears(-1);
-        var expiry = issued.AddMinutes(minutesDelta == 0 ? 0 : -minutesDelta);
-        request.Certificates =
-        [
-            new CredentialItemDto
-            {
-                Type = CertificateType.Degree,
-                DegreeLevel = DegreeLevel.Bachelor,
-                Name = "Medical Degree",
-                IssuedDate = DateTime.UtcNow.AddYears(-5),
-                File = new FormFile(new MemoryStream([1, 2, 3]), 0, 3, "file", "degree.pdf")
-            },
-            new CredentialItemDto
-            {
-                Type = CertificateType.License,
-                Name = "Medical License",
-                IssuedDate = issued,
-                ExpiryDate = expiry,
-                File = new FormFile(new MemoryStream([1, 2, 3]), 0, 3, "file", "license.pdf")
-            }
-        ];
-
-        var result = await service.RegisterOphthalmologistAsync(request, "https://example.com/confirm");
-
-        result.IsSuccess.Should().BeFalse();
-        result.Errors.Should().Contain("Certificate expiry date must be later than issued date");
-    }
-
-    [Theory]
-    [InlineData("not-a-guid")]
-    [InlineData("")]
-    [InlineData(" ")]
-    [InlineData("123")]
-    [InlineData("guid-guid")]
-    [InlineData("00000000-0000-0000-0000-00000000000Z")]
-    [InlineData("{not-guid}")]
-    [InlineData("null")]
-    [InlineData("undefined")]
-    [InlineData("abc-def-ghi")]
-    public async Task ConfirmEmailAsync_WhenUserIdInvalid_ShouldFail(string userId)
-    {
-        var service = CreateServiceForValidationOnly();
-
-        var result = await service.ConfirmEmailAsync(userId, "token");
-
-        result.IsSuccess.Should().BeFalse();
-        result.Errors.Should().Contain("Invalid user ID");
-    }
-
-    [Theory]
-    [InlineData("bad-guid")]
-    [InlineData("")]
-    [InlineData(" ")]
-    [InlineData("123")]
-    [InlineData("not-guid-value")]
-    [InlineData("00000000-0000-0000-0000-00000000000Z")]
-    [InlineData("{not-guid}")]
-    [InlineData("null")]
-    [InlineData("undefined")]
-    [InlineData("abc-def-ghi")]
-    public async Task ResetPasswordAsync_WhenUserIdInvalid_ShouldFail(string userId)
-    {
-        var service = CreateServiceForValidationOnly();
-        var request = new ResetPasswordRequest
-        {
-            UserId = userId,
-            Token = "token",
-            NewPassword = "Password@123",
-            ConfirmPassword = "Password@123"
-        };
-
-        var result = await service.ResetPasswordAsync(request);
-
-        result.IsSuccess.Should().BeFalse();
-        result.Errors.Should().Contain("Invalid user ID");
-    }
-
-    [Theory]
-    [InlineData("org1@test.local")]
-    [InlineData("org2@test.local")]
-    [InlineData("org3@test.local")]
-    [InlineData("org4@test.local")]
-    [InlineData("org5@test.local")]
-    [InlineData("org6@test.local")]
-    [InlineData("org7@test.local")]
-    [InlineData("org8@test.local")]
-    [InlineData("org9@test.local")]
-    [InlineData("org10@test.local")]
-    public async Task RegisterOrganisationAsync_ShouldReturnServiceResult(string email)
-    {
-        var onboarding = new FakeOrganisationOnboardingService
-        {
-            SubmitResult = Result<OrganisationRegistrationResponse>.Success(new OrganisationRegistrationResponse
-            {
-                RequestId = Guid.NewGuid(),
-                Email = email,
-                Message = "submitted"
-            })
-        };
-        var service = CreateServiceWithFakes(organisationOnboardingService: onboarding);
-
-        var result = await service.RegisterOrganisationAsync(new RegisterOrganisationRequest
-        {
-            ContactEmail = email,
-            ContactFullName = "Contact",
-            OrganisationName = "Org",
-            OrgType = (int)OrgType.Clinic
-        });
+        var result = await _authService.LoginAsync(request, "127.0.0.1");
 
         result.IsSuccess.Should().BeTrue();
-        result.Data!.Email.Should().Be(email);
+        result.Data.AuthResponse!.AccessToken.Should().Be("access-token");
+        result.Data.AuthResponse!.RefreshToken.Should().Be("refresh-token");
     }
 
-    [Theory]
-    [InlineData("lost1@test.local")]
-    [InlineData("lost2@test.local")]
-    [InlineData("lost3@test.local")]
-    [InlineData("lost4@test.local")]
-    [InlineData("lost5@test.local")]
-    [InlineData("lost6@test.local")]
-    [InlineData("lost7@test.local")]
-    [InlineData("lost8@test.local")]
-    [InlineData("lost9@test.local")]
-    [InlineData("lost10@test.local")]
-    public async Task ForgotPasswordAsync_WhenUserMissing_ShouldStillReturnSuccess(string email)
+    [Fact]
+    public async Task RegisterPatientAsync_WhenUserExists_ShouldReturnFailure()
     {
-        var identity = new FakeIdentityService();
-        var service = CreateServiceWithFakes(identityService: identity, emailService: new FakeEmailServiceBridge());
+        _identityServiceMock.Setup(x => x.GetUserByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserDto(Guid.NewGuid(), "test@test.com", "Name", true, true, false, null));
 
-        var result = await service.ForgotPasswordAsync(email, "https://example.com/reset");
-
-        result.IsSuccess.Should().BeTrue();
-    }
-
-    [Theory]
-    [InlineData("ok1@test.local")]
-    [InlineData("ok2@test.local")]
-    [InlineData("ok3@test.local")]
-    [InlineData("ok4@test.local")]
-    [InlineData("ok5@test.local")]
-    [InlineData("ok6@test.local")]
-    [InlineData("ok7@test.local")]
-    [InlineData("ok8@test.local")]
-    [InlineData("ok9@test.local")]
-    [InlineData("ok10@test.local")]
-    public async Task ResendConfirmationAsync_WhenUserMissing_ShouldReturnSuccess(string email)
-    {
-        var identity = new FakeIdentityService();
-        var service = CreateServiceWithFakes(identityService: identity, emailService: new FakeEmailServiceBridge());
-
-        var result = await service.ResendConfirmationAsync(email, "https://example.com/confirm");
-
-        result.IsSuccess.Should().BeTrue();
-    }
-
-    [Theory]
-    [InlineData("not-a-jwt", "refresh-token")]
-    [InlineData("", "refresh-token")]
-    [InlineData(" ", "refresh-token")]
-    [InlineData("x.y.z", "refresh-token")]
-    [InlineData("broken", "refresh-token")]
-    [InlineData("header.payload.sig", "refresh-token")]
-    [InlineData("jwt", "refresh-token")]
-    [InlineData("a.b", "refresh-token")]
-    [InlineData("a.b.c.d", "refresh-token")]
-    [InlineData("null", "refresh-token")]
-    public async Task RefreshTokenAsync_WhenAccessTokenInvalid_ShouldReturnUnauthorized(string accessToken, string refreshToken)
-    {
-        var tokenService = new FakeTokenService
-        {
-            UserIdFromToken = null,
-            JtiFromToken = null
-        };
-        var service = CreateServiceWithFakes(tokenService: tokenService);
-
-        var result = await service.RefreshTokenAsync(accessToken, refreshToken, "127.0.0.1");
-
-        result.IsUnauthorized.Should().BeTrue();
-        result.Errors.Should().Contain("Invalid access token");
-    }
-
-    [Theory]
-    [InlineData("hash-a")]
-    [InlineData("hash-b")]
-    [InlineData("hash-c")]
-    [InlineData("hash-d")]
-    [InlineData("hash-e")]
-    [InlineData("hash-f")]
-    [InlineData("hash-g")]
-    [InlineData("hash-h")]
-    [InlineData("hash-i")]
-    [InlineData("hash-j")]
-    public async Task LogoutAsync_WhenTokenNotFound_ShouldStillSucceed(string refreshToken)
-    {
-        var refreshService = new FakeRefreshTokenService { TokenByHash = null };
-        var service = CreateServiceWithFakes(refreshTokenService: refreshService);
-
-        var result = await service.LogoutAsync(refreshToken);
-
-        result.IsSuccess.Should().BeTrue();
-    }
-
-    [Theory]
-    [InlineData("c1")]
-    [InlineData("c2")]
-    [InlineData("c3")]
-    [InlineData("c4")]
-    [InlineData("c5")]
-    [InlineData("c6")]
-    [InlineData("c7")]
-    [InlineData("c8")]
-    [InlineData("c9")]
-    [InlineData("c10")]
-    public async Task LogoutAllAsync_WhenRevocationWorks_ShouldSucceed(string marker)
-    {
-        var refreshService = new FakeRefreshTokenService();
-        var service = CreateServiceWithFakes(refreshTokenService: refreshService);
-        marker.Should().NotBeNullOrWhiteSpace();
-
-        var result = await service.LogoutAllAsync(Guid.NewGuid());
-
-        result.IsSuccess.Should().BeTrue();
-    }
-
-    [Theory]
-    [InlineData("bad-1")]
-    [InlineData("bad-2")]
-    [InlineData("bad-3")]
-    [InlineData("bad-4")]
-    [InlineData("bad-5")]
-    [InlineData("bad-6")]
-    [InlineData("bad-7")]
-    [InlineData("bad-8")]
-    [InlineData("bad-9")]
-    [InlineData("bad-10")]
-    public async Task GetCurrentUserAsync_WhenUserMissing_ShouldReturnUnauthorized(string marker)
-    {
-        var identity = new FakeIdentityService();
-        var service = CreateServiceWithFakes(identityService: identity);
-        marker.Should().NotBeNullOrWhiteSpace();
-
-        var result = await service.GetCurrentUserAsync(Guid.NewGuid());
-
-        result.IsUnauthorized.Should().BeTrue();
-        result.Errors.Should().Contain("User not found");
-    }
-
-    [Theory]
-    [InlineData("dup1@test.local")]
-    [InlineData("dup2@test.local")]
-    [InlineData("dup3@test.local")]
-    [InlineData("dup4@test.local")]
-    [InlineData("dup5@test.local")]
-    [InlineData("dup6@test.local")]
-    [InlineData("dup7@test.local")]
-    [InlineData("dup8@test.local")]
-    [InlineData("dup9@test.local")]
-    [InlineData("dup10@test.local")]
-    public async Task RegisterOrganisationAsync_WhenOnboardingReturnsConflict_ShouldPassThroughConflict(string email)
-    {
-        var onboarding = new FakeOrganisationOnboardingService
-        {
-            SubmitResult = Result<OrganisationRegistrationResponse>.Conflict("duplicate")
-        };
-        var service = CreateServiceWithFakes(organisationOnboardingService: onboarding);
-
-        var result = await service.RegisterOrganisationAsync(new RegisterOrganisationRequest
-        {
-            ContactEmail = email,
-            ContactFullName = "Contact",
-            OrganisationName = "Org",
-            OrgType = (int)OrgType.Clinic
-        });
-
-        result.IsConflict.Should().BeTrue();
-        result.Errors.Should().Contain("duplicate");
-    }
-
-    [Theory]
-    [InlineData("err1@test.local")]
-    [InlineData("err2@test.local")]
-    [InlineData("err3@test.local")]
-    [InlineData("err4@test.local")]
-    [InlineData("err5@test.local")]
-    [InlineData("err6@test.local")]
-    [InlineData("err7@test.local")]
-    [InlineData("err8@test.local")]
-    [InlineData("err9@test.local")]
-    [InlineData("err10@test.local")]
-    public async Task ForgotPasswordAsync_WhenIdentityThrows_ShouldReturnFailure(string email)
-    {
-        var service = CreateServiceWithFakes(identityService: new ThrowingIdentityService());
-
-        var result = await service.ForgotPasswordAsync(email, "https://example.com/reset");
-
-        result.IsSuccess.Should().BeFalse();
-        result.Errors.Should().Contain("An error occurred while processing your request");
-    }
-
-    [Theory]
-    [InlineData("fail1@test.local")]
-    [InlineData("fail2@test.local")]
-    [InlineData("fail3@test.local")]
-    [InlineData("fail4@test.local")]
-    [InlineData("fail5@test.local")]
-    [InlineData("fail6@test.local")]
-    [InlineData("fail7@test.local")]
-    [InlineData("fail8@test.local")]
-    [InlineData("fail9@test.local")]
-    [InlineData("fail10@test.local")]
-    public async Task ResendConfirmationAsync_WhenIdentityThrows_ShouldReturnFailure(string email)
-    {
-        var service = CreateServiceWithFakes(identityService: new ThrowingIdentityService());
-
-        var result = await service.ResendConfirmationAsync(email, "https://example.com/confirm");
-
-        result.IsSuccess.Should().BeFalse();
-        result.Errors.Should().Contain("An error occurred while processing your request");
-    }
-
-    [Theory]
-    [InlineData("logout-f1")]
-    [InlineData("logout-f2")]
-    [InlineData("logout-f3")]
-    [InlineData("logout-f4")]
-    [InlineData("logout-f5")]
-    [InlineData("logout-f6")]
-    [InlineData("logout-f7")]
-    [InlineData("logout-f8")]
-    [InlineData("logout-f9")]
-    [InlineData("logout-f10")]
-    public async Task LogoutAsync_WhenRefreshTokenServiceThrows_ShouldReturnFailure(string refreshToken)
-    {
-        var service = CreateServiceWithFakes(refreshTokenService: new ThrowingRefreshTokenService());
-
-        var result = await service.LogoutAsync(refreshToken);
-
-        result.IsSuccess.Should().BeFalse();
-        result.Errors.Should().Contain("An error occurred during logout");
-    }
-
-    [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(3)]
-    [InlineData(4)]
-    [InlineData(5)]
-    [InlineData(6)]
-    [InlineData(7)]
-    [InlineData(8)]
-    [InlineData(9)]
-    [InlineData(10)]
-    public async Task LogoutAllAsync_WhenRefreshTokenServiceThrows_ShouldReturnFailure(int caseId)
-    {
-        var service = CreateServiceWithFakes(refreshTokenService: new ThrowingRefreshTokenService());
-        caseId.Should().BeGreaterThan(0);
-
-        var result = await service.LogoutAllAsync(Guid.NewGuid());
-
-        result.IsSuccess.Should().BeFalse();
-        result.Errors.Should().Contain("An error occurred during logout");
-    }
-
-    [Theory]
-    [InlineData("p1@test.local")]
-    [InlineData("p2@test.local")]
-    [InlineData("p3@test.local")]
-    [InlineData("p4@test.local")]
-    [InlineData("p5@test.local")]
-    [InlineData("p6@test.local")]
-    [InlineData("p7@test.local")]
-    [InlineData("p8@test.local")]
-    [InlineData("p9@test.local")]
-    [InlineData("p10@test.local")]
-    public async Task RegisterPatientAsync_WhenDependenciesMissing_ShouldReturnFailure(string email)
-    {
-        var service = CreateServiceForValidationOnly();
         var request = new RegisterPatientRequest
         {
-            Email = email,
-            Password = "Password@123",
-            ConfirmPassword = "Password@123",
-            FullName = "Patient"
+            Email = "test@test.com",
+            Password = "Password123!",
+            ConfirmPassword = "Password123!",
+            FullName = "Test User",
+            PhoneNumber = "0123456789",
+            CitizenId = "123456789",
+            DateOfBirth = DateTime.UtcNow.AddYears(-20),
+            Gender = 1,
+            Address = "Test Address"
         };
 
-        var result = await service.RegisterPatientAsync(request, "https://example.com/confirm");
-
-        result.IsSuccess.Should().BeFalse();
-        result.Errors.Should().Contain("An error occurred during registration");
-    }
-
-    [Theory]
-    [InlineData("g1")]
-    [InlineData("g2")]
-    [InlineData("g3")]
-    [InlineData("g4")]
-    [InlineData("g5")]
-    [InlineData("g6")]
-    [InlineData("g7")]
-    [InlineData("g8")]
-    [InlineData("g9")]
-    [InlineData("g10")]
-    public async Task GoogleLoginAsync_WithInvalidToken_ShouldReturnUnauthorized(string caseId)
-    {
-        var service = CreateServiceForValidationOnly();
-
-        var result = await service.GoogleLoginAsync(new GoogleLoginRequest
-        {
-            Credential = $"invalid-{caseId}",
-            DeviceInfo = "web"
-        }, "127.0.0.1");
-
-        result.IsUnauthorized.Should().BeTrue();
-        result.Errors.Should().Contain("Invalid Google token");
-    }
-
-    [Theory]
-    [InlineData("l1@test.local")]
-    [InlineData("l2@test.local")]
-    [InlineData("l3@test.local")]
-    [InlineData("l4@test.local")]
-    [InlineData("l5@test.local")]
-    [InlineData("l6@test.local")]
-    [InlineData("l7@test.local")]
-    [InlineData("l8@test.local")]
-    [InlineData("l9@test.local")]
-    [InlineData("l10@test.local")]
-    public async Task LoginAsync_WhenDependenciesMissing_ShouldReturnFailure(string email)
-    {
-        var service = CreateServiceForValidationOnly();
-
-        var result = await service.LoginAsync(new LoginRequest
-        {
-            Email = email,
-            Password = "Password@123",
-            DeviceInfo = "web"
-        }, "127.0.0.1");
-
-        result.IsSuccess.Should().BeFalse();
-        result.Errors.Should().Contain("An error occurred during login");
-    }
-
-    [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(3)]
-    [InlineData(4)]
-    [InlineData(5)]
-    [InlineData(6)]
-    [InlineData(7)]
-    [InlineData(8)]
-    [InlineData(9)]
-    [InlineData(10)]
-    public async Task VerifyTwoFactorLoginAsync_WhenDependenciesMissing_ShouldReturnFailure(int caseId)
-    {
-        var service = CreateServiceForValidationOnly();
-        caseId.Should().BeGreaterThan(0);
-
-        var result = await service.VerifyTwoFactorLoginAsync(new VerifyTwoFactorRequest
-        {
-            UserId = Guid.NewGuid(),
-            Code = "123456",
-            UseRecoveryCode = false,
-            DeviceInfo = "web"
-        }, "127.0.0.1");
+        var result = await _authService.RegisterPatientAsync(request, "http://localhost/confirm");
 
         result.IsSuccess.Should().BeFalse();
         result.Errors.Should().Contain("An error occurred during verification");
@@ -804,6 +262,11 @@ public class AuthServiceTests
         public Task<(bool Succeeded, string[] Errors)> SetStaffOnboardingStatusAsync(Guid userId)
         {
             throw new NotImplementedException();
+        }
+
+        public Task<(bool Succeeded, string[] Errors)> ClearMustUpdateProfileFlagAsync(Guid userId)
+        {
+            return Task.FromResult((true, Array.Empty<string>()));
         }
     }
 

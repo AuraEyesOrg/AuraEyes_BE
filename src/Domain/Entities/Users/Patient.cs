@@ -24,6 +24,7 @@ public class Patient : BaseEntity, IAggregateRoot
     public DateTime? DateOfBirth { get; private set; }
     public int? GenderId { get; private set; }
     public string? Address { get; private set; }
+    public string? MedicalRecordNumber { get; private set; } // Mã YT (Patient-level)
 
     // ── EMR fields (shared by both flows) ──
 
@@ -107,6 +108,12 @@ public class Patient : BaseEntity, IAggregateRoot
     {
         BMI = bmi;
         DiseaseHistory = diseaseHistory;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void SetMedicalRecordNumber(string medicalRecordNumber)
+    {
+        MedicalRecordNumber = medicalRecordNumber;
         UpdatedAt = DateTime.UtcNow;
     }
 

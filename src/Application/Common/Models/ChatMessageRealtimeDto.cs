@@ -8,5 +8,6 @@ public record ChatMessageRealtimeDto
     public Guid SessionId { get; init; }
     public Guid MessageId { get; init; }
     public Guid SenderProfileId { get; init; }
+    public string Content { get; init; } = string.Empty;
     public DateTime SentAt { get; init; }
 }

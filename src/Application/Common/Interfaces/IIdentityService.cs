@@ -207,6 +207,11 @@ public interface IIdentityService
     Task<(bool Succeeded, string[] Errors)> SetStaffOnboardingStatusAsync(Guid userId);
 
     /// <summary>
+    /// Clear the mandatory profile update flag.
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> ClearMustUpdateProfileFlagAsync(Guid userId);
+
+    /// <summary>
     /// Synchronize all roles with their default permissions defined in code.
     /// </summary>
     Task SynchronizeRolesWithDefaultsAsync(CancellationToken cancellationToken = default);
