@@ -53,8 +53,7 @@ public class CreateClinicFeedbackCommandHandler : ICommandHandler<CreateClinicFe
             request.Rating,
             request.Comment,
             request.DoctorId,
-            request.StaffId,
-            request.OrganisationId);
+            request.StaffId);
 
         await _clinicFeedbackRepository.AddAsync(feedback, cancellationToken);
 

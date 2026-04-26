@@ -48,11 +48,6 @@ public class ClinicFeedbackConfiguration : IEntityTypeConfiguration<ClinicFeedba
             .HasForeignKey(e => e.StaffId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne<Organisation>()
-            .WithMany()
-            .HasForeignKey(e => e.OrganisationId)
-            .OnDelete(DeleteBehavior.SetNull); // Keep if needed for legacy data
-
         // Indexes
         builder.HasIndex(e => e.PatientId);
         builder.HasIndex(e => e.AppointmentId);

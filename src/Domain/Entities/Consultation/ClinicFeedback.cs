@@ -10,10 +10,7 @@ namespace Domain.Entities.Consultation;
 public class ClinicFeedback : BaseEntity, IAggregateRoot
 {
     public Guid PatientId { get; private set; }
-    
-    /// <summary>Optional OrganisationId for legacy support or future use, but no longer required.</summary>
-    public Guid? OrganisationId { get; private set; }
-    
+
     public Guid AppointmentId { get; private set; }
     
     public int Rating { get; private set; }
@@ -34,8 +31,7 @@ public class ClinicFeedback : BaseEntity, IAggregateRoot
         int rating,
         string? comment,
         Guid? doctorId = null,
-        Guid? staffId = null,
-        Guid? organisationId = null)
+        Guid? staffId = null)
     {
         if (patientId == Guid.Empty)
             throw new ArgumentException("Patient ID is required.", nameof(patientId));
@@ -50,6 +46,5 @@ public class ClinicFeedback : BaseEntity, IAggregateRoot
         Comment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim();
         DoctorId = doctorId;
         StaffId = staffId;
-        OrganisationId = organisationId;
     }
 }
