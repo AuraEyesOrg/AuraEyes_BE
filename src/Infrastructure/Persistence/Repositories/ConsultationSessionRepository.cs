@@ -156,4 +156,20 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
                 s.ClosedAt.Value >= todayUtc,
                 cancellationToken);
     }
+
+    public async Task<IReadOnlyList<ConsultationSession>> GetExpiredClinicSessionsAsync(
+        TimeSpan threshold,
+        CancellationToken cancellationToken = default)
+    {
+        var cutoff = DateTime.UtcNow - threshold;
+
+        return await _dbSet
+            .Where(s =>
+                s.Type == ConsultationSessionType.ClinicBooking &&
+                s.ChatStatus == ChatStatus.Open &&
+                s.Status != SessionStatus.Completed &&
+                s.Status != SessionStatus.Cancelled &&
+                s.CreatedAt <= cutoff)
+            .ToListAsync(cancellationToken);
+    }
 }

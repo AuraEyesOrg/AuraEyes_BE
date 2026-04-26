@@ -8,6 +8,9 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 using Domain.Entities.Users;
+using Domain.Entities.Consultation;
+using Domain.Entities.Scheduling;
+using Application.Common.Models;
 
 namespace Application.Financial.Commands.CompleteOrderPayment;
 
@@ -28,6 +31,14 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
     private readonly IPayOSService _payOSService;
     private readonly IPatientVisitRepository _patientVisitRepository;
     private readonly IRepository<Patient> _patientRepository;
+    private readonly IAppointmentRepository _appointmentRepository;
+    private readonly IConsultationSessionRepository _sessionRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly INotificationService _notificationService;
+    private readonly IIdentityService _identityService;
+    private readonly IChatHubService _chatHubService;
+    private readonly IClinicVisitService _clinicVisitService;
+    private readonly PayOSSettings _payOSSettings;
     private readonly ILogger<CompleteOrderPaymentCommandHandler> _logger;
 
     public CompleteOrderPaymentCommandHandler(
@@ -37,6 +48,14 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
         IPayOSService payOSService,
         IPatientVisitRepository patientVisitRepository,
         IRepository<Patient> patientRepository,
+        IAppointmentRepository appointmentRepository,
+        IConsultationSessionRepository sessionRepository,
+        IOphthalmologistRepository ophthalmologistRepository,
+        INotificationService notificationService,
+        IIdentityService identityService,
+        IChatHubService chatHubService,
+        IClinicVisitService clinicVisitService,
+        Microsoft.Extensions.Options.IOptions<PayOSSettings> payOSSettings,
         ILogger<CompleteOrderPaymentCommandHandler> logger)
     {
         _orderRepository = orderRepository;
@@ -45,12 +64,20 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
         _payOSService = payOSService;
         _patientVisitRepository = patientVisitRepository;
         _patientRepository = patientRepository;
+        _appointmentRepository = appointmentRepository;
+        _sessionRepository = sessionRepository;
+        _ophthalmologistRepository = ophthalmologistRepository;
+        _notificationService = notificationService;
+        _identityService = identityService;
+        _chatHubService = chatHubService;
+        _clinicVisitService = clinicVisitService;
+        _payOSSettings = payOSSettings.Value;
         _logger = logger;
     }
 
     public async Task<Result<CompleteOrderPaymentResponse>> Handle(CompleteOrderPaymentCommand request, CancellationToken cancellationToken)
     {
-        var order = await _orderRepository.GetByIdAsync(request.OrderId, cancellationToken);
+        var order = await _orderRepository.GetWithPaymentsAsync(request.OrderId, cancellationToken);
         if (order == null) return Result<CompleteOrderPaymentResponse>.NotFound("Order not found.");
 
         if (order.Status == OrderStatus.Completed)
@@ -67,7 +94,7 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
         {
             order.Complete();
 
-            await CompleteVisitIfAny(order, cancellationToken);
+            await _clinicVisitService.ProcessPaymentCompletionAsync(order, "Legacy/Pre-paid", cancellationToken);
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             return Result<CompleteOrderPaymentResponse>.Success(new CompleteOrderPaymentResponse(order.Id, Guid.Empty, PaymentStatus.Completed));
@@ -86,7 +113,7 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
             payment.Complete("CASH_PAYMENT", "Paid at counter");
             order.Complete();
 
-            await CompleteVisitIfAny(order, cancellationToken);
+            await _clinicVisitService.ProcessPaymentCompletionAsync(order, "Cashier", cancellationToken);
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             
@@ -100,8 +127,8 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
             // Generate PayOS link
             try 
             {
-                var returnUrl = "https://auraeyes.vn/payment/success"; // Placeholder, will be handled by webhook anyway
-                var cancelUrl = "https://auraeyes.vn/payment/cancel";
+                var returnUrl = _payOSSettings.DefaultReturnUrl;
+                var cancelUrl = _payOSSettings.DefaultCancelUrl;
 
                 var (paymentUrl, orderCode) = await _payOSService.CreatePaymentLinkAsync(
                     payment.Id,
@@ -129,42 +156,6 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
         else
         {
             return Result<CompleteOrderPaymentResponse>.Failure($"Payment method {request.Method} is not supported via staff dashboard.");
-        }
-    }
-
-    private async Task CompleteVisitIfAny(Order order, CancellationToken cancellationToken)
-    {
-        if (order.AppointmentId.HasValue)
-        {
-            var appointmentVisit = await _patientVisitRepository.GetByAppointmentIdAsync(
-                order.AppointmentId.Value,
-                cancellationToken);
-
-            if (appointmentVisit != null && appointmentVisit.Status == PatientVisitStatus.WaitingForPayment)
-            {
-                appointmentVisit.Complete();
-                await _patientVisitRepository.UpdateAsync(appointmentVisit, cancellationToken);
-                return;
-            }
-        }
-
-        var patient = await _patientRepository.Query()
-            .FirstOrDefaultAsync(p => p.UserId == order.UserId, cancellationToken);
-
-        if (patient != null)
-        {
-            // Fallback to finding any active visit waiting for payment for this patient
-            var visit = await _patientVisitRepository.Query()
-                .FirstOrDefaultAsync(v => 
-                    v.PatientId == patient.Id && 
-                    v.Status == PatientVisitStatus.WaitingForPayment, 
-                    cancellationToken);
-
-            if (visit != null && visit.Status == PatientVisitStatus.WaitingForPayment)
-            {
-                visit.Complete();
-                await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
-            }
         }
     }
 }

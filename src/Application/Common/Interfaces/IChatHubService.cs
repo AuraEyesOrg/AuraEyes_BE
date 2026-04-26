@@ -13,9 +13,14 @@ public interface IChatHubService
     Task BroadcastChatMessageAsync(Guid userId, ChatMessageRealtimeDto chatMessage, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Broadcasts a room state change (ROOM_OPENED / ROOM_CLOSED) to multiple users.
+    /// Broadcasts a room state change to multiple users.
     /// </summary>
     Task BroadcastRoomStateChangedAsync(IEnumerable<Guid> userIds, RoomStateChangedDto payload, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Broadcasts a room state change to a specific role/group.
+    /// </summary>
+    Task BroadcastRoomStateChangedAsync(string groupName, RoomStateChangedDto payload, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Broadcasts typing indicator state to the other chat participant.

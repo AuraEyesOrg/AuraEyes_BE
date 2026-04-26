@@ -1,9 +1,11 @@
 using Application.Common.Interfaces;
+using Application.Common.Models;
 using Domain.Common;
 using Domain.Enums;
 using Domain.Repositories;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Domain.Entities.Scheduling;
 using Domain.Entities.Financial;
@@ -18,11 +20,15 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
     private readonly IPayOSService _payOSService;
     private readonly IPaymentRepository _paymentRepository;
     private readonly IOrderRepository _orderRepository;
+    private readonly IIdentityService _identityService;
+    private readonly IChatHubService _chatHubService;
+    private readonly IClinicVisitService _clinicVisitService;
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IPatientVisitRepository _patientVisitRepository;
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly IRepository<Domain.Entities.Users.Patient> _patientRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<HandlePaymentWebhookCommandHandler> _logger;
@@ -37,8 +43,12 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
         IPatientVisitRepository patientVisitRepository,
         IConsultationSessionRepository sessionRepository,
         IRepository<Domain.Entities.Users.Patient> patientRepository,
+        IOphthalmologistRepository ophthalmologistRepository,
         INotificationService notificationService,
         IUnitOfWork unitOfWork,
+        IIdentityService identityService,
+        IChatHubService chatHubService,
+        IClinicVisitService clinicVisitService,
         ILogger<HandlePaymentWebhookCommandHandler> logger,
         IMediator mediator)
     {
@@ -50,8 +60,12 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
         _patientVisitRepository = patientVisitRepository;
         _sessionRepository = sessionRepository;
         _patientRepository = patientRepository;
+        _ophthalmologistRepository = ophthalmologistRepository;
         _notificationService = notificationService;
         _unitOfWork = unitOfWork;
+        _identityService = identityService;
+        _chatHubService = chatHubService;
+        _clinicVisitService = clinicVisitService;
         _logger = logger;
         _mediator = mediator;
     }
@@ -157,16 +171,10 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
                 {
                     order.Confirm();
 
-            // Sync with Appointment if this is a clinic booking deposit
+            // Log deposit received but keep appointment status as Pending
             if (order.AppointmentId.HasValue)
             {
-                var appointment = await _appointmentRepository.GetByIdAsync(order.AppointmentId.Value, cancellationToken);
-                if (appointment != null && appointment.Status == AppointmentStatus.Pending)
-                {
-                    appointment.Confirm();
-                    await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
-                    _logger.LogInformation("Appointment {AppointmentId} confirmed automatically via successful deposit for Order {OrderId}.", appointment.Id, order.Id);
-                }
+                _logger.LogInformation("Deposit paid for Appointment {AppointmentId}. Status remains Pending until check-in.", order.AppointmentId.Value);
             }
                     _logger.LogInformation("Order {OrderId} confirmed (deposit received).", order.Id);
                 }
@@ -177,11 +185,8 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
                     _logger.LogInformation("Order {OrderId} completed.", order.Id);
                 }
 
-                // CHECK FOR CLINIC VISIT METADATA IN DESCRIPTION
-                if (!string.IsNullOrWhiteSpace(order.Description) && order.Description.StartsWith("METADATA:"))
-                {
-                    await HandleClinicVisitCompletionAsync(order, cancellationToken);
-                }
+                // CHECK FOR CLINIC VISIT COMPLETION
+                await _clinicVisitService.ProcessPaymentCompletionAsync(order, "PayOS Webhook", cancellationToken);
 
                 // If this is a clinic booking order, extract AppointmentId and send confirmation email
                 if (order.AppointmentId.HasValue)
@@ -231,76 +236,5 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return true;
-    }
-
-    private async Task HandleClinicVisitCompletionAsync(Order order, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var marker = "METADATA:";
-            var pipeIndex = order.Description!.IndexOf(" |");
-            var json = pipeIndex > 0 
-                ? order.Description[marker.Length..pipeIndex].Trim()
-                : order.Description[marker.Length..].Trim();
-
-            var metadata = JsonSerializer.Deserialize<JsonElement>(json);
-            if (metadata.TryGetProperty("V", out var visitIdProp))
-            {
-                var visitId = visitIdProp.GetGuid();
-                var visit = await _patientVisitRepository.GetByIdWithDetailsAsync(visitId, cancellationToken);
-                
-                if (visit != null && visit.Status == PatientVisitStatus.WaitingForPayment)
-                {
-                    _logger.LogInformation("Processing clinic visit completion for Visit {VisitId} after payment.", visitId);
-                    
-                    visit.Complete("Payment received via Cashier/PayOS");
-                    await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
-
-                    if (visit.AppointmentId.HasValue)
-                    {
-                        var appointment = await _appointmentRepository.GetByIdWithDetailsAsync(visit.AppointmentId.Value, cancellationToken);
-                        if (appointment != null)
-                        {
-                            appointment.Complete();
-                            await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
-
-                            // Create Consultation Chat Session (Post-visit follow-up)
-                            if (appointment.AppointmentSlot?.ScheduleTemplate != null)
-                            {
-                                var session = ConsultationSession.CreateClinicBooking(
-                                    appointment.PatientId,
-                                    appointment.AppointmentSlot.ScheduleTemplate.OrgId.GetValueOrDefault(),
-                                    0,
-                                    DateTime.UtcNow,
-                                    visit.AssignedDoctorId.GetValueOrDefault());
-
-                                session.OpenChat();
-                                session.EndSession(visit.AssignedDoctorId ?? Guid.Empty, "ClinicVisitPaidAndCompleted");
-                                
-                                await _sessionRepository.AddAsync(session, cancellationToken);
-
-                                // Notify patient
-                                var patient = await _patientRepository.GetByIdAsync(appointment.PatientId, cancellationToken);
-                                if (patient?.UserId != null)
-                                {
-                                    await _notificationService.SendAsync(
-                                        patient.UserId.Value,
-                                        "Kết quả khám lâm sàng & Tư vấn",
-                                        "Thanh toán hoàn tất. Bạn có thể trao đổi thêm với bác sĩ trong vòng 14 ngày qua mục Chat.",
-                                        NotificationType.ConsultationResultProvided,
-                                        new { ConsultationId = session.Id, AppointmentId = appointment.Id },
-                                        cancellationToken,
-                                        session.Id);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to process clinic visit completion from order metadata.");
-        }
     }
 }

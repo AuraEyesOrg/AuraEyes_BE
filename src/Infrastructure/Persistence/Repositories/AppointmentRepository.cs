@@ -124,6 +124,7 @@ public class AppointmentRepository : Repository<Appointment>, IAppointmentReposi
     {
         var query = _dbSet
             .Include(a => a.AppointmentSlot)
+                .ThenInclude(s => s!.ScheduleTemplate)
             .Where(a => a.PatientId == patientId && a.AppointmentSlot != null);
 
         if (statuses is { Count: > 0 })

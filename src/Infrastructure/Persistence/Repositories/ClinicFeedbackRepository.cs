@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Persistence.Repositories;
 
-public class OrganisationFeedbackRepository : Repository<OrganisationFeedback>, IOrganisationFeedbackRepository
+public class ClinicFeedbackRepository : Repository<ClinicFeedback>, IClinicFeedbackRepository
 {
-    public OrganisationFeedbackRepository(ApplicationDbContext context) : base(context)
+    public ClinicFeedbackRepository(ApplicationDbContext context) : base(context)
     {
     }
 
@@ -38,23 +38,12 @@ public class OrganisationFeedbackRepository : Repository<OrganisationFeedback>, 
         return new HashSet<Guid>(existing);
     }
 
-    public async Task<OrganisationFeedback?> GetByIdForOrganisationAsync(
-        Guid organisationId,
-        Guid feedbackId,
-        CancellationToken cancellationToken = default)
-    {
-        return await _dbSet.FirstOrDefaultAsync(
-            x => x.Id == feedbackId && x.OrganisationId == organisationId,
-            cancellationToken);
-    }
-
-    public async Task<(IReadOnlyList<OrganisationFeedback> Items, int TotalCount)> GetPagedByOrganisationAsync(
-        Guid organisationId,
+    public async Task<(IReadOnlyList<ClinicFeedback> Items, int TotalCount)> GetPagedAsync(
         int pageNumber = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.Where(x => x.OrganisationId == organisationId);
+        var query = _dbSet;
 
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -68,11 +57,9 @@ public class OrganisationFeedbackRepository : Repository<OrganisationFeedback>, 
     }
 
     public async Task<(decimal RatingAverage, int RatingCount, Dictionary<int, int> Distribution)> GetRatingSummaryAsync(
-        Guid organisationId,
         CancellationToken cancellationToken = default)
     {
         var summary = await _dbSet
-            .Where(x => x.OrganisationId == organisationId)
             .GroupBy(_ => 1)
             .Select(g => new
             {
@@ -82,7 +69,6 @@ public class OrganisationFeedbackRepository : Repository<OrganisationFeedback>, 
             .FirstOrDefaultAsync(cancellationToken);
 
         var distributionRows = await _dbSet
-            .Where(x => x.OrganisationId == organisationId)
             .GroupBy(x => x.Rating)
             .Select(g => new { Rating = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);
@@ -104,5 +90,26 @@ public class OrganisationFeedbackRepository : Repository<OrganisationFeedback>, 
             : Math.Round(summary.Avg, 2, MidpointRounding.AwayFromZero);
 
         return (ratingAverage, summary?.Count ?? 0, distribution);
+    }
+
+    public async Task<(decimal RatingAverage, int RatingCount)> GetDoctorRatingSummaryAsync(
+        Guid doctorId,
+        CancellationToken cancellationToken = default)
+    {
+        var summary = await _dbSet
+            .Where(x => x.DoctorId == doctorId)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Count = g.Count(),
+                Avg = g.Average(x => (decimal?)x.Rating) ?? 0m
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var ratingAverage = summary is null
+            ? 0m
+            : Math.Round(summary.Avg, 2, MidpointRounding.AwayFromZero);
+
+        return (ratingAverage, summary?.Count ?? 0);
     }
 }

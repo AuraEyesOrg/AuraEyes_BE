@@ -3,7 +3,7 @@ using Domain.Entities.Consultation;
 
 namespace Domain.Repositories;
 
-public interface IOrganisationFeedbackRepository : IRepository<OrganisationFeedback>
+public interface IClinicFeedbackRepository : IRepository<ClinicFeedback>
 {
     Task<bool> ExistsByPatientAndAppointmentAsync(
         Guid patientId,
@@ -18,18 +18,24 @@ public interface IOrganisationFeedbackRepository : IRepository<OrganisationFeedb
         IReadOnlyCollection<Guid> appointmentIds,
         CancellationToken cancellationToken = default);
 
-    Task<OrganisationFeedback?> GetByIdForOrganisationAsync(
-        Guid organisationId,
-        Guid feedbackId,
-        CancellationToken cancellationToken = default);
-
-    Task<(IReadOnlyList<OrganisationFeedback> Items, int TotalCount)> GetPagedByOrganisationAsync(
-        Guid organisationId,
+    /// <summary>
+    /// Get feedback paged for the entire clinic.
+    /// </summary>
+    Task<(IReadOnlyList<ClinicFeedback> Items, int TotalCount)> GetPagedAsync(
         int pageNumber = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Get rating summary for the entire clinic.
+    /// </summary>
     Task<(decimal RatingAverage, int RatingCount, Dictionary<int, int> Distribution)> GetRatingSummaryAsync(
-        Guid organisationId,
+        CancellationToken cancellationToken = default);
+        
+    /// <summary>
+    /// Get rating summary for a specific doctor.
+    /// </summary>
+    Task<(decimal RatingAverage, int RatingCount)> GetDoctorRatingSummaryAsync(
+        Guid doctorId,
         CancellationToken cancellationToken = default);
 }

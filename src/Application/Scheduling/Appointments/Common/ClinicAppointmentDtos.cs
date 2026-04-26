@@ -15,9 +15,13 @@ public class ClinicAppointmentDto
     public string? VisitReason { get; init; }
     public string Status { get; init; } = string.Empty;
     public DateTime CreatedAt { get; init; }
+    public Guid? OrganisationId { get; init; }
+    public string? OrganisationName { get; init; }
     public Guid? OphthalId { get; init; }
     public string? OphthalFullName { get; init; }
     public string? OphthalAvatarUrl { get; init; }
+    public Guid? StaffId { get; init; }
+    public string? StaffName { get; init; }
 
     /// <summary>
     /// True when the current patient has already submitted feedback for this
