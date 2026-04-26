@@ -1,4 +1,4 @@
-namespace Infrastructure.Settings;
+namespace Application.Common.Models;
 
 /// <summary>
 /// PayOS configuration settings for payment processing.

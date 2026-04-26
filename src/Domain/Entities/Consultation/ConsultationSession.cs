@@ -12,7 +12,6 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
 {
     public Guid PatientId { get; private set; }
     public Guid? OphthalmologistId { get; private set; }
-    public Guid? OrganisationId { get; private set; }
     public Guid? AiScreeningId { get; private set; }
 
     /// <summary>FK to AppointmentSlot - links this session to a specific appointment slot.</summary>
@@ -123,7 +122,6 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     /// </summary>
     public static ConsultationSession CreateClinicBooking(
         Guid patientId,
-        Guid organisationId,
         decimal price,
         DateTime appointmentTime,
         Guid? ophthalmologistId = null)
@@ -131,7 +129,6 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
         return new ConsultationSession
         {
             PatientId = patientId,
-            OrganisationId = organisationId,
             OphthalmologistId = ophthalmologistId,
             Type = ConsultationSessionType.ClinicBooking,
             Status = SessionStatus.Pending,

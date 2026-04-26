@@ -14,7 +14,7 @@ public class GetOverviewMetricsQueryHandler : IQueryHandler<GetOverviewMetricsQu
     private readonly IRepository<Organisation> _organisationRepository;
     private readonly IRepository<AiScreening> _aiScreeningRepository;
     private readonly IRepository<WebsiteFeedback> _websiteFeedbackRepository;
-    private readonly IRepository<OrganisationFeedback> _organisationFeedbackRepository;
+    private readonly IRepository<ClinicFeedback> _clinicFeedbackRepository;
     private readonly IRepository<OphthalmologistFeedback> _ophthalmologistFeedbackRepository;
 
     public GetOverviewMetricsQueryHandler(
@@ -22,14 +22,14 @@ public class GetOverviewMetricsQueryHandler : IQueryHandler<GetOverviewMetricsQu
         IRepository<Organisation> organisationRepository,
         IRepository<AiScreening> aiScreeningRepository,
         IRepository<WebsiteFeedback> websiteFeedbackRepository,
-        IRepository<OrganisationFeedback> organisationFeedbackRepository,
+        IRepository<ClinicFeedback> clinicFeedbackRepository,
         IRepository<OphthalmologistFeedback> ophthalmologistFeedbackRepository)
     {
         _ophthalmologistRepository = ophthalmologistRepository;
         _organisationRepository = organisationRepository;
         _aiScreeningRepository = aiScreeningRepository;
         _websiteFeedbackRepository = websiteFeedbackRepository;
-        _organisationFeedbackRepository = organisationFeedbackRepository;
+        _clinicFeedbackRepository = clinicFeedbackRepository;
         _ophthalmologistFeedbackRepository = ophthalmologistFeedbackRepository;
     }
 
@@ -51,7 +51,7 @@ public class GetOverviewMetricsQueryHandler : IQueryHandler<GetOverviewMetricsQu
                 RatingSum = g.Sum(x => (int?)x.Rating) ?? 0
             })
             .SingleOrDefaultAsync(cancellationToken);
-        var organisationFeedbackMetrics = await _organisationFeedbackRepository.Query()
+        var clinicFeedbackMetrics = await _clinicFeedbackRepository.Query()
             .GroupBy(_ => 1)
             .Select(g => new
             {
@@ -68,10 +68,10 @@ public class GetOverviewMetricsQueryHandler : IQueryHandler<GetOverviewMetricsQu
             })
             .SingleOrDefaultAsync(cancellationToken);
         var totalFeedbackCount = (websiteFeedbackMetrics?.Count ?? 0)
-            + (organisationFeedbackMetrics?.Count ?? 0)
+            + (clinicFeedbackMetrics?.Count ?? 0)
             + (ophthalmologistFeedbackMetrics?.Count ?? 0);
         var totalFeedbackRating = (websiteFeedbackMetrics?.RatingSum ?? 0)
-            + (organisationFeedbackMetrics?.RatingSum ?? 0)
+            + (clinicFeedbackMetrics?.RatingSum ?? 0)
             + (ophthalmologistFeedbackMetrics?.RatingSum ?? 0);
 
         double? averageRating = totalFeedbackCount > 0
