@@ -59,6 +59,9 @@ public class CreateClinicStaffCommandHandler : ICommandHandler<CreateClinicStaff
                 await _identityService.AddToRoleAsync(request.UserId, Roles.ClinicStaff);
             }
 
+            // 5. Synchronize sub-role specific permissions
+            await _identityService.SynchronizeUserSubRolePermissionsAsync(request.UserId, request.SubRoles, cancellationToken);
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 

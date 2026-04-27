@@ -92,14 +92,23 @@ public class OnboardStaffCommandHandler : ICommandHandler<OnboardStaffCommand, G
             }
             else if (request.Role == Roles.ClinicStaff)
             {
+                var subRoles = request.SubRoles
+                    .Select(s => Enum.TryParse<ClinicStaffRole>(s, true, out var role) ? role : (ClinicStaffRole?)null)
+                    .Where(r => r.HasValue)
+                    .Select(r => r!.Value)
+                    .ToList();
+
                 var clinicStaff = new ClinicStaff(
                     user.Id,
-                    subRoles: [ClinicStaffRole.Receptionist],
+                    subRoles: subRoles,
                     department: "General",
                     employeeCode: $"STAFF-{DateTime.UtcNow:yyyyMMddHHmm}",
                     phone: request.Phone);
                 
                 await _clinicStaffRepository.AddAsync(clinicStaff, cancellationToken);
+
+                // Synchronize permissions based on assigned sub-roles
+                await _identityService.SynchronizeUserSubRolePermissionsAsync(user.Id, subRoles, cancellationToken);
             }
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);

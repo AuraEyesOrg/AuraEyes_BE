@@ -18,4 +18,9 @@ public record OnboardStaffCommand : ICommand<Guid>
     /// Initial consultation fee for ophthalmologists.
     /// </summary>
     public decimal ConsultationFee { get; init; }
+
+    /// <summary>
+    /// Sub-roles for clinic staff (Receptionist, Coordinator, Cashier).
+    /// </summary>
+    public List<string> SubRoles { get; init; } = new();
 }
