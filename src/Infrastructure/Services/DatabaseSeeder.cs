@@ -453,6 +453,20 @@ public static class DatabaseSeeder
             return;
         }
 
+        // Idempotency check: If we already have a slot for this doctor at this time today, skip
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var startTime = new TimeOnly(14, 0);
+        var endTime = new TimeOnly(14, 30);
+        
+        var existingSlot = await context.AppointmentSlots
+            .AnyAsync(s => s.OphthalId == ophthalmologist.Id && s.Date == today && s.StartTime == startTime);
+
+        if (existingSlot)
+        {
+            logger?.LogInformation("Clinic queue test data (AppointmentSlot) already exists for today. Skipping.");
+            return;
+        }
+
         // 1. Create AI Screening
         var aiScreening = new AiScreening(patient.Id, "AuraEyes-AI-v1.0");
         aiScreening.Process("{\"result\": \"High risk of AMD\", \"confidence\": 0.92}");
