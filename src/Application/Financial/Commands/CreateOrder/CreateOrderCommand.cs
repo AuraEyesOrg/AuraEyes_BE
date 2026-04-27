@@ -49,6 +49,7 @@ public class CreateOrderCommandHandler : IRequestHandler<CreateOrderCommand, Ord
 
         // 2. Create Initial Payment
         var payment = new Payment(order.Id, request.TotalAmount, request.PaymentMethod, request.Description);
+        order.AddPayment(payment);
         await _paymentRepository.AddAsync(payment, cancellationToken);
 
         // 3. If PayOS, generate payment link
@@ -76,8 +77,9 @@ public class CreateOrderCommandHandler : IRequestHandler<CreateOrderCommand, Ord
             order.DepositAmount,
             null, // PatientName
             order.Description,
-            order.Status,
+            order.Status.ToString(),
             order.CreatedAt,
+            order.PaidAmount,
             new List<PaymentDto> { 
                 new PaymentDto(
                     payment.Id, 

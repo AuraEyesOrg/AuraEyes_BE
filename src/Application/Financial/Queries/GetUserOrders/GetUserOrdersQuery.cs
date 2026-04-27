@@ -66,8 +66,14 @@ public class GetUserOrdersQueryHandler : IRequestHandler<GetUserOrdersQuery, Use
                 order.DepositAmount,
                 patientName,
                 displayDescription,
-                order.Status,
+                order.Status switch
+                {
+                    Domain.Enums.OrderStatus.Confirmed => "PartiallyPaid",
+                    Domain.Enums.OrderStatus.Completed => "FullyPaid",
+                    _ => order.Status.ToString()
+                },
                 order.CreatedAt,
+                order.PaidAmount,
                 order.Payments.Select(p => new PaymentDto(
                     p.Id,
                     p.OrderId,
@@ -76,7 +82,8 @@ public class GetUserOrdersQueryHandler : IRequestHandler<GetUserOrdersQuery, Use
                     p.Method,
                     p.PaidAt,
                     p.PaymentUrl,
-                    displayDescription)).ToList());
+                    p.Description ?? displayDescription,
+                    p.PaymentOrderCode)).ToList());
         }).ToList();
 
         var totalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize);

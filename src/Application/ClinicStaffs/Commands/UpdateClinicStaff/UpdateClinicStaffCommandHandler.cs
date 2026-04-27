@@ -11,13 +11,16 @@ namespace Application.ClinicStaffs.Commands.UpdateClinicStaff;
 public class UpdateClinicStaffCommandHandler : ICommandHandler<UpdateClinicStaffCommand>
 {
     private readonly IClinicStaffRepository _clinicStaffRepository;
+    private readonly IIdentityService _identityService;
     private readonly IUnitOfWork _unitOfWork;
 
     public UpdateClinicStaffCommandHandler(
         IClinicStaffRepository clinicStaffRepository,
+        IIdentityService identityService,
         IUnitOfWork unitOfWork)
     {
         _clinicStaffRepository = clinicStaffRepository;
+        _identityService = identityService;
         _unitOfWork = unitOfWork;
     }
 
@@ -29,6 +32,9 @@ public class UpdateClinicStaffCommandHandler : ICommandHandler<UpdateClinicStaff
 
         staff.UpdateSubRoles(request.SubRoles);
         staff.UpdateProfile(request.Department, request.EmployeeCode, request.Phone);
+
+        // Synchronize permissions based on new sub-roles
+        await _identityService.SynchronizeUserSubRolePermissionsAsync(staff.UserId, request.SubRoles, cancellationToken);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

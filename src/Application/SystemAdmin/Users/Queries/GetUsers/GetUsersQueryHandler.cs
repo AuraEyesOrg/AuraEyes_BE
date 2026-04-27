@@ -11,11 +11,16 @@ public class GetUsersQueryHandler : IQueryHandler<GetUsersQuery, PagedResult<Use
 {
     private readonly IIdentityService _identityService;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IClinicStaffRepository _clinicStaffRepository;
 
-    public GetUsersQueryHandler(IIdentityService identityService, IOphthalmologistRepository ophthalmologistRepository)
+    public GetUsersQueryHandler(
+        IIdentityService identityService, 
+        IOphthalmologistRepository ophthalmologistRepository,
+        IClinicStaffRepository clinicStaffRepository)
     {
         _identityService = identityService;
         _ophthalmologistRepository = ophthalmologistRepository;
+        _clinicStaffRepository = clinicStaffRepository;
     }
 
     public async Task<Result<PagedResult<UserListDto>>> Handle(
@@ -33,8 +38,13 @@ public class GetUsersQueryHandler : IQueryHandler<GetUsersQuery, PagedResult<Use
         var ophthalmologists = await _ophthalmologistRepository.GetAllAsync(cancellationToken);
         var ophthalmologistLookup = ophthalmologists.ToDictionary(o => o.UserId, o => o);
 
+        var clinicStaffs = await _clinicStaffRepository.GetAllAsync(cancellationToken);
+        var clinicStaffLookup = clinicStaffs.ToDictionary(cs => cs.UserId, cs => cs);
+
         var items = users.Select(u => {
             var ophthalmologist = ophthalmologistLookup.TryGetValue(u.Id, out var o) ? o : null;
+            var clinicStaff = clinicStaffLookup.TryGetValue(u.Id, out var cs) ? cs : null;
+
             return new UserListDto
             {
                 Id = u.Id,
@@ -48,7 +58,9 @@ public class GetUsersQueryHandler : IQueryHandler<GetUsersQuery, PagedResult<Use
                 CreatedAt = u.CreatedAt,
                 LastLoginAt = u.LastLoginAt,
                 ConsultationFee = ophthalmologist?.ConsultationFee,
-                OphthalmologistId = ophthalmologist?.Id
+                OphthalmologistId = ophthalmologist?.Id,
+                SubRoles = clinicStaff?.SubRoles.Select(sr => sr.ToString()).ToList() ?? new List<string>(),
+                ClinicStaffId = clinicStaff?.Id
             };
         }).ToList();
 

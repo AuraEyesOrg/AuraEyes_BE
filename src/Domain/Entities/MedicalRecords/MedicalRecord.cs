@@ -32,6 +32,10 @@ public class MedicalRecord : BaseEntity, IAggregateRoot
         PatientId = patientId;
         MedicalRecordNumber = medicalRecordNumber;
         Status = MedicalRecordStatus.Draft;
+        AdministrativeDataJson = "{}";
+        ClinicalDataJson = "{}";
+        FinalDiagnosis = string.Empty;
+        TreatmentPlan = string.Empty;
     }
 
     private void EnsureNotLocked()

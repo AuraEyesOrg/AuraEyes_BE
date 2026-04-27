@@ -23,58 +23,80 @@ public class FinancialController : BaseApiController
     /// Creates a new payment order (generic – e.g., for ad-hoc top-ups).
     /// </summary>
     [HttpPost("orders")]
-    public async Task<ActionResult> CreateOrder(CreateOrderCommand command)
+    public async Task<IActionResult> CreateOrder(CreateOrderCommand command)
     {
         var result = await _mediator.Send(command);
-        return Ok(result);
+        return OkResponse(result);
     }
 
     /// <summary>
     /// Returns a single order with its payments by ID.
     /// </summary>
     [HttpGet("orders/{id}")]
-    public async Task<ActionResult> GetOrder(Guid id)
+    public async Task<IActionResult> GetOrder(Guid id)
     {
         var result = await _mediator.Send(new GetOrderByIdQuery(id));
-        if (result == null) return NotFound();
+        return result != null ? OkResponse(result) : ErrorResponse("Order not found", 404);
+    }
+
+    /// <summary>
+    /// Returns the paginated payment-order history for the currently authenticated user.
+    /// Used by the patient "Ví / Payment History" page.
+    /// </summary>
+    [HttpGet("my-orders")]
+    public async Task<IActionResult> GetMyOrders(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var result = await _mediator.Send(new GetUserOrdersQuery(pageNumber, pageSize));
+        return OkResponse(result);
+    }
+
+    /// <summary>
+    /// Returns all orders in the system (for staff).
+    /// </summary>
+    [HttpGet("orders/all")]
+    [Authorize(Roles = "ClinicStaff,SystemAdmin")]
+    public async Task<IActionResult> GetAllOrders(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var result = await _mediator.Send(new Application.Financial.Queries.GetAllOrders.GetAllOrdersQuery(pageNumber, pageSize));
+        return OkResponse(result);
+    }
+
+    /// <summary>
+    /// Completes an order by paying the remaining balance (e.g. at the clinic counter).
+    /// </summary>
+    [HttpPost("orders/{id}/complete")]
+    [Authorize(Roles = "ClinicStaff,SystemAdmin")]
+    public async Task<IActionResult> CompleteOrder(Guid id, [FromBody] CompleteOrderRequest request)
+    {
+        var result = await _mediator.Send(new Application.Financial.Commands.CompleteOrderPayment.CompleteOrderPaymentCommand(
+            id, 
+            request.Method,
+            request.ReturnUrl,
+            request.CancelUrl));
+            
+        if (!result.IsSuccess) return BadRequest(result);
         return Ok(result);
     }
 
-  /// <summary>
-  /// Returns the paginated payment-order history for the currently authenticated user.
-  /// Used by the patient "Ví / Payment History" page.
-  /// Route: GET api/financial/my-orders (avoids conflict with /orders/{id:guid})
-  /// </summary>
-  [HttpGet("my-orders")]
-  public async Task<ActionResult> GetMyOrders(
-      [FromQuery] int pageNumber = 1,
-      [FromQuery] int pageSize = 20)
-  {
-      var result = await _mediator.Send(new GetUserOrdersQuery(pageNumber, pageSize));
-      return Ok(result);
-  }
+    public record CompleteOrderRequest(
+        PaymentMethod Method = PaymentMethod.Cash, 
+        string? ReturnUrl = null, 
+        string? CancelUrl = null);
 
-  [HttpGet("orders")]
-  [Authorize(Roles = "ClinicStaff,SystemAdmin")]
-  public async Task<ActionResult> GetAllOrders(
-      [FromQuery] int pageNumber = 1,
-      [FromQuery] int pageSize = 20)
-  {
-      var result = await _mediator.Send(new Application.Financial.Queries.GetAllOrders.GetAllOrdersQuery(pageNumber, pageSize));
-      return Ok(result);
-  }
-
-  /// <summary>
-  /// Completes an order by paying the remaining balance (e.g. at the clinic counter).
-  /// </summary>
-  [HttpPost("orders/{id}/complete")]
-  [Authorize(Roles = "ClinicStaff,SystemAdmin")]
-  public async Task<ActionResult> CompleteOrder(Guid id, [FromQuery] PaymentMethod method = PaymentMethod.Cash)
-  {
-      var result = await _mediator.Send(new Application.Financial.Commands.CompleteOrderPayment.CompleteOrderPaymentCommand(id, method));
-      if (!result.IsSuccess) return BadRequest(result);
-      return Ok(result);
-  }
+    /// <summary>
+    /// Synchronizes the payment status with PayOS.
+    /// </summary>
+    [HttpPost("orders/{id}/sync")]
+    [Authorize(Roles = "ClinicStaff,SystemAdmin")]
+    public async Task<IActionResult> SyncOrderPaymentStatus(Guid id)
+    {
+        var result = await _mediator.Send(new Application.Financial.Commands.SyncOrderPaymentStatus.SyncOrderPaymentStatusCommand(id));
+        return result ? OkResponse("Payment status synced") : ErrorResponse("Order not found", 404);
+    }
 
     /// <summary>
     /// PayOS webhook – receives payment status updates (PAID, CANCELLED, …).
