@@ -1,6 +1,8 @@
 using Application.Common.Constants;
+using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.MedicalRecords.Commands.CreateMedicalRecord;
+using Application.MedicalRecords.Queries.ExportMedicalRecordPdf;
 using Application.MedicalRecords.Commands.FinalizeMedicalRecord;
 using Application.MedicalRecords.Commands.UpdateMedicalRecordClinical;
 using Application.MedicalRecords.Commands.StartDoctorFilling;
@@ -9,27 +11,29 @@ using Application.MedicalRecords.Common;
 using Application.MedicalRecords.Queries.GetMedicalRecordById;
 using Application.MedicalRecords.Queries.GetMedicalRecords;
 using Domain.Entities.MedicalRecords;
-using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace API.Controllers;
 
 /// <summary>
 /// EMR 23/BV-01 Medical Records management.
-/// Lifecycle: Draft (Reception) -> ClinicFilling (Staff) -> DoctorFilling (Doctor) -> Completed -> Locked.
+/// Lifecycle: Draft_Admin -> Pending_Clinical -> Finalized.
 /// </summary>
 public class MedicalRecordsController : BaseApiController
 {
     private readonly IMediator _mediator;
+    private readonly ICurrentUserService _currentUserService;
 
-    public MedicalRecordsController(IMediator mediator)
+    public MedicalRecordsController(IMediator mediator, ICurrentUserService currentUserService)
     {
         _mediator = mediator;
+        _currentUserService = currentUserService;
     }
 
     /// <summary>
-    /// Step 1: Initialize a new medical record (Section I & II - Administrative).
+    /// Step 1: Initialize a new medical record (Section I and II - Administrative).
     /// Called by Receptionist/Clinic Staff.
     /// </summary>
     [HttpPost]
@@ -42,17 +46,22 @@ public class MedicalRecordsController : BaseApiController
     }
 
     /// <summary>
-    /// Update administrative data (Section I & II).
+    /// Update administrative data (Section I and II).
     /// Called by Clinic Staff.
     /// </summary>
     [HttpPut("{id:guid}/administrative")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateAdministrative(Guid id, [FromBody] UpdateMedicalRecordAdministrativeRequest request)
     {
+        if (!CanWriteAdministrativeData())
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponseFactory.Forbidden("Only Clinic Staff or System Admin can update administrative EMR data."));
+
+        var administrativeDataJson = ResolveJsonPayload(request.AdministrativeDataJson, request.AdministrativeData);
+
         var command = new UpdateMedicalRecordAdministrativeCommand
         {
             Id = id,
-            AdministrativeDataJson = request.AdministrativeDataJson
+            AdministrativeDataJson = administrativeDataJson
         };
 
         var result = await _mediator.Send(command);
@@ -67,12 +76,15 @@ public class MedicalRecordsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> StartDoctorFilling(Guid id)
     {
+        if (!CanWriteClinicalData())
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponseFactory.Forbidden("Only Ophthalmologist or System Admin can start clinical EMR workflow."));
+
         var result = await _mediator.Send(new StartDoctorFillingCommand(id));
         return HandleResult(result, "Medical record status updated to Doctor Filling.");
     }
 
     /// <summary>
-    /// Step 2: Fill clinical pathology and diagnosis (Section III & Part A).
+    /// Step 2: Fill clinical pathology and diagnosis (Section III and Part A).
     /// Called by Ophthalmologists only.
     /// </summary>
     [HttpPut("{id:guid}/clinical")]
@@ -81,10 +93,15 @@ public class MedicalRecordsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateClinical(Guid id, [FromBody] UpdateMedicalRecordClinicalRequest request)
     {
+        if (!CanWriteClinicalData())
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponseFactory.Forbidden("Only Ophthalmologist or System Admin can update clinical EMR data."));
+
+        var clinicalDataJson = ResolveJsonPayload(request.ClinicalDataJson, request.ClinicalData);
+
         var command = new UpdateMedicalRecordClinicalCommand
         {
             Id = id,
-            ClinicalDataJson = request.ClinicalDataJson,
+            ClinicalDataJson = clinicalDataJson,
             FinalDiagnosis = request.FinalDiagnosis,
             TreatmentPlan = request.TreatmentPlan
         };
@@ -95,7 +112,7 @@ public class MedicalRecordsController : BaseApiController
 
     /// <summary>
     /// Step 3: Finalize and lock the medical record for legal archiving.
-    /// Called by Cashier/Clinic Staff.
+    /// Called by Ophthalmologist.
     /// </summary>
     [HttpPatch("{id:guid}/finalize")]
     [HttpPost("{id:guid}/finalize")] // Supporting exact prompt requirement
@@ -103,8 +120,29 @@ public class MedicalRecordsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Finalize(Guid id)
     {
+        if (!CanFinalize())
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponseFactory.Forbidden("Only Ophthalmologist or System Admin can finalize EMR."));
+
         var result = await _mediator.Send(new FinalizeMedicalRecordCommand(id));
         return HandleResult(result, "Medical record finalized and locked.");
+    }
+
+    /// <summary>
+    /// Download finalized EMR as PDF.
+    /// </summary>
+    [HttpGet("{id:guid}/pdf")]
+    [Produces("application/pdf")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadPdf(Guid id, CancellationToken cancellationToken = default)
+    {
+        var result = await _mediator.Send(new ExportMedicalRecordPdfQuery(id), cancellationToken);
+        if (!result.IsSuccess || result.Data is null)
+            return HandleResult(result, "EMR PDF generated");
+
+        Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
+
+        return File(result.Data.Content, result.Data.ContentType, result.Data.FileName);
     }
 
     /// <summary>
@@ -144,17 +182,45 @@ public class MedicalRecordsController : BaseApiController
         });
         return HandleResult(result);
     }
+
+    private bool CanWriteAdministrativeData()
+    {
+        return _currentUserService.IsInRole(Roles.ClinicStaff) || _currentUserService.IsInRole(Roles.SystemAdmin);
+    }
+
+    private bool CanWriteClinicalData()
+    {
+        return _currentUserService.IsInRole(Roles.Ophthalmologist) || _currentUserService.IsInRole(Roles.SystemAdmin);
+    }
+
+    private bool CanFinalize()
+    {
+        return _currentUserService.IsInRole(Roles.Ophthalmologist) || _currentUserService.IsInRole(Roles.SystemAdmin);
+    }
+
+    private static string ResolveJsonPayload(string? rawJson, JsonElement? jsonElement)
+    {
+        if (!string.IsNullOrWhiteSpace(rawJson))
+            return rawJson;
+
+        if (jsonElement.HasValue && jsonElement.Value.ValueKind != JsonValueKind.Undefined && jsonElement.Value.ValueKind != JsonValueKind.Null)
+            return jsonElement.Value.GetRawText();
+
+        return "{}";
+    }
 }
 
 #region Request Models
 public record UpdateMedicalRecordAdministrativeRequest
 {
-    public string AdministrativeDataJson { get; init; } = string.Empty;
+    public string? AdministrativeDataJson { get; init; }
+    public JsonElement? AdministrativeData { get; init; }
 }
 
 public record UpdateMedicalRecordClinicalRequest
 {
-    public string ClinicalDataJson { get; init; } = string.Empty;
+    public string? ClinicalDataJson { get; init; }
+    public JsonElement? ClinicalData { get; init; }
     public string FinalDiagnosis { get; init; } = string.Empty;
     public string TreatmentPlan { get; init; } = string.Empty;
 }

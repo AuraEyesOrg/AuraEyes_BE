@@ -3,7 +3,9 @@ using Application.ClinicStaffs.Commands.DeleteClinicStaff;
 using Application.ClinicStaffs.Commands.UpdateClinicStaff;
 using Application.ClinicStaffs.Queries.GetAllClinicStaff;
 using Application.ClinicStaffs.Queries.GetClinicStaffById;
+using Application.Patients.Commands.CreateWalkInPatient;
 using Application.Common.Constants;
+using Application.Common.Models;
 using Domain.Enums;
 using Infrastructure.Identity.Authorization;
 using MediatR;
@@ -128,6 +130,34 @@ public class ClinicStaffController : BaseApiController
         var result = await _mediator.Send(new DeleteClinicStaffCommand { StaffId = id }, cancellationToken);
         return HandleResult(result, "Clinic staff deactivated successfully.");
     }
+
+    // ── POST /api/clinic-staff/patients/walk-in ─────────────────────────────
+
+    /// <summary>
+    /// Registers a new walk-in patient. 
+    /// Creates an Identity user account and a Patient profile.
+    /// </summary>
+    [HttpPost("patients/walk-in")]
+    [AuthorizePermission(Permissions.PatientsCreate)]
+    [ProducesResponseType(typeof(ApiResponse<CreateWalkInPatientResult>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CreateWalkInPatient(
+        [FromBody] CreateWalkInPatientRequest request,
+        CancellationToken cancellationToken)
+    {
+        var command = new CreateWalkInPatientCommand
+        {
+            FullName = request.FullName,
+            Email = request.Email,
+            PhoneNumber = request.PhoneNumber,
+            CitizenId = request.CitizenId,
+            DateOfBirth = request.DateOfBirth,
+            Gender = request.Gender,
+            Address = request.Address
+        };
+
+        var result = await _mediator.Send(command, cancellationToken);
+        return HandleResult(result, "Walk-in patient registered successfully.");
+    }
 }
 
 // ─── Request models ────────────────────────────────────────────────────────
@@ -146,3 +176,12 @@ public record UpdateClinicStaffRequest(
     string? Department,
     string? EmployeeCode,
     string? Phone);
+
+public record CreateWalkInPatientRequest(
+    string FullName,
+    string? Email,
+    string? PhoneNumber,
+    string? CitizenId,
+    DateTime? DateOfBirth,
+    int? Gender,
+    string? Address);

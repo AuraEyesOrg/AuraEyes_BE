@@ -33,6 +33,7 @@ public sealed record OphthalmologistScreeningDetailDto
     public OphthalmologistScreeningResultDto? LatestResult { get; init; }
     /// <summary>pending-review | reviewed | approved | flagged</summary>
     public string ReviewStatus { get; init; } = "pending-review";
+    public Guid? MedicalRecordId { get; init; }
 }
 
 public sealed record OphthalmologistRetinalImageDto
