@@ -1,3 +1,4 @@
+using Domain.Enums;
 using System.Text;
 using System.Text.Encodings.Web;
 using Application.Common.Interfaces;
@@ -1046,6 +1047,69 @@ public class IdentityService : IIdentityService
                     // Restore soft-deleted mapping
                     existingMapping.RolePermission.GetType().GetProperty("IsDeleted")?.SetValue(existingMapping.RolePermission, false);
                 }
+            }
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SynchronizeUserSubRolePermissionsAsync(
+        Guid userId,
+        IEnumerable<ClinicStaffRole> subRoles,
+        CancellationToken cancellationToken = default)
+    {
+        var roleList = subRoles.ToList();
+        var expectedPermissionNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var role in roleList)
+        {
+            var extras = role switch
+            {
+                ClinicStaffRole.Receptionist => Application.Common.Constants.Permissions.ReceptionistExtras,
+                ClinicStaffRole.Coordinator => Application.Common.Constants.Permissions.CoordinatorExtras,
+                ClinicStaffRole.Cashier => Application.Common.Constants.Permissions.CashierExtras,
+                _ => Array.Empty<string>()
+            };
+
+            foreach (var perm in extras) expectedPermissionNames.Add(perm);
+        }
+
+        // Get all possible sub-role permissions to distinguish from other manual overrides
+        var allSubRolePermissions = Application.Common.Constants.Permissions.ReceptionistExtras
+            .Concat(Application.Common.Constants.Permissions.CoordinatorExtras)
+            .Concat(Application.Common.Constants.Permissions.CashierExtras)
+            .Distinct()
+            .ToList();
+
+        var allPermissionsInDb = await _context.Permissions
+            .Where(p => allSubRolePermissions.Contains(p.Name))
+            .ToListAsync(cancellationToken);
+
+        var currentAssignments = await _context.UserPermissions
+            .Where(up => up.UserId == userId)
+            .ToListAsync(cancellationToken);
+
+        // 1. Remove assignments that are in the "SubRole Pool" but NOT in the new expected set
+        var subRolePermIds = allPermissionsInDb.Select(p => p.Id).ToList();
+        var toRemove = currentAssignments
+            .Where(up => subRolePermIds.Contains(up.PermissionId))
+            .Where(up => !expectedPermissionNames.Contains(allPermissionsInDb.First(p => p.Id == up.PermissionId).Name))
+            .ToList();
+
+        if (toRemove.Any())
+        {
+            _context.UserPermissions.RemoveRange(toRemove);
+        }
+
+        // 2. Add missing assignments
+        foreach (var permName in expectedPermissionNames)
+        {
+            var permission = allPermissionsInDb.FirstOrDefault(p => p.Name == permName);
+            if (permission == null) continue;
+
+            if (!currentAssignments.Any(up => up.PermissionId == permission.Id))
+            {
+                await _context.UserPermissions.AddAsync(new Domain.Entities.Authorization.UserPermission(userId, permission.Id, true));
             }
         }
 

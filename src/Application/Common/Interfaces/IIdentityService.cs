@@ -1,3 +1,5 @@
+using Domain.Enums;
+
 namespace Application.Common.Interfaces;
 
 /// <summary>
@@ -203,6 +205,11 @@ public interface IIdentityService
     /// Synchronize all roles with their default permissions defined in code.
     /// </summary>
     Task SynchronizeRolesWithDefaultsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Synchronize a clinic staff user's explicit permissions based on their sub-roles.
+    /// </summary>
+    Task SynchronizeUserSubRolePermissionsAsync(Guid userId, IEnumerable<ClinicStaffRole> subRoles, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
