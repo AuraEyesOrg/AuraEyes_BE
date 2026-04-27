@@ -7,6 +7,8 @@ using Application.Scheduling.Appointments.Commands.CreateClinicAppointment;
 using Application.Scheduling.Appointments.Commands.MarkClinicAppointmentNoShow;
 using Application.Scheduling.Appointments.Commands.StartClinicAppointment;
 using Application.Scheduling.Appointments.Common;
+using Application.Scheduling.Appointments.Queries.GetClinicAppointmentsByDate;
+using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -31,9 +33,11 @@ public class ClinicAppointmentsController : BaseApiController
     {
         var command = new CreateClinicAppointmentCommand
         {
-            OrganisationId = request.OrganisationId,
             SlotId = request.SlotId,
-            VisitReason = request.VisitReason
+            PatientId = request.PatientId,
+            VisitReason = request.VisitReason,
+            PricingType = request.PricingType,
+            RequestedDoctorId = request.RequestedDoctorId
         };
 
         var result = await _mediator.Send(command);
@@ -82,13 +86,8 @@ public class ClinicAppointmentsController : BaseApiController
         Guid appointmentId,
         [FromBody] CompleteClinicAppointmentRequest? request = null)
     {
-        var command = new CompleteClinicAppointmentCommand
-        {
-            AppointmentId = appointmentId,
-            Notes = request?.Notes
-        };
-
-        var result = await _mediator.Send(command);
+        var result = await _mediator.Send(
+            new CompleteClinicAppointmentCommand(appointmentId, request?.Notes));
         return HandleResult(result);
     }
 
@@ -100,13 +99,24 @@ public class ClinicAppointmentsController : BaseApiController
         var result = await _mediator.Send(new MarkClinicAppointmentNoShowCommand(appointmentId));
         return HandleResult(result);
     }
+
+    [HttpGet]
+    [AuthorizePermission(Permissions.AppointmentsRead)]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ClinicAppointmentDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetClinicAppointments([FromQuery] DateOnly? date = null)
+    {
+        var result = await _mediator.Send(new GetClinicAppointmentsByDateQuery(date));
+        return HandleResult(result);
+    }
 }
 
 public record CreateClinicAppointmentRequest
 {
-    public Guid OrganisationId { get; init; }
     public Guid SlotId { get; init; }
+    public Guid? PatientId { get; init; }
     public string? VisitReason { get; init; }
+    public PricingType PricingType { get; init; } = PricingType.AutoAssign;
+    public Guid? RequestedDoctorId { get; init; }
 }
 
 public record CancelClinicAppointmentRequest
@@ -118,3 +128,4 @@ public record CompleteClinicAppointmentRequest
 {
     public string? Notes { get; init; }
 }
+

@@ -24,6 +24,7 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
     public string? RejectionReason { get; private set; }
     public decimal RatingAverage { get; private set; }
     public int RatingCount { get; private set; }
+    public decimal ConsultationFee { get; private set; }
 
     // Navigation properties
     private readonly List<Certificate> _certificates = new();
@@ -161,6 +162,15 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
         var total = (RatingAverage * RatingCount) + rating;
         RatingCount += 1;
         RatingAverage = Math.Round(total / RatingCount, 2, MidpointRounding.AwayFromZero);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateConsultationFee(decimal fee)
+    {
+        if (fee < 0)
+            throw new ArgumentException("Consultation fee cannot be negative", nameof(fee));
+
+        ConsultationFee = fee;
         UpdatedAt = DateTime.UtcNow;
     }
 }

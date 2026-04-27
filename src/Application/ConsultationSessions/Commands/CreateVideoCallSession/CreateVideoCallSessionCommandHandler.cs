@@ -87,7 +87,7 @@ public class CreateVideoCallSessionCommandHandler
 
         _logger.LogInformation(
             "VideoCall session {SessionId} created with Meet link for patient {PatientId}, attendees: [{Attendees}]",
-            session.Id, request.PatientId, string.Join(", ", attendeeEmails));
+            session.Id, request.PatientId, string.Join(", ", attendeeEmails ?? new List<string>()));
 
         return Result<Guid>.Success(session.Id);
     }

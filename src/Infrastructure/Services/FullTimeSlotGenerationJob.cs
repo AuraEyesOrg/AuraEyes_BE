@@ -1,4 +1,3 @@
-using Application.Scheduling.ScheduleTemplates.Interfaces;
 using Application.SystemSettings.Interfaces;
 using Domain.Entities.Scheduling;
 using Domain.Enums;
@@ -9,206 +8,160 @@ using Microsoft.Extensions.Logging;
 namespace Infrastructure.Services;
 
 /// <summary>
-/// Recurring job that keeps a rolling window of slots for full-time doctors.
+/// Recurring job that keeps a rolling window of slots for clinic-level templates.
+/// Redesigned for clinic-centric, resource-based scheduling.
 /// </summary>
 public class FullTimeSlotGenerationJob
 {
     private const string FullTimeSlotWindowDaysSettingKey = "FULLTIME_SLOT_WINDOW_DAYS";
-    private const int FixedRollingWindowDays = 7;
+    private const int DefaultRollingWindowDays = 14;
 
     private readonly ApplicationDbContext _context;
-    private readonly IFullTimeTemplateProvisioningService _fullTimeTemplateProvisioningService;
     private readonly ISystemSettingService _settingService;
     private readonly ILogger<FullTimeSlotGenerationJob> _logger;
 
     public FullTimeSlotGenerationJob(
         ApplicationDbContext context,
-        IFullTimeTemplateProvisioningService fullTimeTemplateProvisioningService,
         ISystemSettingService settingService,
         ILogger<FullTimeSlotGenerationJob> logger)
     {
         _context = context;
-        _fullTimeTemplateProvisioningService = fullTimeTemplateProvisioningService;
         _settingService = settingService;
         _logger = logger;
     }
 
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        await ExecuteInternalAsync(null, cancellationToken);
-    }
-
-    public async Task ExecuteForOphthalmologistAsync(
-        Guid ophthalmologistId,
-        CancellationToken cancellationToken = default)
-    {
-        if (ophthalmologistId == Guid.Empty)
-        {
-            throw new ArgumentException("Ophthalmologist ID is required.", nameof(ophthalmologistId));
-        }
-
-        await ExecuteInternalAsync(new[] { ophthalmologistId }, cancellationToken);
-    }
-
-    private async Task ExecuteInternalAsync(
-        IReadOnlyCollection<Guid>? targetOphthalmologistIds,
-        CancellationToken cancellationToken)
-    {
         var windowDays = await GetWindowDaysAsync(cancellationToken);
         var fromDate = DateOnly.FromDateTime(DateTime.UtcNow);
         var toDate = fromDate.AddDays(windowDays - 1);
 
-        IQueryable<Domain.Entities.Users.Ophthalmologist> ophthalmologistQuery = _context.Ophthalmologists
-            .Where(ophthal => ophthal.EmploymentType == OphthalmologistEmploymentType.FullTime);
-
-        if (targetOphthalmologistIds is { Count: > 0 })
-        {
-            ophthalmologistQuery = ophthalmologistQuery
-                .Where(ophthal => targetOphthalmologistIds.Contains(ophthal.Id));
-        }
-
-        var fullTimeOphthalmologists = await ophthalmologistQuery.ToListAsync(cancellationToken);
-
-        if (fullTimeOphthalmologists.Count == 0)
-        {
-            _logger.LogInformation(
-                "No full-time ophthalmologists matched slot generation scope. Targeted={IsTargeted}, RequestedDoctorCount={RequestedDoctorCount}",
-                targetOphthalmologistIds is { Count: > 0 },
-                targetOphthalmologistIds?.Count ?? 0);
-            return;
-        }
-
-        var matchedDoctorIds = fullTimeOphthalmologists.Select(ophthal => ophthal.Id).ToArray();
-
-        var templatesEnsured = 0;
-        foreach (var ophthalmologist in fullTimeOphthalmologists)
-        {
-            templatesEnsured += await _fullTimeTemplateProvisioningService
-                .EnsureSystemGeneratedTemplatesAsync(ophthalmologist, cancellationToken);
-        }
-
         _logger.LogInformation(
-            "Starting full-time slot rolling-window generation. FromDate={FromDate}, ToDate={ToDate}, WindowDays={WindowDays}, TemplatesEnsured={TemplatesEnsured}, Targeted={IsTargeted}, DoctorCount={DoctorCount}",
-            fromDate,
-            toDate,
-            windowDays,
-            templatesEnsured,
-            targetOphthalmologistIds is { Count: > 0 },
-            fullTimeOphthalmologists.Count);
+            "Starting clinic slot rolling-window generation. FromDate={FromDate}, ToDate={ToDate}, WindowDays={WindowDays}",
+            fromDate, toDate, windowDays);
 
-        var templatesQuery =
-            from template in _context.ScheduleTemplates
-            where template.OphthalId.HasValue
-            join ophthal in _context.Ophthalmologists on template.OphthalId!.Value equals ophthal.Id
-            where template.Source == ScheduleTemplateSource.SystemGenerated
-                && template.IsActive
-                && ophthal.EmploymentType == OphthalmologistEmploymentType.FullTime
-            select template;
+        // Get all active templates (usually SystemGenerated for rolling windows)
+        var templates = await _context.ScheduleTemplates
+            .Where(t => t.IsActive && !t.IsDeleted)
+            .ToListAsync(cancellationToken);
 
-        if (targetOphthalmologistIds is { Count: > 0 })
-        {
-            templatesQuery = templatesQuery.Where(template =>
-                template.OphthalId.HasValue && matchedDoctorIds.Contains(template.OphthalId.Value));
-        }
-
-        var templates = await templatesQuery.ToListAsync(cancellationToken);
+        // Fetch doctors once for clinic-wide templates
+        var doctors = await _context.Ophthalmologists
+            .Where(o => o.VerificationStatus != VerificationStatus.Rejected && !o.IsDeleted)
+            .ToListAsync(cancellationToken);
 
         var createdSlots = 0;
         var skippedInvalidTemplates = 0;
 
-        var approvedLeaveRangesByDoctor = await _context.OphthalmologistLeaveRequests
-            .Where(x => x.Status == OphthalmologistLeaveRequestStatus.Approved)
-            .Where(x => x.StartDate <= toDate && x.EndDate >= fromDate)
-            .Where(x => targetOphthalmologistIds == null || matchedDoctorIds.Contains(x.OphthalmologistId))
-            .Select(x => new
-            {
-                x.OphthalmologistId,
-                x.StartDate,
-                x.EndDate
-            })
-            .ToListAsync(cancellationToken);
-
-        var leaveDateLookup = approvedLeaveRangesByDoctor
-            .GroupBy(x => x.OphthalmologistId)
-            .ToDictionary(
-                x => x.Key,
-                x => x.Select(range => (range.StartDate, range.EndDate)).ToList());
-
         foreach (var template in templates)
         {
-            var slotDuration = TimeSpan.FromMinutes(template.SlotDuration);
+            var slotDurationMinutes = template.SlotDuration;
             var templateStart = template.StartTime.ToTimeSpan();
             var templateEnd = template.EndTime.ToTimeSpan();
 
-            if (template.SlotDuration <= 0
-                || slotDuration <= TimeSpan.Zero
-                || templateEnd <= templateStart
-                || template.MaxCapacity <= 0)
+            if (slotDurationMinutes <= 0 || templateEnd <= templateStart || template.MaxCapacity <= 0)
             {
                 skippedInvalidTemplates++;
                 _logger.LogWarning(
-                    "Skipping invalid full-time template {TemplateId}. SlotDuration={SlotDuration}, StartTime={StartTime}, EndTime={EndTime}, MaxCapacity={MaxCapacity}",
-                    template.Id,
-                    template.SlotDuration,
-                    template.StartTime,
-                    template.EndTime,
-                    template.MaxCapacity);
+                    "Skipping invalid template {TemplateId}. SlotDuration={SlotDuration}, StartTime={StartTime}, EndTime={EndTime}, MaxCapacity={MaxCapacity}",
+                    template.Id, template.SlotDuration, template.StartTime, template.EndTime, template.MaxCapacity);
                 continue;
             }
 
             try
             {
-                var existingDates = await _context.AppointmentSlots
-                    .Where(s => s.ScheduleTemplateId == template.Id)
+                // Fetch all existing slots for this template in the window to prevent duplicates
+                // Using (Date, StartTime) as the unique identity for an occurrence of a template
+                var existingSlots = await _context.AppointmentSlots
+                    .Where(s => s.ScheduleTemplateId == template.Id && !s.IsDeleted)
                     .Where(s => s.Date >= fromDate && s.Date <= toDate)
-                    .Select(s => s.Date)
-                    .Distinct()
+                    .Select(s => new { s.Date, s.StartTime, s.OphthalId })
                     .ToListAsync(cancellationToken);
 
-                var existingDateSet = existingDates.ToHashSet();
+                var existingSlotMap = existingSlots
+                    .GroupBy(s => new { s.Date, s.OphthalId })
+                    .ToDictionary(g => g.Key, g => g.Select(s => s.StartTime).ToHashSet());
 
+                var slotDuration = TimeSpan.FromMinutes(slotDurationMinutes);
                 var currentDate = fromDate;
+
                 while (currentDate <= toDate)
                 {
-                    if (template.OphthalId.HasValue
-                        && leaveDateLookup.TryGetValue(template.OphthalId.Value, out var leaveRanges)
-                        && leaveRanges.Any(range => currentDate >= range.StartDate && currentDate <= range.EndDate))
-                    {
-                        currentDate = currentDate.AddDays(1);
-                        continue;
-                    }
-
-                    if (currentDate.DayOfWeek == template.DayOfWeek && !existingDateSet.Contains(currentDate))
+                    if (currentDate.DayOfWeek == template.DayOfWeek)
                     {
                         for (var currentStart = templateStart; currentStart + slotDuration <= templateEnd; currentStart += slotDuration)
                         {
-                            var slotEndSpan = currentStart + slotDuration;
                             var slotStart = TimeOnly.FromTimeSpan(currentStart);
+                            var slotEndSpan = currentStart + slotDuration;
                             var slotEnd = TimeOnly.FromTimeSpan(slotEndSpan);
+                            
+                            if (doctors.Any())
+                            {
+                                foreach (var doctor in doctors)
+                                {
+                                    // Check if this doctor already has a slot for this time
+                                    if (existingSlotMap.TryGetValue(new { Date = currentDate, OphthalId = (Guid?)doctor.Id }, out var docTimes) 
+                                        && docTimes.Contains(slotStart))
+                                        continue;
 
-                            _context.AppointmentSlots.Add(new AppointmentSlot(
-                                template.Id,
-                                currentDate,
-                                slotStart,
-                                slotEnd,
-                                template.MaxCapacity,
-                                template.Cost,
-                                SlotSource.System));
+                                    // Check if there is a "generic" slot (OphthalId is null) for this time and remove it
+                                    // to make room for doctor-specific slots and avoid confusion
+                                    if (existingSlotMap.TryGetValue(new { Date = currentDate, OphthalId = (Guid?)null }, out var genericTimes)
+                                        && genericTimes.Contains(slotStart))
+                                    {
+                                        var genericSlot = await _context.AppointmentSlots
+                                            .FirstOrDefaultAsync(s => s.ScheduleTemplateId == template.Id 
+                                                && s.Date == currentDate && s.StartTime == slotStart 
+                                                && s.OphthalId == null && !s.IsDeleted, cancellationToken);
+                                        if (genericSlot != null) _context.AppointmentSlots.Remove(genericSlot);
+                                        
+                                        // Remove from map so we don't try to delete it again for the next doctor
+                                        genericTimes.Remove(slotStart);
+                                    }
 
-                            createdSlots++;
+                                    var slot = new AppointmentSlot(
+                                        template.Id,
+                                        currentDate,
+                                        slotStart,
+                                        slotEnd,
+                                        1,
+                                        SlotSource.System);
+                                    
+                                    slot.UpdateOphthalId(doctor.Id);
+                                    var cost = doctor.ConsultationFee > 0 ? doctor.ConsultationFee : (template.Cost ?? 0);
+                                    slot.UpdateCost(cost);
+
+                                    _context.AppointmentSlots.Add(slot);
+                                    createdSlots++;
+                                }
+                            }
+                            else
+                            {
+                                // Check if generic slot already exists
+                                if (existingSlotMap.TryGetValue(new { Date = currentDate, OphthalId = (Guid?)null }, out var genericTimes) 
+                                    && genericTimes.Contains(slotStart))
+                                    continue;
+
+                                _context.AppointmentSlots.Add(new AppointmentSlot(
+                                    template.Id,
+                                    currentDate,
+                                    slotStart,
+                                    slotEnd,
+                                    template.MaxCapacity,
+                                    SlotSource.System));
+
+                                createdSlots++;
+                            }
                         }
                     }
 
                     currentDate = currentDate.AddDays(1);
                 }
             }
-            catch (ArgumentException ex)
+            catch (Exception ex)
             {
                 skippedInvalidTemplates++;
-                _logger.LogWarning(
-                    ex,
-                    "Skipping template {TemplateId} due to invalid data while generating full-time slots.",
-                    template.Id);
+                _logger.LogError(ex, "Error generating slots for template {TemplateId}", template.Id);
             }
         }
 
@@ -218,40 +171,30 @@ public class FullTimeSlotGenerationJob
         }
 
         _logger.LogInformation(
-            "Completed full-time slot rolling-window generation. Templates={TemplateCount}, TemplatesEnsured={TemplatesEnsured}, SlotsCreated={SlotsCreated}, SkippedInvalidTemplates={SkippedInvalidTemplates}, Targeted={IsTargeted}, DoctorCount={DoctorCount}",
-            templates.Count,
-            templatesEnsured,
-            createdSlots,
-            skippedInvalidTemplates,
-            targetOphthalmologistIds is { Count: > 0 },
-            fullTimeOphthalmologists.Count);
+            "Completed clinic slot rolling-window generation. TemplatesProcessed={TemplateCount}, SlotsCreated={SlotsCreated}, SkippedInvalidTemplates={SkippedInvalidTemplates}",
+            templates.Count, createdSlots, skippedInvalidTemplates);
     }
 
     /// <summary>
     /// Backward-compatible overload for legacy Hangfire payloads.
     /// </summary>
-    [Obsolete("Use ExecuteAsync(CancellationToken) instead. This overload exists for Hangfire compatibility.")]
+    [Obsolete("Use ExecuteAsync(CancellationToken) instead.")]
     public Task ExecuteAsync() => ExecuteAsync(CancellationToken.None);
 
     /// <summary>
     /// Backward-compatible entry point for legacy Hangfire payloads.
     /// </summary>
-    [Obsolete("Use ExecuteAsync(CancellationToken) instead. This overload exists for Hangfire compatibility.")]
+    [Obsolete("Use ExecuteAsync(CancellationToken) instead.")]
     public Task Execute() => ExecuteAsync(CancellationToken.None);
 
     private async Task<int> GetWindowDaysAsync(CancellationToken cancellationToken)
     {
         var configured = await _settingService.GetSettingAsync(FullTimeSlotWindowDaysSettingKey, cancellationToken);
-        if (int.TryParse(configured, out var configuredDays)
-            && configuredDays > 0
-            && configuredDays != FixedRollingWindowDays)
+        if (int.TryParse(configured, out var configuredDays) && configuredDays > 0)
         {
-            _logger.LogWarning(
-                "Ignoring configured {SettingKey}={ConfiguredDays}. Recurring full-time slot generation uses a fixed 7-day window.",
-                FullTimeSlotWindowDaysSettingKey,
-                configuredDays);
+            return configuredDays;
         }
 
-        return FixedRollingWindowDays;
+        return DefaultRollingWindowDays;
     }
 }

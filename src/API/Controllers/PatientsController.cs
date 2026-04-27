@@ -2,12 +2,13 @@ using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Patients.Queries.GetDashboardMetrics;
-using Application.Scheduling.Appointments.Common;
 using Application.Scheduling.Appointments.Queries.GetPatientClinicAppointments;
+using Application.MedicalRecords.Common;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Infrastructure.Identity.Authorization;
+using Application.Scheduling.Appointments.Common;
 
 namespace API.Controllers;
 
@@ -46,6 +47,23 @@ public class PatientsController : BaseApiController
     {
         var result = await _mediator.Send(
             new GetPatientClinicAppointmentsQuery(patientId, tab, pageNumber, pageSize));
+        return HandleResult(result);
+    }
+
+    [HttpGet("{patientId:guid}/medical-records")]
+    // [AuthorizePermission(Permissions.MedicalRecordsRead)]
+    [ProducesResponseType(typeof(ApiResponse<List<MedicalRecordDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPatientMedicalRecords(Guid patientId)
+    {
+        var result = await _mediator.Send(new Application.MedicalRecords.Queries.GetPatientMedicalRecords.GetPatientMedicalRecordsQuery(patientId));
+        return HandleResult(result);
+    }
+
+    [HttpGet("medical-history/{mrn}")]
+    [ProducesResponseType(typeof(ApiResponse<Application.Patients.Queries.GetMedicalRecords.PatientMedicalHistoryDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPatientMedicalHistoryByMrn(string mrn)
+    {
+        var result = await _mediator.Send(new Application.Patients.Queries.GetMedicalRecords.GetPatientMedicalRecordsQuery { Mrn = mrn });
         return HandleResult(result);
     }
 }

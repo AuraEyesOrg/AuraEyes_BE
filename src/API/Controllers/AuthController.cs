@@ -91,21 +91,7 @@ public class AuthController : BaseApiController
         return HandleResult(result, result.Data?.Message ?? "Registration successful");
     }
 
-    /// <summary>
-    /// Submit a new organisation onboarding request.
-    /// </summary>
-    [HttpPost("register/organisation")]
-    [AllowAnonymous]
-    [ProducesResponseType(typeof(ApiResponse<OrganisationRegistrationResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> RegisterOrganisation(
-        [FromBody] RegisterOrganisationRequest request,
-        CancellationToken cancellationToken)
-    {
-        var result = await _authService.RegisterOrganisationAsync(request, cancellationToken);
-        return HandleResult(result, result.Data?.Message ?? "Organisation registration submitted successfully");
-    }
+
 
     [HttpPost("google-login")]
     [AllowAnonymous]
@@ -189,6 +175,18 @@ public class AuthController : BaseApiController
         }
 
         return OkResponse(loginResponse.AuthResponse, "Login successful");
+    }
+
+    [HttpPost("lookup-account")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<LookupAccountByCitizenIdResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> LookupAccountByCitizenId(
+        [FromBody] LookupAccountByCitizenIdRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _authService.LookupAccountByCitizenIdAsync(request.CitizenId, cancellationToken);
+        return HandleResult(result, "Lookup completed");
     }
 
     /// <summary>

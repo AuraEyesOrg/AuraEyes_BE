@@ -9,6 +9,7 @@ using Domain.Enums;
 using Domain.Repositories;
 using Application.Common.Constants;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 
 namespace Application.Scheduling.Appointments.Commands.CreateClinicAppointment;
 
@@ -17,77 +18,126 @@ public class CreateClinicAppointmentCommandHandler
 {
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IAppointmentRepository _appointmentRepository;
-    private readonly IRepository<Organisation> _organisationRepository;
+    private readonly IPatientVisitRepository _patientVisitRepository;
     private readonly IRepository<Patient> _patientRepository;
-    private readonly IRepository<OrganisationPatientLink> _organisationPatientLinkRepository;
-    private readonly IWalletRepository _walletRepository;
+    private readonly IOrderRepository _orderRepository;
+    private readonly IPaymentRepository _paymentRepository;
     private readonly ICurrentUserService _currentUser;
     private readonly IIdentityService _identityService;
     private readonly IEmailService _emailService;
     private readonly INotificationService _notificationService;
+    private readonly ISlotAssignmentRepository _slotAssignmentRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IPayOSService _payOSService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CreateClinicAppointmentCommandHandler> _logger;
+    private readonly IConfiguration _configuration;
+
+    /// <summary>
+    /// Deposit ratio: patient pays 30% of the full slot price upfront via PayOS.
+    /// </summary>
+    private const decimal DepositRatio = 0.30m;
+
+    private const decimal BASE_CLINIC_PRICE = 50000m; // Base clinic price for auto-assign
 
     public CreateClinicAppointmentCommandHandler(
         IAppointmentSlotRepository appointmentSlotRepository,
         IAppointmentRepository appointmentRepository,
-        IRepository<Organisation> organisationRepository,
+        IPatientVisitRepository patientVisitRepository,
         IRepository<Patient> patientRepository,
-        IRepository<OrganisationPatientLink> organisationPatientLinkRepository,
-        IWalletRepository walletRepository,
+        IOrderRepository orderRepository,
+        IPaymentRepository paymentRepository,
         ICurrentUserService currentUser,
         IIdentityService identityService,
         IEmailService emailService,
         INotificationService notificationService,
+        ISlotAssignmentRepository slotAssignmentRepository,
+        IOphthalmologistRepository ophthalmologistRepository,
+        IPayOSService payOSService,
         IUnitOfWork unitOfWork,
-        ILogger<CreateClinicAppointmentCommandHandler> logger)
+        ILogger<CreateClinicAppointmentCommandHandler> logger,
+        IConfiguration configuration)
     {
         _appointmentSlotRepository = appointmentSlotRepository;
         _appointmentRepository = appointmentRepository;
-        _organisationRepository = organisationRepository;
+        _patientVisitRepository = patientVisitRepository;
         _patientRepository = patientRepository;
-        _organisationPatientLinkRepository = organisationPatientLinkRepository;
-        _walletRepository = walletRepository;
+        _orderRepository = orderRepository;
+        _paymentRepository = paymentRepository;
         _currentUser = currentUser;
         _identityService = identityService;
         _emailService = emailService;
         _notificationService = notificationService;
+        _slotAssignmentRepository = slotAssignmentRepository;
+        _ophthalmologistRepository = ophthalmologistRepository;
+        _payOSService = payOSService;
         _unitOfWork = unitOfWork;
         _logger = logger;
+        _configuration = configuration;
     }
 
     public async Task<Result<CreateClinicAppointmentResult>> Handle(
         CreateClinicAppointmentCommand request,
         CancellationToken cancellationToken)
     {
-        if (_currentUser.ProfileId is null)
+        if (!_currentUser.UserId.HasValue)
         {
-            return Result<CreateClinicAppointmentResult>.Unauthorized("Patient profile is required.");
-        }
-
-        var organisation = await _organisationRepository.GetByIdAsync(request.OrganisationId, cancellationToken);
-        if (organisation is null)
-        {
-            return Result<CreateClinicAppointmentResult>.NotFound(
-                $"Organisation '{request.OrganisationId}' not found.");
+            return Result<CreateClinicAppointmentResult>.Forbidden(
+                "Unable to resolve user identity for payment operation.");
         }
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
         try
         {
+            // ── 1. Resolve Patient ──────────────────────────────────────────
+            Guid targetPatientProfileId;
+            Guid orderUserId;
+            Guid? notificationUserId;
+            bool isStaffCreatedWalkIn = false;
+
+            if (request.PatientId.HasValue)
+            {
+                var isStaffBooking = await _identityService.IsInRoleAsync(_currentUser.UserId.Value, Roles.ClinicStaff) ||
+                                     await _identityService.IsInRoleAsync(_currentUser.UserId.Value, Roles.SystemAdmin);
+                if (!isStaffBooking)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.Forbidden("Only clinic staff can book for another patient.");
+                }
+
+                // Staff booking for another patient
+                var patient = await _patientRepository.GetByIdAsync(request.PatientId.Value, cancellationToken);
+                if (patient == null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.NotFound($"Patient profile '{request.PatientId}' not found.");
+                }
+                targetPatientProfileId = patient.Id;
+                orderUserId = patient.UserId ?? _currentUser.UserId.Value;
+                notificationUserId = patient.UserId;
+                isStaffCreatedWalkIn = true;
+            }
+            else
+            {
+                // Self-booking
+                if (_currentUser.ProfileId is null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.Unauthorized("Patient profile is required for self-booking.");
+                }
+                targetPatientProfileId = _currentUser.ProfileId.Value;
+                orderUserId = _currentUser.UserId.Value;
+                notificationUserId = _currentUser.UserId.Value;
+            }
+
+            // ── 2. Validate slot ──────────────────────────────────────────────
             var slot = await _appointmentSlotRepository.GetByIdWithLockAsync(request.SlotId, cancellationToken);
             if (slot is null)
             {
                 await _unitOfWork.RollbackTransactionAsync(cancellationToken);
                 return Result<CreateClinicAppointmentResult>.NotFound(
                     $"Appointment slot '{request.SlotId}' not found.");
-            }
-
-            if (slot.ScheduleTemplate?.OrgId != request.OrganisationId)
-            {
-                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                return Result<CreateClinicAppointmentResult>.Failure("The selected slot does not belong to this organisation.");
             }
 
             if (slot.Status != ScheduleStatus.Available)
@@ -103,219 +153,177 @@ public class CreateClinicAppointmentCommandHandler
                 return Result<CreateClinicAppointmentResult>.Conflict("This appointment slot is fully booked.");
             }
 
-            var patientId = _currentUser.ProfileId.Value;
+            // ── 3. Duplicate booking check ────────────────────────────────────
             var hasExistingAppointment = await _appointmentRepository.HasExistingAppointmentAsync(
-                patientId,
+                targetPatientProfileId,
                 request.SlotId,
                 cancellationToken);
 
             if (hasExistingAppointment)
             {
                 await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                return Result<CreateClinicAppointmentResult>.Conflict("You already have an appointment for this slot.");
+                return Result<CreateClinicAppointmentResult>.Conflict("Patient already has an appointment for this slot.");
             }
 
-            // ── Wallet deposit deduction (anti-spam) ──
-            var depositFee = slot.Cost ?? 0;
+            // ── 4. Resolve pricing ────────────────────────────────────────────
+            decimal price = BASE_CLINIC_PRICE;
+            Guid? finalDoctorId = request.RequestedDoctorId;
+            var finalPricingType = request.PricingType;
 
-            if (depositFee > 0)
+            // Auto-detect doctor if the slot is owned by one (Doctor-centric model)
+            if (slot.OphthalId.HasValue && finalDoctorId == null)
             {
-                if (!_currentUser.UserId.HasValue)
-                {
-                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                    return Result<CreateClinicAppointmentResult>.Forbidden(
-                        "Unable to resolve user identity for wallet operation.");
-                }
-
-                var wallet = await _walletRepository.GetByUserIdAsync(
-                    _currentUser.UserId.Value, cancellationToken);
-
-                if (wallet is null)
-                {
-                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                    return Result<CreateClinicAppointmentResult>.Failure(
-                        "Wallet not found. Please top up your wallet first.");
-                }
-
-                if (wallet.Balance < depositFee)
-                {
-                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                    return Result<CreateClinicAppointmentResult>.Failure(
-                        $"Insufficient wallet balance. Required: {depositFee:N0} VND, Available: {wallet.Balance:N0} VND.");
-                }
-
-                wallet.Withdraw(depositFee, $"Clinic booking deposit – Slot {slot.Id}");
-
-                var transaction = new WalletTransaction(
-                    wallet.Id,
-                    depositFee,
-                    TransactionType.Payment,
-                    $"Clinic visit deposit – {organisation.Name}",
-                    referenceType: "ClinicBooking",
-                    referenceId: slot.Id);
-
-                wallet.AddTransaction(transaction);
-                await _walletRepository.AddTransactionAsync(transaction, cancellationToken);
+                finalDoctorId = slot.OphthalId;
+                finalPricingType = PricingType.DoctorSelected;
             }
 
+            if (finalPricingType == PricingType.DoctorSelected)
+            {
+                if (finalDoctorId == null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.Failure("Doctor must be selected for DoctorSelected pricing type.");
+                }
+
+                var doctor = await _ophthalmologistRepository.GetByIdAsync(finalDoctorId.Value, cancellationToken);
+                if (doctor == null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.NotFound($"Doctor '{finalDoctorId}' not found.");
+                }
+
+                // If the slot has a specific OphthalId, verify it matches
+                if (slot.OphthalId.HasValue && slot.OphthalId != finalDoctorId)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<CreateClinicAppointmentResult>.Failure("The selected doctor does not match the doctor assigned to this slot.");
+                }
+
+                // If slot doesn't have OphthalId but we have assignments (shared slot model), verify assignment
+                if (!slot.OphthalId.HasValue)
+                {
+                    var isAssigned = await _slotAssignmentRepository.HasAssignmentAsync(
+                        request.SlotId,
+                        finalDoctorId.Value,
+                        SlotAssignmentRole.Doctor,
+                        cancellationToken);
+
+                    if (!isAssigned)
+                    {
+                        await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                        return Result<CreateClinicAppointmentResult>.Failure("The selected doctor is not available for this appointment slot.");
+                    }
+                }
+
+                price = doctor.ConsultationFee;
+            }
+
+            // ── 5. Calculate deposit ──────────────────────────────────────────
+            // If it's a walk-in (staff booking), there is NO deposit (they pay 100% full amount).
+            // For online bookings, we take 30% deposit.
+            decimal? depositAmount = isStaffCreatedWalkIn ? null : Math.Round(price * DepositRatio, 0);
+            if (depositAmount.HasValue && depositAmount.Value < 1) depositAmount = 1;
+
+            // ── 6. Create Appointment ─────────────────────────────────────────
             slot.BookWithCapacity();
-            if (slot.BookedCount >= slot.MaxCapacity)
-            {
-                slot.UpdateStatus(ScheduleStatus.Booked);
-            }
 
-            var appointment = Appointment.CreateClinicVisit(
-                patientId,
+            var appointment = new Appointment(
+                targetPatientProfileId,
                 request.SlotId,
-                request.OrganisationId,
+                price,
+                finalPricingType,
+                finalDoctorId,
                 request.VisitReason);
-
-            var existingLink = (await _organisationPatientLinkRepository.FindAsync(
-                link => link.OrganisationId == request.OrganisationId
-                        && link.PatientId == patientId
-                        && !link.IsDeleted,
-                cancellationToken)).FirstOrDefault();
-
-            if (existingLink is null)
-            {
-                await _organisationPatientLinkRepository.AddAsync(
-                    new OrganisationPatientLink(request.OrganisationId, patientId, "clinic-booking"),
-                    cancellationToken);
-            }
-            else
-            {
-                existingLink.Touch("clinic-booking");
-                await _organisationPatientLinkRepository.UpdateAsync(existingLink, cancellationToken);
-            }
 
             await _appointmentRepository.AddAsync(appointment, cancellationToken);
             await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
+
+            // ── 7. Create Order + Payment ─────────────────────────────────────
+            var typeLabel = isStaffCreatedWalkIn ? "Thanh toán đủ" : "Đặt cọc";
+            var orderDescription = $"{typeLabel} khám {slot.Date:dd/MM} {slot.StartTime:HH:mm}";
+            
+            var order = new Order(
+                orderUserId,
+                price,
+                depositAmount,
+                orderDescription,
+                appointment.Id);
+
+            await _orderRepository.AddAsync(order, cancellationToken);
+
+            string? paymentUrl = null;
+            if (!isStaffCreatedWalkIn)
+            {
+                // Create PayOS payment link for online deposit
+                var payment = new Payment(order.Id, depositAmount!.Value, PaymentMethod.PayOS, orderDescription);
+                await _paymentRepository.AddAsync(payment, cancellationToken);
+
+                var returnUrl = _configuration["PayOS:DefaultReturnUrl"] ?? "";
+                var cancelUrl = _configuration["PayOS:DefaultCancelUrl"] ?? "";
+
+                // Append IDs to returnUrl so the callback page knows which order/appointment to process
+                var separator = returnUrl.Contains("?") ? "&" : "?";
+                var queryParams = $"orderId={order.Id}&appointmentId={appointment.Id}&type=clinic-booking";
+                returnUrl = $"{returnUrl}{separator}{queryParams}";
+
+                var cancelSeparator = cancelUrl.Contains("?") ? "&" : "?";
+                cancelUrl = $"{cancelUrl}{cancelSeparator}{queryParams}&cancel=true";
+
+                var (pUrl, orderCode) = await _payOSService.CreatePaymentLinkAsync(
+                    payment.Id,
+                    depositAmount.Value,
+                    orderDescription,
+                    returnUrl,
+                    cancelUrl);
+
+                payment.SetPaymentLink(pUrl, orderCode);
+                paymentUrl = pUrl;
+            }
+            else
+            {
+                // For walk-ins, we can create a "Pending" Cash payment or just leave it for staff to collect
+                // Let's create a pending Cash payment for the full amount
+                var payment = new Payment(order.Id, price, PaymentMethod.Cash, orderDescription);
+                await _paymentRepository.AddAsync(payment, cancellationToken);
+            }
+
+            PatientVisit? visit = null;
+            if (isStaffCreatedWalkIn)
+            {
+                visit = PatientVisit.CreateFromAppointment(appointment);
+                await _patientVisitRepository.AddAsync(visit, cancellationToken);
+            }
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Created clinic appointment {AppointmentId} for patient {PatientId} at slot {SlotId} organisation {OrganisationId}, deposit {DepositFee} VND",
+                "Created {Type} clinic appointment {AppointmentId} for patient {PatientId} at slot {SlotId}. " +
+                "FullPrice: {FullPrice} VND, Deposit: {DepositAmount} VND. Order {OrderId}",
+                isStaffCreatedWalkIn ? "Walk-in" : "Online",
                 appointment.Id,
-                patientId,
+                targetPatientProfileId,
                 request.SlotId,
-                request.OrganisationId,
-                depositFee);
+                price,
+                depositAmount ?? price,
+                order.Id);
 
-            var appointmentTime = slot.StartTime.ToString("HH:mm");
-            var appointmentDate = slot.Date.ToString("dd/MM/yyyy");
-            var patientName = "bệnh nhân";
-            string? patientEmail = null;
+            // ── 8. Post-commit: notifications ──────────────────────────
+            await SendBookingNotificationAsync(appointment, notificationUserId, slot, request.VisitReason, isStaffCreatedWalkIn, cancellationToken);
 
-            var patient = await _patientRepository.GetByIdAsync(patientId, cancellationToken);
-            if (patient is not null)
+            if (visit is not null)
             {
-                if (patient.IsWalkIn)
-                {
-                    if (!string.IsNullOrWhiteSpace(patient.FullName))
-                    {
-                        patientName = patient.FullName;
-                    }
-                }
-                else if (patient.UserId.HasValue)
-                {
-                    var patientUser = await _identityService.GetUserByIdAsync(patient.UserId.Value, cancellationToken);
-                    if (!string.IsNullOrWhiteSpace(patientUser?.FullName))
-                    {
-                        patientName = patientUser.FullName;
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(patientUser?.Email))
-                    {
-                        patientEmail = patientUser.Email;
-                    }
-                }
-            }
-
-            if (_currentUser.UserId.HasValue)
-            {
-                try
-                {
-                    await _notificationService.SendAsync(
-                        _currentUser.UserId.Value,
-                        "Đặt lịch khám thành công",
-                        $"Bạn đã đặt lịch thành công vào lúc {appointmentTime}, ngày {appointmentDate}",
-                        NotificationType.NewAppointmentBooked,
-                        new
-                        {
-                            AppointmentId = appointment.Id,
-                            AppointmentTime = $"{slot.Date:yyyy-MM-dd}T{slot.StartTime.ToString("HH:mm")}:00",
-                            Reason = request.VisitReason,
-                            OrganisationId = request.OrganisationId
-                        },
-                        cancellationToken);
-
-                    var organisationAdminUserIds = await _identityService.GetUserIdsByRoleAndOrganizationAsync(
-                        Roles.OrgAdmin,
-                        request.OrganisationId,
-                        cancellationToken);
-
-                    foreach (var providerUserId in organisationAdminUserIds)
-                    {
-                        await _notificationService.SendAsync(
-                            providerUserId,
-                            "Lịch hẹn mới từ bệnh nhân",
-                            $"Bạn có 1 lịch vào lúc {appointmentTime}, ngày {appointmentDate} từ bệnh nhân {patientName}",
-                            NotificationType.NewAppointmentBooked,
-                            new
-                            {
-                                AppointmentId = appointment.Id,
-                                AppointmentTime = $"{slot.Date:yyyy-MM-dd}T{slot.StartTime.ToString("HH:mm")}:00",
-                                PatientId = patientId,
-                                OrganisationId = request.OrganisationId
-                            },
-                            cancellationToken);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(
-                        ex,
-                        "Failed to send appointment booking notification for appointment {AppointmentId}",
-                        appointment.Id);
-                }
-            }
-
-            if (!string.IsNullOrWhiteSpace(patientEmail))
-            {
-                try
-                {
-                    var qrPayload =
-                        $"AURA-CLINIC-APPOINTMENT|{appointment.Id}|{patientId}|{request.OrganisationId}|{slot.Date:yyyy-MM-dd}|{slot.StartTime:HH:mm}|{slot.EndTime:HH:mm}";
-
-                    var checkInCode = appointment.Id.ToString("N")[..10].ToUpperInvariant();
-
-                    await _emailService.SendClinicAppointmentConfirmationAsync(
-                        patientEmail,
-                        new ClinicAppointmentConfirmationEmailPayload(
-                            appointment.Id,
-                            patientName,
-                            organisation.Name,
-                            slot.Date,
-                            slot.StartTime,
-                            slot.EndTime,
-                            request.VisitReason,
-                            checkInCode,
-                            qrPayload),
-                        cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(
-                        ex,
-                        "Failed to send clinic appointment email for appointment {AppointmentId}",
-                        appointment.Id);
-                }
+                await SendQueueNotificationAsync(appointment, visit, cancellationToken);
             }
 
             return Result<CreateClinicAppointmentResult>.Success(new CreateClinicAppointmentResult
             {
                 AppointmentId = appointment.Id,
-                Status = appointment.Status
+                VisitId = visit?.Id,
+                Status = visit?.Status.ToString() ?? appointment.Status.ToString(),
+                PaymentUrl = paymentUrl,
+                OrderId = order.Id,
+                DepositAmount = depositAmount,
             });
         }
         catch (Domain.Common.ConcurrencyException)
@@ -333,6 +341,74 @@ public class CreateClinicAppointmentCommandHandler
         {
             await _unitOfWork.RollbackTransactionAsync(cancellationToken);
             throw;
+        }
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private async Task SendBookingNotificationAsync(
+        Appointment appointment,
+        Guid? targetUserId,
+        AppointmentSlot slot,
+        string? visitReason,
+        bool isWalkIn,
+        CancellationToken cancellationToken)
+    {
+        if (!targetUserId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var title = isWalkIn ? "Đặt lịch khám trực tiếp thành công" : "Đặt lịch khám thành công";
+            var body = isWalkIn 
+                ? $"Bạn đã được đặt lịch khám trực tiếp vào lúc {slot.StartTime:HH:mm}, ngày {slot.Date:dd/MM/yyyy}."
+                : $"Bạn đã đặt lịch thành công vào lúc {slot.StartTime:HH:mm}, ngày {slot.Date:dd/MM/yyyy}. Vui lòng hoàn tất thanh toán đặt cọc.";
+
+            await _notificationService.SendAsync(
+                targetUserId.Value,
+                title,
+                body,
+                NotificationType.NewAppointmentBooked,
+                new
+                {
+                    AppointmentId = appointment.Id,
+                    AppointmentTime = $"{slot.Date:yyyy-MM-dd}T{slot.StartTime:HH:mm}:00",
+                    Reason = visitReason
+                },
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to send appointment booking notification for appointment {AppointmentId}",
+                appointment.Id);
+        }
+    }
+
+    private async Task SendQueueNotificationAsync(
+        Appointment appointment,
+        PatientVisit visit,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _notificationService.SendToRoleAsync(
+                roleName: Roles.ClinicStaff,
+                title: "New Patient in Queue",
+                message: $"Patient {appointment.Patient?.FullName ?? "Unknown"} has been added to the clinic queue.",
+                type: NotificationType.SystemAlert,
+                payload: new { VisitId = visit.Id, PatientId = visit.PatientId },
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to send walk-in queue notification for visit {VisitId}",
+                visit.Id);
         }
     }
 }

@@ -23,6 +23,19 @@ public record LoginRequest
     public string? DeviceInfo { get; init; }
 }
 
+public record LookupAccountByCitizenIdRequest
+{
+    [Required]
+    [MinLength(6)]
+    public string CitizenId { get; init; } = string.Empty;
+}
+
+public record LookupAccountByCitizenIdResponse
+{
+    public bool Exists { get; init; }
+    public string? MaskedEmail { get; init; }
+}
+
 /// <summary>
 /// Register patient request DTO.
 /// </summary>
@@ -44,11 +57,19 @@ public record RegisterPatientRequest
     [MaxLength(200)]
     public string FullName { get; init; } = string.Empty;
 
+    [MaxLength(500)]
     public string? Address { get; init; }
 
     public DateTime? DateOfBirth { get; init; }
 
     public int? Gender { get; init; }
+
+    [Phone]
+    [MaxLength(20)]
+    public string? PhoneNumber { get; init; }
+
+    [MaxLength(20)]
+    public string? CitizenId { get; init; }
 }
 
 /// <summary>
@@ -89,8 +110,6 @@ public class RegisterOphthalmologistRequest
 
     [Range(typeof(decimal), "0", "999999999")]
     public decimal? ExpectedMonthlySalary { get; set; }
-
-    public Guid? OrganizationId { get; set; }
 
     /// <summary>
     /// Unified credentials list for both degrees and licenses/certificates.
@@ -154,35 +173,6 @@ public class LegacyDegreeCredentialItemDto
     public IFormFile? File { get; set; }
 }
 
-public record RegisterOrganisationRequest
-{
-    [Required]
-    [EmailAddress]
-    public string ContactEmail { get; init; } = string.Empty;
-
-    [Required]
-    [MaxLength(200)]
-    public string ContactFullName { get; init; } = string.Empty;
-
-    [Required]
-    [MaxLength(200)]
-    public string OrganisationName { get; init; } = string.Empty;
-
-    [Required]
-    public int OrgType { get; init; }
-
-    [Phone]
-    public string? ContactPhone { get; init; }
-
-    public string? Address { get; init; }
-
-    public string? LicenseNumber { get; init; }
-
-    public string? TaxCode { get; init; }
-
-    public string? Notes { get; init; }
-}
-
 /// <summary>
 /// Authentication response DTO.
 /// </summary>
@@ -244,7 +234,6 @@ public record UserInfoResponse
     public string? ProviderAvatarUrl { get; init; }
     public string[] Roles { get; init; } = Array.Empty<string>();
     public bool EmailConfirmed { get; init; }
-    public Guid? OrganizationId { get; init; }
     public Guid? RoleId { get; init; }
     /// <summary>
     /// Indicates if 2FA is enabled for this user.
@@ -264,23 +253,23 @@ public record UserInfoResponse
     public string? VerificationStatus { get; init; }
 
     /// <summary>
-    /// Contract status for the ophthalmologist (Draft, PendingSignature, Active, etc.).
-    /// Null for non-ophthalmologist roles or if no contract exists.
+    /// Indicates whether the user must update their profile information before accessing protected features.
+    /// Used for initial onboarding of new staff members.
     /// </summary>
-    public string? ContractStatus { get; init; }
-
-    /// <summary>
-    /// Indicates whether the user must change password before accessing protected features.
-    /// Used for first login after temporary credentials are provisioned.
-    /// </summary>
-    public bool MustChangePassword { get; init; }
+    public bool MustUpdateProfile { get; init; }
 
     /// <summary>
     /// Employment type for ophthalmologist users (FullTime/PartTime).
     /// Null for non-ophthalmologist roles.
     /// </summary>
     public string? EmploymentType { get; init; }
-    
+
+    /// <summary>
+    /// Comma-separated sub-role names for ClinicStaff users (e.g. "Receptionist,Cashier").
+    /// Null for non-ClinicStaff roles.
+    /// </summary>
+    public string? StaffSubRoles { get; init; }
+
     /// <summary>
     /// Granular permissions for the user based on their roles.
     /// </summary>

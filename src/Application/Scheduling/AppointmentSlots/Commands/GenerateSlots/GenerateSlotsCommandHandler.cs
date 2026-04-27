@@ -1,40 +1,35 @@
-using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
-using Application.SystemSettings.Interfaces;
 using Domain.Common;
 using Domain.Entities.Scheduling;
+using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
 using Microsoft.Extensions.Logging;
 
 namespace Application.Scheduling.AppointmentSlots.Commands.GenerateSlots;
 
-/// <summary>
-/// Handler for GenerateSlotsCommand.
-/// Generates appointment slots from a schedule template for a given date range.
-/// </summary>
 public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand, int>
 {
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
-    private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IScheduleTemplateRepository _scheduleTemplateRepository;
-    private readonly ISystemSettingService _settingService;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IOphthalmologistLeaveRequestRepository _leaveRequestRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<GenerateSlotsCommandHandler> _logger;
 
     public GenerateSlotsCommandHandler(
         IAppointmentSlotRepository appointmentSlotRepository,
-        IOphthalmologistRepository ophthalmologistRepository,
         IScheduleTemplateRepository scheduleTemplateRepository,
-        ISystemSettingService settingService,
+        IOphthalmologistRepository ophthalmologistRepository,
+        IOphthalmologistLeaveRequestRepository leaveRequestRepository,
         IUnitOfWork unitOfWork,
         ILogger<GenerateSlotsCommandHandler> logger)
     {
         _appointmentSlotRepository = appointmentSlotRepository;
-        _ophthalmologistRepository = ophthalmologistRepository;
         _scheduleTemplateRepository = scheduleTemplateRepository;
-        _settingService = settingService;
+        _ophthalmologistRepository = ophthalmologistRepository;
+        _leaveRequestRepository = leaveRequestRepository;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -61,21 +56,6 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
             return Result<int>.NotFound($"Schedule template '{request.ScheduleTemplateId}' not found.");
         }
 
-        Domain.Entities.Users.Ophthalmologist? ophthalmologist = null;
-        if (template.OphthalId.HasValue)
-        {
-            ophthalmologist = await _ophthalmologistRepository.GetByIdAsync(template.OphthalId.Value, cancellationToken);
-            if (ophthalmologist is null)
-            {
-                return Result<int>.NotFound($"Ophthalmologist '{template.OphthalId.Value}' not found.");
-            }
-
-            if (ophthalmologist.EmploymentType == OphthalmologistEmploymentType.FullTime)
-            {
-                return Result<int>.Forbidden("Full-time ophthalmologists cannot manually create slots.");
-            }
-        }
-
         // Get existing slots if we need to skip existing dates
         HashSet<DateOnly> existingDates = new();
         if (request.SkipExistingDates)
@@ -88,7 +68,6 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
             existingDates = existingSlots.Select(s => s.Date).ToHashSet();
         }
 
-        // Build slots grouped by date first so quota can be reserved before inserts.
         var slotsByDate = new Dictionary<DateOnly, List<(TimeOnly Start, TimeOnly End)>>();
         var currentDate = request.FromDate;
 
@@ -119,74 +98,102 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
             currentDate = currentDate.AddDays(1);
         }
 
+        // Get verified doctors if it's a general clinic template
+        IReadOnlyList<Ophthalmologist>? doctors = null;
+        var doctorLeaves = new Dictionary<Guid, List<OphthalmologistLeaveRequest>>();
+
+        if (template.OphthalId.HasValue)
+        {
+            var leaves = await _leaveRequestRepository.GetApprovedOverlappingAsync(
+                template.OphthalId.Value, request.FromDate, request.ToDate, cancellationToken);
+            doctorLeaves[template.OphthalId.Value] = leaves.ToList();
+        }
+        else
+        {
+            var allDoctors = await _ophthalmologistRepository.GetAllAsync(cancellationToken);
+            doctors = allDoctors.Where(d => d.VerificationStatus != VerificationStatus.Rejected).ToList();
+            
+            foreach (var doc in doctors)
+            {
+                var leaves = await _leaveRequestRepository.GetApprovedOverlappingAsync(
+                    doc.Id, request.FromDate, request.ToDate, cancellationToken);
+                doctorLeaves[doc.Id] = leaves.ToList();
+            }
+        }
+
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
         try
         {
             var slotsCreated = 0;
-            if (ophthalmologist?.EmploymentType == OphthalmologistEmploymentType.PartTime)
-            {
-                var quota = await GetPartTimeDailyQuotaAsync(cancellationToken);
-
-                foreach (var kvp in slotsByDate.OrderBy(x => x.Key))
-                {
-                    var reserveResult = await _settingService.TryReservePartTimeSlotsAsync(
-                        kvp.Key,
-                        kvp.Value.Count,
-                        quota,
-                        cancellationToken);
-
-                    if (!reserveResult.Success)
-                    {
-                        await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                        _logger.LogWarning(
-                            "Part-time quota exceeded while generating slots. Date={Date}, Quota={Quota}, CurrentCount={CurrentCount}, Requested={Requested}",
-                            kvp.Key,
-                            reserveResult.Quota,
-                            reserveResult.UsedSlots,
-                            kvp.Value.Count);
-
-                        return Result<int>.Conflict("Daily slot quota for part-time doctors has been reached");
-                    }
-
-                    var nearLimitThreshold = Math.Max(1, (int)Math.Ceiling(reserveResult.Quota * 0.1));
-                    if (reserveResult.RemainingSlots <= nearLimitThreshold)
-                    {
-                        _logger.LogWarning(
-                            "Part-time quota near limit after bulk reserve. Date={Date}, Quota={Quota}, Used={Used}, Remaining={Remaining}",
-                            kvp.Key,
-                            reserveResult.Quota,
-                            reserveResult.UsedSlots,
-                            reserveResult.RemainingSlots);
-                    }
-                    else
-                    {
-                        _logger.LogInformation(
-                            "Reserved part-time quota for bulk generation. Date={Date}, Requested={Requested}, Quota={Quota}, Used={Used}, Remaining={Remaining}",
-                            kvp.Key,
-                            kvp.Value.Count,
-                            reserveResult.Quota,
-                            reserveResult.UsedSlots,
-                            reserveResult.RemainingSlots);
-                    }
-                }
-            }
 
             foreach (var kvp in slotsByDate.OrderBy(x => x.Key))
             {
                 foreach (var timeWindow in kvp.Value)
                 {
-                    var slot = new AppointmentSlot(
-                        template.Id,
-                        kvp.Key,
-                        timeWindow.Start,
-                        timeWindow.End,
-                        template.MaxCapacity,
-                        template.Cost,
-                        SlotSource.Doctor);
+                    if (template.OphthalId.HasValue)
+                    {
+                        var docId = template.OphthalId.Value;
+                        var isOnLeave = doctorLeaves[docId].Any(l => l.Overlaps(kvp.Key, kvp.Key));
 
-                    await _appointmentSlotRepository.AddAsync(slot, cancellationToken);
-                    slotsCreated++;
+                        if (!isOnLeave)
+                        {
+                            var slot = new AppointmentSlot(
+                                template.Id,
+                                kvp.Key,
+                                timeWindow.Start,
+                                timeWindow.End,
+                                template.MaxCapacity,
+                                SlotSource.System);
+                            
+                            slot.UpdateOphthalId(docId);
+                            await _appointmentSlotRepository.AddAsync(slot, cancellationToken);
+                            slotsCreated++;
+                        }
+                    }
+                    else if (doctors != null && doctors.Any())
+                    {
+                        foreach (var doctor in doctors)
+                        {
+                            var isOnLeave = doctorLeaves[doctor.Id].Any(l => l.Overlaps(kvp.Key, kvp.Key));
+
+                            if (!isOnLeave)
+                            {
+                                var slot = new AppointmentSlot(
+                                    template.Id,
+                                    kvp.Key,
+                                    timeWindow.Start,
+                                    timeWindow.End,
+                                    1, // Max capacity 1 per doctor
+                                    SlotSource.System);
+                                
+                                slot.UpdateOphthalId(doctor.Id);
+                                
+                                // Set cost: Prioritize doctor's specific fee, then template's cost
+                                var cost = doctor.ConsultationFee > 0 
+                                    ? doctor.ConsultationFee 
+                                    : (template.Cost ?? 0);
+                                slot.UpdateCost(cost);
+
+                                await _appointmentSlotRepository.AddAsync(slot, cancellationToken);
+                                slotsCreated++;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Fallback if no doctors are verified, just generate the generic slot
+                        var slot = new AppointmentSlot(
+                            template.Id,
+                            kvp.Key,
+                            timeWindow.Start,
+                            timeWindow.End,
+                            template.MaxCapacity,
+                            SlotSource.System);
+
+                        await _appointmentSlotRepository.AddAsync(slot, cancellationToken);
+                        slotsCreated++;
+                    }
                 }
             }
 
@@ -202,18 +209,6 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
 
             return Result<int>.Success(slotsCreated);
         }
-        catch (ConcurrencyException ex)
-        {
-            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-            _logger.LogWarning(
-                ex,
-                "Concurrency conflict while generating slots for template {TemplateId} from {FromDate} to {ToDate}",
-                request.ScheduleTemplateId,
-                request.FromDate,
-                request.ToDate);
-
-            return Result<int>.Conflict("Slot generation conflicted with another request. Please retry.");
-        }
         catch (Exception ex)
         {
             await _unitOfWork.RollbackTransactionAsync(cancellationToken);
@@ -225,11 +220,5 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
                 request.ToDate);
             throw;
         }
-    }
-
-    private async Task<int> GetPartTimeDailyQuotaAsync(CancellationToken cancellationToken)
-    {
-        var configured = await _settingService.GetSettingAsync("PART_TIME_MAX_SLOTS_PER_DAY", cancellationToken);
-        return int.TryParse(configured, out var value) && value > 0 ? value : 100;
     }
 }

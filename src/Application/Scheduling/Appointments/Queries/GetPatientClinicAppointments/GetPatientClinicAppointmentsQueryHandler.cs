@@ -2,6 +2,8 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Scheduling.Appointments.Common;
 using Domain.Enums;
+using Domain.Common;
+using Domain.Entities.Users;
 using Domain.Repositories;
 
 namespace Application.Scheduling.Appointments.Queries.GetPatientClinicAppointments;
@@ -12,16 +14,28 @@ public class GetPatientClinicAppointmentsQueryHandler
     private const int MaxPageSize = 50;
 
     private readonly IAppointmentRepository _appointmentRepository;
-    private readonly IOrganisationFeedbackRepository _organisationFeedbackRepository;
+    private readonly IClinicFeedbackRepository _clinicFeedbackRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IOrderRepository _orderRepository;
+    private readonly IClinicStaffRepository _staffRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
 
     public GetPatientClinicAppointmentsQueryHandler(
         IAppointmentRepository appointmentRepository,
-        IOrganisationFeedbackRepository organisationFeedbackRepository,
+        IClinicFeedbackRepository clinicFeedbackRepository,
+        IOphthalmologistRepository ophthalmologistRepository,
+        IOrderRepository orderRepository,
+        IClinicStaffRepository staffRepository,
+        IUnitOfWork unitOfWork,
         ICurrentUserService currentUser)
     {
         _appointmentRepository = appointmentRepository;
-        _organisationFeedbackRepository = organisationFeedbackRepository;
+        _clinicFeedbackRepository = clinicFeedbackRepository;
+        _ophthalmologistRepository = ophthalmologistRepository;
+        _orderRepository = orderRepository;
+        _staffRepository = staffRepository;
+        _unitOfWork = unitOfWork;
         _currentUser = currentUser;
     }
 
@@ -53,10 +67,10 @@ public class GetPatientClinicAppointmentsQueryHandler
 
         var (appointments, totalCount) = await _appointmentRepository.GetPagedByPatientAsync(
             request.PatientId,
-            AppointmentType.ClinicVisit,
             statuses,
             pageNumber,
             pageSize,
+            request.Tab == PatientAppointmentTab.Upcoming,
             cancellationToken);
 
         var appointmentIds = appointments
@@ -67,27 +81,66 @@ public class GetPatientClinicAppointmentsQueryHandler
         // Batch feedback presence check in a single query (avoids N+1 round-trips).
         IReadOnlySet<Guid> feedbackAppointmentIds = appointmentIds.Length == 0
             ? new HashSet<Guid>()
-            : await _organisationFeedbackRepository.GetAppointmentIdsWithFeedbackAsync(
+            : await _clinicFeedbackRepository.GetAppointmentIdsWithFeedbackAsync(
                 request.PatientId,
                 appointmentIds,
                 cancellationToken);
 
+        // Fetch doctor names/avatars in batch
+        var doctorIds = appointments
+            .Where(a => a.AppointmentSlot?.OphthalId != null)
+            .Select(a => a.AppointmentSlot!.OphthalId!.Value)
+            .Distinct()
+            .ToList();
+
+        var doctorMap = await _ophthalmologistRepository.GetDoctorDetailsByIdsAsync(doctorIds, cancellationToken);
+
+        // Fetch associated orders to populate OrderId/Billing info
+        var orders = await _orderRepository.GetByAppointmentIdsAsync(appointmentIds, cancellationToken);
+        var orderMap = orders.GroupBy(o => o.AppointmentId)
+            .ToDictionary(g => g.Key!.Value, g => g.OrderByDescending(o => o.CreatedAt).First());
+
+        // In a real scenario, we'd link a staff member to the appointment lifecycle (confirmed by, etc.)
+        // For now, we don't have a direct StaffId in Appointment entity.
+
         var items = appointments
             .Where(a => a.AppointmentSlot is not null)
-            .Select(a => new ClinicAppointmentDto
+            .Select(a =>
             {
-                Id = a.Id,
-                PatientId = a.PatientId,
-                OrganisationId = a.OrganisationId ?? Guid.Empty,
-                OrganisationName = a.Organisation?.Name,
-                SlotId = a.AppointmentSlotId,
-                Date = a.AppointmentSlot!.Date,
-                StartTime = a.AppointmentSlot.StartTime,
-                EndTime = a.AppointmentSlot.EndTime,
-                VisitReason = a.VisitReason,
-                Status = a.Status,
-                CreatedAt = a.CreatedAt,
-                HasFeedback = feedbackAppointmentIds.Contains(a.Id)
+                doctorMap.TryGetValue(a.AppointmentSlot!.OphthalId ?? Guid.Empty, out var doc);
+
+                return new ClinicAppointmentDto
+                {
+                    Id = a.Id,
+                    PatientId = a.PatientId,
+                    SlotId = a.AppointmentSlotId,
+                    Date = a.AppointmentSlot!.Date,
+                    StartTime = a.AppointmentSlot.StartTime,
+                    EndTime = a.AppointmentSlot.EndTime,
+                    VisitReason = a.VisitReason,
+                    Status = a.Status.ToString(),
+                    CreatedAt = a.CreatedAt,
+                    HasFeedback = feedbackAppointmentIds.Contains(a.Id),
+                    OrganisationId = null,
+                    OrganisationName = "Aura Clinic",
+                    OphthalId = a.AppointmentSlot.OphthalId,
+                    OphthalFullName = doc.FullName ?? "Clinic Doctor",
+                    OphthalAvatarUrl = doc.AvatarUrl,
+                    StaffId = null, // No specific staff linked yet
+                    StaffName = null,
+                    
+                    // Billing info
+                    OrderId = orderMap.TryGetValue(a.Id, out var ord) ? ord.Id : null,
+                    OrderStatus = ord?.Status switch
+                    {
+                        OrderStatus.Confirmed => "PartiallyPaid",
+                        OrderStatus.Completed => "FullyPaid",
+                        _ => ord?.Status.ToString()
+                    },
+                    TotalAmount = ord?.TotalAmount,
+                    DepositAmount = ord?.DepositAmount,
+                    IsPaidDeposit = ord?.Status == OrderStatus.Confirmed || ord?.Status == OrderStatus.Completed
+                };
             })
             .ToList();
 
@@ -105,7 +158,10 @@ public class GetPatientClinicAppointmentsQueryHandler
                 AppointmentStatus.CheckedIn,
                 AppointmentStatus.InProgress
             },
-            PatientAppointmentTab.Completed => new[] { AppointmentStatus.Completed },
+            PatientAppointmentTab.Completed => new[]
+            {
+                AppointmentStatus.Completed
+            },
             PatientAppointmentTab.Cancelled => new[]
             {
                 AppointmentStatus.Cancelled,

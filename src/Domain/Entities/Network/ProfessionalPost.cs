@@ -10,7 +10,7 @@ namespace Domain.Entities.Network;
 public class ProfessionalPost : BaseEntity, IAggregateRoot
 {
     /// <summary>
-    /// Author ID - Ophthalmologist.Id or Organisation.Id (NO FK - just stores ID)
+    /// Author ID - Ophthalmologist.Id (NO FK - just stores ID)
     /// </summary>
     public Guid AuthorId { get; private set; }
     
@@ -18,11 +18,6 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
     /// Type of author
     /// </summary>
     public AuthorType AuthorType { get; private set; }
-    
-    /// <summary>
-    /// Organisation context - if posting on behalf of organisation
-    /// </summary>
-    public Guid? OrganisationId { get; private set; }
     
     /// <summary>
     /// Post content
@@ -134,7 +129,6 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
         AuthorType authorType,
         string content,
         PostCategory category,
-        Guid? organisationId = null,
         bool allowComments = true)
     {
         if (string.IsNullOrWhiteSpace(content))
@@ -144,7 +138,6 @@ public class ProfessionalPost : BaseEntity, IAggregateRoot
         AuthorType = authorType;
         Content = content;
         Category = category;
-        OrganisationId = organisationId;
         AllowComments = allowComments;
         IsRepost = false;
     }

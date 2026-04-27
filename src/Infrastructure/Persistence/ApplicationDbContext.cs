@@ -1,9 +1,11 @@
 using Domain.Common;
 using Domain.Entities.Authorization;
+using Domain.Entities.CarePlan;
 using Domain.Entities.Consultation;
-using Domain.Entities.Contracts;
 using Domain.Entities.Financial;
 using Domain.Entities.Network;
+using Domain.Entities.Network.InternalChat;
+using Domain.Entities.MedicalRecords;
 using Domain.Entities.Platform;
 using Domain.Entities.Scheduling;
 using Domain.Entities.Screening;
@@ -36,48 +38,34 @@ public class ApplicationDbContext : IdentityDbContext<
     #region DbSets - Domain Entities
 
     // Users
-    public DbSet<Organisation> Organisations => Set<Organisation>();
-    public DbSet<OrganisationOnboardingRequest> OrganisationOnboardingRequests => Set<OrganisationOnboardingRequest>();
     public DbSet<Ophthalmologist> Ophthalmologists => Set<Ophthalmologist>();
-    public DbSet<OphthalmologistEmploymentTypeChangeRequest> OphthalmologistEmploymentTypeChangeRequests => Set<OphthalmologistEmploymentTypeChangeRequest>();
     public DbSet<Patient> Patients => Set<Patient>();
-    public DbSet<OrganisationPatientLink> OrganisationPatientLinks => Set<OrganisationPatientLink>();
+    public DbSet<ClinicStaff> ClinicStaffs => Set<ClinicStaff>();
     public DbSet<Certificate> Certificates => Set<Certificate>();
-    public DbSet<Consent> Consents => Set<Consent>();
 
     // Screening
     public DbSet<AiScreening> AiScreenings => Set<AiScreening>();
     public DbSet<RetinalImage> RetinalImages => Set<RetinalImage>();
     public DbSet<ScreeningResult> ScreeningResults => Set<ScreeningResult>();
     public DbSet<MedicalDiagnosis> MedicalDiagnoses => Set<MedicalDiagnosis>();
-    public DbSet<PatientRoadmap> PatientRoadmaps => Set<PatientRoadmap>();
 
     // Consultation
     public DbSet<ConsultationSession> ConsultationSessions => Set<ConsultationSession>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
-    public DbSet<WebsiteFeedback> WebsiteFeedbacks => Set<WebsiteFeedback>();
-    public DbSet<OrganisationFeedback> OrganisationFeedbacks => Set<OrganisationFeedback>();
-    public DbSet<OphthalmologistFeedback> OphthalmologistFeedbacks => Set<OphthalmologistFeedback>();
+    public DbSet<ClinicFeedback> ClinicFeedbacks => Set<ClinicFeedback>();
 
     // Scheduling
     public DbSet<ScheduleTemplate> ScheduleTemplates => Set<ScheduleTemplate>();
     public DbSet<AppointmentSlot> AppointmentSlots => Set<AppointmentSlot>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<SlotAssignment> SlotAssignments => Set<SlotAssignment>();
+    public DbSet<PatientVisit> PatientVisits => Set<PatientVisit>();
     public DbSet<OphthalmologistLeaveRequest> OphthalmologistLeaveRequests => Set<OphthalmologistLeaveRequest>();
-    public DbSet<ExperiencePricingRule> ExperiencePricingRules => Set<ExperiencePricingRule>();
 
     // Financial
-    public DbSet<Wallet> Wallets => Set<Wallet>();
-    public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
-    public DbSet<DepositRequest> DepositRequests => Set<DepositRequest>();
-    public DbSet<WithdrawalRequest> WithdrawalRequests => Set<WithdrawalRequest>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<Payment> Payments => Set<Payment>();
-
-    // Contracts
-    public DbSet<Contract> Contracts => Set<Contract>();
-    public DbSet<ContractTemplate> ContractTemplates => Set<ContractTemplate>();
 
     // Authorization
     public DbSet<Permission> Permissions => Set<Permission>();
@@ -88,7 +76,6 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
-    public DbSet<WorkloadRequirement> WorkloadRequirements => Set<WorkloadRequirement>();
 
     // Identity
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
@@ -99,6 +86,18 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<PostComment> PostComments => Set<PostComment>();
     public DbSet<PostAttachment> PostAttachments => Set<PostAttachment>();
     public DbSet<SavedPost> SavedPosts => Set<SavedPost>();
+    
+    // Internal Chat
+    public DbSet<InternalGroupChat> InternalGroupChats => Set<InternalGroupChat>();
+    public DbSet<InternalGroupMember> InternalGroupMembers => Set<InternalGroupMember>();
+    public DbSet<InternalGroupMessage> InternalGroupMessages => Set<InternalGroupMessage>();
+
+    // Medical Records
+    public DbSet<MedicalRecord> MedicalRecords => Set<MedicalRecord>();
+
+    // Care Plan (Healthcare Roadmap)
+    public DbSet<HealthRoadmap> HealthRoadmaps => Set<HealthRoadmap>();
+    public DbSet<HealthRoadmapStep> HealthRoadmapSteps => Set<HealthRoadmapStep>();
 
     #endregion
 
@@ -155,7 +154,12 @@ public class ApplicationDbContext : IdentityDbContext<
 
         foreach (var entry in entries)
         {
-            if (entry.State == EntityState.Deleted)
+            if (entry.State == EntityState.Added)
+            {
+                entry.Property(nameof(BaseEntity.IsDeleted)).CurrentValue = false;
+                entry.Property(nameof(BaseEntity.CreatedAt)).CurrentValue = DateTime.UtcNow;
+            }
+            else if (entry.State == EntityState.Deleted)
             {
                 // For all other BaseEntity types: convert hard delete → soft delete.
                 entry.State = EntityState.Modified;
@@ -171,6 +175,12 @@ public class ApplicationDbContext : IdentityDbContext<
                 if (entry.Property(nameof(BaseEntity.CreatedAt)).IsModified)
                 {
                     entry.State = EntityState.Added;
+                    // Re-applying IsDeleted = false after the state transition is critical.
+                    // Changing entry.State to Added can cause EF Core to lose current
+                    // property values (resetting them to CLR defaults, i.e. null for
+                    // nullable-annotated booleans in shadow state), which would violate
+                    // the NOT NULL constraint on the "IsDeleted" column.
+                    entry.Property(nameof(BaseEntity.IsDeleted)).CurrentValue = false;
                     continue;
                 }
 

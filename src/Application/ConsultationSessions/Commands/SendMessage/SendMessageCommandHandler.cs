@@ -65,6 +65,13 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         if (session.ChatStatus == ChatStatus.Archived)
             return Result.Failure("Session has been archived. No new messages allowed.");
 
+        // Enforce 14-day chat lock after completion/closure
+        var referenceDate = session.ClosedAt ?? session.EndTime;
+        if (referenceDate.HasValue && DateTime.UtcNow > referenceDate.Value.AddDays(14))
+        {
+            return Result.Failure("Chat is locked as the 14-day grace period after consultation has expired.");
+        }
+
         if (session.ChatStatus == ChatStatus.MemoOnly
             && isDoctor)
         {
@@ -109,15 +116,26 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
             recipientUserId = patient?.UserId;
         }
 
-        if (recipientUserId.HasValue)
+        // Broadcast to both parties for realtime sync [FR-47]
+        var participants = new List<Guid>();
+        if (_currentUser.UserId.HasValue) participants.Add(_currentUser.UserId.Value);
+        if (recipientUserId.HasValue) participants.Add(recipientUserId.Value);
+
+        var distinctParticipants = participants.Distinct().ToList();
+        
+        // Log for diagnostic
+        Console.WriteLine($"[SignalR_Debug] Broadcasting message {chatMessage.Id} to {distinctParticipants.Count} participants. RecipientUserId: {recipientUserId}");
+
+        foreach (var userId in distinctParticipants)
         {
             await _chatHubService.BroadcastChatMessageAsync(
-                recipientUserId.Value,
+                userId,
                 new ChatMessageRealtimeDto
                 {
                     SessionId = session.Id,
                     MessageId = chatMessage.Id,
                     SenderProfileId = senderProfileId,
+                    Content = chatMessage.Message,
                     SentAt = chatMessage.SentAt
                 },
                 cancellationToken);

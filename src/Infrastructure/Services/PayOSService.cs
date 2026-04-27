@@ -1,5 +1,5 @@
 using Application.Common.Interfaces;
-using Infrastructure.Settings;
+using Application.Common.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Net.payOS;

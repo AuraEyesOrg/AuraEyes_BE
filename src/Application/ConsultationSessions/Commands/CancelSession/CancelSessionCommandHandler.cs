@@ -1,7 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
-using Domain.Entities.Financial;
 using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
@@ -15,7 +14,6 @@ namespace Application.ConsultationSessions.Commands.CancelSession;
 ///   - Patient anti-spam: max 3 cancellations per day.
 ///   - Doctor cancels → slot is burned (locked).
 ///   - Patient cancels → slot released back to Available.
-///   - 100 % wallet refund to patient.
 /// </summary>
 public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
 {
@@ -24,7 +22,6 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
 
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly IAppointmentSlotRepository _slotRepository;
-    private readonly IWalletRepository _walletRepository;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IGoogleMeetService _googleMeetService;
     private readonly IUnitOfWork _unitOfWork;
@@ -34,7 +31,6 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
     public CancelSessionCommandHandler(
         IConsultationSessionRepository sessionRepository,
         IAppointmentSlotRepository slotRepository,
-        IWalletRepository walletRepository,
         IRepository<Patient> patientRepository,
         IGoogleMeetService googleMeetService,
         IUnitOfWork unitOfWork,
@@ -43,7 +39,6 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
     {
         _sessionRepository = sessionRepository;
         _slotRepository = slotRepository;
-        _walletRepository = walletRepository;
         _patientRepository = patientRepository;
         _googleMeetService = googleMeetService;
         _unitOfWork = unitOfWork;
@@ -133,14 +128,17 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
                 var slot = await _slotRepository.GetByIdWithLockAsync(
                     session.AppointmentSlotId.Value, cancellationToken);
 
-                if (slot is not null && slot.Status == ScheduleStatus.Booked)
+                if (slot is not null && slot.BookedCount > 0)
                 {
                     if (isCancelledByDoctor)
                     {
                         slot.CancelBooking(); // Release back to Available first to allow cancellation
-                        slot.Cancel(); // "Burn" the slot — Cancelled, no rebooking
+                        if (slot.BookedCount == 0) 
+                        {
+                            slot.Block(); // "Burn" the slot — Blocked, no rebooking
+                        }
                         _logger.LogInformation(
-                            "Slot {SlotId} burned (doctor-cancelled session {SessionId}).",
+                            "Slot {SlotId} burned/released (doctor-cancelled session {SessionId}).",
                             slot.Id, session.Id);
                     }
                     else
@@ -149,52 +147,6 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
                         _logger.LogInformation(
                             "Slot {SlotId} released back to Available (patient-cancelled session {SessionId}).",
                             slot.Id, session.Id);
-                    }
-                }
-            }
-
-            // ── 7. Refund only if patient actually paid for this booking ──
-            if (session.Price > 0)
-            {
-                var patient = await _patientRepository.GetByIdAsync(session.PatientId, cancellationToken);
-                if (patient is not null && patient.UserId.HasValue)
-                {
-                    var wallet = await _walletRepository.GetByUserIdWithTransactionsAsync(patient.UserId.Value, cancellationToken);
-                    if (wallet is not null)
-                    {
-                        var hasBookingPayment = wallet.Transactions.Any(tx =>
-                            tx.TransactionType == TransactionType.Payment
-                            && tx.ReferenceType == "Booking"
-                            && tx.ReferenceId.HasValue
-                            && (tx.ReferenceId.Value == session.Id
-                                || (session.AppointmentSlotId.HasValue
-                                    && tx.ReferenceId.Value == session.AppointmentSlotId.Value)));
-
-                        if (!hasBookingPayment)
-                        {
-                            _logger.LogInformation(
-                                "Skipped refund for session {SessionId} because no booking payment transaction was found.",
-                                session.Id);
-                        }
-                        else
-                        {
-                            wallet.Deposit(session.Price, $"Refund – cancelled session {session.Id}");
-
-                            var refundTx = new WalletTransaction(
-                                wallet.Id,
-                                session.Price,
-                                TransactionType.Refund,
-                                "Consultation cancellation refund",
-                                referenceType: "Booking",
-                                referenceId: session.Id);
-
-                            wallet.AddTransaction(refundTx);
-                            await _walletRepository.AddTransactionAsync(refundTx, cancellationToken);
-
-                            _logger.LogInformation(
-                                "Refunded {Amount} VND to patient wallet {WalletId} for session {SessionId}.",
-                                session.Price, wallet.Id, session.Id);
-                        }
                     }
                 }
             }

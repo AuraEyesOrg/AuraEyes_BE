@@ -33,15 +33,9 @@ public class PatientConfiguration : IEntityTypeConfiguration<Patient>
 
         builder.Property(e => e.DiseaseHistory)
             .HasMaxLength(1000);
+        builder.Property(e => e.MedicalRecordNumber)
+            .HasMaxLength(50);
 
-        builder.Property(e => e.PurchasedAiQuota)
-            .HasDefaultValue(0);
-
-        builder.Property(e => e.UsedAiQuota)
-            .HasDefaultValue(0);
-
-        builder.Property(e => e.IsDeleted)
-            .HasDefaultValue(false);
 
         // UserId unique index — only for registered patients (non-null UserId)
         builder.HasIndex(e => e.UserId)

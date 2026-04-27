@@ -9,18 +9,13 @@ using Application.Ophthalmologists.Commands.VerifyOphthalmologist;
 using Application.Ophthalmologists.Commands.UploadCredentials;
 using Application.Ophthalmologists.Common;
 using Application.Patients.Commands.UploadAvatar;
-using Application.Ophthalmologists.Contracts.GetMyContract;
-using Application.Ophthalmologists.Contracts.UploadSignedContract;
 using Application.Ophthalmologists.Queries.GetDashboardMetrics;
+using Application.Ophthalmologists.Queries.GetReviewQueue;
 using Application.Ophthalmologists.Queries.GetOphthalmologist;
 using Application.Ophthalmologists.Queries.GetOphthalmologists;
 using Application.Ophthalmologists.LeaveRequests.Commands.CancelLeaveRequest;
 using Application.Ophthalmologists.LeaveRequests.Commands.CreateLeaveRequest;
 using Application.Ophthalmologists.LeaveRequests.Queries.GetMyLeaveRequests;
-using Application.Ophthalmologists.EmploymentTypeChangeRequests.Commands.CancelEmploymentTypeChangeRequest;
-using Application.Ophthalmologists.EmploymentTypeChangeRequests.Commands.CreateEmploymentTypeChangeRequest;
-using Application.Ophthalmologists.EmploymentTypeChangeRequests.Queries.GetMyEmploymentTypeChangeRequests;
-using Application.SystemAdmin.Contracts.Common;
 using Domain.Enums;
 using Domain.Repositories;
 using MediatR;
@@ -38,18 +33,15 @@ public class OphthalmologistsController : BaseApiController
 {
     private readonly IMediator _mediator;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IFileStorageService _fileStorageService;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
 
     public OphthalmologistsController(
         IMediator mediator,
         ICurrentUserService currentUserService,
-        IFileStorageService fileStorageService,
         IOphthalmologistRepository ophthalmologistRepository)
     {
         _mediator = mediator;
         _currentUserService = currentUserService;
-        _fileStorageService = fileStorageService;
         _ophthalmologistRepository = ophthalmologistRepository;
     }
 
@@ -449,92 +441,6 @@ public class OphthalmologistsController : BaseApiController
     }
 
     /// <summary>
-    /// Get employment type change requests for the current authenticated ophthalmologist.
-    /// </summary>
-    [HttpGet("~/api/ophthalmologist/employment-type-change-requests")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
-    [ProducesResponseType(typeof(ApiResponse<PagedResult<Application.Ophthalmologists.Common.OphthalmologistEmploymentTypeChangeRequestDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetMyEmploymentTypeChangeRequests(
-        [FromQuery] OphthalmologistEmploymentTypeChangeRequestStatus? status = null,
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 20,
-        CancellationToken cancellationToken = default)
-    {
-        var profileId = await ResolveCurrentOphthalmologistProfileIdAsync(cancellationToken);
-        if (!profileId.HasValue)
-            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
-
-        var result = await _mediator.Send(
-            new GetMyEmploymentTypeChangeRequestsQuery
-            {
-                OphthalmologistId = profileId.Value,
-                Status = status,
-                PageNumber = pageNumber,
-                PageSize = pageSize
-            },
-            cancellationToken);
-
-        return HandleResult(result);
-    }
-
-    /// <summary>
-    /// Submit an employment type change request for the current authenticated ophthalmologist.
-    /// </summary>
-    [HttpPost("~/api/ophthalmologist/employment-type-change-requests")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
-    [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CreateEmploymentTypeChangeRequest(
-        [FromBody] CreateEmploymentTypeChangeRequestApiRequest request,
-        CancellationToken cancellationToken)
-    {
-        var profileId = await ResolveCurrentOphthalmologistProfileIdAsync(cancellationToken);
-        if (!profileId.HasValue)
-            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
-
-        var result = await _mediator.Send(
-            new CreateEmploymentTypeChangeRequestCommand
-            {
-                OphthalmologistId = profileId.Value,
-                TargetEmploymentType = request.TargetEmploymentType,
-                Reason = request.Reason
-            },
-            cancellationToken);
-
-        return HandleResult(result, "Employment type change request submitted successfully.");
-    }
-
-    /// <summary>
-    /// Cancel a pending employment type change request owned by current authenticated ophthalmologist.
-    /// </summary>
-    [HttpPost("~/api/ophthalmologist/employment-type-change-requests/{requestId:guid}/cancel")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CancelEmploymentTypeChangeRequest(
-        Guid requestId,
-        CancellationToken cancellationToken)
-    {
-        var profileId = await ResolveCurrentOphthalmologistProfileIdAsync(cancellationToken);
-        if (!profileId.HasValue)
-            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
-
-        var result = await _mediator.Send(
-            new CancelEmploymentTypeChangeRequestCommand
-            {
-                RequestId = requestId,
-                OphthalmologistId = profileId.Value
-            },
-            cancellationToken);
-
-        return HandleResult(result, "Employment type change request cancelled successfully.");
-    }
-
-    /// <summary>
     /// Delete (soft-delete) an ophthalmologist profile.
     /// </summary>
     /// <param name="id">Ophthalmologist ID.</param>
@@ -582,24 +488,21 @@ public class OphthalmologistsController : BaseApiController
     }
 
     // =========================================================================
-    // CONTRACT ENDPOINTS (for the authenticated ophthalmologist)
+    // LEGACY CONTRACT ENDPOINTS (deprecated)
     // =========================================================================
 
     /// <summary>
-    /// Get the current ophthalmologist's contract.
+    /// Legacy endpoint - external contract flow for ophthalmologists has been removed.
     /// </summary>
     [HttpGet("my-contract")]
     [Authorize]
-    [ProducesResponseType(typeof(ApiResponse<ContractDetailDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status410Gone)]
     public async Task<IActionResult> GetMyContract()
     {
-        var userId = _currentUserService.UserId;
-        if (userId is null)
-            return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
-
-        var result = await _mediator.Send(new GetMyContractQuery(userId.Value));
-        return HandleResult(result);
+        await Task.CompletedTask;
+        return StatusCode(
+            StatusCodes.Status410Gone,
+            ApiResponseFactory.Error("External contract flow has been removed for ophthalmologists."));
     }
 
     [HttpGet("dashboard-metrics")]
@@ -614,51 +517,30 @@ public class OphthalmologistsController : BaseApiController
         return HandleResult(result);
     }
 
+    [HttpGet("review-queue")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<List<ReviewQueueItemDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetReviewQueue()
+    {
+        if (_currentUserService.UserId is null)
+            return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
+
+        var result = await _mediator.Send(new GetReviewQueueQuery(_currentUserService.UserId.Value));
+        return HandleResult(result);
+    }
+
     /// <summary>
-    /// Upload a signed contract document (scanned image).
+    /// Legacy endpoint - external contract flow for ophthalmologists has been removed.
     /// </summary>
     [HttpPost("my-contract/upload")]
     [Authorize]
-    [Consumes("multipart/form-data")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UploadSignedContract(IFormFile contractImage)
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status410Gone)]
+    public async Task<IActionResult> UploadSignedContract()
     {
-        var userId = _currentUserService.UserId;
-        if (userId is null)
-            return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
-
-        if (contractImage == null || contractImage.Length == 0)
-            return BadRequest(ApiResponseFactory.Error("Contract image file is required."));
-
-        // Validate file type
-        var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp", "application/pdf" };
-        if (!allowedTypes.Contains(contractImage.ContentType.ToLowerInvariant()))
-            return BadRequest(ApiResponseFactory.Error("Only JPEG, PNG, WebP and PDF files are allowed."));
-
-        // Validate file size (max 10MB)
-        if (contractImage.Length > 10 * 1024 * 1024)
-            return BadRequest(ApiResponseFactory.Error("File size must not exceed 10MB."));
-
-        // Upload to storage
-        string scannedUrl;
-        await using (var stream = contractImage.OpenReadStream())
-        {
-            scannedUrl = await _fileStorageService.SaveFileAsync(
-                stream,
-                contractImage.FileName,
-                $"ophthalmologists/contracts/{userId.Value}");
-        }
-
-        var command = new UploadSignedContractCommand
-        {
-            UserId = userId.Value,
-            ScannedDocumentUrl = scannedUrl
-        };
-
-        var result = await _mediator.Send(command);
-        return HandleResult(result, "Contract uploaded successfully. Waiting for admin verification.");
+        await Task.CompletedTask;
+        return StatusCode(
+            StatusCodes.Status410Gone,
+            ApiResponseFactory.Error("External contract flow has been removed for ophthalmologists."));
     }
 }
 
@@ -675,11 +557,5 @@ public record CreateLeaveRequestApiRequest
 {
     public DateOnly StartDate { get; init; }
     public DateOnly EndDate { get; init; }
-    public string Reason { get; init; } = string.Empty;
-}
-
-public record CreateEmploymentTypeChangeRequestApiRequest
-{
-    public OphthalmologistEmploymentType TargetEmploymentType { get; init; }
     public string Reason { get; init; } = string.Empty;
 }

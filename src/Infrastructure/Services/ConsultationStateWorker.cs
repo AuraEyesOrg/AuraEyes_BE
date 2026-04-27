@@ -97,6 +97,15 @@ public class ConsultationStateWorker : BackgroundService
             sender,
             unitOfWork,
             cancellationToken);
+
+        await ArchiveExpiredClinicSessionsAsync(
+            sessionRepo,
+            patientRepo,
+            ophthalmologistRepo,
+            chatHubService,
+            sender,
+            unitOfWork,
+            cancellationToken);
     }
 
     private async Task OpenReadySessionsAsync(
@@ -220,6 +229,67 @@ public class ConsultationStateWorker : BackgroundService
             _logger.LogInformation(
                 "ROOM_CLOSED for session {SessionId} (grace period expired)",
                 session.SessionId);
+        }
+    }
+
+    private async Task ArchiveExpiredClinicSessionsAsync(
+        IConsultationSessionRepository sessionRepo,
+        IRepository<Patient> patientRepo,
+        IRepository<Ophthalmologist> ophthalmologistRepo,
+        IChatHubService chatHubService,
+        ISender sender,
+        IUnitOfWork unitOfWork,
+        CancellationToken cancellationToken)
+    {
+        var threshold = TimeSpan.FromDays(14);
+        var sessions = await sessionRepo.GetExpiredClinicSessionsAsync(threshold, cancellationToken);
+
+        if (sessions.Count == 0) return;
+
+        _logger.LogInformation("Auto-completing {Count} clinic session(s) past 14-day window", sessions.Count);
+
+        var closedSessions = new List<(Guid SessionId, Guid PatientId, Guid? OphthalmologistId)>();
+
+        foreach (var session in sessions)
+        {
+            if (!session.OphthalmologistId.HasValue)
+            {
+                session.CompleteBySystem("ClinicFollowupWindowExpired");
+                await sessionRepo.UpdateAsync(session, cancellationToken);
+                closedSessions.Add((session.Id, session.PatientId, session.OphthalmologistId));
+                continue;
+            }
+
+            var result = await sender.Send(
+                new EndSessionCommand
+                {
+                    SessionId = session.Id,
+                    DoctorId = session.OphthalmologistId.Value,
+                    Reason = "ClinicFollowupWindowExpired"
+                },
+                cancellationToken);
+
+            if (result.IsSuccess)
+            {
+                closedSessions.Add((session.Id, session.PatientId, session.OphthalmologistId));
+            }
+        }
+
+        foreach (var session in closedSessions)
+        {
+            var userIds = await ResolveParticipantUserIdsAsync(
+                session.PatientId, session.OphthalmologistId,
+                patientRepo, ophthalmologistRepo, cancellationToken);
+
+            await chatHubService.BroadcastRoomStateChangedAsync(
+                userIds,
+                new RoomStateChangedDto
+                {
+                    SessionId = session.SessionId,
+                    Event = "ROOM_CLOSED",
+                    Timestamp = DateTime.UtcNow
+                },
+                cancellationToken);
         }
     }
 

@@ -8,6 +8,14 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
 {
     public void Configure(EntityTypeBuilder<AppointmentSlot> builder)
     {
+        builder.ToTable("AppointmentSlots", tableBuilder =>
+        {
+            // Database-level enforcement: booked_count <= capacity
+            tableBuilder.HasCheckConstraint(
+                "CK_AppointmentSlots_BookedCount_Capacity",
+                "\"BookedCount\" <= \"MaxCapacity\"");
+        });
+
         builder.Property(e => e.Status)
             .HasConversion<string>()
             .HasMaxLength(20);
@@ -16,9 +24,6 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
             .HasConversion<string>()
             .HasMaxLength(20)
             .HasDefaultValue(Domain.Enums.SlotSource.Doctor);
-
-        builder.Property(e => e.Cost)
-            .HasPrecision(18, 2);
 
         builder.Property(e => e.MaxCapacity)
             .HasDefaultValue(1);
@@ -29,34 +34,29 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
-        // Reservation tracking (for online consultations with capacity = 1)
-        builder.Property(e => e.ReservedBy)
-            .IsRequired(false);
-
-        builder.Property(e => e.ReservationExpireAt)
-            .IsRequired(false);
-
         // Relationships
         builder.HasOne(e => e.ScheduleTemplate)
             .WithMany(t => t.AppointmentSlots)
             .HasForeignKey(e => e.ScheduleTemplateId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Appointments relationship
         builder.HasMany(e => e.Appointments)
             .WithOne(a => a.AppointmentSlot)
             .HasForeignKey(a => a.AppointmentSlotId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasMany(e => e.SlotAssignments)
+            .WithOne(sa => sa.AppointmentSlot)
+            .HasForeignKey(sa => sa.AppointmentSlotId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasIndex(e => e.ScheduleTemplateId);
         builder.HasIndex(e => e.Date);
         builder.HasIndex(e => e.Status);
-        builder.HasIndex(e => new { e.ScheduleTemplateId, e.Date, e.StartTime, e.EndTime })
+        builder.HasIndex(e => new { e.ScheduleTemplateId, e.Date, e.StartTime, e.EndTime, e.OphthalId })
             .IsUnique()
             .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("UX_AppointmentSlots_TemplateDateTime");
-        builder.HasIndex(e => new { e.Status, e.ReservationExpireAt })
-            .HasFilter("\"Status\" = 'Reserved'");
         builder.HasIndex(e => new { e.Status, e.BookedCount, e.MaxCapacity })
             .HasDatabaseName("IX_AppointmentSlots_Capacity");
     }

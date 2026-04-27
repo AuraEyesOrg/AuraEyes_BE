@@ -2,23 +2,22 @@ using Application.Common.Constants;
 using Application.Common.Helpers;
 using Application.Common.Models;
 using Application.SystemAdmin.Dashboard.Queries.GetDashboardMetrics;
+using Application.SystemAdmin.Dashboard.Queries.GetDoctorStatus;
 using Application.SystemAdmin.Dashboard.Queries.GetDoctorWorkload;
 using Application.SystemAdmin.Dashboard.Queries.GetDoctorWorkloads;
-using Application.SystemAdmin.Dashboard.Queries.GetPartTimeSlotQuotaUsage;
+using Application.SystemAdmin.Dashboard.Queries.GetLiveQueue;
 using Application.SystemAdmin.Dashboard.Queries.GetPopulationRiskAnalysis;
 using Application.SystemAdmin.Dashboard.Queries.GetRecentScreenings;
 using Application.SystemAdmin.Dashboard.Queries.GetScreeningVolumeTrends;
+using Application.SystemAdmin.Dashboard.Queries.GetSlotUtilization;
 using Application.SystemAdmin.Dashboard.Queries.GetSystemHealth;
+using Application.SystemAdmin.Dashboard.Queries.GetTodaySummary;
 using Domain.Enums;
 using Infrastructure.Services;
 using MediatR;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-
 using Infrastructure.Identity.Authorization;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers.SystemAdmin;
 
@@ -140,27 +139,6 @@ public class DashboardController : BaseApiController
     }
 
     /// <summary>
-    /// Get part-time slot quota usage by day.
-    /// </summary>
-    [HttpGet("part-time-slot-usage")]
-    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<PartTimeSlotQuotaUsageDto>>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetPartTimeSlotUsage(
-        [FromQuery] DateOnly? fromDate = null,
-        [FromQuery] DateOnly? toDate = null)
-    {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var query = new GetPartTimeSlotQuotaUsageQuery
-        {
-            FromDate = fromDate ?? today,
-            ToDate = toDate ?? today.AddDays(7)
-        };
-
-        var result = await _mediator.Send(query);
-        return HandleResult(result);
-    }
-
-    /// <summary>
     /// Get weekly/monthly workload compliance for a single doctor.
     /// Working hours are calculated from completed consultation sessions only.
     /// </summary>
@@ -251,5 +229,49 @@ public class DashboardController : BaseApiController
             return StatusCode(StatusCodes.Status500InternalServerError,
                 ApiResponseFactory.InternalServerError("Failed to trigger full-time rolling-window job."));
         }
+    }
+
+    /// <summary>
+    /// Get today's clinic operations summary.
+    /// </summary>
+    [HttpGet("today-summary")]
+    [ProducesResponseType(typeof(ApiResponse<TodaySummaryDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTodaySummary(CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new GetTodaySummaryQuery(), cancellationToken);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Get today's slot utilization overview.
+    /// </summary>
+    [HttpGet("slot-utilization")]
+    [ProducesResponseType(typeof(ApiResponse<SlotUtilizationDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetSlotUtilization(CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new GetSlotUtilizationQuery(), cancellationToken);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Get the live patient queue for today.
+    /// </summary>
+    [HttpGet("live-queue")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<LiveQueueItemDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetLiveQueue(CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new GetLiveQueueQuery(), cancellationToken);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Get current doctor status and workload for today.
+    /// </summary>
+    [HttpGet("doctor-status")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<DoctorStatusDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDoctorStatus(CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new GetDoctorStatusQuery(), cancellationToken);
+        return HandleResult(result);
     }
 }

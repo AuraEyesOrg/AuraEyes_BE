@@ -19,8 +19,6 @@ public class GetScheduleTemplatesQueryHandler : IQueryHandler<GetScheduleTemplat
         CancellationToken cancellationToken)
     {
         var (items, totalCount) = await _repository.GetPagedAsync(
-            request.OphthalId,
-            request.OrgId,
             request.DayOfWeek,
             request.PageNumber,
             request.PageSize,
@@ -29,14 +27,16 @@ public class GetScheduleTemplatesQueryHandler : IQueryHandler<GetScheduleTemplat
         var dtoList = items.Select(t => new ScheduleTemplateListDto
         {
             Id = t.Id,
-            OrgId = t.OrgId,
             OphthalId = t.OphthalId,
+            OrgId = null,
             DayOfWeek = t.DayOfWeek.ToString(),
             StartTime = t.StartTime,
             EndTime = t.EndTime,
             SlotDuration = t.SlotDuration,
             MaxCapacity = t.MaxCapacity,
             Cost = t.Cost,
+            Source = t.Source.ToString(),
+            IsActive = t.IsActive,
             CreatedAt = t.CreatedAt
         }).ToList();
 

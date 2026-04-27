@@ -32,16 +32,12 @@ public class ScheduleTemplatesController : BaseApiController
     [Authorize]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<ScheduleTemplateListDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetScheduleTemplates(
-        [FromQuery] Guid? ophthalId = null,
-        [FromQuery] Guid? orgId = null,
         [FromQuery] DayOfWeek? dayOfWeek = null,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10)
     {
         var query = new GetScheduleTemplatesQuery
         {
-            OphthalId = ophthalId,
-            OrgId = orgId,
             DayOfWeek = dayOfWeek,
             PageNumber = pageNumber,
             PageSize = pageSize
@@ -76,14 +72,11 @@ public class ScheduleTemplatesController : BaseApiController
     {
         var command = new CreateScheduleTemplateCommand
         {
-            OrgId = request.OrgId,
-            OphthalId = request.OphthalId,
             DayOfWeek = request.DayOfWeek,
             StartTime = request.StartTime,
             EndTime = request.EndTime,
             SlotDuration = request.SlotDuration,
-            MaxCapacity = request.MaxCapacity,
-            Cost = request.Cost
+            MaxCapacity = request.MaxCapacity
         };
 
         var result = await _mediator.Send(command);
@@ -118,7 +111,7 @@ public class ScheduleTemplatesController : BaseApiController
             EndTime = request.EndTime,
             SlotDuration = request.SlotDuration,
             MaxCapacity = request.MaxCapacity,
-            Cost = request.Cost
+            IsActive = request.IsActive
         };
 
         var result = await _mediator.Send(command);
@@ -143,14 +136,11 @@ public class ScheduleTemplatesController : BaseApiController
 
 public record CreateScheduleTemplateRequest
 {
-    public Guid? OrgId { get; init; }
-    public Guid? OphthalId { get; init; }
     public DayOfWeek DayOfWeek { get; init; }
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }
     public int SlotDuration { get; init; }
     public int MaxCapacity { get; init; }
-    public decimal? Cost { get; init; }
 }
 
 public record UpdateScheduleTemplateRequest
@@ -160,5 +150,5 @@ public record UpdateScheduleTemplateRequest
     public TimeOnly EndTime { get; init; }
     public int SlotDuration { get; init; }
     public int MaxCapacity { get; init; }
-    public decimal? Cost { get; init; }
+    public bool IsActive { get; init; }
 }

@@ -23,14 +23,16 @@ public class GetScheduleTemplateQueryHandler : IQueryHandler<GetScheduleTemplate
         var dto = new ScheduleTemplateDto
         {
             Id = template.Id,
-            OrgId = template.OrgId,
             OphthalId = template.OphthalId,
+            OrgId = null,
             DayOfWeek = template.DayOfWeek.ToString(),
             StartTime = template.StartTime,
             EndTime = template.EndTime,
             SlotDuration = template.SlotDuration,
             MaxCapacity = template.MaxCapacity,
             Cost = template.Cost,
+            Source = template.Source.ToString(),
+            IsActive = template.IsActive,
             CreatedAt = template.CreatedAt,
             UpdatedAt = template.UpdatedAt
         };

@@ -1,11 +1,9 @@
 using System.Text;
-using Application.AiQuota.Interfaces;
+using Application.Common.Models;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
-using Application.OrganisationScreenings.Interfaces;
 using Application.Screenings.Interfaces;
 using Application.Scheduling.ScheduleTemplates.Interfaces;
-using Application.SystemAdmin.Ophthalmologists.Interfaces;
 using Application.SystemAdmin.Interfaces;
 using Application.SystemSettings.Interfaces;
 using Domain.Common;
@@ -165,20 +163,13 @@ public static class DependencyInjection
             .AddPolicy(Policies.Authenticated, policy => policy.RequireAuthenticatedUser())
             .AddPolicy(Policies.PatientOnly, policy => policy.RequireRole(Roles.Patient))
             .AddPolicy(Policies.OphthalmologistOnly, policy => policy.RequireRole(Roles.Ophthalmologist))
-            .AddPolicy(Policies.OrgAdminOnly, policy => policy.RequireRole(Roles.OrgAdmin))
-            .AddPolicy(Policies.OphthalmologistOrOrgAdmin, policy =>
-                policy.RequireRole(Roles.Ophthalmologist, Roles.OrgAdmin))
+            .AddPolicy(Policies.ClinicStaffOnly, policy => policy.RequireRole(Roles.ClinicStaff))
+            .AddPolicy(Policies.ClinicalTeam, policy => policy.RequireRole(Roles.Ophthalmologist, Roles.ClinicStaff, Roles.SystemAdmin))
             .AddPolicy(Policies.SystemAdminOnly, policy => policy.RequireRole(Roles.SystemAdmin))
             .AddPolicy(Policies.AdminsOnly, policy => policy.RequireRole(Roles.Admins))
             .AddPolicy(Policies.MedicalStaff, policy => policy.RequireRole(Roles.Medical))
             .AddPolicy(Policies.VerifiedOphthalmologist, policy =>
-            {
-                policy.RequireRole(Roles.Ophthalmologist);
-                policy.RequireClaim("IsVerified", "True");
-            })
-            .AddPolicy(Policies.OrganizationMember, policy =>
-                policy.RequireAssertion(context =>
-                    context.User.HasClaim(c => c.Type == "org_id" && !string.IsNullOrEmpty(c.Value))));
+                policy.RequireRole(Roles.Ophthalmologist));
 
         // Register Permission-based policies dynamically from Permissions constant class
         foreach (var prop in typeof(Permissions).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.FlattenHierarchy))
@@ -196,25 +187,23 @@ public static class DependencyInjection
         // Register repositories
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IOphthalmologistRepository, OphthalmologistRepository>();
-        services.AddScoped<IWalletRepository, WalletRepository>();
-        services.AddScoped<IDepositRequestRepository, DepositRequestRepository>();
-        services.AddScoped<IWithdrawalRequestRepository, WithdrawalRequestRepository>();
+        services.AddScoped<IClinicStaffRepository, ClinicStaffRepository>();
         services.AddScoped<IOphthalmologistLeaveRequestRepository, OphthalmologistLeaveRequestRepository>();
-        services.AddScoped<IOphthalmologistEmploymentTypeChangeRequestRepository, OphthalmologistEmploymentTypeChangeRequestRepository>();
         services.AddScoped<IScheduleTemplateRepository, ScheduleTemplateRepository>();
         services.AddScoped<IAppointmentSlotRepository, AppointmentSlotRepository>();
-        services.AddScoped<IExperiencePricingRuleRepository, ExperiencePricingRuleRepository>();
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
+        services.AddScoped<ISlotAssignmentRepository, SlotAssignmentRepository>();
+        services.AddScoped<IPatientVisitRepository, PatientVisitRepository>();
+        services.AddScoped<IHealthRoadmapRepository, HealthRoadmapRepository>();
         services.AddScoped<IConsultationSessionRepository, ConsultationSessionRepository>();
-        services.AddScoped<IOrganisationFeedbackRepository, OrganisationFeedbackRepository>();
-        services.AddScoped<IOphthalmologistFeedbackRepository, OphthalmologistFeedbackRepository>();
+        services.AddScoped<IClinicFeedbackRepository, ClinicFeedbackRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
-        services.AddScoped<IContractTemplateRepository, ContractTemplateRepository>();
-        services.AddScoped<IContractRepository, ContractRepository>();
         services.AddScoped<IPostRepository, PostRepository>();
         services.AddScoped<IAiScreeningQuery, AiScreeningQuery>();
-        services.AddScoped<IOrganisationPatientsRepository, OrganisationPatientsRepository>();
         services.AddScoped<IOphthalmologistScreeningsReadRepository, OphthalmologistScreeningsReadRepository>();
+        services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<IMedicalRecordRepository, MedicalRecordRepository>();
 
         // Register Identity Services
         services.AddScoped<IIdentityService, IdentityService>();
@@ -225,63 +214,32 @@ public static class DependencyInjection
         // Register other services
         services.AddTransient<IDateTime, DateTimeService>();
         services.AddTransient<IEmailService, EmailService>();
-        services.AddScoped<IOrganisationOnboardingService, OrganisationOnboardingService>();
+        services.AddScoped<IClinicVisitService, ClinicVisitService>();
         services.AddScoped<IFileStorageService, CloudinaryStorageService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IGoogleMeetService, GoogleMeetService>();
-        services.AddScoped<IPatientRoadmapGenerationService, PatientRoadmapGenerationService>();
         services.AddScoped<IAdminQueryService, AdminQueryService>();
-        services.AddScoped<IAiQuotaService, AiQuotaService>();
         services.AddScoped<IDashboardMetricsService, DashboardMetricsService>();
         services.AddScoped<ISystemSettingService, SystemSettingService>();
-        services.AddScoped<IOrganisationScreeningPdfService, OrganisationScreeningPdfService>();
         services.AddScoped<IPatientScreeningPdfService, PatientScreeningPdfService>();
-        services.AddScoped<IOphthalmologistContractProvisioningService, OphthalmologistContractProvisioningService>();
+        services.AddScoped<IMedicalRecordPdfService, MedicalRecordPdfService>();
         services.AddSingleton<IAiAssetBaseUrlProvider, AiAssetBaseUrlProvider>();
         services.AddSingleton<IBetterStackHeartbeatService, BetterStackHeartbeatService>();
-        services.AddScoped<IFullTimeTemplateProvisioningService, FullTimeTemplateProvisioningService>();
         services.AddScoped<IFullTimeSlotGenerationService, FullTimeSlotGenerationService>();
 
         // Background workers
         services.AddHostedService<SessionReminderWorker>();
-        services.AddHostedService<ReservationExpirationWorker>();
         services.AddHostedService<ConsultationStateWorker>();
 
         // Register Hangfire daily job
-        services.AddScoped<DailyQuotaResetJob>();
-        services.AddScoped<MonthlyQuotaResetJob>();
+
         services.AddScoped<SlotMaintenanceJob>();
         services.AddScoped<FullTimeSlotGenerationJob>();
-        services.AddScoped<MonthlySalaryJob>();
 
         // Configure PayOS Settings
         services.Configure<PayOSSettings>(configuration.GetSection(PayOSSettings.SectionName));
         services.AddScoped<IPayOSService, PayOSService>();
 
-        // Register PayOS Payout Service with IPv4-only SocketsHttpHandler
-        // to ensure requests go through the whitelisted IPv4 address (not IPv6).
-        services.AddHttpClient<IPayOSPayoutService, PayOSPayoutService>()
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-            {
-                ConnectCallback = async (context, cancellationToken) =>
-                {
-                    // Force IPv4 by resolving DNS and picking only IPv4 addresses
-                    var addresses = await System.Net.Dns.GetHostAddressesAsync(
-                        context.DnsEndPoint.Host,
-                        System.Net.Sockets.AddressFamily.InterNetwork,
-                        cancellationToken);
-                    var ipv4 = addresses.FirstOrDefault()
-                        ?? throw new InvalidOperationException(
-                            $"No IPv4 address found for {context.DnsEndPoint.Host}");
-                    var socket = new System.Net.Sockets.Socket(
-                        System.Net.Sockets.AddressFamily.InterNetwork,
-                        System.Net.Sockets.SocketType.Stream,
-                        System.Net.Sockets.ProtocolType.Tcp);
-                    socket.NoDelay = true;
-                    await socket.ConnectAsync(ipv4, context.DnsEndPoint.Port, cancellationToken);
-                    return new System.Net.Sockets.NetworkStream(socket, ownsSocket: true);
-                }
-            });
 
         return services;
     }

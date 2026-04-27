@@ -9,7 +9,15 @@ namespace Domain.Entities.Financial;
 public class Order : BaseEntity, IAggregateRoot
 {
     public Guid UserId { get; private set; }
+    public Guid? AppointmentId { get; private set; }
+    public decimal TotalAmount { get; private set; }
+    public decimal? DepositAmount { get; private set; }
+    public string? Description { get; private set; }
     public OrderStatus Status { get; private set; }
+
+    public decimal PaidAmount => _payments
+        .Where(p => p.Status == PaymentStatus.Completed)
+        .Sum(p => p.Amount);
 
     // Navigation properties
     private readonly List<Payment> _payments = new();
@@ -17,9 +25,13 @@ public class Order : BaseEntity, IAggregateRoot
 
     private Order() { } // EF Core
 
-    public Order(Guid userId)
+    public Order(Guid userId, decimal totalAmount, decimal? depositAmount = null, string? description = null, Guid? appointmentId = null)
     {
         UserId = userId;
+        TotalAmount = totalAmount;
+        DepositAmount = depositAmount;
+        Description = description;
+        AppointmentId = appointmentId;
         Status = OrderStatus.Pending;
     }
 
@@ -43,8 +55,8 @@ public class Order : BaseEntity, IAggregateRoot
 
     public void Complete()
     {
-        if (Status != OrderStatus.Processing)
-            throw new InvalidOperationException("Only processing orders can be completed");
+        if (Status != OrderStatus.Processing && Status != OrderStatus.Confirmed && Status != OrderStatus.Pending)
+            throw new InvalidOperationException("Cannot complete order in current status");
 
         Status = OrderStatus.Completed;
         UpdatedAt = DateTime.UtcNow;

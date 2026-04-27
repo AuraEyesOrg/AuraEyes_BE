@@ -89,7 +89,7 @@ public class ProfessionalPostConfiguration : IEntityTypeConfiguration<Profession
 
         // Indexes for performance
         builder.HasIndex(e => e.AuthorId);
-        builder.HasIndex(e => e.OrganisationId);
+
         builder.HasIndex(e => e.Category);
         builder.HasIndex(e => e.CreatedAt);
         builder.HasIndex(e => new { e.AuthorId, e.AuthorType });

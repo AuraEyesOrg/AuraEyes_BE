@@ -1,29 +1,37 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
-using Domain.Entities.Users;
+using Domain.Entities.MedicalRecords;
+using Domain.Entities.Scheduling;
 using Domain.Enums;
 using Domain.Repositories;
+using Application.Common.Constants;
 
 namespace Application.Scheduling.Appointments.Commands.CheckInClinicAppointment;
 
 public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInClinicAppointmentCommand>
 {
     private readonly IAppointmentRepository _appointmentRepository;
-    private readonly IRepository<Organisation> _organisationRepository;
-    private readonly ICurrentUserService _currentUser;
+    private readonly IPatientVisitRepository _patientVisitRepository;
+    private readonly IMedicalRecordRepository _medicalRecordRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService _notificationService;
+    private readonly IIdentityService _identityService;
 
     public CheckInClinicAppointmentCommandHandler(
         IAppointmentRepository appointmentRepository,
-        IRepository<Organisation> organisationRepository,
-        ICurrentUserService currentUser,
-        IUnitOfWork unitOfWork)
+        IPatientVisitRepository patientVisitRepository,
+        IMedicalRecordRepository medicalRecordRepository,
+        IUnitOfWork unitOfWork,
+        INotificationService notificationService,
+        IIdentityService identityService)
     {
         _appointmentRepository = appointmentRepository;
-        _organisationRepository = organisationRepository;
-        _currentUser = currentUser;
+        _patientVisitRepository = patientVisitRepository;
+        _medicalRecordRepository = medicalRecordRepository;
         _unitOfWork = unitOfWork;
+        _notificationService = notificationService;
+        _identityService = identityService;
     }
 
     public async Task<Result> Handle(CheckInClinicAppointmentCommand request, CancellationToken cancellationToken)
@@ -34,49 +42,66 @@ public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInCli
             return Result.NotFound($"Clinic appointment '{request.AppointmentId}' not found.");
         }
 
-        if (appointment.Type != AppointmentType.ClinicVisit)
+        if (appointment.Status is AppointmentStatus.Cancelled or AppointmentStatus.NoShow)
         {
-            return Result.Failure("Only clinic visit appointments support check-in.");
+            return Result.Failure("Cannot check in a cancelled or no-show appointment.");
         }
 
-        var access = await HasOrganisationAccessAsync(appointment.OrganisationId, cancellationToken);
-        if (!access.IsSuccess)
+        var existingVisit = await _patientVisitRepository.GetByAppointmentIdAsync(request.AppointmentId, cancellationToken);
+        if (existingVisit is not null)
         {
-            return access;
-        }
-
-        try
-        {
-            appointment.CheckIn();
-            await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-
             return Result.Success();
         }
-        catch (InvalidOperationException ex)
-        {
-            return Result.Failure(ex.Message);
-        }
-    }
 
-    private async Task<Result> HasOrganisationAccessAsync(Guid? organisationId, CancellationToken cancellationToken)
-    {
-        if (_currentUser.UserId is null)
+        if (appointment.Status == AppointmentStatus.Pending)
         {
-            return Result.Unauthorized("Authenticated user is required.");
+            appointment.Confirm();
         }
 
-        if (!organisationId.HasValue)
+        appointment.CheckIn();
+        await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
+
+        var visit = PatientVisit.CreateFromAppointment(appointment);
+        await _patientVisitRepository.AddAsync(visit, cancellationToken);
+
+        // Create initial empty Medical Record (Step 1 requirement)
+        var medicalRecordNumber = $"MT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}";
+        var medicalRecord = new Domain.Entities.MedicalRecords.MedicalRecord(visit.PatientId, medicalRecordNumber);
+        medicalRecord.LinkToPatientVisit(visit.Id);
+        
+        // Pre-fill administrative data if possible (e.g., from patient profile)
+        // For now, initialized with empty JSON as required
+        medicalRecord.UpdateAdministrativeInfo("{}"); 
+        
+        await _medicalRecordRepository.AddAsync(medicalRecord, cancellationToken);
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Resolve patient name for notification
+        string patientName = "Patient";
+        if (appointment.Patient != null)
         {
-            return Result.Failure("Appointment does not belong to an organisation.");
+            if (appointment.Patient.UserId.HasValue)
+            {
+                var user = await _identityService.GetUserByIdAsync(appointment.Patient.UserId.Value, cancellationToken);
+                patientName = user?.FullName ?? "Patient";
+            }
+            else if (!string.IsNullOrWhiteSpace(appointment.Patient.FullName))
+            {
+                patientName = appointment.Patient.FullName;
+            }
         }
 
-        var hasAccess = await _organisationRepository.ExistsAsync(
-            o => o.Id == organisationId.Value && o.OwnerId == _currentUser.UserId.Value,
-            cancellationToken);
+        // Notify Coordinator (ClinicStaff) that a patient has checked in
+        await _notificationService.SendToRoleAsync(
+            roleName: Roles.ClinicStaff,
+            title: "New Patient in Queue",
+            message: $"{patientName} has checked in and is waiting for screening.",
+            type: NotificationType.SystemAlert,
+            payload: new { VisitId = visit.Id, PatientId = visit.PatientId },
+            cancellationToken: cancellationToken
+        );
 
-        return hasAccess
-            ? Result.Success()
-            : Result.Forbidden("You are not authorized to operate appointments of this organisation.");
+        return Result.Success();
     }
 }

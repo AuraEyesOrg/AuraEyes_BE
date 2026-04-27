@@ -1,16 +1,14 @@
 using Domain.Common;
-using Domain.Entities.Users;
 
 namespace Domain.Entities.Screening;
 
 /// <summary>
 /// AI Screening entity - contains AI processing results.
-/// Each session is owned by a Patient and requires exactly one Consent record.
+/// Each session is owned by a Patient.
 /// </summary>
 public class AiScreening : BaseEntity, IAggregateRoot
 {
     public Guid PatientId { get; private set; }
-    public Guid? OrganisationId { get; private set; }
     public string ModelVersion { get; private set; } = string.Empty;
     public DateTime? ProcessedAt { get; private set; }
 
@@ -28,18 +26,15 @@ public class AiScreening : BaseEntity, IAggregateRoot
     private readonly List<ScreeningResult> _screeningResults = new();
     public IReadOnlyCollection<ScreeningResult> ScreeningResults => _screeningResults.AsReadOnly();
 
-    /// <summary>1:1 consent that must accompany every AI session.</summary>
-    public Consent? Consent { get; private set; }
 
     private AiScreening() { } // EF Core
 
-    public AiScreening(Guid patientId, string modelVersion, Guid? organisationId = null)
+    public AiScreening(Guid patientId, string modelVersion)
     {
         if (string.IsNullOrWhiteSpace(modelVersion))
             throw new ArgumentException("Model version cannot be empty", nameof(modelVersion));
 
         PatientId = patientId;
-        OrganisationId = organisationId;
         ModelVersion = modelVersion;
         IsActive = true;
     }
@@ -69,46 +64,4 @@ public class AiScreening : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void RecordConsent(Guid patientId, string consentContent)
-    {
-        if (patientId == Guid.Empty)
-            throw new ArgumentException("PatientId cannot be empty", nameof(patientId));
-
-        if (patientId != PatientId)
-            throw new InvalidOperationException("Consent can only be recorded by the screening owner.");
-
-        if (string.IsNullOrWhiteSpace(consentContent))
-            throw new ArgumentException("Consent content cannot be empty", nameof(consentContent));
-
-        var normalizedContent = consentContent.Trim();
-
-        if (Consent is null)
-        {
-            Consent = new Consent(Id, patientId, normalizedContent);
-            Consent.Agree();
-            UpdatedAt = DateTime.UtcNow;
-            return;
-        }
-
-        if (Consent.PatientId != patientId)
-            throw new InvalidOperationException("Existing consent owner does not match screening owner.");
-
-        var mergedContent = Consent.Content;
-        if (!mergedContent.Contains(normalizedContent, StringComparison.Ordinal))
-        {
-            mergedContent = string.IsNullOrWhiteSpace(mergedContent)
-                ? normalizedContent
-                : $"{mergedContent}\n\n{normalizedContent}";
-        }
-
-        Consent.Agree(mergedContent);
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    public bool HasAgreedConsent(Guid patientId)
-    {
-        return Consent is not null
-               && Consent.IsAgreed
-               && Consent.PatientId == patientId;
-    }
 }

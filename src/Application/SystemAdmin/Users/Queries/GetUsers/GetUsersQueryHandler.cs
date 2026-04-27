@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Domain.Repositories;
 
 namespace Application.SystemAdmin.Users.Queries.GetUsers;
 
@@ -9,10 +10,17 @@ namespace Application.SystemAdmin.Users.Queries.GetUsers;
 public class GetUsersQueryHandler : IQueryHandler<GetUsersQuery, PagedResult<UserListDto>>
 {
     private readonly IIdentityService _identityService;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IClinicStaffRepository _clinicStaffRepository;
 
-    public GetUsersQueryHandler(IIdentityService identityService)
+    public GetUsersQueryHandler(
+        IIdentityService identityService, 
+        IOphthalmologistRepository ophthalmologistRepository,
+        IClinicStaffRepository clinicStaffRepository)
     {
         _identityService = identityService;
+        _ophthalmologistRepository = ophthalmologistRepository;
+        _clinicStaffRepository = clinicStaffRepository;
     }
 
     public async Task<Result<PagedResult<UserListDto>>> Handle(
@@ -27,18 +35,33 @@ public class GetUsersQueryHandler : IQueryHandler<GetUsersQuery, PagedResult<Use
             request.PageSize,
             cancellationToken);
 
-        var items = users.Select(u => new UserListDto
-        {
-            Id = u.Id,
-            Email = u.Email,
-            FullName = u.FullName,
-            PhoneNumber = u.PhoneNumber,
-            Roles = u.Roles,
-            Status = u.Status,
-            IsActive = u.IsActive,
-            EmailConfirmed = u.EmailConfirmed,
-            CreatedAt = u.CreatedAt,
-            LastLoginAt = u.LastLoginAt
+        var ophthalmologists = await _ophthalmologistRepository.GetAllAsync(cancellationToken);
+        var ophthalmologistLookup = ophthalmologists.ToDictionary(o => o.UserId, o => o);
+
+        var clinicStaffs = await _clinicStaffRepository.GetAllAsync(cancellationToken);
+        var clinicStaffLookup = clinicStaffs.ToDictionary(cs => cs.UserId, cs => cs);
+
+        var items = users.Select(u => {
+            var ophthalmologist = ophthalmologistLookup.TryGetValue(u.Id, out var o) ? o : null;
+            var clinicStaff = clinicStaffLookup.TryGetValue(u.Id, out var cs) ? cs : null;
+
+            return new UserListDto
+            {
+                Id = u.Id,
+                Email = u.Email,
+                FullName = u.FullName,
+                PhoneNumber = u.PhoneNumber,
+                Roles = u.Roles,
+                Status = u.Status,
+                IsActive = u.IsActive,
+                EmailConfirmed = u.EmailConfirmed,
+                CreatedAt = u.CreatedAt,
+                LastLoginAt = u.LastLoginAt,
+                ConsultationFee = ophthalmologist?.ConsultationFee,
+                OphthalmologistId = ophthalmologist?.Id,
+                SubRoles = clinicStaff?.SubRoles.Select(sr => sr.ToString()).ToList() ?? new List<string>(),
+                ClinicStaffId = clinicStaff?.Id
+            };
         }).ToList();
 
         var pagedResult = new PagedResult<UserListDto>(

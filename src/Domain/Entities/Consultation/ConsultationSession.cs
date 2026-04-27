@@ -12,7 +12,6 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
 {
     public Guid PatientId { get; private set; }
     public Guid? OphthalmologistId { get; private set; }
-    public Guid? OrganisationId { get; private set; }
     public Guid? AiScreeningId { get; private set; }
 
     /// <summary>FK to AppointmentSlot - links this session to a specific appointment slot.</summary>
@@ -62,7 +61,9 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
         Guid patientId,
         Guid aiScreeningId,
         decimal price,
-        Guid? ophthalmologistId = null)
+        Guid? ophthalmologistId = null,
+        bool shareRetinalImages = false,
+        bool shareAiResults = false)
     {
         return new ConsultationSession
         {
@@ -73,6 +74,8 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
             Status = SessionStatus.Pending,
             ChatStatus = ChatStatus.Locked,
             Price = price,
+            IsRetinalImagesShared = shareRetinalImages,
+            IsAIResultShared = shareAiResults,
             LastActivityAt = DateTime.UtcNow
         };
     }
@@ -119,18 +122,13 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     /// </summary>
     public static ConsultationSession CreateClinicBooking(
         Guid patientId,
-        Guid organisationId,
         decimal price,
         DateTime appointmentTime,
         Guid? ophthalmologistId = null)
     {
-        if (appointmentTime <= DateTime.UtcNow.AddMinutes(1))
-            throw new ArgumentException("Appointment time must be in the future", nameof(appointmentTime));
-
         return new ConsultationSession
         {
             PatientId = patientId,
-            OrganisationId = organisationId,
             OphthalmologistId = ophthalmologistId,
             Type = ConsultationSessionType.ClinicBooking,
             Status = SessionStatus.Pending,
@@ -153,6 +151,16 @@ public class ConsultationSession : BaseEntity, IAggregateRoot
     public void AssignDoctor(Guid ophthalmologistId)
     {
         OphthalmologistId = ophthalmologistId;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void ShareScreeningDataWithDoctor()
+    {
+        if (!AiScreeningId.HasValue)
+            throw new InvalidOperationException("Cannot share screening data without a linked AI screening.");
+
+        IsRetinalImagesShared = true;
+        IsAIResultShared = true;
         UpdatedAt = DateTime.UtcNow;
     }
 

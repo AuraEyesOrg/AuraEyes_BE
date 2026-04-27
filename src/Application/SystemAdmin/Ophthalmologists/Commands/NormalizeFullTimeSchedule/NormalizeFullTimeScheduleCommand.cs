@@ -1,12 +1,12 @@
+using Application.Common.Interfaces;
 using Application.Common.Models;
-using MediatR;
 
 namespace Application.SystemAdmin.Ophthalmologists.Commands.NormalizeFullTimeSchedule;
 
 /// <summary>
 /// Normalizes full-time ophthalmologist schedules to canonical system-generated weekday templates and reconciles future slots.
 /// </summary>
-public record NormalizeFullTimeScheduleCommand : IRequest<Result<NormalizeFullTimeScheduleResultDto>>
+public record NormalizeFullTimeScheduleCommand : ICommand<NormalizeFullTimeScheduleResultDto>
 {
     public Guid OphthalmologistId { get; init; }
     public int? WindowDays { get; init; }

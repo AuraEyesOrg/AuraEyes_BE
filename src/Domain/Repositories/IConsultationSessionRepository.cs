@@ -63,4 +63,11 @@ public interface IConsultationSessionRepository : IRepository<ConsultationSessio
     Task<int> CountCancelledTodayByPatientAsync(
         Guid patientId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns ClinicBooking sessions in Open chat status that have exceeded the 14-day window.
+    /// </summary>
+    Task<IReadOnlyList<ConsultationSession>> GetExpiredClinicSessionsAsync(
+        TimeSpan threshold,
+        CancellationToken cancellationToken = default);
 }

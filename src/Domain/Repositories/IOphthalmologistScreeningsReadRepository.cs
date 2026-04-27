@@ -13,7 +13,8 @@ public interface IOphthalmologistScreeningsReadRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get detailed screening information with access control and consent-based data redaction.
+    /// Get detailed screening information with access control.
+    /// Assigned doctors for verification/clinic sessions can always view full screening data.
     /// Returns null if consultation session not found or access denied.
     /// </summary>
     Task<OphthalmologistScreeningDetailReadModel?> GetDetailForOphthalmologistAsync(
@@ -43,7 +44,7 @@ public sealed record OphthalmologistScreeningListReadModel
 }
 
 /// <summary>
-/// Read model for ophthalmologist screening detail view with consent-aware data redaction.
+/// Read model for ophthalmologist screening detail view.
 /// </summary>
 public sealed record OphthalmologistScreeningDetailReadModel
 {
@@ -53,11 +54,8 @@ public sealed record OphthalmologistScreeningDetailReadModel
     public required string ModelVersion { get; init; }
     public required DateTime CreatedAt { get; init; }
     public DateTime? ProcessedAt { get; init; }
-    // Null if IsAIResultShared = false (redacted by repository)
     public string? RawJsonOutput { get; init; }
-    // Empty if IsRetinalImagesShared = false (filtered by repository)
     public required IReadOnlyList<OphthalmologistRetinalImageReadModel> Images { get; init; }
-    // Null if IsAIResultShared = false (redacted by repository)
     public OphthalmologistScreeningResultReadModel? LatestResult { get; init; }
     /// <summary>pending-review | reviewed | approved | flagged</summary>
     public required string ReviewStatus { get; init; }

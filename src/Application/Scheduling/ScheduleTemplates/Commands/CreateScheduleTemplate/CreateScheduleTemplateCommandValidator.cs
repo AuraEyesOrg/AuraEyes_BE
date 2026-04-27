@@ -6,14 +6,6 @@ public class CreateScheduleTemplateCommandValidator : AbstractValidator<CreateSc
 {
     public CreateScheduleTemplateCommandValidator()
     {
-        RuleFor(x => x)
-            .Must(x => x.OrgId.HasValue || x.OphthalId.HasValue)
-            .WithMessage("At least one of OrgId or OphthalId must be provided.");
-
-        RuleFor(x => x)
-            .Must(x => !(x.OrgId.HasValue && x.OphthalId.HasValue))
-            .WithMessage("OrgId must be null when OphthalId is provided.");
-
         RuleFor(x => x.DayOfWeek)
             .IsInEnum()
             .WithMessage("Invalid day of week.");
@@ -35,14 +27,5 @@ public class CreateScheduleTemplateCommandValidator : AbstractValidator<CreateSc
         RuleFor(x => x.MaxCapacity)
             .GreaterThanOrEqualTo(1)
             .WithMessage("Max capacity must be at least 1.");
-
-        RuleFor(x => x.Cost)
-            .GreaterThan(0)
-            .When(x => x.Cost.HasValue)
-            .WithMessage("Cost must be a positive value.");
-
-        RuleFor(x => x.Cost)
-            .Must(cost => !cost.HasValue || decimal.Truncate(cost.Value) == cost.Value)
-            .WithMessage("Cost must be an integer value.");
     }
 }

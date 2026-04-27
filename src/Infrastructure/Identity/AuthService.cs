@@ -11,6 +11,7 @@ using Domain.Repositories;
 using Google.Apis.Auth;
 using Infrastructure.Settings;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -32,13 +33,11 @@ public class AuthService : IAuthService
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenService _refreshTokenService;
     private readonly IEmailService _emailService;
-    private readonly IOrganisationOnboardingService _organisationOnboardingService;
     private readonly INotificationService _notificationService;
     private readonly IFileStorageService _fileStorageService;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
-    private readonly IContractRepository _contractRepository;
-    private readonly IFullTimeTemplateProvisioningService _fullTimeTemplateProvisioningService;
+    private readonly IClinicStaffRepository _clinicStaffRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
@@ -50,13 +49,11 @@ public class AuthService : IAuthService
         ITokenService tokenService,
         IRefreshTokenService refreshTokenService,
         IEmailService emailService,
-        IOrganisationOnboardingService organisationOnboardingService,
         INotificationService notificationService,
         IFileStorageService fileStorageService,
         IRepository<Patient> patientRepository,
         IRepository<Ophthalmologist> ophthalmologistRepository,
-        IContractRepository contractRepository,
-        IFullTimeTemplateProvisioningService fullTimeTemplateProvisioningService,
+        IClinicStaffRepository clinicStaffRepository,
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
@@ -67,13 +64,11 @@ public class AuthService : IAuthService
         _tokenService = tokenService;
         _refreshTokenService = refreshTokenService;
         _emailService = emailService;
-        _organisationOnboardingService = organisationOnboardingService;
         _notificationService = notificationService;
         _fileStorageService = fileStorageService;
         _patientRepository = patientRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
-        _contractRepository = contractRepository;
-        _fullTimeTemplateProvisioningService = fullTimeTemplateProvisioningService;
+        _clinicStaffRepository = clinicStaffRepository;
         _unitOfWork = unitOfWork;
         _userManager = userManager;
         _signInManager = signInManager;
@@ -107,7 +102,9 @@ public class AuthService : IAuthService
                 FullName = request.FullName,
                 Address = request.Address,
                 DateOfBirth = request.DateOfBirth,
-                Gender = request.Gender.HasValue ? (Gender)request.Gender.Value : null
+                Gender = request.Gender.HasValue ? (Gender)request.Gender.Value : null,
+                PhoneNumber = request.PhoneNumber,
+                CitizenId = request.CitizenId
             };
 
             var createResult = await _userManager.CreateAsync(user, request.Password);
@@ -120,8 +117,8 @@ public class AuthService : IAuthService
             // Add to Patient role
             await _identityService.AddToRoleAsync(user.Id, Roles.Patient);
 
-            // Create Patient profile using Repository pattern
-            var patient = new Patient(user.Id, null);
+            // Create Patient profile using factory method (ensures IsDeleted = false)
+            var patient = Patient.CreateRegistered(user.Id);
             await _patientRepository.AddAsync(patient, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -245,8 +242,7 @@ public class AuthService : IAuthService
             {
                 UserName = request.Email,
                 Email = request.Email,
-                FullName = request.FullName,
-                OrganizationId = request.OrganizationId
+                FullName = request.FullName
             };
 
             var createResult = await _userManager.CreateAsync(user, request.Password);
@@ -313,17 +309,6 @@ public class AuthService : IAuthService
 
             await _ophthalmologistRepository.AddAsync(ophthalmologist, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-            if (ophthalmologist.EmploymentType == OphthalmologistEmploymentType.FullTime)
-            {
-                var createdTemplates = await _fullTimeTemplateProvisioningService
-                    .EnsureSystemGeneratedTemplatesAsync(ophthalmologist, cancellationToken);
-
-                _logger.LogInformation(
-                    "Provisioned {CreatedTemplates} system templates for newly registered full-time ophthalmologist {OphthalmologistId}",
-                    createdTemplates,
-                    ophthalmologist.Id);
-            }
 
             // All DB operations succeeded — commit transaction
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
@@ -484,11 +469,6 @@ public class AuthService : IAuthService
         return value.HasValue ? EnsureUtc(value.Value) : null;
     }
 
-    public Task<Result<OrganisationRegistrationResponse>> RegisterOrganisationAsync(
-        RegisterOrganisationRequest request,
-        CancellationToken cancellationToken = default)
-        => _organisationOnboardingService.SubmitRequestAsync(request, cancellationToken);
-
     /// <inheritdoc />
     public async Task<Result<LoginResponse>> GoogleLoginAsync(
         GoogleLoginRequest request,
@@ -613,7 +593,7 @@ public class AuthService : IAuthService
 
             await _identityService.AddToRoleAsync(newUser.Id, Roles.Patient);
 
-            var patient = new Patient(newUser.Id, null);
+            var patient = Patient.CreateRegistered(newUser.Id);
             await _patientRepository.AddAsync(patient, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
@@ -706,6 +686,35 @@ public class AuthService : IAuthService
         }
     }
 
+    public async Task<Result<LookupAccountByCitizenIdResponse>> LookupAccountByCitizenIdAsync(
+        string citizenId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(citizenId))
+        {
+            return Result<LookupAccountByCitizenIdResponse>.Failure("Citizen ID is required.");
+        }
+
+        var normalizedCitizenId = citizenId.Trim();
+        var user = await _userManager.Users
+            .FirstOrDefaultAsync(u => u.CitizenId == normalizedCitizenId && !u.IsDeleted, cancellationToken);
+
+        if (user == null)
+        {
+            return Result<LookupAccountByCitizenIdResponse>.Success(new LookupAccountByCitizenIdResponse
+            {
+                Exists = false,
+                MaskedEmail = null
+            });
+        }
+
+        return Result<LookupAccountByCitizenIdResponse>.Success(new LookupAccountByCitizenIdResponse
+        {
+            Exists = true,
+            MaskedEmail = MaskEmailForLookup(user.Email)
+        });
+    }
+
     /// <inheritdoc />
     public async Task<Result<AuthResponse>> VerifyTwoFactorLoginAsync(
         VerifyTwoFactorRequest request,
@@ -757,6 +766,29 @@ public class AuthService : IAuthService
         }
     }
 
+    private static string? MaskEmailForLookup(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return null;
+        }
+
+        var parts = email.Split('@');
+        if (parts.Length != 2)
+        {
+            return null;
+        }
+
+        var local = parts[0];
+        var domain = parts[1];
+        if (local.Length <= 2)
+        {
+            return $"**@{domain}";
+        }
+
+        return $"{local[..2]}***@{domain}";
+    }
+
     /// <summary>
     /// Helper method to complete login and generate tokens.
     /// </summary>
@@ -794,12 +826,12 @@ public class AuthService : IAuthService
 
         _logger.LogInformation("User logged in: {Email}", user.Email);
 
-        // Resolve role-specific profile entity (PatientId / OphthalmologistId)
+        // Resolve role-specific profile entity
         Guid? roleId = null;
         bool? isVerified = null;
         string? verificationStatus = null;
-        string? contractStatus = null;
         string? employmentType = null;
+        string? staffSubRoles = null;
 
         if (roles.Contains(Roles.Patient))
         {
@@ -820,15 +852,16 @@ public class AuthService : IAuthService
                 employmentType = doctors[0].EmploymentType.ToString();
             }
         }
-
-        if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+        else if (roles.Contains(Roles.ClinicStaff))
         {
-            var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
-            if (contract != null)
+            var staff = await _clinicStaffRepository.GetByUserIdAsync(user.Id, cancellationToken);
+            if (staff is not null)
             {
-                contractStatus = contract.Status.ToString();
+                roleId = staff.Id;
+                staffSubRoles = staff.SubRoles;
             }
         }
+
 
         var providerAvatarUrl = await GetProviderAvatarUrlAsync(user);
         var uploadedAvatarUrl = user.AvatarUrl;
@@ -849,14 +882,12 @@ public class AuthService : IAuthService
                 ProviderAvatarUrl = providerAvatarUrl,
                 Roles = roles.ToArray(),
                 EmailConfirmed = user.EmailConfirmed,
-                OrganizationId = user.OrganizationId,
                 RoleId = roleId,
                 TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
-                ContractStatus = contractStatus,
-                MustChangePassword = user.MustChangePassword,
                 EmploymentType = employmentType,
+                StaffSubRoles = staffSubRoles,
                 Permissions = permissions.ToArray()
             }
         };
@@ -930,12 +961,12 @@ public class AuthService : IAuthService
 
             _logger.LogInformation("Token refreshed for user: {UserId}", user.Id);
 
-            // Resolve role-specific profile entity (PatientId / OphthalmologistId)
+            // Resolve role-specific profile entity
             Guid? roleId = null;
             bool? isVerified = null;
             string? verificationStatus = null;
-            string? contractStatus = null;
             string? employmentType = null;
+            string? staffSubRoles = null;
 
             if (roles.Contains(Roles.Patient))
             {
@@ -956,15 +987,16 @@ public class AuthService : IAuthService
                     employmentType = doctors[0].EmploymentType.ToString();
                 }
             }
-
-            if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+            else if (roles.Contains(Roles.ClinicStaff))
             {
-                var contract = await _contractRepository.GetByUserIdAsync(user.Id, cancellationToken);
-                if (contract != null)
+                var staff = await _clinicStaffRepository.GetByUserIdAsync(user.Id, cancellationToken);
+                if (staff is not null)
                 {
-                    contractStatus = contract.Status.ToString();
+                    roleId = staff.Id;
+                    staffSubRoles = staff.SubRoles;
                 }
             }
+
 
             var providerAvatarUrl = await GetProviderAvatarUrlAsync(user);
             var uploadedAvatarUrl = user.AvatarUrl;
@@ -985,14 +1017,13 @@ public class AuthService : IAuthService
                     ProviderAvatarUrl = providerAvatarUrl,
                     Roles = roles.ToArray(),
                     EmailConfirmed = user.EmailConfirmed,
-                    OrganizationId = user.OrganizationId,
                     RoleId = roleId,
                     TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
                     IsVerified = isVerified,
                     VerificationStatus = verificationStatus,
-                    ContractStatus = contractStatus,
-                    MustChangePassword = user.MustChangePassword,
+                    MustUpdateProfile = user.MustUpdateProfile,
                     EmploymentType = employmentType,
+                    StaffSubRoles = staffSubRoles,
                     Permissions = permissions.ToArray()
                 }
             });
@@ -1180,12 +1211,12 @@ public class AuthService : IAuthService
             var permissions = await _identityService.GetUserPermissionsAsync(userId);
             var twoFactorEnabled = await _identityService.IsTwoFactorEnabledAsync(userId);
 
-            // Resolve role-specific profile entity (PatientId / OphthalmologistId)
+            // Resolve role-specific profile entity
             Guid? roleId = null;
             bool? isVerified = null;
             string? verificationStatus = null;
-            string? contractStatus = null;
             string? employmentType = null;
+            string? staffSubRoles = null;
 
             if (roles.Contains(Roles.Patient))
             {
@@ -1206,15 +1237,16 @@ public class AuthService : IAuthService
                     employmentType = doctors[0].EmploymentType.ToString();
                 }
             }
-
-            if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
+            else if (roles.Contains(Roles.ClinicStaff))
             {
-                var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
-                if (contract != null)
+                var staff = await _clinicStaffRepository.GetByUserIdAsync(userId, cancellationToken);
+                if (staff is not null)
                 {
-                    contractStatus = contract.Status.ToString();
+                    roleId = staff.Id;
+                    staffSubRoles = staff.SubRoles;
                 }
             }
+
 
             return Result<UserInfoResponse>.Success(new UserInfoResponse
             {
@@ -1226,14 +1258,13 @@ public class AuthService : IAuthService
                 ProviderAvatarUrl = await GetProviderAvatarUrlAsync(identityUser),
                 Roles = roles.ToArray(),
                 EmailConfirmed = userDto.EmailConfirmed,
-                OrganizationId = userDto.OrganizationId,
                 RoleId = roleId,
                 TwoFactorEnabled = twoFactorEnabled,
                 IsVerified = isVerified,
                 VerificationStatus = verificationStatus,
-                ContractStatus = contractStatus,
-                MustChangePassword = identityUser?.MustChangePassword ?? false,
+                MustUpdateProfile = identityUser?.MustUpdateProfile ?? false,
                 EmploymentType = employmentType,
+                StaffSubRoles = staffSubRoles,
                 Permissions = permissions.ToArray()
             });
         }
@@ -1302,13 +1333,12 @@ public class AuthService : IAuthService
         return claims;
     }
 
-    private async Task<(Guid? RoleId, bool? IsVerified, string? VerificationStatus, string? ContractStatus)>
+    private async Task<(Guid? RoleId, bool? IsVerified, string? VerificationStatus)>
         ResolveRoleContextAsync(Guid userId, IList<string> roles, CancellationToken cancellationToken)
     {
         Guid? roleId = null;
         bool? isVerified = null;
         string? verificationStatus = null;
-        string? contractStatus = null;
 
         if (roles.Contains(Roles.Patient))
         {
@@ -1335,16 +1365,8 @@ public class AuthService : IAuthService
             }
         }
 
-        if (roles.Contains(Roles.Ophthalmologist) || roles.Contains(Roles.OrgAdmin))
-        {
-            var contract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
-            if (contract is not null)
-            {
-                contractStatus = contract.Status.ToString();
-            }
-        }
 
-        return (roleId, isVerified, verificationStatus, contractStatus);
+        return (roleId, isVerified, verificationStatus);
     }
 
     private async Task<Result> LinkGoogleLoginAsync(ApplicationUser user, string providerKey)

@@ -23,6 +23,7 @@ public abstract class BaseEntity
     {
         Id = id;
         CreatedAt = DateTime.UtcNow;
+        IsDeleted = false;
     }
 
     public void AddDomainEvent(IDomainEvent domainEvent)
@@ -38,5 +39,11 @@ public abstract class BaseEntity
     public void ClearDomainEvents()
     {
         _domainEvents.Clear();
+    }
+
+    public void SoftDelete()
+    {
+        IsDeleted = true;
+        UpdatedAt = DateTime.UtcNow;
     }
 }

@@ -15,18 +15,16 @@ public class CreateOphthalmologistCommandHandler : ICommandHandler<CreateOphthal
 {
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IIdentityService _identityService;
-    private readonly IFullTimeTemplateProvisioningService _fullTimeTemplateProvisioningService;
+
     private readonly IUnitOfWork _unitOfWork;
 
     public CreateOphthalmologistCommandHandler(
         IOphthalmologistRepository ophthalmologistRepository,
         IIdentityService identityService,
-        IFullTimeTemplateProvisioningService fullTimeTemplateProvisioningService,
         IUnitOfWork unitOfWork)
     {
         _ophthalmologistRepository = ophthalmologistRepository;
         _identityService = identityService;
-        _fullTimeTemplateProvisioningService = fullTimeTemplateProvisioningService;
         _unitOfWork = unitOfWork;
     }
 
@@ -61,12 +59,7 @@ public class CreateOphthalmologistCommandHandler : ICommandHandler<CreateOphthal
             await _ophthalmologistRepository.AddAsync(ophthalmologist, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            if (ophthalmologist.EmploymentType == OphthalmologistEmploymentType.FullTime)
-            {
-                await _fullTimeTemplateProvisioningService.EnsureSystemGeneratedTemplatesAsync(
-                    ophthalmologist,
-                    cancellationToken);
-            }
+            // System generated templates are clinic-level now, not doctor-level.
 
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 

@@ -1,3 +1,5 @@
+using Domain.Enums;
+
 namespace Application.Common.Interfaces;
 
 /// <summary>
@@ -25,23 +27,22 @@ public interface IIdentityService
         string password,
         string fullName,
         string role,
-        Guid? organizationId = null,
         UserProfileWalkInDto? userProfile = null,
         CancellationToken cancellationToken = default);
 
     Task<bool> CheckPasswordAsync(Guid userId, string password);
 
     Task<UserDto?> GetUserByEmailAsync(string email, CancellationToken cancellationToken = default);
+    Task<UserDto?> GetUserByCitizenIdAsync(string citizenId, CancellationToken cancellationToken = default);
 
     Task<UserDto?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<UserDto>> GetUsersByIdsAsync(IEnumerable<Guid> userIds, CancellationToken cancellationToken = default);
 
-    Task<bool> IsPhoneNumberInUseByOrganizationAsync(
-        Guid organizationId,
+    Task<bool> IsPhoneNumberInUseAsync(
         string phoneNumber,
         CancellationToken cancellationToken = default);
 
-    Task<bool> IsCitizenIdInUseByOrganizationAsync(
-        Guid organizationId,
+    Task<bool> IsCitizenIdInUseAsync(
         string citizenId,
         CancellationToken cancellationToken = default);
 
@@ -67,11 +68,10 @@ public interface IIdentityService
     Task<bool> IsInRoleAsync(Guid userId, string role);
 
     /// <summary>
-    /// Get active, non-deleted user IDs by role and organization.
+    /// Get active, non-deleted user IDs by role.
     /// </summary>
-    Task<IReadOnlyList<Guid>> GetUserIdsByRoleAndOrganizationAsync(
+    Task<IReadOnlyList<Guid>> GetUserIdsByRoleAsync(
         string role,
-        Guid organizationId,
         CancellationToken cancellationToken = default);
 
     // Account Management
@@ -158,6 +158,7 @@ public interface IIdentityService
         DateTime? dateOfBirth,
         int? gender,
         string? address,
+        string? citizenId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -177,14 +178,6 @@ public interface IIdentityService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Update user OrganizationId.
-    /// </summary>
-    Task<(bool Succeeded, string[] Errors)> UpdateUserOrganizationAsync(
-        Guid userId,
-        Guid? organizationId,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Get all effective permissions for a user (Role-based + User-based).
     /// </summary>
     Task<IList<string>> GetUserPermissionsAsync(Guid userId);
@@ -199,9 +192,24 @@ public interface IIdentityService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Finalize staff onboarding: confirms email and sets MustChangePassword flag.
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> SetStaffOnboardingStatusAsync(Guid userId);
+
+    /// <summary>
+    /// Clear the mandatory profile update flag.
+    /// </summary>
+    Task<(bool Succeeded, string[] Errors)> ClearMustUpdateProfileFlagAsync(Guid userId);
+
+    /// <summary>
     /// Synchronize all roles with their default permissions defined in code.
     /// </summary>
     Task SynchronizeRolesWithDefaultsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Synchronize a clinic staff user's explicit permissions based on their sub-roles.
+    /// </summary>
+    Task SynchronizeUserSubRolePermissionsAsync(Guid userId, IEnumerable<ClinicStaffRole> subRoles, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -214,7 +222,6 @@ public record UserDto(
     bool EmailConfirmed,
     bool IsActive,
     bool IsDeleted,
-    Guid? OrganizationId,
     bool TwoFactorEnabled = false,
     string? AvatarUrl = null
 );

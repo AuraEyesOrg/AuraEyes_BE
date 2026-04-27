@@ -36,7 +36,9 @@ public class CreateVerificationSessionCommandHandler
             request.PatientId,
             request.AiScreeningId,
             request.Price,
-            request.OphthalmologistId);
+            request.OphthalmologistId,
+            shareRetinalImages: true,
+            shareAiResults: true);
 
         await _sessionRepository.AddAsync(session, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -55,7 +57,13 @@ public class CreateVerificationSessionCommandHandler
                     "Yêu cầu tư vấn mới",
                     "Bạn có một yêu cầu xác minh kết quả sàng lọc AI mới từ bệnh nhân. Vui lòng xem chi tiết và phản hồi.",
                     NotificationType.NewConsultationRequest,
-                    new { ConsultationId = session.Id, PatientId = request.PatientId },
+                    new
+                    {
+                        ConsultationId = session.Id,
+                        PatientId = request.PatientId,
+                        ScreeningId = request.AiScreeningId,
+                        RouteHint = $"/ophthalmologist/screenings/{request.AiScreeningId}/review"
+                    },
                     cancellationToken);
             }
         }

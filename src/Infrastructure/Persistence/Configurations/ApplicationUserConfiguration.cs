@@ -25,13 +25,13 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(u => u.CitizenId)
             .HasMaxLength(12);
 
-        builder.Property(u => u.MustChangePassword)
+        builder.Property(u => u.MustUpdateProfile)
             .HasDefaultValue(false);
 
         // Indexes for common queries
         builder.HasIndex(u => u.IsDeleted);
         builder.HasIndex(u => u.IsActive);
-        builder.HasIndex(u => u.OrganizationId);
+
 
         // Global query filter for soft delete
         builder.HasQueryFilter(u => !u.IsDeleted);

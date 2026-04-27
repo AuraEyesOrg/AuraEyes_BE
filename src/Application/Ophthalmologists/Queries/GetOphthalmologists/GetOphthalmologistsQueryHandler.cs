@@ -12,16 +12,13 @@ namespace Application.Ophthalmologists.Queries.GetOphthalmologists;
 public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologistsQuery, PagedResult<OphthalmologistListDto>>
 {
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
-    private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IIdentityService _identityService;
 
     public GetOphthalmologistsQueryHandler(
         IOphthalmologistRepository ophthalmologistRepository,
-        IAppointmentSlotRepository appointmentSlotRepository,
         IIdentityService identityService)
     {
         _ophthalmologistRepository = ophthalmologistRepository;
-        _appointmentSlotRepository = appointmentSlotRepository;
         _identityService = identityService;
     }
 
@@ -36,28 +33,11 @@ public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologists
             request.PageSize,
             cancellationToken);
 
-        var fromDate = DateOnly.FromDateTime(DateTime.UtcNow);
-        var ophthalmologistIds = items.Select(x => x.Id).ToArray();
-        var priceRangesByOphthalmologist = await _appointmentSlotRepository.GetPriceRangesByOphthalmologistAsync(
-            ophthalmologistIds,
-            fromDate,
-            null,
-            Domain.Enums.ScheduleStatus.Available,
-            cancellationToken);
-
         var dtoList = new List<OphthalmologistListDto>();
 
         foreach (var ophthalmologist in items)
         {
             var user = await _identityService.GetUserByIdAsync(ophthalmologist.UserId, cancellationToken);
-
-            decimal? minPrice = null;
-            decimal? maxPrice = null;
-            if (priceRangesByOphthalmologist.TryGetValue(ophthalmologist.Id, out var range))
-            {
-                minPrice = range.MinPrice;
-                maxPrice = range.MaxPrice;
-            }
 
             dtoList.Add(new OphthalmologistListDto
             {
@@ -75,8 +55,9 @@ public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologists
                 DegreeUrl = ophthalmologist.DegreeUrl,
                 RatingAverage = ophthalmologist.RatingAverage,
                 RatingCount = ophthalmologist.RatingCount,
-                MinPrice = minPrice,
-                MaxPrice = maxPrice,
+                ConsultationFee = ophthalmologist.ConsultationFee,
+                MinPrice = null,
+                MaxPrice = null,
                 Degrees = ophthalmologist.Certificates
                     .Where(c => c.Type == CertificateType.Degree)
                     .OrderByDescending(c => c.IssuedDate)

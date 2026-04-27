@@ -199,11 +199,17 @@ builder.Services.AddSignalR(options =>
     options.EnableDetailedErrors = builder.Environment.IsDevelopment();
     options.KeepAliveInterval = TimeSpan.FromSeconds(15);
     options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+})
+.AddJsonProtocol(options =>
+{
+    options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
 // Register SignalR hub service for notification,chat broadcasting
 builder.Services.AddScoped<INotificationHubService, NotificationHubService>();
 builder.Services.AddScoped<IChatHubService, ChatHubService>();
+builder.Services.AddScoped<IInternalChatHubService, InternalChatHubService>();
 builder.Services.AddSingleton<IUserIdProvider, SignalRUserIdProvider>();
 
 var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -430,6 +436,7 @@ app.MapControllers();
 // Map SignalR hubs for real-time notifications
 app.MapHub<NotificationHub>("/api/hubs/notifications");
 app.MapHub<ChatHub>("/api/hubs/chat");
+app.MapHub<InternalChatHub>("/api/hubs/internal-chat");
 
 app.MapHealthChecks("/health");
 
@@ -439,21 +446,9 @@ if (app.Environment.IsDevelopment())
     app.UseHangfireDashboard("/hangfire");
 }
 
-var defaultQuotaResetCron = app.Environment.IsDevelopment()
-    ? "*/2 * * * *"
-    : "0 0 * * *";
 
-var quotaResetCron = Environment.GetEnvironmentVariable("HANGFIRE_DAILY_QUOTA_RESET_CRON");
-if (string.IsNullOrWhiteSpace(quotaResetCron))
-{
-    quotaResetCron = defaultQuotaResetCron;
-}
 
-var monthlyQuotaResetCron = Environment.GetEnvironmentVariable("HANGFIRE_MONTHLY_QUOTA_RESET_CRON");
-if (string.IsNullOrWhiteSpace(monthlyQuotaResetCron))
-{
-    monthlyQuotaResetCron = "0 0 1 * *";
-}
+
 
 var slotMaintenanceCron = Environment.GetEnvironmentVariable("HANGFIRE_SLOT_MAINTENANCE_CRON");
 if (string.IsNullOrWhiteSpace(slotMaintenanceCron))
@@ -481,6 +476,7 @@ if (enableHangfireServer)
     var legacyRecurringJobIds = new[]
     {
         "monthly-quota-reset",
+        "daily-quota-reset",
         "fulltime-slot-generation",
         "full-time-slot-generation",
         "fulltime-slot-generation-job",
@@ -491,20 +487,17 @@ if (enableHangfireServer)
 
     foreach (var recurringJobId in legacyRecurringJobIds)
     {
-        recurringJobManager.RemoveIfExists(recurringJobId);
+        try
+        {
+            recurringJobManager.RemoveIfExists(recurringJobId);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("Could not remove legacy job {JobId} due to lock or timeout: {Message}", recurringJobId, ex.Message);
+        }
     }
 
-    recurringJobManager.AddOrUpdate<DailyQuotaResetJob>(
-        "daily-quota-reset",
-        job => job.ExecuteAsync(),
-        quotaResetCron,
-        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
-    recurringJobManager.AddOrUpdate<MonthlyQuotaResetJob>(
-        "monthly-quota-reset",
-        job => job.ExecuteAsync(),
-        monthlyQuotaResetCron,
-        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
     recurringJobManager.AddOrUpdate<SlotMaintenanceJob>(
         "slot-maintenance-expire-unused",
@@ -518,11 +511,6 @@ if (enableHangfireServer)
         fullTimeSlotGenerationCron,
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
-    recurringJobManager.AddOrUpdate<MonthlySalaryJob>(
-        "monthly-salary-payout",
-        job => job.ExecuteAsync(CancellationToken.None),
-        monthlySalaryCron,
-        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
     try
     {

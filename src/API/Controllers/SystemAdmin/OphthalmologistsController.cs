@@ -1,36 +1,25 @@
 using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
-using Application.SystemAdmin.Ophthalmologists.Commands.PaySalary;
-using Application.SystemAdmin.Ophthalmologists.Commands.ConfirmWithdrawalRequest;
-using Application.SystemAdmin.Ophthalmologists.Commands.RejectWithdrawalRequest;
 using Application.SystemAdmin.Ophthalmologists.Commands.BackfillFullTimeSchedule;
 using Application.SystemAdmin.Ophthalmologists.Commands.DeleteFutureOphthalmologistSlots;
 using Application.SystemAdmin.Ophthalmologists.Commands.NormalizeAllFullTimeSchedules;
 using Application.SystemAdmin.Ophthalmologists.Commands.NormalizeFullTimeSchedule;
 using Application.SystemAdmin.Ophthalmologists.Commands.ApproveLeaveRequest;
-using Application.SystemAdmin.Ophthalmologists.Commands.ApproveEmploymentTypeChangeRequest;
-using Application.SystemAdmin.Ophthalmologists.Commands.RejectEmploymentTypeChangeRequest;
 using Application.SystemAdmin.Ophthalmologists.Commands.RejectLeaveRequest;
 using Application.SystemAdmin.Ophthalmologists.Queries.GetOphthalmologists;
-using Application.SystemAdmin.Ophthalmologists.Queries.GetEmploymentTypeChangeRequests;
 using Application.SystemAdmin.Ophthalmologists.Queries.GetLeaveRequests;
-using Application.SystemAdmin.Ophthalmologists.Queries.GetWithdrawalRequests;
-using Application.Wallets.Common;
 using Domain.Enums;
 using Infrastructure.Identity.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Infrastructure.Identity.Authorization;
-using Application.Ophthalmologists.Contracts.UploadSignedContract;
 using Application.Ophthalmologists.Common;
 using Application.Ophthalmologists.Queries.GetOphthalmologist;
 using Application.Ophthalmologists.Commands.CreateOphthalmologist;
 using Application.Ophthalmologists.Commands.UpdateOphthalmologist;
 using Application.Patients.Commands.UploadAvatar;
-using Application.SystemAdmin.Contracts.Common;
-using Application.Ophthalmologists.Contracts.GetMyContract;
 using Application.Ophthalmologists.Commands.UnverifyOphthalmologist;
 using Application.Ophthalmologists.Commands.DeleteOphthalmologist;
 using Application.Ophthalmologists.Queries.GetDashboardMetrics;
@@ -305,22 +294,6 @@ public class OphthalmologistsController : BaseApiController
     // CONTRACT ENDPOINTS (for the authenticated ophthalmologist)
     // =========================================================================
 
-    /// <summary>
-    /// Get the current ophthalmologist's contract.
-    /// </summary>
-    [HttpGet("my-contract")]
-    [AuthorizePermission(Permissions.ContractsRead)]
-    [ProducesResponseType(typeof(ApiResponse<ContractDetailDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetMyContract()
-    {
-        var userId = _currentUserService.UserId;
-        if (userId is null)
-            return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
-
-        var result = await _mediator.Send(new GetMyContractQuery(userId.Value));
-        return HandleResult(result);
-    }
 
     [HttpGet("dashboard-metrics")]
     [AuthorizePermission(Permissions.DashboardRead)]
@@ -334,156 +307,6 @@ public class OphthalmologistsController : BaseApiController
         return HandleResult(result);
     }
 
-    /// <summary>
-    /// Upload a signed contract document (scanned image).
-    /// </summary>
-    [HttpPost("my-contract/upload")]
-    [AuthorizePermission(Permissions.ContractsRead)]
-    [Consumes("multipart/form-data")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UploadSignedContract(IFormFile contractImage)
-    {
-        var userId = _currentUserService.UserId;
-        if (userId is null)
-            return Unauthorized(ApiResponseFactory.Error("User not authenticated."));
-
-        if (contractImage == null || contractImage.Length == 0)
-            return BadRequest(ApiResponseFactory.Error("Contract image file is required."));
-
-        // Validate file type
-        var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp", "application/pdf" };
-        if (!allowedTypes.Contains(contractImage.ContentType.ToLowerInvariant()))
-            return BadRequest(ApiResponseFactory.Error("Only JPEG, PNG, WebP and PDF files are allowed."));
-
-        // Validate file size (max 10MB)
-        if (contractImage.Length > 10 * 1024 * 1024)
-            return BadRequest(ApiResponseFactory.Error("File size must not exceed 10MB."));
-
-        // Upload to storage
-        string scannedUrl;
-        await using (var stream = contractImage.OpenReadStream())
-        {
-            scannedUrl = await _fileStorageService.SaveFileAsync(
-                stream,
-                contractImage.FileName,
-                $"contracts/{userId.Value}");
-        }
-
-        var command = new UploadSignedContractCommand
-        {
-            UserId = userId.Value,
-            ScannedDocumentUrl = scannedUrl
-        };
-
-        var result = await _mediator.Send(command);
-        return HandleResult(result, "Contract uploaded successfully. Waiting for admin verification.");
-    }
-
-    /// <summary>
-    /// Pay monthly salary (or custom amount) into ophthalmologist wallet.
-    /// </summary>
-    [HttpPost("{id:guid}/salary-payout")]
-    [AuthorizePermission(Permissions.WalletsManage)]
-    [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> PaySalary(
-        Guid id,
-        [FromBody] PaySalaryRequest request)
-    {
-        var command = new PayOphthalmologistSalaryCommand
-        {
-            OphthalmologistId = id,
-            Amount = request.Amount,
-            Note = request.Note
-        };
-
-        var result = await _mediator.Send(command);
-        return HandleResult(result);
-    }
-
-    /// <summary>
-    /// Get withdrawal requests from ophthalmologists.
-    /// </summary>
-    [HttpGet("withdrawal-requests")]
-    [AuthorizePermission(Permissions.PayoutsRead)]
-    [ProducesResponseType(typeof(ApiResponse<PagedResult<AdminWithdrawalRequestDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetWithdrawalRequests(
-        [FromQuery] PaymentStatus? status = null,
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 20)
-    {
-        var query = new GetWithdrawalRequestsQuery
-        {
-            Status = status,
-            PageNumber = pageNumber,
-            PageSize = pageSize
-        };
-
-        var result = await _mediator.Send(query);
-        return HandleResult(result);
-    }
-
-    /// <summary>
-    /// Confirm that transfer for a withdrawal request has been completed.
-    /// </summary>
-    [HttpPost("withdrawal-requests/{requestId:guid}/confirm")]
-    [AuthorizePermission(Permissions.PayoutsManage)]
-    [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ConfirmWithdrawalRequest(
-        Guid requestId,
-        [FromBody] ConfirmWithdrawalRequestApi request)
-    {
-        var currentUserId = _currentUserService.UserId;
-        if (!currentUserId.HasValue)
-        {
-            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated."));
-        }
-
-        var command = new ConfirmWithdrawalRequestCommand
-        {
-            WithdrawalRequestId = requestId,
-            AdminUserId = currentUserId.Value,
-            TransferReference = request.TransferReference,
-            Note = request.Note
-        };
-
-        var result = await _mediator.Send(command);
-        return HandleResult(result);
-    }
-
-    /// <summary>
-    /// Reject a withdrawal request.
-    /// </summary>
-    [HttpPost("withdrawal-requests/{requestId:guid}/reject")]
-    [AuthorizePermission(Permissions.PayoutsManage)]
-    [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> RejectWithdrawalRequest(
-        Guid requestId,
-        [FromBody] RejectWithdrawalRequestApi request)
-    {
-        var currentUserId = _currentUserService.UserId;
-        if (!currentUserId.HasValue)
-        {
-            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated."));
-        }
-
-        var command = new RejectWithdrawalRequestCommand
-        {
-            WithdrawalRequestId = requestId,
-            AdminUserId = currentUserId.Value,
-            Reason = request.Reason
-        };
-
-        var result = await _mediator.Send(command);
-        return HandleResult(result);
-    }
 
     /// <summary>
     /// Get ophthalmologist leave requests for review.
@@ -560,82 +383,6 @@ public class OphthalmologistsController : BaseApiController
 
         return HandleResult(result, "Leave request rejected successfully.");
     }
-
-    /// <summary>
-    /// Get ophthalmologist employment type change requests for review.
-    /// </summary>
-    [HttpGet("employment-type-change-requests")]
-    [AuthorizePermission(Permissions.OphthalmologistsUpdate)]
-    [ProducesResponseType(typeof(ApiResponse<PagedResult<AdminOphthalmologistEmploymentTypeChangeRequestDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetEmploymentTypeChangeRequests(
-        [FromQuery] OphthalmologistEmploymentTypeChangeRequestStatus? status = null,
-        [FromQuery] Guid? ophthalmologistId = null,
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 20)
-    {
-        var query = new GetEmploymentTypeChangeRequestsQuery
-        {
-            Status = status,
-            OphthalmologistId = ophthalmologistId,
-            PageNumber = pageNumber,
-            PageSize = pageSize
-        };
-
-        var result = await _mediator.Send(query);
-        return HandleResult(result);
-    }
-
-    /// <summary>
-    /// Approve an ophthalmologist employment type change request.
-    /// </summary>
-    [HttpPost("employment-type-change-requests/{requestId:guid}/approve")]
-    [AuthorizePermission(Permissions.OphthalmologistsUpdate)]
-    [ProducesResponseType(typeof(ApiResponse<ApproveEmploymentTypeChangeRequestResultDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> ApproveEmploymentTypeChangeRequest(
-        Guid requestId,
-        [FromBody] ReviewEmploymentTypeChangeRequestApi request)
-    {
-        if (!_currentUserService.UserId.HasValue)
-            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated."));
-
-        var result = await _mediator.Send(new ApproveEmploymentTypeChangeRequestCommand
-        {
-            RequestId = requestId,
-            ReviewedByAdminUserId = _currentUserService.UserId.Value,
-            AdminNote = request.AdminNote
-        });
-
-        return HandleResult(result, "Employment type change request approved successfully.");
-    }
-
-    /// <summary>
-    /// Reject an ophthalmologist employment type change request.
-    /// </summary>
-    [HttpPost("employment-type-change-requests/{requestId:guid}/reject")]
-    [AuthorizePermission(Permissions.OphthalmologistsUpdate)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> RejectEmploymentTypeChangeRequest(
-        Guid requestId,
-        [FromBody] ReviewEmploymentTypeChangeRequestApi request)
-    {
-        if (!_currentUserService.UserId.HasValue)
-            return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated."));
-
-        var result = await _mediator.Send(new RejectEmploymentTypeChangeRequestCommand
-        {
-            RequestId = requestId,
-            ReviewedByAdminUserId = _currentUserService.UserId.Value,
-            AdminNote = request.AdminNote
-        });
-
-        return HandleResult(result, "Employment type change request rejected successfully.");
-    }
 }
 
 /// <summary>
@@ -647,29 +394,8 @@ public class VerifyOphthalmologistRequest
     public string? RejectionReason { get; set; }
 }
 
-public class PaySalaryRequest
-{
-    public decimal? Amount { get; set; }
-    public string? Note { get; set; }
-}
-
-public class ConfirmWithdrawalRequestApi
-{
-    public string? TransferReference { get; set; }
-    public string? Note { get; set; }
-}
-
-public class RejectWithdrawalRequestApi
-{
-    public string? Reason { get; set; }
-}
 
 public class ReviewLeaveRequestApi
-{
-    public string? AdminNote { get; set; }
-}
-
-public class ReviewEmploymentTypeChangeRequestApi
 {
     public string? AdminNote { get; set; }
 }

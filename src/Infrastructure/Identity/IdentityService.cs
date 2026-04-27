@@ -1,3 +1,4 @@
+using Domain.Enums;
 using System.Text;
 using System.Text.Encodings.Web;
 using Application.Common.Interfaces;
@@ -94,7 +95,6 @@ public class IdentityService : IIdentityService
         string password,
         string fullName,
         string role,
-        Guid? organizationId = null,
         UserProfileWalkInDto? userProfile = null,
         CancellationToken cancellationToken = default)
     {
@@ -102,8 +102,7 @@ public class IdentityService : IIdentityService
         {
             UserName = email,
             Email = email,
-            FullName = fullName,
-            OrganizationId = organizationId
+            FullName = fullName
         };
 
         if (userProfile != null)
@@ -161,6 +160,20 @@ public class IdentityService : IIdentityService
         return user == null ? null : await MapToDtoAsync(user);
     }
 
+    public async Task<UserDto?> GetUserByCitizenIdAsync(string citizenId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(citizenId))
+        {
+            return null;
+        }
+
+        var normalizedCitizenId = citizenId.Trim();
+        var user = await _userManager.Users
+            .FirstOrDefaultAsync(u => u.CitizenId == normalizedCitizenId && !u.IsDeleted, cancellationToken);
+
+        return user == null ? null : await MapToDtoAsync(user);
+    }
+
     public async Task<UserDto?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var user = await _userManager.Users
@@ -169,8 +182,22 @@ public class IdentityService : IIdentityService
         return user == null ? null : await MapToDtoAsync(user);
     }
 
-    public async Task<bool> IsPhoneNumberInUseByOrganizationAsync(
-        Guid organizationId,
+    public async Task<IReadOnlyList<UserDto>> GetUsersByIdsAsync(IEnumerable<Guid> userIds, CancellationToken cancellationToken = default)
+    {
+        var users = await _userManager.Users
+            .Where(u => userIds.Contains(u.Id) && !u.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        var dtos = new List<UserDto>();
+        foreach (var user in users)
+        {
+            dtos.Add(await MapToDtoAsync(user));
+        }
+
+        return dtos.AsReadOnly();
+    }
+
+    public async Task<bool> IsPhoneNumberInUseAsync(
         string phoneNumber,
         CancellationToken cancellationToken = default)
     {
@@ -184,7 +211,6 @@ public class IdentityService : IIdentityService
 
         var existingPhoneNumbers = await _userManager.Users
             .Where(u =>
-                u.OrganizationId == organizationId &&
                 !u.IsDeleted &&
                 u.PhoneNumber != null &&
                 u.PhoneNumber != string.Empty)
@@ -205,8 +231,7 @@ public class IdentityService : IIdentityService
             .Any(p => p == normalizedPhoneNumber);
     }
 
-    public async Task<bool> IsCitizenIdInUseByOrganizationAsync(
-        Guid organizationId,
+    public async Task<bool> IsCitizenIdInUseAsync(
         string citizenId,
         CancellationToken cancellationToken = default)
     {
@@ -216,7 +241,7 @@ public class IdentityService : IIdentityService
         }
 
         return await _userManager.Users
-            .AnyAsync(u => u.OrganizationId == organizationId && u.CitizenId == citizenId && !u.IsDeleted, cancellationToken);
+            .AnyAsync(u => u.CitizenId == citizenId && !u.IsDeleted, cancellationToken);
     }
 
     public async Task<bool> IsEmailConfirmedAsync(Guid userId)
@@ -312,16 +337,14 @@ public class IdentityService : IIdentityService
         return await _userManager.IsInRoleAsync(user, role);
     }
 
-    public async Task<IReadOnlyList<Guid>> GetUserIdsByRoleAndOrganizationAsync(
+    public async Task<IReadOnlyList<Guid>> GetUserIdsByRoleAsync(
         string role,
-        Guid organizationId,
         CancellationToken cancellationToken = default)
     {
         var usersInRole = await _userManager.GetUsersInRoleAsync(role);
 
         return usersInRole
             .Where(u =>
-                u.OrganizationId == organizationId &&
                 u.IsActive &&
                 !u.IsDeleted)
             .Select(u => u.Id)
@@ -376,7 +399,6 @@ public class IdentityService : IIdentityService
             user.EmailConfirmed,
             user.IsActive,
             user.IsDeleted,
-            user.OrganizationId,
             user.TwoFactorEnabled,
             avatarUrl
         );
@@ -791,9 +813,6 @@ public class IdentityService : IIdentityService
         var user = await _userManager.FindByIdAsync(userId.ToString());
         if (user == null || user.IsDeleted)
             return (false, new[] { "User not found" });
-            
-        if(!user.OrganizationId.HasValue)
-            return (false, new[] { "Only organization users can have their email updated" });
 
         if (string.IsNullOrWhiteSpace(email))
             return (false, new[] { "Email is required" });
@@ -825,22 +844,6 @@ public class IdentityService : IIdentityService
         return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
     }
 
-    public async Task<(bool Succeeded, string[] Errors)> UpdateUserOrganizationAsync(
-        Guid userId,
-        Guid? organizationId,
-        CancellationToken cancellationToken = default)
-    {
-        var user = await _userManager.FindByIdAsync(userId.ToString());
-        if (user == null || user.IsDeleted)
-            return (false, new[] { "User not found" });
-
-        user.OrganizationId = organizationId;
-        user.UpdatedAt = DateTime.UtcNow;
-
-        var result = await _userManager.UpdateAsync(user);
-        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
-    }
-
     public async Task<IList<string>> GetUserPermissionsAsync(Guid userId)
     {
         var user = await _userManager.FindByIdAsync(userId.ToString());
@@ -852,7 +855,7 @@ public class IdentityService : IIdentityService
         var rolePermissions = await (from rp in _context.RolePermissions
                                      join r in _roleManager.Roles on rp.RoleId equals r.Id
                                      join p in _context.Permissions on rp.PermissionId equals p.Id
-                                     where userRoles.Contains(r.Name)
+                                     where userRoles.Contains(r.Name!)
                                      select p.Name).ToListAsync();
 
         // 2. Get direct user overrides
@@ -891,31 +894,37 @@ public class IdentityService : IIdentityService
         if (result.Succeeded)
         {
             user.UpdatedAt = DateTime.UtcNow;
-            user.MustChangePassword = false;
             await _userManager.UpdateAsync(user);
         }
 
         return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
     }
 
-    public async Task<(bool Succeeded, string[] Errors)> UpdateUserProfileAsync(
-        Guid userId,
-        string fullName,
-        string? phone,
-        DateTime? dateOfBirth,
-        int? gender,
-        string? address,
-        CancellationToken cancellationToken = default)
+    public async Task<(bool Succeeded, string[] Errors)> SetStaffOnboardingStatusAsync(Guid userId)
     {
         var user = await _userManager.FindByIdAsync(userId.ToString());
-        if (user == null || user.IsDeleted)
+        if (user == null)
+        {
             return (false, new[] { "User not found" });
+        }
 
-        user.FullName = fullName;
-        user.PhoneNumber = phone;
-        user.DateOfBirth = dateOfBirth;
-        user.Gender = gender.HasValue ? (Domain.Enums.Gender)gender.Value : null;
-        user.Address = address;
+        user.EmailConfirmed = true;
+        user.MustUpdateProfile = true;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var result = await _userManager.UpdateAsync(user);
+        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
+    }
+
+    public async Task<(bool Succeeded, string[] Errors)> ClearMustUpdateProfileFlagAsync(Guid userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null)
+        {
+            return (false, new[] { "User not found" });
+        }
+
+        user.MustUpdateProfile = false;
         user.UpdatedAt = DateTime.UtcNow;
 
         var result = await _userManager.UpdateAsync(user);
@@ -1038,6 +1047,69 @@ public class IdentityService : IIdentityService
                     // Restore soft-deleted mapping
                     existingMapping.RolePermission.GetType().GetProperty("IsDeleted")?.SetValue(existingMapping.RolePermission, false);
                 }
+            }
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SynchronizeUserSubRolePermissionsAsync(
+        Guid userId,
+        IEnumerable<ClinicStaffRole> subRoles,
+        CancellationToken cancellationToken = default)
+    {
+        var roleList = subRoles.ToList();
+        var expectedPermissionNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var role in roleList)
+        {
+            var extras = role switch
+            {
+                ClinicStaffRole.Receptionist => Application.Common.Constants.Permissions.ReceptionistExtras,
+                ClinicStaffRole.Coordinator => Application.Common.Constants.Permissions.CoordinatorExtras,
+                ClinicStaffRole.Cashier => Application.Common.Constants.Permissions.CashierExtras,
+                _ => Array.Empty<string>()
+            };
+
+            foreach (var perm in extras) expectedPermissionNames.Add(perm);
+        }
+
+        // Get all possible sub-role permissions to distinguish from other manual overrides
+        var allSubRolePermissions = Application.Common.Constants.Permissions.ReceptionistExtras
+            .Concat(Application.Common.Constants.Permissions.CoordinatorExtras)
+            .Concat(Application.Common.Constants.Permissions.CashierExtras)
+            .Distinct()
+            .ToList();
+
+        var allPermissionsInDb = await _context.Permissions
+            .Where(p => allSubRolePermissions.Contains(p.Name))
+            .ToListAsync(cancellationToken);
+
+        var currentAssignments = await _context.UserPermissions
+            .Where(up => up.UserId == userId)
+            .ToListAsync(cancellationToken);
+
+        // 1. Remove assignments that are in the "SubRole Pool" but NOT in the new expected set
+        var subRolePermIds = allPermissionsInDb.Select(p => p.Id).ToList();
+        var toRemove = currentAssignments
+            .Where(up => subRolePermIds.Contains(up.PermissionId))
+            .Where(up => !expectedPermissionNames.Contains(allPermissionsInDb.First(p => p.Id == up.PermissionId).Name))
+            .ToList();
+
+        if (toRemove.Any())
+        {
+            _context.UserPermissions.RemoveRange(toRemove);
+        }
+
+        // 2. Add missing assignments
+        foreach (var permName in expectedPermissionNames)
+        {
+            var permission = allPermissionsInDb.FirstOrDefault(p => p.Name == permName);
+            if (permission == null) continue;
+
+            if (!currentAssignments.Any(up => up.PermissionId == permission.Id))
+            {
+                await _context.UserPermissions.AddAsync(new Domain.Entities.Authorization.UserPermission(userId, permission.Id, true));
             }
         }
 

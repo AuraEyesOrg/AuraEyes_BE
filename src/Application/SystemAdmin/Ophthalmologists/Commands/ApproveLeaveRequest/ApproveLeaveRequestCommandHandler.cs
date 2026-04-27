@@ -3,7 +3,6 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Consultation;
-using Domain.Entities.Financial;
 using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
@@ -17,10 +16,8 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
     private readonly IOphthalmologistLeaveRequestRepository _leaveRequestRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IConsultationSessionRepository _consultationSessionRepository;
-    private readonly IAppointmentRepository _appointmentRepository;
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IRepository<Patient> _patientRepository;
-    private readonly IWalletRepository _walletRepository;
     private readonly IGoogleMeetService _googleMeetService;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
@@ -30,10 +27,8 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
         IOphthalmologistLeaveRequestRepository leaveRequestRepository,
         IOphthalmologistRepository ophthalmologistRepository,
         IConsultationSessionRepository consultationSessionRepository,
-        IAppointmentRepository appointmentRepository,
         IAppointmentSlotRepository appointmentSlotRepository,
         IRepository<Patient> patientRepository,
-        IWalletRepository walletRepository,
         IGoogleMeetService googleMeetService,
         INotificationService notificationService,
         IUnitOfWork unitOfWork,
@@ -42,10 +37,8 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
         _leaveRequestRepository = leaveRequestRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _consultationSessionRepository = consultationSessionRepository;
-        _appointmentRepository = appointmentRepository;
         _appointmentSlotRepository = appointmentSlotRepository;
         _patientRepository = patientRepository;
-        _walletRepository = walletRepository;
         _googleMeetService = googleMeetService;
         _notificationService = notificationService;
         _unitOfWork = unitOfWork;
@@ -90,15 +83,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
         {
             leaveRequest.Approve(request.ReviewedByAdminUserId, request.AdminNote);
 
-            var slotsInRange = (await _appointmentSlotRepository.GetByOphthalmologistAsync(
-                leaveRequest.OphthalmologistId,
-                leaveRequest.StartDate,
-                leaveRequest.EndDate,
-                null,
-                cancellationToken)).ToList();
-
-            var slotMap = slotsInRange.ToDictionary(x => x.Id, x => x);
-
             var sessionWindowStartUtc = GetUtcStartOfDay(leaveRequest.StartDate);
             var sessionWindowEndUtcExclusive = GetUtcStartOfDay(leaveRequest.EndDate.AddDays(1));
 
@@ -112,25 +96,10 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
 
             var patientIds = sessions.Select(x => x.PatientId).ToHashSet();
 
-            var appointments = await _appointmentRepository.GetByDoctorAsync(
-                leaveRequest.OphthalmologistId,
-                leaveRequest.StartDate,
-                leaveRequest.EndDate,
-                null,
-                null,
-                cancellationToken);
-
-            foreach (var appointment in appointments)
-            {
-                patientIds.Add(appointment.PatientId);
-            }
-
             var patientUserMap = await _patientRepository.Query()
                 .Where(x => patientIds.Contains(x.Id))
                 .Select(x => new { x.Id, x.UserId })
                 .ToDictionaryAsync(x => x.Id, x => x.UserId, cancellationToken);
-
-            var walletCache = new Dictionary<Guid, Wallet?>();
 
             var cancelledSessions = 0;
             foreach (var session in sessions)
@@ -140,13 +109,15 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
 
                 await TryDeleteCalendarEventAsync(session, cancellationToken);
 
-                if (session.AppointmentSlotId.HasValue
-                    && slotMap.TryGetValue(session.AppointmentSlotId.Value, out var sessionSlot))
+                if (session.AppointmentSlotId.HasValue)
                 {
-                    ReleaseBookedOrReservedState(sessionSlot);
+                    var sessionSlot = await _appointmentSlotRepository.GetByIdWithLockAsync(session.AppointmentSlotId.Value, cancellationToken);
+                    if (sessionSlot != null)
+                    {
+                        ReleaseBookedOrReservedState(sessionSlot);
+                        await _appointmentSlotRepository.UpdateAsync(sessionSlot, cancellationToken);
+                    }
                 }
-
-                await TryRefundSessionAsync(session, patientUserMap, walletCache, cancellationToken);
 
                 if (patientUserMap.TryGetValue(session.PatientId, out var patientUserId)
                     && patientUserId.HasValue)
@@ -164,45 +135,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
                             Action = "DoctorLeaveApproved"
                         },
                         session.Id));
-                }
-            }
-
-            var cancelledAppointments = 0;
-            foreach (var appointment in appointments.Where(IsCancellableAppointment))
-            {
-                appointment.Cancel(request.ReviewedByAdminUserId, "CancelledDueToApprovedDoctorLeave");
-                cancelledAppointments++;
-
-                if (slotMap.TryGetValue(appointment.AppointmentSlotId, out var appointmentSlot))
-                {
-                    ReleaseBookedOrReservedState(appointmentSlot);
-                }
-
-                if (patientUserMap.TryGetValue(appointment.PatientId, out var patientUserId)
-                    && patientUserId.HasValue)
-                {
-                    pendingNotifications.Add(new PendingNotification(
-                        patientUserId.Value,
-                        "Lịch hẹn bị hủy",
-                        BuildAppointmentCancellationMessage(appointment.AppointmentSlot?.Date, appointment.AppointmentSlot?.StartTime),
-                        NotificationType.ScheduleChanged,
-                        new
-                        {
-                            AppointmentId = appointment.Id,
-                            AppointmentSlotId = appointment.AppointmentSlotId,
-                            LeaveRequestId = leaveRequest.Id,
-                            Action = "DoctorLeaveApproved"
-                        },
-                        appointment.Id));
-                }
-            }
-
-            var blockedSlots = 0;
-            foreach (var slot in slotsInRange)
-            {
-                if (TryBlockSlot(slot))
-                {
-                    blockedSlots++;
                 }
             }
 
@@ -230,8 +162,8 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
             {
                 LeaveRequestId = leaveRequest.Id,
                 CancelledConsultationSessions = cancelledSessions,
-                CancelledAppointments = cancelledAppointments,
-                BlockedSlots = blockedSlots
+                CancelledAppointments = 0,
+                BlockedSlots = 0
             });
         }
         catch (InvalidOperationException ex)
@@ -244,13 +176,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
             await _unitOfWork.RollbackTransactionAsync(cancellationToken);
             throw;
         }
-    }
-
-    private static bool IsCancellableAppointment(Domain.Entities.Scheduling.Appointment appointment)
-    {
-        return appointment.Status == AppointmentStatus.Pending
-            || appointment.Status == AppointmentStatus.Confirmed
-            || appointment.Status == AppointmentStatus.CheckedIn;
     }
 
     private static DateTime GetUtcStartOfDay(DateOnly date)
@@ -268,16 +193,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
 
         var vietnamTime = TimeZoneInfo.ConvertTimeFromUtc(appointmentTimeUtc.Value, VietnamTimeZoneResolver.TimeZone);
         return $"Lịch tư vấn lúc {vietnamTime:HH:mm} ngày {vietnamTime:dd/MM/yyyy} đã bị hủy do bác sĩ nghỉ phép được phê duyệt.";
-    }
-
-    private static string BuildAppointmentCancellationMessage(DateOnly? date, TimeOnly? startTime)
-    {
-        if (!date.HasValue || !startTime.HasValue)
-        {
-            return "Lịch hẹn của bạn đã bị hủy do bác sĩ nghỉ phép được phê duyệt.";
-        }
-
-        return $"Lịch hẹn lúc {startTime:HH\\:mm} ngày {date:dd/MM/yyyy} đã bị hủy do bác sĩ nghỉ phép được phê duyệt.";
     }
 
     private async Task TryDeleteCalendarEventAsync(
@@ -307,100 +222,10 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
 
     private static void ReleaseBookedOrReservedState(Domain.Entities.Scheduling.AppointmentSlot slot)
     {
-        if (slot.Status == ScheduleStatus.Booked && slot.BookedCount > 0)
+        if (slot.BookedCount > 0)
         {
             slot.CancelBooking();
-            return;
         }
-
-        if (slot.Status == ScheduleStatus.Reserved)
-        {
-            slot.ReleaseReservation();
-        }
-    }
-
-    private static bool TryBlockSlot(Domain.Entities.Scheduling.AppointmentSlot slot)
-    {
-        if (slot.Status == ScheduleStatus.Blocked
-            || slot.Status == ScheduleStatus.Cancelled
-            || slot.Status == ScheduleStatus.Completed
-            || slot.Status == ScheduleStatus.NoShow)
-        {
-            return false;
-        }
-
-        if (slot.Status == ScheduleStatus.Reserved)
-        {
-            slot.ReleaseReservation();
-        }
-
-        if (slot.Status == ScheduleStatus.Booked)
-        {
-            if (slot.BookedCount > 0)
-            {
-                return false;
-            }
-
-            slot.UpdateStatus(ScheduleStatus.Available);
-        }
-
-        slot.Block();
-        return true;
-    }
-
-    private async Task TryRefundSessionAsync(
-        ConsultationSession session,
-        IReadOnlyDictionary<Guid, Guid?> patientUserMap,
-        IDictionary<Guid, Wallet?> walletCache,
-        CancellationToken cancellationToken)
-    {
-        if (session.Price <= 0)
-        {
-            return;
-        }
-
-        if (!patientUserMap.TryGetValue(session.PatientId, out var patientUserId)
-            || !patientUserId.HasValue)
-        {
-            return;
-        }
-
-        if (!walletCache.TryGetValue(patientUserId.Value, out var wallet))
-        {
-            wallet = await _walletRepository.GetByUserIdWithTransactionsAsync(patientUserId.Value, cancellationToken);
-            walletCache[patientUserId.Value] = wallet;
-        }
-
-        if (wallet is null)
-        {
-            return;
-        }
-
-        var hasBookingPayment = wallet.Transactions.Any(tx =>
-            tx.TransactionType == TransactionType.Payment
-            && tx.ReferenceType == "Booking"
-            && tx.ReferenceId.HasValue
-            && (tx.ReferenceId.Value == session.Id
-                || (session.AppointmentSlotId.HasValue
-                    && tx.ReferenceId.Value == session.AppointmentSlotId.Value)));
-
-        if (!hasBookingPayment)
-        {
-            return;
-        }
-
-        wallet.Deposit(session.Price, $"Refund – session {session.Id} cancelled due to doctor leave");
-
-        var refundTx = new WalletTransaction(
-            wallet.Id,
-            session.Price,
-            TransactionType.Refund,
-            "Consultation cancellation refund (doctor leave)",
-            referenceType: "Booking",
-            referenceId: session.Id);
-
-        wallet.AddTransaction(refundTx);
-        await _walletRepository.AddTransactionAsync(refundTx, cancellationToken);
     }
 
     private async Task SendNotificationsAsync(

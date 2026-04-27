@@ -29,13 +29,19 @@ public class ChatHubService : IChatHubService
     {
         try
         {
+            _logger.LogInformation(
+                "Attempting to broadcast chat message to UserId={UserId} for SessionId={SessionId}",
+                userId, chatMessage.SessionId);
+
+            // Broadcast to the specific session group for high reliability [FR-47]
+            var groupName = $"session_{chatMessage.SessionId}";
             await _hubContext.Clients
-                .User(userId.ToString())
+                .Group(groupName)
                 .SendAsync("ReceiveChatMessage", chatMessage, cancellationToken);
 
             _logger.LogInformation(
-                "Chat message broadcast to UserId={UserId} for SessionId={SessionId}, MessageId={MessageId}",
-                userId, chatMessage.SessionId, chatMessage.MessageId);
+                "Chat message broadcast SUCCESS to Group={GroupName} for SessionId={SessionId}, MessageId={MessageId}",
+                groupName, chatMessage.SessionId, chatMessage.MessageId);
         }
         catch (Exception ex)
         {
@@ -62,7 +68,6 @@ public class ChatHubService : IChatHubService
                 .SendAsync("RoomStateChanged", payload, cancellationToken);
 
             _logger.LogInformation(
-                "Room state {Event} broadcast for session {SessionId} to {Count} user(s)",
                 payload.Event, payload.SessionId, ids.Count);
         }
         catch (Exception ex)
@@ -70,6 +75,31 @@ public class ChatHubService : IChatHubService
             _logger.LogError(ex,
                 "Failed to broadcast {Event} for session {SessionId}",
                 payload.Event, payload.SessionId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task BroadcastRoomStateChangedAsync(
+        string groupName,
+        RoomStateChangedDto payload,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _hubContext.Clients
+                .Group(groupName)
+                .SendAsync("RoomStateChanged", payload, cancellationToken);
+
+            _logger.LogInformation(
+                "Room state {Event} broadcast for session {SessionId} to group {GroupName}",
+                payload.Event, payload.SessionId, groupName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to broadcast {Event} for session {SessionId} to group {GroupName}",
+                payload.Event, payload.SessionId, groupName);
             throw;
         }
     }

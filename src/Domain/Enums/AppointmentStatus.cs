@@ -1,7 +1,7 @@
 namespace Domain.Enums;
 
 /// <summary>
-/// Status for clinic appointments (organisation-based bookings).
+/// Status for booking-only appointments in the clinic-centric scheduling model.
 /// </summary>
 public enum AppointmentStatus
 {
@@ -14,10 +14,10 @@ public enum AppointmentStatus
     /// <summary>Patient has checked in at the clinic.</summary>
     CheckedIn = 3,
 
-    /// <summary>Consultation is in progress.</summary>
+    /// <summary>Consultation with doctor is in progress.</summary>
     InProgress = 4,
 
-    /// <summary>Consultation completed successfully.</summary>
+    /// <summary>Visit completed successfully.</summary>
     Completed = 5,
 
     /// <summary>Appointment cancelled by patient or organisation.</summary>

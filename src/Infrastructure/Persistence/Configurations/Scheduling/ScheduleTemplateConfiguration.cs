@@ -8,9 +8,7 @@ public class ScheduleTemplateConfiguration : IEntityTypeConfiguration<ScheduleTe
 {
     public void Configure(EntityTypeBuilder<ScheduleTemplate> builder)
     {
-        builder.ToTable(t => t.HasCheckConstraint(
-            "CK_ScheduleTemplates_OphthalWithoutOrg",
-            "\"OphthalId\" IS NULL OR \"OrgId\" IS NULL"));
+        builder.ToTable("ScheduleTemplates");
 
         builder.Property(e => e.DayOfWeek)
             .HasConversion<string>()
@@ -21,10 +19,6 @@ public class ScheduleTemplateConfiguration : IEntityTypeConfiguration<ScheduleTe
 
         builder.Property(e => e.MaxCapacity)
             .IsRequired();
-
-        builder.Property(e => e.Cost)
-            .HasPrecision(18, 2)
-            .IsRequired(false);
 
         builder.Property(e => e.Source)
             .HasConversion<string>()
@@ -37,24 +31,13 @@ public class ScheduleTemplateConfiguration : IEntityTypeConfiguration<ScheduleTe
         builder.Property(e => e.IsActive)
             .HasDefaultValue(true);
 
-        builder.Property(e => e.OrgId)
-            .IsRequired(false);
-
-        builder.Property(e => e.OphthalId)
-            .IsRequired(false);
-
         // Relationships
         builder.HasMany(e => e.AppointmentSlots)
             .WithOne(a => a.ScheduleTemplate)
             .HasForeignKey(a => a.ScheduleTemplateId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(e => e.OrgId);
-        builder.HasIndex(e => e.OphthalId);
         builder.HasIndex(e => e.DayOfWeek);
-        builder.HasIndex(e => new { e.OphthalId, e.DayOfWeek })
-            .IsUnique()
-            .HasFilter("\"IsDeleted\" = false AND \"IsActive\" = true AND \"Source\" = 'SystemGenerated' AND \"OphthalId\" IS NOT NULL")
-            .HasDatabaseName("UX_ScheduleTemplates_FullTime_SystemGenerated_Day");
+        builder.HasIndex(e => e.IsActive);
     }
 }

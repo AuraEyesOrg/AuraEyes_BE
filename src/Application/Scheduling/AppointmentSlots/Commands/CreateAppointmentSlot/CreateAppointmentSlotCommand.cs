@@ -8,5 +8,4 @@ public record CreateAppointmentSlotCommand : ICommand<Guid>
     public DateOnly Date { get; init; }
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }
-    public decimal? Cost { get; init; }
 }

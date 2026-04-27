@@ -4,15 +4,13 @@ using Domain.Enums;
 namespace Domain.Entities.Scheduling;
 
 /// <summary>
-/// ScheduleTemplate - A recurring availability pattern for a doctor or organization.
+/// ScheduleTemplate - A clinic-level recurring availability pattern.
 /// Defines when slots are available (e.g., "Every Monday 9am-5pm, 30min slots").
+/// Single-clinic model: no OrgId ownership.
 /// </summary>
 public class ScheduleTemplate : BaseEntity, IAggregateRoot
 {
-    /// <summary>FK to Organisation (nullable - can be a solo doctor template).</summary>
-    public Guid? OrgId { get; private set; }
-
-    /// <summary>FK to Ophthalmologist (nullable - can be an org-only template).</summary>
+    /// <summary>FK to the Ophthalmologist owner (for personal schedules).</summary>
     public Guid? OphthalId { get; private set; }
 
     /// <summary>Day of week (0=Sunday, 1=Monday, etc.).</summary>
@@ -30,10 +28,10 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
     /// <summary>Maximum concurrent patients per slot.</summary>
     public int MaxCapacity { get; private set; }
 
-    /// <summary>Default cost for slots generated from this template (optional).</summary>
+    /// <summary>The cost/fee for slots generated from this template.</summary>
     public decimal? Cost { get; private set; }
 
-    /// <summary>Template source (doctor-defined or system-generated).</summary>
+    /// <summary>Template source (staff-defined or system-generated).</summary>
     public ScheduleTemplateSource Source { get; private set; }
 
     /// <summary>Indicates whether this template is active and can be used for slot generation.</summary>
@@ -51,9 +49,8 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         TimeOnly endTime,
         int slotDuration,
         int maxCapacity,
-        Guid? orgId = null,
-        Guid? ophthalId = null,
         decimal? cost = null,
+        Guid? ophthalId = null,
         ScheduleTemplateSource source = ScheduleTemplateSource.Doctor)
     {
         if (endTime <= startTime)
@@ -62,12 +59,6 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
             throw new ArgumentException("Slot duration must be at least 1 minute", nameof(slotDuration));
         if (maxCapacity < 1)
             throw new ArgumentException("Max capacity must be at least 1", nameof(maxCapacity));
-        if (orgId is null && ophthalId is null)
-            throw new ArgumentException("At least one of OrgId or OphthalId must be provided");
-        if (orgId.HasValue && ophthalId.HasValue)
-            throw new ArgumentException("OrgId must be null when OphthalId is provided.");
-        if (cost.HasValue && cost.Value < 0)
-            throw new ArgumentException("Cost cannot be negative", nameof(cost));
 
         DayOfWeek = dayOfWeek;
         StartTime = startTime;
@@ -75,7 +66,6 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         SlotDuration = slotDuration;
         MaxCapacity = maxCapacity;
         Cost = cost;
-        OrgId = orgId;
         OphthalId = ophthalId;
         Source = source;
         IsActive = true;
@@ -87,7 +77,9 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         TimeOnly endTime,
         int slotDuration,
         int maxCapacity,
-        decimal? cost)
+        decimal? cost = null,
+        Guid? ophthalId = null,
+        bool isActive = true)
     {
         if (endTime <= startTime)
             throw new ArgumentException("End time must be after start time");
@@ -95,8 +87,6 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
             throw new ArgumentException("Slot duration must be at least 1 minute", nameof(slotDuration));
         if (maxCapacity < 1)
             throw new ArgumentException("Max capacity must be at least 1", nameof(maxCapacity));
-        if (cost.HasValue && cost.Value < 0)
-            throw new ArgumentException("Cost cannot be negative", nameof(cost));
 
         DayOfWeek = dayOfWeek;
         StartTime = startTime;
@@ -104,6 +94,8 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         SlotDuration = slotDuration;
         MaxCapacity = maxCapacity;
         Cost = cost;
+        OphthalId = ophthalId;
+        IsActive = isActive;
         UpdatedAt = DateTime.UtcNow;
     }
 

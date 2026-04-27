@@ -41,11 +41,9 @@ public class ApplicationUser : IdentityUser<Guid>
     public DateTime? LastLoginAt { get; set; }
     public DateTime? DeletedAt { get; set; }
 
-    // Organization Association
-    public Guid? OrganizationId { get; set; }
 
     // Security policy flags
-    public bool MustChangePassword { get; set; } = false;
+    public bool MustUpdateProfile { get; set; } = false;
 
     // Navigation Properties
     public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();

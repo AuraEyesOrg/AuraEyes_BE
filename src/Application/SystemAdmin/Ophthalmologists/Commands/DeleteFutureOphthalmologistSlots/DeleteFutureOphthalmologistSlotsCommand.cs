@@ -1,5 +1,5 @@
+using Application.Common.Interfaces;
 using Application.Common.Models;
-using MediatR;
 
 namespace Application.SystemAdmin.Ophthalmologists.Commands.DeleteFutureOphthalmologistSlots;
 
@@ -7,7 +7,7 @@ namespace Application.SystemAdmin.Ophthalmologists.Commands.DeleteFutureOphthalm
 /// Deletes appointment slots from today onward for one ophthalmologist.
 /// Slots before today are preserved.
 /// </summary>
-public record DeleteFutureOphthalmologistSlotsCommand : IRequest<Result<DeleteFutureOphthalmologistSlotsResultDto>>
+public record DeleteFutureOphthalmologistSlotsCommand : ICommand<DeleteFutureOphthalmologistSlotsResultDto>
 {
     public Guid OphthalmologistId { get; init; }
 }
