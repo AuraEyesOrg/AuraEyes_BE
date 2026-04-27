@@ -239,13 +239,6 @@ public static class Permissions
         [Roles.ClinicStaff] =
         [
             DashboardRead,
-            PatientsRead, PatientsCreate, PatientsUpdate,
-            AppointmentsRead, AppointmentsCreate, AppointmentsManage,
-            VisitsRead, VisitsManage,
-            ScreeningRead, ScreeningCreate,
-            OrdersRead, OrdersManage,
-            PaymentsRead, PaymentsManage,
-            MedicalRecordsRead, MedicalRecordsCreate, MedicalRecordsFinalize,
             SettingsRead,
         ],
 
@@ -257,6 +250,7 @@ public static class Permissions
             ConsultationsRead, ConsultationsCreate,
             AppointmentsRead, AppointmentsCreate,
             PatientsRead, PatientsUpdate,
+            OrdersRead, PaymentsRead,
             SettingsRead,
         ],
     };
@@ -264,15 +258,29 @@ public static class Permissions
     // ─── Convenience permission groups for sub-role assignment ──────────────────────
 
     /// <summary>Extra permissions assigned to a Receptionist sub-role.</summary>
-    public static readonly string[] ReceptionistExtras = [];
+    public static readonly string[] ReceptionistExtras =
+    [
+        PatientsRead, PatientsCreate, PatientsUpdate,
+        AppointmentsRead, AppointmentsCreate, AppointmentsManage,
+        VisitsRead, VisitsManage,
+        OrdersRead, PaymentsRead,
+    ];
 
     /// <summary>Extra permissions assigned to a Coordinator sub-role.</summary>
     public static readonly string[] CoordinatorExtras =
     [
-        ScreeningApprove,
+        ScreeningRead, ScreeningCreate, ScreeningApprove,
+        MedicalRecordsRead, MedicalRecordsCreate, MedicalRecordsFinalize,
     ];
 
-    public static readonly string[] CashierExtras = [];
+    /// <summary>Extra permissions assigned to a Cashier sub-role.</summary>
+    public static readonly string[] CashierExtras =
+    [
+        PatientsRead,
+        AppointmentsRead, AppointmentsManage,
+        OrdersRead, OrdersManage,
+        PaymentsRead, PaymentsManage,
+    ];
 }
 
 /// <summary>Seed metadata for a single permission.</summary>

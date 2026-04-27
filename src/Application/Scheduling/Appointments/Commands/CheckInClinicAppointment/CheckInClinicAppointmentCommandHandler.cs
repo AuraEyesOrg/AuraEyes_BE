@@ -16,19 +16,22 @@ public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInCli
     private readonly IMedicalRecordRepository _medicalRecordRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
+    private readonly IIdentityService _identityService;
 
     public CheckInClinicAppointmentCommandHandler(
         IAppointmentRepository appointmentRepository,
         IPatientVisitRepository patientVisitRepository,
         IMedicalRecordRepository medicalRecordRepository,
         IUnitOfWork unitOfWork,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IIdentityService identityService)
     {
         _appointmentRepository = appointmentRepository;
         _patientVisitRepository = patientVisitRepository;
         _medicalRecordRepository = medicalRecordRepository;
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
+        _identityService = identityService;
     }
 
     public async Task<Result> Handle(CheckInClinicAppointmentCommand request, CancellationToken cancellationToken)
@@ -74,11 +77,26 @@ public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInCli
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        // Resolve patient name for notification
+        string patientName = "Patient";
+        if (appointment.Patient != null)
+        {
+            if (appointment.Patient.UserId.HasValue)
+            {
+                var user = await _identityService.GetUserByIdAsync(appointment.Patient.UserId.Value, cancellationToken);
+                patientName = user?.FullName ?? "Patient";
+            }
+            else if (!string.IsNullOrWhiteSpace(appointment.Patient.FullName))
+            {
+                patientName = appointment.Patient.FullName;
+            }
+        }
+
         // Notify Coordinator (ClinicStaff) that a patient has checked in
         await _notificationService.SendToRoleAsync(
             roleName: Roles.ClinicStaff,
             title: "New Patient in Queue",
-            message: $"Patient {appointment.Patient?.FullName ?? "Unknown"} has checked in and is waiting for screening.",
+            message: $"{patientName} has checked in and is waiting for screening.",
             type: NotificationType.SystemAlert,
             payload: new { VisitId = visit.Id, PatientId = visit.PatientId },
             cancellationToken: cancellationToken

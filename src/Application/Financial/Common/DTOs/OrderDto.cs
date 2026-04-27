@@ -9,8 +9,9 @@ public record OrderDto(
     decimal? DepositAmount,
     string? PatientName,
     string? Description,
-    OrderStatus Status,
+    string Status,
     DateTime CreatedAt,
+    decimal PaidAmount,
     List<PaymentDto> Payments);
 
 public record PaymentDto(
@@ -21,4 +22,5 @@ public record PaymentDto(
     PaymentMethod Method,
     DateTime? PaidAt,
     string? PaymentUrl,
-    string? Description);
+    string? Description,
+    string? PaymentOrderCode = null);

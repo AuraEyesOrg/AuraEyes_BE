@@ -159,8 +159,14 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
             order.DepositAmount,
             user?.FullName,
             displayDescription,
-            order.Status,
+            order.Status switch
+            {
+                OrderStatus.Confirmed => "PartiallyPaid",
+                OrderStatus.Completed => "FullyPaid",
+                _ => order.Status.ToString()
+            },
             order.CreatedAt,
+            order.PaidAmount,
             order.Payments.Select(p => new PaymentDto(
                 p.Id,
                 p.OrderId,
@@ -169,6 +175,7 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
                 p.Method,
                 p.PaidAt,
                 p.PaymentUrl,
-                displayDescription)).ToList());
+                p.Description ?? displayDescription,
+                p.PaymentOrderCode)).ToList());
     }
 }
