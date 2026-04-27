@@ -40,6 +40,19 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<AppointmentSlot>> GetByDateRangeAsync(
+        DateOnly fromDate,
+        DateOnly toDate,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Include(s => s.ScheduleTemplate)
+            .Where(s => s.Date >= fromDate && s.Date <= toDate)
+            .OrderBy(s => s.Date)
+            .ThenBy(s => s.StartTime)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<AppointmentSlot>> GetAvailableSlotsAsync(
         Guid? scheduleTemplateId,
         DateOnly? fromDate = null,

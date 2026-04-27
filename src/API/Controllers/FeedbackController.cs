@@ -21,14 +21,13 @@ public class FeedbackController : BaseApiController
         _mediator = mediator;
     }
 
-    [HttpPost("clinics/{clinicId:guid}")]
+    [HttpPost("clinics")]
     [Authorize(Policy = Policies.PatientOnly)]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateClinicFeedback(
-        Guid clinicId,
         [FromBody] CreateClinicFeedbackRequest request)
     {
         var command = new CreateClinicFeedbackCommand
@@ -45,28 +44,27 @@ public class FeedbackController : BaseApiController
         {
             return CreatedAtAction(
                 nameof(GetClinicFeedback),
-                new { clinicId, feedbackId = result.Data },
+                new { feedbackId = result.Data },
                 ApiResponseFactory.Success(result.Data, "Clinic feedback created successfully."));
         }
 
         return HandleResult(result);
     }
 
-    [HttpGet("clinics/{clinicId:guid}/items/{feedbackId:guid}")]
+    [HttpGet("clinics/items/{feedbackId:guid}")]
     [Authorize]
     [ProducesResponseType(typeof(ApiResponse<ClinicFeedbackDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetClinicFeedback(Guid clinicId, Guid feedbackId)
+    public async Task<IActionResult> GetClinicFeedback(Guid feedbackId)
     {
         var result = await _mediator.Send(new GetClinicFeedbackQuery(feedbackId));
         return HandleResult(result);
     }
 
-    [HttpGet("clinics/{clinicId:guid}/items")]
+    [HttpGet("clinics/items")]
     [Authorize]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<ClinicFeedbackDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ListClinicFeedback(
-        Guid clinicId,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10)
     {
@@ -79,11 +77,11 @@ public class FeedbackController : BaseApiController
         return HandleResult(result);
     }
 
-    [HttpGet("clinics/{clinicId:guid}/rating")]
+    [HttpGet("clinics/rating")]
     [Authorize]
     [ProducesResponseType(typeof(ApiResponse<FeedbackRatingSummaryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetClinicRatingSummary(Guid clinicId)
+    public async Task<IActionResult> GetClinicRatingSummary()
     {
         var result = await _mediator.Send(new GetClinicRatingSummaryQuery());
         return HandleResult(result);
