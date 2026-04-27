@@ -9,7 +9,6 @@ namespace Infrastructure.Services;
 
 public class SystemSettingService : ISystemSettingService
 {
-    private const string PartTimeReservedSlotsPrefix = "PART_TIME_RESERVED_SLOTS_";
 
     private readonly ApplicationDbContext _context;
     private readonly ILogger<SystemSettingService> _logger;
@@ -62,87 +61,6 @@ public class SystemSettingService : ISystemSettingService
 
         await _context.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("System settings updated for keys: {Keys}", string.Join(", ", keys));
-    }
-
-    public async Task<(bool Success, int UsedSlots, int Quota, int RemainingSlots)> TryReservePartTimeSlotsAsync(
-        DateOnly date,
-        int slotsToReserve,
-        int quotaSnapshot,
-        CancellationToken cancellationToken = default)
-    {
-        if (slotsToReserve < 1)
-            throw new ArgumentOutOfRangeException(nameof(slotsToReserve), "Reserved slots must be at least 1.");
-
-        if (quotaSnapshot < 1)
-            throw new ArgumentOutOfRangeException(nameof(quotaSnapshot), "Quota must be at least 1.");
-
-        var counterKey = BuildPartTimeReservedSlotsKey(date);
-        var description = $"Reserved part-time slots for {date:yyyy-MM-dd}";
-
-        await _context.Database.ExecuteSqlInterpolatedAsync(
-            $@"INSERT INTO ""SystemSettings"" (""Key"", ""Value"", ""Description"")
-               VALUES ({counterKey}, {"0"}, {description})
-               ON CONFLICT (""Key"") DO NOTHING",
-            cancellationToken);
-
-        var setting = await _context.SystemSettings
-            .FromSqlInterpolated($@"SELECT * FROM ""SystemSettings"" WHERE ""Key"" = {counterKey} FOR UPDATE")
-            .SingleAsync(cancellationToken);
-
-        var currentUsed = TryParseNonNegativeInt(setting.Value);
-        var proposed = currentUsed + slotsToReserve;
-
-        if (proposed > quotaSnapshot)
-        {
-            return (false, currentUsed, quotaSnapshot, Math.Max(0, quotaSnapshot - currentUsed));
-        }
-
-        setting.UpdateValue(proposed.ToString(CultureInfo.InvariantCulture));
-
-        return (true, proposed, quotaSnapshot, Math.Max(0, quotaSnapshot - proposed));
-    }
-
-    public async Task<IReadOnlyDictionary<DateOnly, int>> GetPartTimeReservedSlotsByDateRangeAsync(
-        DateOnly fromDate,
-        DateOnly toDate,
-        CancellationToken cancellationToken = default)
-    {
-        var prefix = PartTimeReservedSlotsPrefix;
-
-        var rows = await _context.SystemSettings
-            .AsNoTracking()
-            .Where(s => EF.Functions.Like(s.Key, $"{prefix}%"))
-            .ToListAsync(cancellationToken);
-
-        var result = new Dictionary<DateOnly, int>();
-
-        foreach (var row in rows)
-        {
-            if (!TryParseDateFromPartTimeReservedSlotsKey(row.Key, out var date))
-                continue;
-
-            if (date < fromDate || date > toDate)
-                continue;
-
-            result[date] = TryParseNonNegativeInt(row.Value);
-        }
-
-        return result;
-    }
-
-    private static string BuildPartTimeReservedSlotsKey(DateOnly date)
-        => $"{PartTimeReservedSlotsPrefix}{date:yyyyMMdd}";
-
-    private static bool TryParseDateFromPartTimeReservedSlotsKey(string key, out DateOnly date)
-    {
-        var prefix = PartTimeReservedSlotsPrefix;
-        date = default;
-
-        if (!key.StartsWith(prefix, StringComparison.Ordinal))
-            return false;
-
-        var suffix = key[prefix.Length..];
-        return DateOnly.TryParseExact(suffix, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
     }
 
     private static int TryParseNonNegativeInt(string value)

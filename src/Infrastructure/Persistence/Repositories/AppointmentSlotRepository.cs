@@ -170,26 +170,7 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
             .ToDictionaryAsync(x => x.Status, x => x.Count, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<AppointmentSlot>> GetByOrganisationAndDateRangeAsync(
-        Guid organisationId,
-        DateOnly fromDate,
-        DateOnly toDate,
-        CancellationToken cancellationToken = default)
-    {
-        var query = _dbSet
-            .Include(s => s.ScheduleTemplate)
-            .Where(s => s.Date >= fromDate && s.Date <= toDate);
 
-        if (organisationId != Guid.Empty)
-        {
-            query = query.Where(s => s.ScheduleTemplate!.OrgId == organisationId);
-        }
-
-        return await query
-            .OrderBy(s => s.Date)
-            .ThenBy(s => s.StartTime)
-            .ToListAsync(cancellationToken);
-    }
 
     public async Task<IReadOnlyList<AppointmentSlot>> GetUnbookedSlotsByDoctorAsync(
         Guid doctorId,

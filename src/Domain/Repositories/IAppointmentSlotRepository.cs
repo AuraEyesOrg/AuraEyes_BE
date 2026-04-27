@@ -54,11 +54,7 @@ public interface IAppointmentSlotRepository : IRepository<AppointmentSlot>
     Task<Dictionary<ScheduleStatus, int>> GetStatusCountsAsync(
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<AppointmentSlot>> GetByOrganisationAndDateRangeAsync(
-        Guid organisationId,
-        DateOnly fromDate,
-        DateOnly toDate,
-        CancellationToken cancellationToken = default);
+
 
     Task<IReadOnlyList<AppointmentSlot>> GetUnbookedSlotsByDoctorAsync(
         Guid doctorId,

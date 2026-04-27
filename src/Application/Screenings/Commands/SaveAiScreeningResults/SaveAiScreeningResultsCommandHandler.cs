@@ -58,7 +58,6 @@ public class SaveAiScreeningResultsCommandHandler : ICommandHandler<SaveAiScreen
         // Get the screening session
         var screening = await _screeningRepository
             .Query()
-            .Include(s => s.Consent)
             .FirstOrDefaultAsync(s => s.Id == request.ScreeningId, cancellationToken);
         if (screening is null)
         {
@@ -75,15 +74,6 @@ public class SaveAiScreeningResultsCommandHandler : ICommandHandler<SaveAiScreen
             return Result<SaveAiScreeningResultsResponse>.NotFound("Patient not found");
         }
 
-        if (!screening.HasAgreedConsent(screening.PatientId))
-        {
-            _logger.LogWarning(
-                "Consent missing or not agreed for screening {ScreeningId}, patient {PatientId}",
-                request.ScreeningId,
-                screening.PatientId);
-            return Result<SaveAiScreeningResultsResponse>.Failure(
-                "Patient consent is required before saving AI screening results.");
-        }
 
             var wasProcessedBefore = screening.ProcessedAt.HasValue;
 
@@ -193,32 +183,18 @@ public class SaveAiScreeningResultsCommandHandler : ICommandHandler<SaveAiScreen
                 screening.PatientId,
                 screening.Id);
         }
-
-        if (screening.OrganisationId is not Guid organisationId)
-            return;
-
-        var organisationAdminUserIds = await _identityService.GetUserIdsByRoleAndOrganizationAsync(
-            Roles.SystemAdmin,
-            organisationId,
-            cancellationToken);
-
-        foreach (var organisationAdminUserId in organisationAdminUserIds)
+        
+        // Notify System Admins or Clinic Staff if needed
+        var admins = await _identityService.GetUserIdsByRoleAsync(Roles.SystemAdmin, cancellationToken);
+        foreach (var adminId in admins)
         {
             await _notificationService.SendAsync(
-                organisationAdminUserId,
+                adminId,
                 "Kết quả AI ca sàng lọc đã sẵn sàng",
                 "Kết quả phân tích AI cho bệnh nhân đã hoàn tất. Mở danh sách bệnh nhân để xem chi tiết.",
                 NotificationType.AiScreeningCompleted,
                 payload,
                 cancellationToken);
-        }
-
-        if (organisationAdminUserIds.Count > 0)
-        {
-            _logger.LogInformation(
-                "AI completion notification sent to {Count} organisation admins for screening {ScreeningId}",
-                organisationAdminUserIds.Count,
-                screening.Id);
         }
     }
 }

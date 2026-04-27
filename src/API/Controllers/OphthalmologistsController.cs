@@ -16,9 +16,6 @@ using Application.Ophthalmologists.Queries.GetOphthalmologists;
 using Application.Ophthalmologists.LeaveRequests.Commands.CancelLeaveRequest;
 using Application.Ophthalmologists.LeaveRequests.Commands.CreateLeaveRequest;
 using Application.Ophthalmologists.LeaveRequests.Queries.GetMyLeaveRequests;
-using Application.Ophthalmologists.EmploymentTypeChangeRequests.Commands.CancelEmploymentTypeChangeRequest;
-using Application.Ophthalmologists.EmploymentTypeChangeRequests.Commands.CreateEmploymentTypeChangeRequest;
-using Application.Ophthalmologists.EmploymentTypeChangeRequests.Queries.GetMyEmploymentTypeChangeRequests;
 using Domain.Enums;
 using Domain.Repositories;
 using MediatR;
@@ -444,92 +441,6 @@ public class OphthalmologistsController : BaseApiController
     }
 
     /// <summary>
-    /// Get employment type change requests for the current authenticated ophthalmologist.
-    /// </summary>
-    [HttpGet("~/api/ophthalmologist/employment-type-change-requests")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
-    [ProducesResponseType(typeof(ApiResponse<PagedResult<Application.Ophthalmologists.Common.OphthalmologistEmploymentTypeChangeRequestDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetMyEmploymentTypeChangeRequests(
-        [FromQuery] OphthalmologistEmploymentTypeChangeRequestStatus? status = null,
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 20,
-        CancellationToken cancellationToken = default)
-    {
-        var profileId = await ResolveCurrentOphthalmologistProfileIdAsync(cancellationToken);
-        if (!profileId.HasValue)
-            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
-
-        var result = await _mediator.Send(
-            new GetMyEmploymentTypeChangeRequestsQuery
-            {
-                OphthalmologistId = profileId.Value,
-                Status = status,
-                PageNumber = pageNumber,
-                PageSize = pageSize
-            },
-            cancellationToken);
-
-        return HandleResult(result);
-    }
-
-    /// <summary>
-    /// Submit an employment type change request for the current authenticated ophthalmologist.
-    /// </summary>
-    [HttpPost("~/api/ophthalmologist/employment-type-change-requests")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
-    [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CreateEmploymentTypeChangeRequest(
-        [FromBody] CreateEmploymentTypeChangeRequestApiRequest request,
-        CancellationToken cancellationToken)
-    {
-        var profileId = await ResolveCurrentOphthalmologistProfileIdAsync(cancellationToken);
-        if (!profileId.HasValue)
-            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
-
-        var result = await _mediator.Send(
-            new CreateEmploymentTypeChangeRequestCommand
-            {
-                OphthalmologistId = profileId.Value,
-                TargetEmploymentType = request.TargetEmploymentType,
-                Reason = request.Reason
-            },
-            cancellationToken);
-
-        return HandleResult(result, "Employment type change request submitted successfully.");
-    }
-
-    /// <summary>
-    /// Cancel a pending employment type change request owned by current authenticated ophthalmologist.
-    /// </summary>
-    [HttpPost("~/api/ophthalmologist/employment-type-change-requests/{requestId:guid}/cancel")]
-    [Authorize(Policy = Policies.OphthalmologistOnly)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CancelEmploymentTypeChangeRequest(
-        Guid requestId,
-        CancellationToken cancellationToken)
-    {
-        var profileId = await ResolveCurrentOphthalmologistProfileIdAsync(cancellationToken);
-        if (!profileId.HasValue)
-            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
-
-        var result = await _mediator.Send(
-            new CancelEmploymentTypeChangeRequestCommand
-            {
-                RequestId = requestId,
-                OphthalmologistId = profileId.Value
-            },
-            cancellationToken);
-
-        return HandleResult(result, "Employment type change request cancelled successfully.");
-    }
-
-    /// <summary>
     /// Delete (soft-delete) an ophthalmologist profile.
     /// </summary>
     /// <param name="id">Ophthalmologist ID.</param>
@@ -646,11 +557,5 @@ public record CreateLeaveRequestApiRequest
 {
     public DateOnly StartDate { get; init; }
     public DateOnly EndDate { get; init; }
-    public string Reason { get; init; } = string.Empty;
-}
-
-public record CreateEmploymentTypeChangeRequestApiRequest
-{
-    public OphthalmologistEmploymentType TargetEmploymentType { get; init; }
     public string Reason { get; init; } = string.Empty;
 }

@@ -17,7 +17,6 @@ public class GetPatientClinicAppointmentsQueryHandler
     private readonly IClinicFeedbackRepository _clinicFeedbackRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IOrderRepository _orderRepository;
-    private readonly IRepository<Organisation> _organisationRepository;
     private readonly IClinicStaffRepository _staffRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
@@ -27,7 +26,6 @@ public class GetPatientClinicAppointmentsQueryHandler
         IClinicFeedbackRepository clinicFeedbackRepository,
         IOphthalmologistRepository ophthalmologistRepository,
         IOrderRepository orderRepository,
-        IRepository<Organisation> organisationRepository,
         IClinicStaffRepository staffRepository,
         IUnitOfWork unitOfWork,
         ICurrentUserService currentUser)
@@ -36,7 +34,6 @@ public class GetPatientClinicAppointmentsQueryHandler
         _clinicFeedbackRepository = clinicFeedbackRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _orderRepository = orderRepository;
-        _organisationRepository = organisationRepository;
         _staffRepository = staffRepository;
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
@@ -103,17 +100,6 @@ public class GetPatientClinicAppointmentsQueryHandler
         var orderMap = orders.GroupBy(o => o.AppointmentId)
             .ToDictionary(g => g.Key!.Value, g => g.OrderByDescending(o => o.CreatedAt).First());
 
-        // Fetch Organisation names
-        var orgIds = appointments
-            .Where(a => a.AppointmentSlot?.ScheduleTemplate?.OrgId != null)
-            .Select(a => a.AppointmentSlot!.ScheduleTemplate!.OrgId!.Value)
-            .Distinct()
-            .ToList();
-
-        var organisationMap = (await _organisationRepository.GetAllAsync(cancellationToken))
-            .Where(o => orgIds.Contains(o.Id))
-            .ToDictionary(o => o.Id, o => o.Name);
-
         // In a real scenario, we'd link a staff member to the appointment lifecycle (confirmed by, etc.)
         // For now, we don't have a direct StaffId in Appointment entity.
 
@@ -123,8 +109,6 @@ public class GetPatientClinicAppointmentsQueryHandler
             {
                 doctorMap.TryGetValue(a.AppointmentSlot!.OphthalId ?? Guid.Empty, out var doc);
 
-                organisationMap.TryGetValue(a.AppointmentSlot.ScheduleTemplate?.OrgId ?? Guid.Empty, out var orgName);
-                
                 return new ClinicAppointmentDto
                 {
                     Id = a.Id,
@@ -137,8 +121,8 @@ public class GetPatientClinicAppointmentsQueryHandler
                     Status = a.Status.ToString(),
                     CreatedAt = a.CreatedAt,
                     HasFeedback = feedbackAppointmentIds.Contains(a.Id),
-                    OrganisationId = a.AppointmentSlot.ScheduleTemplate?.OrgId,
-                    OrganisationName = orgName ?? "Aura Clinic",
+                    OrganisationId = null,
+                    OrganisationName = "Aura Clinic",
                     OphthalId = a.AppointmentSlot.OphthalId,
                     OphthalFullName = doc.FullName ?? "Clinic Doctor",
                     OphthalAvatarUrl = doc.AvatarUrl,

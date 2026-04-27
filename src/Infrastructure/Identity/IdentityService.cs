@@ -94,7 +94,6 @@ public class IdentityService : IIdentityService
         string password,
         string fullName,
         string role,
-        Guid? organizationId = null,
         UserProfileWalkInDto? userProfile = null,
         CancellationToken cancellationToken = default)
     {
@@ -102,8 +101,7 @@ public class IdentityService : IIdentityService
         {
             UserName = email,
             Email = email,
-            FullName = fullName,
-            OrganizationId = organizationId
+            FullName = fullName
         };
 
         if (userProfile != null)
@@ -198,8 +196,7 @@ public class IdentityService : IIdentityService
         return dtos.AsReadOnly();
     }
 
-    public async Task<bool> IsPhoneNumberInUseByOrganizationAsync(
-        Guid organizationId,
+    public async Task<bool> IsPhoneNumberInUseAsync(
         string phoneNumber,
         CancellationToken cancellationToken = default)
     {
@@ -213,7 +210,6 @@ public class IdentityService : IIdentityService
 
         var existingPhoneNumbers = await _userManager.Users
             .Where(u =>
-                u.OrganizationId == organizationId &&
                 !u.IsDeleted &&
                 u.PhoneNumber != null &&
                 u.PhoneNumber != string.Empty)
@@ -234,8 +230,7 @@ public class IdentityService : IIdentityService
             .Any(p => p == normalizedPhoneNumber);
     }
 
-    public async Task<bool> IsCitizenIdInUseByOrganizationAsync(
-        Guid organizationId,
+    public async Task<bool> IsCitizenIdInUseAsync(
         string citizenId,
         CancellationToken cancellationToken = default)
     {
@@ -245,7 +240,7 @@ public class IdentityService : IIdentityService
         }
 
         return await _userManager.Users
-            .AnyAsync(u => u.OrganizationId == organizationId && u.CitizenId == citizenId && !u.IsDeleted, cancellationToken);
+            .AnyAsync(u => u.CitizenId == citizenId && !u.IsDeleted, cancellationToken);
     }
 
     public async Task<bool> IsEmailConfirmedAsync(Guid userId)
@@ -341,16 +336,14 @@ public class IdentityService : IIdentityService
         return await _userManager.IsInRoleAsync(user, role);
     }
 
-    public async Task<IReadOnlyList<Guid>> GetUserIdsByRoleAndOrganizationAsync(
+    public async Task<IReadOnlyList<Guid>> GetUserIdsByRoleAsync(
         string role,
-        Guid organizationId,
         CancellationToken cancellationToken = default)
     {
         var usersInRole = await _userManager.GetUsersInRoleAsync(role);
 
         return usersInRole
             .Where(u =>
-                u.OrganizationId == organizationId &&
                 u.IsActive &&
                 !u.IsDeleted)
             .Select(u => u.Id)
@@ -405,7 +398,6 @@ public class IdentityService : IIdentityService
             user.EmailConfirmed,
             user.IsActive,
             user.IsDeleted,
-            user.OrganizationId,
             user.TwoFactorEnabled,
             avatarUrl
         );
@@ -820,9 +812,6 @@ public class IdentityService : IIdentityService
         var user = await _userManager.FindByIdAsync(userId.ToString());
         if (user == null || user.IsDeleted)
             return (false, new[] { "User not found" });
-            
-        if(!user.OrganizationId.HasValue)
-            return (false, new[] { "Only organization users can have their email updated" });
 
         if (string.IsNullOrWhiteSpace(email))
             return (false, new[] { "Email is required" });
@@ -848,22 +837,6 @@ public class IdentityService : IIdentityService
             return (false, new[] { "User not found" });
 
         user.AvatarUrl = avatarUrl;
-        user.UpdatedAt = DateTime.UtcNow;
-
-        var result = await _userManager.UpdateAsync(user);
-        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
-    }
-
-    public async Task<(bool Succeeded, string[] Errors)> UpdateUserOrganizationAsync(
-        Guid userId,
-        Guid? organizationId,
-        CancellationToken cancellationToken = default)
-    {
-        var user = await _userManager.FindByIdAsync(userId.ToString());
-        if (user == null || user.IsDeleted)
-            return (false, new[] { "User not found" });
-
-        user.OrganizationId = organizationId;
         user.UpdatedAt = DateTime.UtcNow;
 
         var result = await _userManager.UpdateAsync(user);
@@ -923,30 +896,6 @@ public class IdentityService : IIdentityService
             await _userManager.UpdateAsync(user);
         }
 
-        return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
-    }
-
-    public async Task<(bool Succeeded, string[] Errors)> UpdateUserProfileAsync(
-        Guid userId,
-        string fullName,
-        string? phone,
-        DateTime? dateOfBirth,
-        int? gender,
-        string? address,
-        CancellationToken cancellationToken = default)
-    {
-        var user = await _userManager.FindByIdAsync(userId.ToString());
-        if (user == null || user.IsDeleted)
-            return (false, new[] { "User not found" });
-
-        user.FullName = fullName;
-        user.PhoneNumber = phone;
-        user.DateOfBirth = dateOfBirth;
-        user.Gender = gender.HasValue ? (Domain.Enums.Gender)gender.Value : null;
-        user.Address = address;
-        user.UpdatedAt = DateTime.UtcNow;
-
-        var result = await _userManager.UpdateAsync(user);
         return (result.Succeeded, result.Errors.Select(e => e.Description).ToArray());
     }
 
