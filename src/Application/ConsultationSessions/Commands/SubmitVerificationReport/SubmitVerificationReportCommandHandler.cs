@@ -1,6 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
-using Application.PatientRoadmaps.Common;
+
 using System.Text.Json;
 using Domain.Common;
 using Domain.Entities.Consultation;
@@ -19,9 +19,7 @@ public class SubmitVerificationReportCommandHandler
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly IRepository<MedicalDiagnosis> _diagnosisRepository;
     private readonly IRepository<AiScreening> _screeningRepository;
-    private readonly IRepository<PatientRoadmap> _roadmapRepository;
     private readonly IRepository<Patient> _patientRepository;
-    private readonly IPatientRoadmapGenerationService _roadmapGenerationService;
     private readonly INotificationService _notificationService;
     private readonly IIdentityService _identityService;
     private readonly IPatientVisitRepository _patientVisitRepository;
@@ -31,9 +29,7 @@ public class SubmitVerificationReportCommandHandler
         IConsultationSessionRepository sessionRepository,
         IRepository<MedicalDiagnosis> diagnosisRepository,
         IRepository<AiScreening> screeningRepository,
-        IRepository<PatientRoadmap> roadmapRepository,
         IRepository<Patient> patientRepository,
-        IPatientRoadmapGenerationService roadmapGenerationService,
         INotificationService notificationService,
         IIdentityService identityService,
         IPatientVisitRepository patientVisitRepository,
@@ -42,9 +38,7 @@ public class SubmitVerificationReportCommandHandler
         _sessionRepository = sessionRepository;
         _diagnosisRepository = diagnosisRepository;
         _screeningRepository = screeningRepository;
-        _roadmapRepository = roadmapRepository;
         _patientRepository = patientRepository;
-        _roadmapGenerationService = roadmapGenerationService;
         _notificationService = notificationService;
         _identityService = identityService;
         _patientVisitRepository = patientVisitRepository;
@@ -175,30 +169,6 @@ public class SubmitVerificationReportCommandHandler
         if (string.IsNullOrWhiteSpace(screening.RawJsonOutput))
             return Result.Failure("AI screening output is unavailable for roadmap generation.");
 
-        var generatedRoadmap = await _roadmapGenerationService.GenerateFromDiagnosisAsync(
-            new PatientRoadmapGenerationInput
-            {
-                PatientId = session.PatientId,
-                ScreeningId = screening.Id,
-                AiScreeningRawJson = screening.RawJsonOutput,
-                DiagnosisCode = diagnosisCode,
-                CodingSystem = request.CodingSystem,
-                ClinicalFindings = clinicalFindings,
-                SeverityLevel = request.SeverityLevel,
-                ConfidenceLevel = request.ConfidenceLevel,
-                TreatmentPlan = request.TreatmentPlan,
-                Recommendations = request.Recommendations,
-                LifestyleAdvice = normalizedLifestyleAdvice,
-                IsUrgent = request.IsUrgent,
-                Status = request.Status,
-                FollowUpDate = request.FollowUpDate,
-                IsReferralNeeded = request.IsReferralNeeded
-            },
-            cancellationToken);
-
-        if (!generatedRoadmap.IsSuccess || generatedRoadmap.Data is null)
-            return Result.Failure(generatedRoadmap.ErrorMessage);
-
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
@@ -221,22 +191,6 @@ public class SubmitVerificationReportCommandHandler
                     finalizedAtUtc);
 
             await _diagnosisRepository.AddAsync(diagnosis, cancellationToken);
-
-            var roadmap = new PatientRoadmap(
-                session.PatientId,
-                diagnosis.Id,
-                generatedRoadmap.Data.RiskLevel,
-                generatedRoadmap.Data.Summary,
-                JsonSerializer.Serialize(generatedRoadmap.Data.NextSteps),
-                JsonSerializer.Serialize(generatedRoadmap.Data.LifestyleAdvice),
-                JsonSerializer.Serialize(generatedRoadmap.Data.WarningSigns),
-                generatedRoadmap.Data.FollowUpNeeded,
-                generatedRoadmap.Data.FollowUpTimeframe,
-                generatedRoadmap.Data.RawAiResponse,
-                "AI",
-                DateTime.UtcNow);
-
-            await _roadmapRepository.AddAsync(roadmap, cancellationToken);
 
             session.OpenChat();
             await _sessionRepository.UpdateAsync(session, cancellationToken);

@@ -26,7 +26,6 @@ public class SendToDoctorCommandHandler
     private readonly IRepository<AiScreening> _screeningRepository;
     private readonly IConsultationSessionRepository _consultationSessionRepository;
     private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
-    private readonly ICurrentUserOrganisationService _currentUserOrganisationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
 
@@ -35,7 +34,6 @@ public class SendToDoctorCommandHandler
         IRepository<AiScreening> screeningRepository,
         IConsultationSessionRepository consultationSessionRepository,
         IRepository<Ophthalmologist> ophthalmologistRepository,
-        ICurrentUserOrganisationService currentUserOrganisationService,
         IUnitOfWork unitOfWork,
         INotificationService notificationService)
     {
@@ -43,7 +41,6 @@ public class SendToDoctorCommandHandler
         _screeningRepository = screeningRepository;
         _consultationSessionRepository = consultationSessionRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
-        _currentUserOrganisationService = currentUserOrganisationService;
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
     }
@@ -67,8 +64,6 @@ public class SendToDoctorCommandHandler
 
         if (visit == null)
             return Result<SendToDoctorResponse>.NotFound("Visit not found.");
-
-
 
         if (visit.Status == PatientVisitStatus.Completed)
             return Result<SendToDoctorResponse>.Failure("Cannot send completed visit to doctor.");

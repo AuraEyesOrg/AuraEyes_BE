@@ -103,7 +103,6 @@ public class ShareConsultationToNetworkCommandHandler : ICommandHandler<ShareCon
             AuthorType.Ophthalmologist,
             BuildShareContent(patientAge, patientGender, latestResult),
             PostCategory.CasePresentation,
-            organisationId: null,
             allowComments: true);
 
         post.SetClinicalCaseMetadata(

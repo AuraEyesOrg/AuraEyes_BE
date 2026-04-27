@@ -6,7 +6,6 @@ using Application.SystemAdmin.Dashboard.Queries.GetDoctorStatus;
 using Application.SystemAdmin.Dashboard.Queries.GetDoctorWorkload;
 using Application.SystemAdmin.Dashboard.Queries.GetDoctorWorkloads;
 using Application.SystemAdmin.Dashboard.Queries.GetLiveQueue;
-using Application.SystemAdmin.Dashboard.Queries.GetPartTimeSlotQuotaUsage;
 using Application.SystemAdmin.Dashboard.Queries.GetPopulationRiskAnalysis;
 using Application.SystemAdmin.Dashboard.Queries.GetRecentScreenings;
 using Application.SystemAdmin.Dashboard.Queries.GetScreeningVolumeTrends;
@@ -16,13 +15,9 @@ using Application.SystemAdmin.Dashboard.Queries.GetTodaySummary;
 using Domain.Enums;
 using Infrastructure.Services;
 using MediatR;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-
 using Infrastructure.Identity.Authorization;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers.SystemAdmin;
 
@@ -139,27 +134,6 @@ public class DashboardController : BaseApiController
             PageNumber = pageNumber,
             PageSize = pageSize
         };
-        var result = await _mediator.Send(query);
-        return HandleResult(result);
-    }
-
-    /// <summary>
-    /// Get part-time slot quota usage by day.
-    /// </summary>
-    [HttpGet("part-time-slot-usage")]
-    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<PartTimeSlotQuotaUsageDto>>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetPartTimeSlotUsage(
-        [FromQuery] DateOnly? fromDate = null,
-        [FromQuery] DateOnly? toDate = null)
-    {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var query = new GetPartTimeSlotQuotaUsageQuery
-        {
-            FromDate = fromDate ?? today,
-            ToDate = toDate ?? today.AddDays(7)
-        };
-
         var result = await _mediator.Send(query);
         return HandleResult(result);
     }

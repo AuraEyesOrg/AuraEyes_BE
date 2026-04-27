@@ -25,11 +25,6 @@ public interface IAuthService
         string confirmationUrlBase,
         CancellationToken cancellationToken = default);
 
-    Task<Result<OrganisationRegistrationResponse>> RegisterOrganisationAsync(
-        RegisterOrganisationRequest request,
-        CancellationToken cancellationToken = default);
-
-
     Task<Result<LoginResponse>> GoogleLoginAsync(
         GoogleLoginRequest request,
         string? ipAddress,

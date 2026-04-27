@@ -37,7 +37,7 @@ public class ClinicAppointmentDto
     public OrderStatus? OrderStatus { get; init; }
 }
 
-public class OrganisationAvailableSlotDto
+public class ClinicAvailableSlotDto
 {
     public Guid SlotId { get; init; }
     public DateOnly Date { get; init; }

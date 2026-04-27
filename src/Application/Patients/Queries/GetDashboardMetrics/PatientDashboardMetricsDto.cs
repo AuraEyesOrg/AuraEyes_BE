@@ -5,5 +5,4 @@ public class PatientDashboardMetricsDto
     public int CompletedScreenings { get; set; }
     public int TotalReports { get; set; }
     public int UpcomingAppointments { get; set; }
-    public int RemainingQuota { get; set; }
 }

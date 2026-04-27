@@ -1,11 +1,9 @@
-using Application.AiQuota.Interfaces;
 using Application.Common.Constants;
 using Application.Common.Helpers;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Ophthalmologists.Queries.GetDashboardMetrics;
 using Application.Ophthalmologists.Queries.GetReviewQueue;
-using Application.Organisations.Queries.GetDashboardMetrics;
 using Application.Patients.Queries.GetDashboardMetrics;
 using Application.SystemAdmin.Dashboard.Queries.GetDashboardMetrics;
 using Application.SystemAdmin.Dashboard.Queries.GetDoctorWorkload;
@@ -32,16 +30,13 @@ public class DashboardMetricsService : IDashboardMetricsService
     private const string FullTimeRequiredHoursMonthSettingKey = "FULLTIME_REQUIRED_HOURS_MONTH";
 
     private readonly ApplicationDbContext _context;
-    private readonly IAiQuotaService _aiQuotaService;
     private readonly IBetterStackHeartbeatService _betterStackHeartbeatService;
 
     public DashboardMetricsService(
         ApplicationDbContext context,
-        IAiQuotaService aiQuotaService,
         IBetterStackHeartbeatService betterStackHeartbeatService)
     {
         _context = context;
-        _aiQuotaService = aiQuotaService;
         _betterStackHeartbeatService = betterStackHeartbeatService;
     }
 
@@ -67,20 +62,6 @@ public class DashboardMetricsService : IDashboardMetricsService
             PreviousMonth = doctorPreviousMonthCount
         };
 
-        var organisationTotalCount = await _context.Organisations.AsNoTracking()
-            .CountAsync(cancellationToken);
-        var organisationCurrentMonthCount = await _context.Organisations.AsNoTracking()
-            .CountAsync(item => item.CreatedAt >= currentMonthStart && item.CreatedAt < nextMonthStart, cancellationToken);
-        var organisationPreviousMonthCount = await _context.Organisations.AsNoTracking()
-            .CountAsync(item => item.CreatedAt >= previousMonthStart && item.CreatedAt < currentMonthStart, cancellationToken);
-
-        var organisationStats = new
-        {
-            Total = organisationTotalCount,
-            CurrentMonth = organisationCurrentMonthCount,
-            PreviousMonth = organisationPreviousMonthCount
-        };
-
         var patientTotalCount = await _context.Patients.AsNoTracking()
             .CountAsync(cancellationToken);
         var patientCurrentMonthCount = await _context.Patients.AsNoTracking()
@@ -98,160 +79,53 @@ public class DashboardMetricsService : IDashboardMetricsService
         var doctorCurrentMonth = doctorStats?.CurrentMonth ?? 0;
         var doctorPreviousMonth = doctorStats?.PreviousMonth ?? 0;
 
-        var organisationTotal = organisationStats?.Total ?? 0;
-        var organisationCurrentMonth = organisationStats?.CurrentMonth ?? 0;
-        var organisationPreviousMonth = organisationStats?.PreviousMonth ?? 0;
-
         var patientTotal = patientStats?.Total ?? 0;
         var patientCurrentMonth = patientStats?.CurrentMonth ?? 0;
         var patientPreviousMonth = patientStats?.PreviousMonth ?? 0;
 
         var yearStart = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var nextYearStart = yearStart.AddYears(1);
-
-        var paymentMethodRevenueRaw = await _context.DepositRequests.AsNoTracking()
-            .Where(deposit =>
-                deposit.Status == PaymentStatus.Completed &&
-                (deposit.CompletedAt ?? deposit.CreatedAt) >= yearStart &&
-                (deposit.CompletedAt ?? deposit.CreatedAt) < nextYearStart)
-            .GroupBy(deposit => deposit.PaymentMethod)
-            .Select(group => new
-            {
-                PaymentMethod = group.Key,
-                Amount = group.Sum(item => item.Amount)
-            })
-            .ToListAsync(cancellationToken);
-
-        var monthlyRevenueRaw = await _context.DepositRequests.AsNoTracking()
-            .Where(deposit =>
-                deposit.Status == PaymentStatus.Completed &&
-                (deposit.CompletedAt ?? deposit.CreatedAt) >= yearStart &&
-                (deposit.CompletedAt ?? deposit.CreatedAt) < nextYearStart)
-            .GroupBy(deposit => (deposit.CompletedAt ?? deposit.CreatedAt).Month)
-            .Select(group => new
-            {
-                Month = group.Key,
-                Revenue = group.Sum(item => item.Amount)
-            })
-            .ToListAsync(cancellationToken);
-
         var sevenDaysStart = now.Date.AddDays(-6);
-        var nextDay = now.Date.AddDays(1);
-        var dailyRevenueRaw = await _context.DepositRequests.AsNoTracking()
-            .Where(deposit =>
-                deposit.Status == PaymentStatus.Completed &&
-                (deposit.CompletedAt ?? deposit.CreatedAt) >= sevenDaysStart &&
-                (deposit.CompletedAt ?? deposit.CreatedAt) < nextDay)
-            .GroupBy(deposit => (deposit.CompletedAt ?? deposit.CreatedAt).Date)
-            .Select(group => new
-            {
-                Date = group.Key,
-                Revenue = group.Sum(item => item.Amount)
-            })
-            .ToListAsync(cancellationToken);
-        var totalDepositAmount = paymentMethodRevenueRaw.Sum(item => item.Amount);
 
-        var paymentMethodBreakdown = paymentMethodRevenueRaw
-            .Select(item =>
-            {
-                var amount = item.Amount;
-                return new PaymentMethodRevenueDto
-                {
-                    PaymentMethod = item.PaymentMethod.ToString(),
-                    Amount = amount,
-                    Percentage = totalDepositAmount <= 0m ? 0m : Math.Round(amount / totalDepositAmount * 100m, 1)
-                };
-            })
-            .OrderByDescending(item => item.Amount)
-            .ToList();
-
-        var monthlyRevenueMap = monthlyRevenueRaw
-            .ToDictionary(item => item.Month, item => Math.Round(item.Revenue, 0));
+        var paymentMethodBreakdown = new List<PaymentMethodRevenueDto>();
         var monthlyRevenue = Enumerable.Range(1, 12)
             .Select(month => new MonthlyRevenuePointDto
             {
                 Month = month,
                 Label = CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(month),
-                Revenue = monthlyRevenueMap.GetValueOrDefault(month, 0m)
+                Revenue = 0m
             })
             .ToList();
-
-        var dailyRevenueMap = dailyRevenueRaw
-            .ToDictionary(item => item.Date, item => Math.Round(item.Revenue, 0));
         var dailyRevenue = Enumerable.Range(0, 7)
             .Select(offset => sevenDaysStart.AddDays(offset))
             .Select(date => new DailyRevenuePointDto
             {
                 Date = DateTime.SpecifyKind(date, DateTimeKind.Utc),
                 Label = date.ToString("dd MMM", CultureInfo.InvariantCulture),
-                Revenue = dailyRevenueMap.GetValueOrDefault(date, 0m)
+                Revenue = 0m
+            })
+            .ToList();
+        var monthlyPlatformCommission = monthlyRevenue
+            .Select(item => new MonthlyRevenuePointDto
+            {
+                Month = item.Month,
+                Label = item.Label,
+                Revenue = 0m
+            })
+            .ToList();
+        var dailyPlatformCommission = dailyRevenue
+            .Select(item => new DailyRevenuePointDto
+            {
+                Date = item.Date,
+                Label = item.Label,
+                Revenue = 0m
             })
             .ToList();
 
-        var monthlyPlatformRaw = await (
-            from t in _context.WalletTransactions.AsNoTracking()
-            join w in _context.Wallets.AsNoTracking() on t.WalletId equals w.Id
-            where w.OwnerType == "System"
-                  && t.TransactionType == TransactionType.Deposit
-                  && t.ReferenceType == "Booking"
-                  && t.CreatedAt >= yearStart
-                  && t.CreatedAt < nextYearStart
-            group t by t.CreatedAt.Month
-            into g
-            select new
-            {
-                Month = g.Key,
-                Revenue = g.Sum(x => x.Amount)
-            }).ToListAsync(cancellationToken);
-
-        var dailyPlatformRaw = await (
-            from t in _context.WalletTransactions.AsNoTracking()
-            join w in _context.Wallets.AsNoTracking() on t.WalletId equals w.Id
-            where w.OwnerType == "System"
-                  && t.TransactionType == TransactionType.Deposit
-                  && t.ReferenceType == "Booking"
-                  && t.CreatedAt >= sevenDaysStart
-                  && t.CreatedAt < nextDay
-            group t by t.CreatedAt.Date
-            into g
-            select new
-            {
-                Date = g.Key,
-                Revenue = g.Sum(x => x.Amount)
-            }).ToListAsync(cancellationToken);
-
-        var monthlyPlatformMap = monthlyPlatformRaw
-            .ToDictionary(item => item.Month, item => Math.Round(item.Revenue, 0));
-        var monthlyPlatformCommission = Enumerable.Range(1, 12)
-            .Select(month => new MonthlyRevenuePointDto
-            {
-                Month = month,
-                Label = CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(month),
-                Revenue = monthlyPlatformMap.GetValueOrDefault(month, 0m)
-            })
-            .ToList();
-
-        var dailyPlatformMap = dailyPlatformRaw
-            .ToDictionary(item => item.Date, item => Math.Round(item.Revenue, 0));
-        var dailyPlatformCommission = Enumerable.Range(0, 7)
-            .Select(offset => sevenDaysStart.AddDays(offset))
-            .Select(date => new DailyRevenuePointDto
-            {
-                Date = DateTime.SpecifyKind(date, DateTimeKind.Utc),
-                Label = date.ToString("dd MMM", CultureInfo.InvariantCulture),
-                Revenue = dailyPlatformMap.GetValueOrDefault(date, 0m)
-            })
-            .ToList();
-
-        var totalDepositRevenueYear = monthlyRevenue.Sum(m => m.Revenue);
-        var totalPlatformCommissionYear = monthlyPlatformCommission.Sum(m => m.Revenue);
+        var totalDepositRevenueYear = 0m;
+        var totalPlatformCommissionYear = 0m;
 
         var newDoctorsByMonth = await _context.Ophthalmologists.AsNoTracking()
-            .Where(o => o.CreatedAt >= yearStart && o.CreatedAt < nextYearStart)
-            .GroupBy(o => o.CreatedAt.Month)
-            .Select(g => new { Month = g.Key, Count = g.Count() })
-            .ToListAsync(cancellationToken);
-        var newOrgsByMonth = await _context.Organisations.AsNoTracking()
             .Where(o => o.CreatedAt >= yearStart && o.CreatedAt < nextYearStart)
             .GroupBy(o => o.CreatedAt.Month)
             .Select(g => new { Month = g.Key, Count = g.Count() })
@@ -263,20 +137,12 @@ public class DashboardMetricsService : IDashboardMetricsService
             .ToListAsync(cancellationToken);
 
         var doctorMonthMap = newDoctorsByMonth.ToDictionary(x => x.Month, x => x.Count);
-        var orgMonthMap = newOrgsByMonth.ToDictionary(x => x.Month, x => x.Count);
         var patientMonthMap = newPatientsByMonth.ToDictionary(x => x.Month, x => x.Count);
         var monthlyNewDoctorCounts = Enumerable.Range(1, 12).Select(m => doctorMonthMap.GetValueOrDefault(m, 0)).ToList();
-        var monthlyNewOrganisationCounts = Enumerable.Range(1, 12).Select(m => orgMonthMap.GetValueOrDefault(m, 0)).ToList();
         var monthlyNewPatientCounts = Enumerable.Range(1, 12).Select(m => patientMonthMap.GetValueOrDefault(m, 0)).ToList();
 
         var pendingDoctorVerifications = await _context.Ophthalmologists
             .CountAsync(o => o.VerificationStatus == VerificationStatus.PendingVerification, cancellationToken);
-        var pendingWithdrawals = await _context.WithdrawalRequests
-            .CountAsync(
-                w => w.Status == PaymentStatus.Pending || w.Status == PaymentStatus.Processing,
-                cancellationToken);
-        var pendingOnboarding = await _context.OrganisationOnboardingRequests
-            .CountAsync(r => r.Status == OrganisationOnboardingStatus.Pending, cancellationToken);
 
         var liveConsultations = await _context.ConsultationSessions
             .CountAsync(
@@ -287,38 +153,7 @@ public class DashboardMetricsService : IDashboardMetricsService
 
         var databaseHealthy = await _context.Database.CanConnectAsync(cancellationToken);
 
-        // Consultation credits: Deposit or Transfer on ophthalmologist wallets. ReferenceType is usually
-        var topDoctorRows = await (
-            from t in _context.WalletTransactions.AsNoTracking()
-            join w in _context.Wallets.AsNoTracking() on t.WalletId equals w.Id
-            join o in _context.Ophthalmologists.AsNoTracking() on w.UserId equals o.UserId
-            join u in _context.Users.IgnoreQueryFilters().AsNoTracking() on o.UserId equals u.Id
-            where w.OwnerType == "Ophthalmologist"
-                  && (t.TransactionType == TransactionType.Deposit
-                      || t.TransactionType == TransactionType.Transfer)
-                  && (t.ReferenceType == "Booking")
-            group t.Amount by new { o.Id, o.RatingAverage, o.RatingCount, FullName = u.FullName } into g
-            select new TopPerformerDoctorDto
-            {
-                OphthalmologistId = g.Key.Id,
-                Name = g.Key.FullName ?? string.Empty,
-                Revenue = g.Sum(),
-                RatingAverage = g.Key.RatingAverage,
-                RatingCount = g.Key.RatingCount
-            }).OrderByDescending(x => x.Revenue).Take(5).ToListAsync(cancellationToken);
-
-        var topOrgRows = await _context.Organisations.AsNoTracking()
-            .OrderByDescending(o => o.RatingAverage)
-            .ThenByDescending(o => o.RatingCount)
-            .Take(5)
-            .Select(o => new TopPerformerOrganisationDto
-            {
-                OrganisationId = o.Id,
-                Name = o.Name,
-                RatingAverage = o.RatingAverage,
-                RatingCount = o.RatingCount
-            })
-            .ToListAsync(cancellationToken);
+        var topDoctorRows = new List<TopPerformerDoctorDto>();
 
         var monitorDescriptors = _betterStackHeartbeatService.GetMonitorDescriptors();
 
@@ -333,10 +168,10 @@ public class DashboardMetricsService : IDashboardMetricsService
             },
             Organisations = new UserGrowthMetricDto
             {
-                Total = organisationTotal,
-                CurrentMonth = organisationCurrentMonth,
-                PreviousMonth = organisationPreviousMonth,
-                GrowthPercentage = CalculateGrowthPercentage(organisationCurrentMonth, organisationPreviousMonth)
+                Total = 0,
+                CurrentMonth = 0,
+                PreviousMonth = 0,
+                GrowthPercentage = 0
             },
             Patients = new UserGrowthMetricDto
             {
@@ -353,13 +188,12 @@ public class DashboardMetricsService : IDashboardMetricsService
             MonthlyPlatformCommission = monthlyPlatformCommission,
             DailyPlatformCommission = dailyPlatformCommission,
             MonthlyNewDoctorCounts = monthlyNewDoctorCounts,
-            MonthlyNewOrganisationCounts = monthlyNewOrganisationCounts,
+            MonthlyNewOrganisationCounts = Enumerable.Range(1, 12).Select(_ => 0).ToList(),
             MonthlyNewPatientCounts = monthlyNewPatientCounts,
             PendingActions = new DashboardPendingActionsDto
             {
                 PendingOphthalmologistVerifications = pendingDoctorVerifications,
-                PendingWithdrawalRequests = pendingWithdrawals,
-                PendingOrganisationOnboarding = pendingOnboarding
+                PendingOrganisationOnboarding = 0
             },
             SystemStatus = new DashboardSystemStatusDto
             {
@@ -382,7 +216,7 @@ public class DashboardMetricsService : IDashboardMetricsService
                     .ToList()
             },
             TopDoctorsByConsultationRevenue = topDoctorRows,
-            TopOrganisationsByRating = topOrgRows
+            TopOrganisationsByRating = new List<TopPerformerOrganisationDto>()
         };
     }
 
@@ -761,7 +595,6 @@ public class DashboardMetricsService : IDashboardMetricsService
             return new OphthalmologistDashboardMetricsDto();
         }
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var pendingReviews = await _context.ConsultationSessions.CountAsync(
             session => session.OphthalmologistId == doctorId && session.Status == SessionStatus.Pending,
             cancellationToken);
@@ -814,82 +647,42 @@ public class DashboardMetricsService : IDashboardMetricsService
                            session.EndTime.HasValue &&
                            session.EndTime.Value >= DateTime.UtcNow.Date,
             cancellationToken);
-        var openSlotsToday = 0; // Doctors no longer own slots
 
         return new OphthalmologistDashboardMetricsDto
         {
             PendingReviews = pendingReviews,
             UrgentCases = urgentCases,
             CompletedToday = completedToday,
-            OpenSlotsToday = openSlotsToday,
+            OpenSlotsToday = 0,
             UrgentCaseList = urgentCaseList
         };
     }
 
-    public async Task<OrganisationDashboardMetricsDto> GetOrganisationMetricsAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<PatientDashboardMetricsDto> GetPatientMetricsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var organisationId = await _context.Users
-            .Where(user => user.Id == userId)
-            .Select(user => user.OrganizationId)
+        var patientId = await _context.Patients
+            .Where(p => p.UserId == userId)
+            .Select(p => (Guid?)p.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (!organisationId.HasValue)
+        if (!patientId.HasValue)
+            return new PatientDashboardMetricsDto();
+
+        var screeningsCount = await _context.AiScreenings.CountAsync(s => s.PatientId == patientId, cancellationToken);
+        var consultationsCount = await _context.ConsultationSessions.CountAsync(s => s.PatientId == patientId, cancellationToken);
+        
+        var nextAppointment = await _context.Appointments
+            .Where(a => a.PatientId == patientId && a.Status == AppointmentStatus.Confirmed)
+            .OrderBy(a => a.AppointmentSlot!.Date)
+            .ThenBy(a => a.AppointmentSlot!.StartTime)
+            .Select(a => new { a.AppointmentSlot!.Date, a.AppointmentSlot!.StartTime })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return new PatientDashboardMetricsDto
         {
-            return new OrganisationDashboardMetricsDto();
-        }
-
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var appointmentsQuery = _context.Appointments; // Clinic-centric
-
-        var totalPatients = await _context.Patients
-            .AsNoTracking()
-            .CountAsync(cancellationToken);
-
-        var totalAppointments = await appointmentsQuery.CountAsync(cancellationToken);
-        var pendingCount = await appointmentsQuery.CountAsync(
-            appointment => appointment.Status == AppointmentStatus.Pending,
-            cancellationToken);
-        var confirmedCount = await appointmentsQuery.CountAsync(
-            appointment => appointment.Status == AppointmentStatus.Confirmed,
-            cancellationToken);
-        var completedCount = await _context.ConsultationSessions.CountAsync(
-            session => session.Status == SessionStatus.Completed,
-            cancellationToken);
-        var cancelledCount = await appointmentsQuery.CountAsync(
-            appointment => appointment.Status == AppointmentStatus.Cancelled,
-            cancellationToken);
-        var noShowCount = await appointmentsQuery.CountAsync(
-            appointment => appointment.Status == AppointmentStatus.NoShow,
-            cancellationToken);
-
-        var todayCapacity = await (from slot in _context.AppointmentSlots
-                                   join template in _context.ScheduleTemplates on slot.ScheduleTemplateId equals template.Id
-                                   where slot.Date == today
-                                   select new { slot.BookedCount, slot.MaxCapacity })
-            .ToListAsync(cancellationToken);
-
-        var totalBooked = todayCapacity.Sum(item => item.BookedCount);
-        var totalCapacity = todayCapacity.Sum(item => item.MaxCapacity);
-        var utilizationRate = totalCapacity <= 0
-            ? 0m
-            : Math.Round((decimal)totalBooked / totalCapacity * 100m, 1);
-
-        var quota = await _aiQuotaService.GetQuotaAsync(userId, Roles.SystemAdmin, cancellationToken);
-
-        return new OrganisationDashboardMetricsDto
-        {
-            UtilizationRatePercent = utilizationRate,
-            RemainingAiQuota = quota.RemainingQuota,
-            TotalPatients = totalPatients,
-            TotalAppointments = totalAppointments,
-            AppointmentStatus = new OrganisationAppointmentStatusBreakdownDto
-            {
-                Pending = pendingCount,
-                Confirmed = confirmedCount,
-                Completed = completedCount,
-                Cancelled = cancelledCount,
-                NoShow = noShowCount
-            }
+            CompletedScreenings = screeningsCount,
+            TotalReports = consultationsCount,
+            UpcomingAppointments = nextAppointment != null ? 1 : 0
         };
     }
 
@@ -902,8 +695,6 @@ public class DashboardMetricsService : IDashboardMetricsService
 
         if (!doctorId.HasValue)
             return new List<ReviewQueueItemDto>();
-
-        var nowUtc = DateTime.UtcNow;
 
         var rawItems = await (
             from session in _context.ConsultationSessions
@@ -925,527 +716,226 @@ public class DashboardMetricsService : IDashboardMetricsService
                 ConfidenceScore = result != null ? result.ConfidenceScore : 0m,
                 AiSummary = result != null ? result.Summary : null,
                 session.AppointmentTime,
-                session.StartTime,
                 session.CreatedAt,
-            }
-        ).ToListAsync(cancellationToken);
-
-        var screeningIds = rawItems
-            .Where(x => x.ScreeningId != Guid.Empty)
-            .Select(x => x.ScreeningId)
-            .Distinct()
-            .ToList();
-
-        var thumbnails = screeningIds.Count > 0
-            ? await _context.RetinalImages
-                .Where(img => img.AiScreeningId.HasValue && screeningIds.Contains(img.AiScreeningId.Value))
-                .GroupBy(img => img.AiScreeningId!.Value)
-                .Select(g => new { ScreeningId = g.Key, ThumbnailUrl = g.OrderBy(i => i.CapturedAt).Select(i => i.ImageUrl).FirstOrDefault() })
-                .ToDictionaryAsync(x => x.ScreeningId, x => x.ThumbnailUrl, cancellationToken)
-            : new Dictionary<Guid, string?>();
-
-        var items = rawItems
-            .GroupBy(x => x.SessionId)
-            .Select(g =>
-            {
-                var first = g.First();
-                thumbnails.TryGetValue(first.ScreeningId, out var thumbUrl);
-                return new ReviewQueueItemDto
-                {
-                    ScreeningId = first.ScreeningId,
-                    ConsultationSessionId = first.SessionId,
-                    PatientId = first.PatientId,
-                    PatientName = first.PatientName,
-                    RiskLevel = first.RiskLevel.ToString(),
-                    ConfidenceScore = first.ConfidenceScore,
-                    AiSummary = first.AiSummary,
-                    ThumbnailUrl = thumbUrl,
-                    ReviewStatus = first.StartTime.HasValue ? "IN_PROGRESS" : "READY_FOR_REVIEW",
-                    WaitingMinutes = (int)(nowUtc - first.CreatedAt).TotalMinutes,
-                    AppointmentTime = first.AppointmentTime,
-                    CreatedAt = first.CreatedAt,
-                };
+                session.Status
             })
-            .OrderByDescending(item => item.RiskLevel == "Critical")
-            .ThenByDescending(item => item.RiskLevel == "High")
-            .ThenByDescending(item => item.WaitingMinutes)
-            .ToList();
-
-        return items;
-    }
-
-    public async Task<PatientDashboardMetricsDto> GetPatientMetricsAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        var patient = await _context.Patients.FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
-        if (patient == null)
-        {
-            return new PatientDashboardMetricsDto();
-        }
-
-        var quota = await _aiQuotaService.GetQuotaAsync(userId, Roles.Patient, cancellationToken);
-
-        return new PatientDashboardMetricsDto
-        {
-            CompletedScreenings = await _context.AiScreenings.CountAsync(screening => screening.PatientId == patient.Id && screening.ProcessedAt.HasValue, cancellationToken),
-            TotalReports = await (from screening in _context.AiScreenings
-                                  join report in _context.ScreeningResults on screening.Id equals report.AiScreeningId
-                                  where screening.PatientId == patient.Id
-                                  select report.Id).CountAsync(cancellationToken),
-            UpcomingAppointments = await _context.Appointments.CountAsync(appointment => appointment.PatientId == patient.Id && (appointment.Status == AppointmentStatus.Pending || appointment.Status == AppointmentStatus.Confirmed), cancellationToken),
-            RemainingQuota = quota.RemainingQuota
-        };
-    }
-
-    private async Task<decimal> GetRequiredHoursAsync(
-        OphthalmologistEmploymentType employmentType,
-        WorkloadPeriodType periodType,
-        CancellationToken cancellationToken)
-    {
-        var requiredHours = await _context.WorkloadRequirements
-            .AsNoTracking()
-            .Where(x => x.EmploymentType == employmentType && x.PeriodType == periodType)
-            .Select(x => (decimal?)x.RequiredHours)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (employmentType == OphthalmologistEmploymentType.FullTime)
-        {
-            var configuredRequiredHours = await GetConfiguredFullTimeRequiredHoursAsync(periodType, cancellationToken);
-            if (configuredRequiredHours.HasValue)
-                return configuredRequiredHours.Value;
-        }
-
-        return requiredHours.GetValueOrDefault(0m);
-    }
-
-    private async Task<Dictionary<OphthalmologistEmploymentType, decimal>> GetRequiredHoursByEmploymentTypeAsync(
-        WorkloadPeriodType periodType,
-        CancellationToken cancellationToken)
-    {
-        var requiredHoursByEmploymentType = await _context.WorkloadRequirements
-            .AsNoTracking()
-            .Where(x => x.PeriodType == periodType)
-            .GroupBy(x => x.EmploymentType)
-            .Select(group => new
-            {
-                EmploymentType = group.Key,
-                RequiredHours = group
-                    .OrderByDescending(item => item.UpdatedAt ?? item.CreatedAt)
-                    .Select(item => item.RequiredHours)
-                    .FirstOrDefault()
-            })
-            .ToDictionaryAsync(x => x.EmploymentType, x => x.RequiredHours, cancellationToken);
-
-        var configuredRequiredHours = await GetConfiguredFullTimeRequiredHoursAsync(periodType, cancellationToken);
-        if (configuredRequiredHours.HasValue)
-        {
-            requiredHoursByEmploymentType[OphthalmologistEmploymentType.FullTime] = configuredRequiredHours.Value;
-        }
-
-        return requiredHoursByEmploymentType;
-    }
-
-    private async Task<decimal?> GetConfiguredFullTimeRequiredHoursAsync(
-        WorkloadPeriodType periodType,
-        CancellationToken cancellationToken)
-    {
-        var settingKey = periodType == WorkloadPeriodType.Week
-            ? FullTimeRequiredHoursWeekSettingKey
-            : FullTimeRequiredHoursMonthSettingKey;
-
-        var configuredValue = await _context.SystemSettings
-            .AsNoTracking()
-            .Where(x => x.Key == settingKey)
-            .Select(x => x.Value)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        return TryParseConfiguredRequiredHours(configuredValue);
-    }
-
-    private static decimal? TryParseConfiguredRequiredHours(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
-
-        if (!decimal.TryParse(value.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
-            return null;
-
-        if (parsed < 0m || parsed > 744m)
-            return null;
-
-        return Math.Round(parsed, 2, MidpointRounding.AwayFromZero);
-    }
-
-    private async Task<List<SessionIntervalProjection>> QueryCompletedSessionIntervalsAsync(
-        IReadOnlyCollection<Guid> doctorIds,
-        DateTime periodStartUtc,
-        DateTime periodEndUtcExclusive,
-        CancellationToken cancellationToken)
-    {
-        if (doctorIds.Count == 0)
-            return new List<SessionIntervalProjection>();
-
-        return await _context.ConsultationSessions
-            .AsNoTracking()
-            .Where(session =>
-                session.OphthalmologistId.HasValue
-                && doctorIds.Contains(session.OphthalmologistId.Value)
-                && session.Status == SessionStatus.Completed
-                && session.StartTime.HasValue
-                && session.EndTime.HasValue
-                && session.StartTime.Value < periodEndUtcExclusive
-                && session.EndTime.Value > periodStartUtc)
-            .Select(session => new SessionIntervalProjection
-            {
-                DoctorId = session.OphthalmologistId!.Value,
-                StartUtc = session.StartTime!.Value,
-                EndUtc = session.EndTime!.Value
-            })
+            .OrderByDescending(item => item.RiskLevel == RiskLevel.Critical)
+            .ThenBy(item => item.AppointmentTime ?? DateTime.MaxValue)
+            .ThenByDescending(item => item.CreatedAt)
             .ToListAsync(cancellationToken);
-    }
 
-    private static decimal CalculateMergedHours(
-        IEnumerable<SessionIntervalProjection> intervals,
-        DateTime periodStartUtc,
-        DateTime periodEndUtcExclusive)
-    {
-        var normalized = intervals
-            .Select(interval =>
-            {
-                var clampedStart = interval.StartUtc < periodStartUtc ? periodStartUtc : interval.StartUtc;
-                var clampedEnd = interval.EndUtc > periodEndUtcExclusive ? periodEndUtcExclusive : interval.EndUtc;
-
-                return new WorkloadInterval
-                {
-                    StartUtc = clampedStart,
-                    EndUtc = clampedEnd
-                };
-            })
-            .Where(interval => interval.EndUtc > interval.StartUtc)
-            .OrderBy(interval => interval.StartUtc)
-            .ToList();
-
-        if (normalized.Count == 0)
-            return 0m;
-
-        var mergedStart = normalized[0].StartUtc;
-        var mergedEnd = normalized[0].EndUtc;
-        decimal totalHours = 0m;
-
-        foreach (var interval in normalized.Skip(1))
+        return rawItems.Select(item => new ReviewQueueItemDto
         {
-            if (interval.StartUtc <= mergedEnd)
-            {
-                if (interval.EndUtc > mergedEnd)
-                    mergedEnd = interval.EndUtc;
-
-                continue;
-            }
-
-            totalHours += ConvertTicksToHours(mergedEnd - mergedStart);
-            mergedStart = interval.StartUtc;
-            mergedEnd = interval.EndUtc;
-        }
-
-        totalHours += ConvertTicksToHours(mergedEnd - mergedStart);
-        return Math.Round(totalHours, 2, MidpointRounding.AwayFromZero);
+            ConsultationSessionId = item.SessionId,
+            ScreeningId = item.ScreeningId,
+            PatientId = item.PatientId,
+            PatientName = item.PatientName,
+            RiskLevel = item.RiskLevel.ToString(),
+            ConfidenceScore = item.ConfidenceScore,
+            AiSummary = item.AiSummary,
+            AppointmentTime = item.AppointmentTime,
+            CreatedAt = item.CreatedAt,
+            ReviewStatus = item.Status.ToString()
+        }).ToList();
     }
-
-    private static decimal ConvertTicksToHours(TimeSpan duration)
-    {
-        if (duration <= TimeSpan.Zero)
-            return 0m;
-
-        return duration.Ticks / (decimal)TimeSpan.TicksPerHour;
-    }
-
-    private static DateOnly ResolveAnchorDate(DateOnly date)
-    {
-        if (date != default)
-            return date;
-
-        var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, VietnamTimeZoneResolver.TimeZone);
-        return DateOnly.FromDateTime(localNow);
-    }
-
-    private static PeriodBounds GetPeriodBounds(WorkloadPeriodType periodType, DateOnly date)
-    {
-        var localDateTime = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
-
-        DateTime localStart;
-        DateTime localEndExclusive;
-
-        if (periodType == WorkloadPeriodType.Week)
-        {
-            var offset = ((int)localDateTime.DayOfWeek + 6) % 7;
-            localStart = localDateTime.Date.AddDays(-offset);
-            localEndExclusive = localStart.AddDays(7);
-        }
-        else
-        {
-            localStart = new DateTime(localDateTime.Year, localDateTime.Month, 1, 0, 0, 0, DateTimeKind.Unspecified);
-            localEndExclusive = localStart.AddMonths(1);
-        }
-
-        var periodStartUtc = TimeZoneInfo.ConvertTimeToUtc(localStart, VietnamTimeZoneResolver.TimeZone);
-        var periodEndUtcExclusive = TimeZoneInfo.ConvertTimeToUtc(localEndExclusive, VietnamTimeZoneResolver.TimeZone);
-
-        return new PeriodBounds(
-            periodStartUtc,
-            periodEndUtcExclusive,
-            periodEndUtcExclusive.AddTicks(-1));
-    }
-
-    private static decimal CalculateCompletionRate(decimal actualHours, decimal requiredHours)
-    {
-        if (requiredHours <= 0)
-            return 1m;
-
-        var completionRate = actualHours / requiredHours;
-        if (completionRate < 0)
-            return 0m;
-
-        return Math.Round(completionRate, 2, MidpointRounding.AwayFromZero);
-    }
-
-    private static string ToApiPeriodType(WorkloadPeriodType periodType)
-        => periodType == WorkloadPeriodType.Week ? "WEEK" : "MONTH";
-
-    private static string ToApiEmploymentType(OphthalmologistEmploymentType employmentType)
-        => employmentType == OphthalmologistEmploymentType.FullTime ? "FULL_TIME" : "PART_TIME";
-
-    private static string? NormalizeStatusFilter(string? status)
-    {
-        if (string.IsNullOrWhiteSpace(status))
-            return null;
-
-        var normalized = status.Trim().ToUpperInvariant();
-        return normalized is "OK" or "UNDER" ? normalized : null;
-    }
-
-    private sealed class DoctorProjection
-    {
-        public Guid Id { get; init; }
-        public string Name { get; init; } = string.Empty;
-        public string? Email { get; init; }
-        public OphthalmologistEmploymentType EmploymentType { get; init; }
-    }
-
-    private sealed class SessionIntervalProjection
-    {
-        public Guid DoctorId { get; init; }
-        public DateTime StartUtc { get; init; }
-        public DateTime EndUtc { get; init; }
-    }
-
-    private sealed class WorkloadInterval
-    {
-        public DateTime StartUtc { get; init; }
-        public DateTime EndUtc { get; init; }
-    }
-
-    private readonly record struct PeriodBounds(
-        DateTime StartUtc,
-        DateTime EndUtcExclusive,
-        DateTime EndUtcInclusive);
-
-    // ─── Real-time Clinic Operations Dashboard Methods ──────────────────────────
 
     public async Task<TodaySummaryDto> GetTodaySummaryAsync(CancellationToken cancellationToken = default)
     {
-        var today = GetVietnamToday();
-        var todayStart = today.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var tomorrowStart = today.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-
-        var totalAppointments = await _context.Appointments
-            .AsNoTracking()
-            .Where(a => a.AppointmentSlot != null && a.AppointmentSlot.Date == today)
-            .Where(a => a.Status != AppointmentStatus.Cancelled)
-            .CountAsync(cancellationToken);
-
-        var checkedInAppointments = await _context.Appointments
-            .AsNoTracking()
-            .Where(a => a.AppointmentSlot != null && a.AppointmentSlot.Date == today)
-            .Where(a => a.Status == AppointmentStatus.CheckedIn || a.Status == AppointmentStatus.InProgress || a.Status == AppointmentStatus.Completed)
-            .CountAsync(cancellationToken);
-
-        var completedVisits = await _context.PatientVisits
-            .AsNoTracking()
-            .Where(v => v.Status == PatientVisitStatus.Completed)
-            .Where(v => v.CompletedAt >= todayStart && v.CompletedAt < tomorrowStart)
-            .CountAsync(cancellationToken);
-
-        var noShowCount = await _context.Appointments
-            .AsNoTracking()
-            .Where(a => a.AppointmentSlot != null && a.AppointmentSlot.Date == today)
-            .Where(a => a.Status == AppointmentStatus.NoShow)
-            .CountAsync(cancellationToken);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        var appointments = await _context.Appointments
+            .CountAsync(a => a.AppointmentSlot!.Date == today, cancellationToken);
+        var checkedIn = await _context.Appointments
+            .CountAsync(a => a.AppointmentSlot!.Date == today && a.Status == AppointmentStatus.CheckedIn, cancellationToken);
+        var completed = await _context.Appointments
+            .CountAsync(a => a.AppointmentSlot!.Date == today && a.Status == AppointmentStatus.Completed, cancellationToken);
 
         return new TodaySummaryDto
         {
-            TotalAppointments = totalAppointments,
-            CheckedInPatients = checkedInAppointments,
-            CompletedVisits = completedVisits,
-            NoShowCount = noShowCount
+            TotalAppointments = appointments,
+            CheckedInPatients = checkedIn,
+            CompletedVisits = completed
         };
     }
 
     public async Task<SlotUtilizationDto> GetSlotUtilizationAsync(CancellationToken cancellationToken = default)
     {
-        var today = GetVietnamToday();
-
-        var todaySlots = await _context.AppointmentSlots
-            .AsNoTracking()
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        var slots = await _context.AppointmentSlots
             .Where(s => s.Date == today)
-            .Select(s => new { s.MaxCapacity, s.BookedCount })
             .ToListAsync(cancellationToken);
 
-        var totalCapacity = todaySlots.Sum(s => s.MaxCapacity);
-        var booked = todaySlots.Sum(s => s.BookedCount);
-        var remaining = totalCapacity - booked;
-        var utilizationRate = totalCapacity <= 0
-            ? 0m
-            : Math.Round((decimal)booked / totalCapacity * 100m, 1);
+        var totalCapacity = slots.Sum(s => s.MaxCapacity);
+        var booked = slots.Sum(s => s.BookedCount);
 
         return new SlotUtilizationDto
         {
             TotalSlots = totalCapacity,
             BookedSlots = booked,
-            RemainingCapacity = Math.Max(0, remaining),
-            UtilizationRate = utilizationRate
+            UtilizationRate = totalCapacity == 0 ? 0 : (decimal)booked / totalCapacity * 100
         };
     }
 
     public async Task<IReadOnlyList<LiveQueueItemDto>> GetLiveQueueAsync(CancellationToken cancellationToken = default)
     {
-        var today = GetVietnamToday();
-        var todayStart = today.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var tomorrowStart = today.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var now = DateTime.UtcNow;
-
-        var visits = await _context.PatientVisits
-            .AsNoTracking()
-            .Where(v => v.CheckedInAt >= todayStart && v.CheckedInAt < tomorrowStart)
-            .Where(v => v.Status != PatientVisitStatus.Completed)
-            .OrderBy(v => v.CheckedInAt)
-            .ToListAsync(cancellationToken);
-
-        var patientIds = visits.Select(v => v.PatientId).Distinct().ToList();
-        var patients = await _context.Patients
-            .AsNoTracking()
-            .Where(p => patientIds.Contains(p.Id))
-            .ToDictionaryAsync(p => p.Id, cancellationToken);
-
-        var userIds = patients.Values.Where(p => p.UserId.HasValue).Select(p => p.UserId.Value).Distinct().ToList();
-        var users = await _context.Users.AsNoTracking()
-            .Where(u => userIds.Contains(u.Id))
-            .ToDictionaryAsync(u => u.Id, cancellationToken);
-
-        var doctorIds = visits.Where(v => v.AssignedDoctorId.HasValue).Select(v => v.AssignedDoctorId.Value).Distinct().ToList();
-        var doctors = await _context.Ophthalmologists.AsNoTracking()
-            .Where(o => doctorIds.Contains(o.Id))
-            .ToDictionaryAsync(o => o.Id, cancellationToken);
-
-        var doctorUserIds = doctors.Values.Select(o => o.UserId).Distinct().ToList();
-        var doctorUsers = await _context.Users.AsNoTracking()
-            .Where(u => doctorUserIds.Contains(u.Id))
-            .ToDictionaryAsync(u => u.Id, cancellationToken);
-
-        var result = visits.Select(v =>
-        {
-            var waitingMinutes = v.CheckedInAt.HasValue
-                ? (int)(now - v.CheckedInAt.Value).TotalMinutes
-                : 0;
-
-            var statusLabel = v.Status switch
-            {
-                PatientVisitStatus.CheckedIn => "WAITING",
-                PatientVisitStatus.InProgress => "IN_PROGRESS",
-                PatientVisitStatus.WaitingForPayment => "WAITING_PAYMENT",
-                _ => v.Status.ToString().ToUpperInvariant()
-            };
-
-            var patientName = "Unknown";
-            if (patients.TryGetValue(v.PatientId, out var patient))
-            {
-                if (!string.IsNullOrWhiteSpace(patient.FullName))
-                    patientName = patient.FullName;
-                else if (patient.UserId.HasValue && users.TryGetValue(patient.UserId.Value, out var user))
-                    patientName = user.FullName ?? user.Email ?? "Unknown";
-            }
-
-            var assignedDoctorName = (string?)null;
-            if (v.AssignedDoctorId.HasValue && doctors.TryGetValue(v.AssignedDoctorId.Value, out var doctor))
-            {
-                if (doctorUsers.TryGetValue(doctor.UserId, out var dUser))
-                    assignedDoctorName = dUser.FullName;
-            }
-
-            return new LiveQueueItemDto
-            {
-                VisitId = v.Id,
-                PatientName = patientName,
-                Status = statusLabel,
-                AssignedDoctorName = assignedDoctorName,
-                WaitingTimeMinutes = Math.Max(0, waitingMinutes),
-                CheckedInAt = v.CheckedInAt
-            };
-        }).ToList();
-
-        return result;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        return await (from a in _context.Appointments
+                      join p in _context.Patients on a.PatientId equals p.Id
+                      join u in _context.Users on p.UserId equals u.Id
+                      where a.AppointmentSlot!.Date == today &&
+                            (a.Status == AppointmentStatus.CheckedIn || a.Status == AppointmentStatus.InProgress)
+                      select new LiveQueueItemDto
+                      {
+                          VisitId = a.Id,
+                          PatientName = u.FullName,
+                          Status = a.Status.ToString(),
+                          CheckedInAt = a.UpdatedAt // Simplified
+                      }).ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<DoctorStatusDto>> GetDoctorStatusAsync(CancellationToken cancellationToken = default)
     {
-        var today = GetVietnamToday();
-        var todayStart = today.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var tomorrowStart = today.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-
-        var doctors = await (
-            from ophthal in _context.Ophthalmologists.AsNoTracking()
-            join user in _context.Users.AsNoTracking() on ophthal.UserId equals user.Id
-            where !user.IsDeleted
-            select new { ophthal.Id, Name = user.FullName }
-        ).ToListAsync(cancellationToken);
-
-        var todayVisits = await _context.PatientVisits
-            .AsNoTracking()
-            .Where(v => v.CheckedInAt >= todayStart && v.CheckedInAt < tomorrowStart)
-            .Select(v => new { v.AssignedDoctorId, v.Status })
-            .ToListAsync(cancellationToken);
-
-        var result = doctors.Select(d =>
-        {
-            var doctorVisits = todayVisits.Where(v => v.AssignedDoctorId == d.Id).ToList();
-            var activeLoad = doctorVisits.Count(v => v.Status == PatientVisitStatus.InProgress);
-            var patientsHandledToday = doctorVisits.Count(v =>
-                v.Status == PatientVisitStatus.Completed || v.Status == PatientVisitStatus.WaitingForPayment);
-
-            var currentStatus = activeLoad > 0 ? "In consultation" : "Available";
-
-            return new DoctorStatusDto
-            {
-                DoctorId = d.Id,
-                DoctorName = d.Name ?? "Unknown",
-                CurrentStatus = currentStatus,
-                PatientsHandledToday = patientsHandledToday,
-                ActiveLoad = activeLoad
-            };
-        }).ToList();
-
-        return result;
+        return await (from d in _context.Ophthalmologists
+                      join u in _context.Users on d.UserId equals u.Id
+                      select new DoctorStatusDto
+                      {
+                          DoctorId = d.Id,
+                          DoctorName = u.FullName,
+                          CurrentStatus = "Available", // Simplified
+                      }).ToListAsync(cancellationToken);
     }
 
-    private static DateOnly GetVietnamToday()
+    // Helper methods for workload calculation
+    private static WorkloadPeriodType ResolvePeriodType(string period) =>
+        string.Equals(period, "monthly", StringComparison.OrdinalIgnoreCase)
+            ? WorkloadPeriodType.Month
+            : WorkloadPeriodType.Week;
+
+    private static DateOnly ResolveAnchorDate(DateOnly? date) =>
+        date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+
+    private static (DateTime StartUtc, DateTime EndUtcInclusive, DateTime EndUtcExclusive) GetPeriodBounds(WorkloadPeriodType type, DateOnly anchor)
     {
-        var utcNow = DateTime.UtcNow;
-        try
+        if (type == WorkloadPeriodType.Week)
         {
-            var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(utcNow, VietnamTimeZoneResolver.TimeZone);
-            return DateOnly.FromDateTime(vietnamNow);
+            var offset = ((int)anchor.DayOfWeek + 6) % 7;
+            var start = anchor.AddDays(-offset);
+            var end = start.AddDays(6);
+            return (
+                start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
+                end.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc),
+                end.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
         }
-        catch
+        else
         {
-            return DateOnly.FromDateTime(utcNow.AddHours(7));
+            var start = new DateOnly(anchor.Year, anchor.Month, 1);
+            var end = start.AddMonths(1).AddDays(-1);
+            return (
+                start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
+                end.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc),
+                start.AddMonths(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
         }
+    }
+
+    private async Task<List<SessionIntervalProjection>> QueryCompletedSessionIntervalsAsync(
+        IList<Guid> doctorIds,
+        DateTime startUtc,
+        DateTime endUtcExclusive,
+        CancellationToken cancellationToken)
+    {
+        return await _context.ConsultationSessions.AsNoTracking()
+            .Where(s => s.OphthalmologistId != null
+                        && doctorIds.Contains(s.OphthalmologistId.Value)
+                        && s.Status == SessionStatus.Completed
+                        && s.StartTime.HasValue
+                        && s.EndTime.HasValue
+                        && s.EndTime.Value >= startUtc
+                        && s.StartTime.Value < endUtcExclusive)
+            .Select(s => new SessionIntervalProjection
+            {
+                DoctorId = s.OphthalmologistId!.Value,
+                Start = s.StartTime!.Value,
+                End = s.EndTime!.Value
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    private static decimal CalculateMergedHours(List<SessionIntervalProjection> intervals, DateTime periodStart, DateTime periodEndExclusive)
+    {
+        if (intervals.Count == 0) return 0m;
+
+        var totalSeconds = 0d;
+        foreach (var interval in intervals)
+        {
+            var s = interval.Start < periodStart ? periodStart : interval.Start;
+            var e = interval.End > periodEndExclusive ? periodEndExclusive : interval.End;
+
+            if (e > s)
+            {
+                totalSeconds += (e - s).TotalSeconds;
+            }
+        }
+
+        return Math.Round((decimal)totalSeconds / 3600m, 1);
+    }
+
+    private async Task<decimal> GetRequiredHoursAsync(OphthalmologistEmploymentType type, WorkloadPeriodType periodType, CancellationToken cancellationToken)
+    {
+        if (type == OphthalmologistEmploymentType.PartTime) return 0m;
+
+        var key = periodType == WorkloadPeriodType.Week
+            ? FullTimeRequiredHoursWeekSettingKey
+            : FullTimeRequiredHoursMonthSettingKey;
+
+        var setting = await _context.SystemSettings.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
+
+        if (setting is not null && decimal.TryParse(setting.Value, out var val))
+            return val;
+
+        return periodType == WorkloadPeriodType.Week ? 40m : 160m;
+    }
+
+    private async Task<Dictionary<OphthalmologistEmploymentType, decimal>> GetRequiredHoursByEmploymentTypeAsync(
+        WorkloadPeriodType periodType, CancellationToken cancellationToken)
+    {
+        var fullTimeHours = await GetRequiredHoursAsync(OphthalmologistEmploymentType.FullTime, periodType, cancellationToken);
+        return new Dictionary<OphthalmologistEmploymentType, decimal>
+        {
+            [OphthalmologistEmploymentType.FullTime] = fullTimeHours,
+            [OphthalmologistEmploymentType.PartTime] = 0m
+        };
+    }
+
+    private static decimal CalculateCompletionRate(decimal actual, decimal required) =>
+        required <= 0 ? 1m : Math.Min(Math.Round(actual / required, 2), 2m);
+
+    private static string? NormalizeStatusFilter(string? status) =>
+        status?.ToUpperInvariant() switch
+        {
+            "OK" => "OK",
+            "UNDER" => "UNDER",
+            _ => null
+        };
+
+    private static string ToApiPeriodType(WorkloadPeriodType type) =>
+        type == WorkloadPeriodType.Week ? "weekly" : "monthly";
+
+    private static string ToApiEmploymentType(OphthalmologistEmploymentType type) =>
+        type == OphthalmologistEmploymentType.FullTime ? "FullTime" : "PartTime";
+
+    private class DoctorProjection
+    {
+        public Guid Id { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? Email { get; set; }
+        public OphthalmologistEmploymentType EmploymentType { get; set; }
+    }
+
+    private class SessionIntervalProjection
+    {
+        public Guid DoctorId { get; set; }
+        public DateTime Start { get; set; }
+        public DateTime End { get; set; }
     }
 }

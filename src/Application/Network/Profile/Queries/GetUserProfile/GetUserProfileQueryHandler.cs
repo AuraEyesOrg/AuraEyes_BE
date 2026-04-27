@@ -17,18 +17,15 @@ public class GetUserProfileQueryHandler : IQueryHandler<GetUserProfileQuery, Use
     private readonly IIdentityService _identityService;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IPostRepository _postRepository;
-    private readonly IRepository<Organisation> _organisationRepository;
 
     public GetUserProfileQueryHandler(
         IIdentityService identityService,
         IOphthalmologistRepository ophthalmologistRepository,
-        IPostRepository postRepository,
-        IRepository<Organisation> organisationRepository)
+        IPostRepository postRepository)
     {
         _identityService = identityService;
         _ophthalmologistRepository = ophthalmologistRepository;
         _postRepository = postRepository;
-        _organisationRepository = organisationRepository;
     }
 
     public async Task<Result<UserProfileDto>> Handle(
@@ -41,8 +38,7 @@ public class GetUserProfileQueryHandler : IQueryHandler<GetUserProfileQuery, Use
 
         // Ophthalmologist profile is optional (user may not have one yet)
         var ophthalmologist = await _ophthalmologistRepository.GetByUserIdAsync(request.UserId, cancellationToken);
-        var roles = await _identityService.GetUserRolesAsync(request.UserId);
-
+        
         string? bio = ophthalmologist?.Bio;
         // In Digital Clinic model there is no separate Organisation entity
 

@@ -11,12 +11,9 @@ namespace Application.ClinicScreenings.Commands.CreateClinicScreeningSession;
 public class CreateClinicScreeningSessionCommandHandler
     : ICommandHandler<CreateClinicScreeningSessionCommand, CreateClinicScreeningSessionResponse>
 {
-    private const string ClinicScreeningConsentContent =
-        "Clinic-initiated AI screening was authorized and recorded on behalf of the patient.";
 
     private readonly IRepository<AiScreening> _screeningRepository;
     private readonly IRepository<Patient> _patientRepository;
-    private readonly IOrganisationPatientsRepository _organisationPatientsRepository;
     private readonly ICurrentUserService _currentUserService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CreateClinicScreeningSessionCommandHandler> _logger;
@@ -24,14 +21,12 @@ public class CreateClinicScreeningSessionCommandHandler
     public CreateClinicScreeningSessionCommandHandler(
         IRepository<AiScreening> screeningRepository,
         IRepository<Patient> patientRepository,
-        IOrganisationPatientsRepository organisationPatientsRepository,
         ICurrentUserService currentUserService,
         IUnitOfWork unitOfWork,
         ILogger<CreateClinicScreeningSessionCommandHandler> logger)
     {
         _screeningRepository = screeningRepository;
         _patientRepository = patientRepository;
-        _organisationPatientsRepository = organisationPatientsRepository;
         _currentUserService = currentUserService;
         _unitOfWork = unitOfWork;
         _logger = logger;
@@ -49,16 +44,8 @@ public class CreateClinicScreeningSessionCommandHandler
         if (patient is null)
             return Result<CreateClinicScreeningSessionResponse>.NotFound("Patient not found");
 
-        var hasPatientAccess = await _organisationPatientsRepository.IsPatientManagedByOrganisationAdminAsync(
-            userId.Value,
-            patient.Id,
-            cancellationToken);
-        if (!hasPatientAccess)
-            return Result<CreateClinicScreeningSessionResponse>.NotFound("Patient not found");
-
         // Clinic-owned AI: session does not depend on organisation quota.
-        var screening = new AiScreening(patient.Id, request.ModelVersion, null);
-        screening.RecordConsent(patient.Id, ClinicScreeningConsentContent);
+        var screening = new AiScreening(patient.Id, request.ModelVersion);
 
         var savedImages = new List<RetinalImageResponse>();
         foreach (var imageData in request.RetinalImages)

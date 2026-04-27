@@ -31,7 +31,7 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         // Indexes for common queries
         builder.HasIndex(u => u.IsDeleted);
         builder.HasIndex(u => u.IsActive);
-        builder.HasIndex(u => u.OrganizationId);
+
 
         // Global query filter for soft delete
         builder.HasQueryFilter(u => !u.IsDeleted);

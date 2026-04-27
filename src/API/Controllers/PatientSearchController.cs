@@ -1,13 +1,10 @@
 using Application.Common.Models;
 using Application.Ophthalmologists.Common;
-using Application.Ophthalmologists.Queries.GetOphthalmologistDisplayNamesByIds;
 using Application.Ophthalmologists.Queries.GetOphthalmologist;
 using Application.Ophthalmologists.Queries.GetOphthalmologists;
 using Application.Scheduling.AppointmentSlots.Common;
 using Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlot;
 using Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlots;
-using Application.SystemAdmin.Organisations.Queries.GetOrganisations;
-using Application.Organisations.Queries.GetOrganisationSchedule;
 using Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -17,7 +14,7 @@ using Microsoft.AspNetCore.OutputCaching;
 namespace API.Controllers;
 
 /// <summary>
-/// Patient-facing search endpoints for ophthalmologists, organisations and booking slots.
+/// Patient-facing search endpoints for ophthalmologists and booking slots.
 /// </summary>
 [Route("api/patient/search")]
 public class PatientSearchController : BaseApiController
@@ -75,39 +72,8 @@ public class PatientSearchController : BaseApiController
     }
 
     /// <summary>
-    /// Search organisations (clinics/hospitals) with pagination.
+    /// Get available booking slots.
     /// </summary>
-    /// <param name="searchTerm">Search by name or address.</param>
-    /// <param name="orgType">Filter by organisation type.</param>
-    /// <param name="pageNumber">Page number (default: 1).</param>
-    /// <param name="pageSize">Page size (default: 10).</param>
-    /// <returns>Paginated list of organisations.</returns>
-    [HttpGet("organisations")]
-    [AllowAnonymous]
-    [OutputCache(PolicyName = "PublicData")]
-    [ProducesResponseType(typeof(ApiResponse<PagedResult<OrganisationListDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> SearchOrganisations(
-        [FromQuery] string? searchTerm = null,
-        [FromQuery] string? orgType = null,
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 10)
-    {
-        var query = new GetOrganisationsQuery
-        {
-            SearchTerm = searchTerm,
-            OrgType = orgType,
-            PageNumber = pageNumber,
-            PageSize = pageSize
-        };
-
-        var result = await _mediator.Send(query);
-        return HandleResult(result);
-    }
-
-    /// <summary>
-    /// Get available booking slots for a specific ophthalmologist or organisation.
-    /// </summary>
-    /// <param name="ophthalmologistId">Filter by ophthalmologist ID.</param>
     /// <param name="fromDate">Filter slots from this date.</param>
     /// <param name="toDate">Filter slots up to this date.</param>
     /// <param name="pageNumber">Page number (default: 1).</param>
@@ -167,24 +133,4 @@ public class PatientSearchController : BaseApiController
         var result = await _mediator.Send(new GetAppointmentSlotQuery(slotId));
         return HandleResult(result);
     }
-
-    [HttpGet("organisations/{organisationId:guid}/schedule")]
-    [AllowAnonymous]
-    [ProducesResponseType(typeof(ApiResponse<OrganisationScheduleDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetOrganisationSchedule(
-        Guid organisationId,
-        [FromQuery] DateOnly? fromDate = null,
-        [FromQuery] DateOnly? toDate = null)
-    {
-        var query = new GetOrganisationScheduleQuery
-        {
-            OrganisationId = organisationId,
-            FromDate = fromDate,
-            ToDate = toDate
-        };
-
-        var result = await _mediator.Send(query);
-        return HandleResult(result);
-    }
 }
-

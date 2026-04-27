@@ -3,7 +3,6 @@ using Application.Auth.Queries.GetProfileClaimsByUserId;
 using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Screenings.Commands.CompleteAiScreening;
-using Application.Wallets.Commands.VerifyPayment;
 using Infrastructure.Identity;
 using Infrastructure.Persistence;
 using Infrastructure.Services;
@@ -185,31 +184,6 @@ public class TestBackdoorController : ControllerBase
         return Ok(new { success = true, orderCode = request.OrderCode, message = "Marked as PAID in fake payment gateway." });
     }
 
-    [HttpPost("payments/verify")]
-    public async Task<IActionResult> VerifyPayment([FromBody] VerifyPaymentBypassRequest request, CancellationToken cancellationToken)
-    {
-        if (!ValidateBackdoorAccess())
-            return Forbid();
-
-        var result = await _mediator.Send(new VerifyPaymentCommand
-        {
-            OrderCode = request.OrderCode,
-            UserId = request.UserId
-        }, cancellationToken);
-
-        if (!result.IsSuccess)
-        {
-            return BadRequest(new
-            {
-                success = false,
-                message = result.ErrorMessage,
-                errors = result.Errors
-            });
-        }
-
-        return Ok(new { success = true, data = result.Data });
-    }
-
     [HttpPost("screenings/complete-mock-ai")]
     public async Task<IActionResult> CompleteMockAi(
         [FromBody] CompleteMockAiScreeningRequest request,
@@ -301,11 +275,6 @@ public record MarkPaymentSuccessRequest
     public string? TransactionReference { get; init; }
 }
 
-public record VerifyPaymentBypassRequest
-{
-    public string OrderCode { get; init; } = string.Empty;
-    public Guid? UserId { get; init; }
-}
 
 public record CompleteMockAiScreeningRequest
 {

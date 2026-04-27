@@ -1,6 +1,5 @@
 using Application.Ophthalmologists.Queries.GetDashboardMetrics;
 using Application.Ophthalmologists.Queries.GetReviewQueue;
-using Application.Organisations.Queries.GetDashboardMetrics;
 using Application.Patients.Queries.GetDashboardMetrics;
 using Application.SystemAdmin.Dashboard.Queries.GetDashboardMetrics;
 using Application.SystemAdmin.Dashboard.Queries.GetPopulationRiskAnalysis;
@@ -42,7 +41,6 @@ public interface IDashboardMetricsService
         CancellationToken cancellationToken = default);
     Task<OphthalmologistDashboardMetricsDto> GetOphthalmologistMetricsAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<List<ReviewQueueItemDto>> GetReviewQueueAsync(Guid userId, CancellationToken cancellationToken = default);
-    Task<OrganisationDashboardMetricsDto> GetOrganisationMetricsAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<PatientDashboardMetricsDto> GetPatientMetricsAsync(Guid userId, CancellationToken cancellationToken = default);
 
     // Real-time clinic operations dashboard methods

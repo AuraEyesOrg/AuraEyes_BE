@@ -32,9 +32,7 @@ public class AdminQueryService : IAdminQueryService
     {
         var query = from o in _context.Ophthalmologists.AsNoTracking()
                     join u in _context.Users.AsNoTracking() on o.UserId equals u.Id
-                    join org in _context.Organisations.AsNoTracking() on u.OrganizationId equals org.Id into orgJoin
-                    from org in orgJoin.DefaultIfEmpty()
-                    select new { Ophthalmologist = o, User = u, Organisation = org };
+                    select new { Ophthalmologist = o, User = u };
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
@@ -86,7 +84,6 @@ public class AdminQueryService : IAdminQueryService
                 LicenseUrl = x.Ophthalmologist.LicenseUrl,
                 DegreeUrl = x.Ophthalmologist.DegreeUrl,
                 RejectionReason = x.Ophthalmologist.RejectionReason,
-                OrganisationName = x.Organisation != null ? x.Organisation.Name : null,
                 IsActive = x.User.IsActive,
                 CreatedAt = x.Ophthalmologist.CreatedAt
             })
@@ -160,7 +157,7 @@ public class AdminQueryService : IAdminQueryService
                     Licenses = licenses,
                     Degrees = degrees,
                     RejectionReason = row.RejectionReason,
-                    OrganisationName = row.OrganisationName,
+                    OrganisationName = null,
                     IsActive = row.IsActive,
                     CreatedAt = row.CreatedAt
                 };
@@ -236,11 +233,7 @@ public class AdminQueryService : IAdminQueryService
                 EmailConfirmed = x.User != null && x.User.EmailConfirmed,
                 IsWalkIn = x.Patient.UserId == null,
                 PatientType = x.Patient.UserId == null ? "WalkIn" : "Registered",
-                LinkedOrganisationName = _context.Organisations
-                    .AsNoTracking()
-                    .OrderBy(org => org.CreatedAt)
-                    .Select(org => org.Name)
-                    .FirstOrDefault(),
+                LinkedOrganisationName = null,
                 CreatedAt = x.Patient.CreatedAt,
                 LastLoginAt = x.User != null ? x.User.LastLoginAt : null
             })

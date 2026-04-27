@@ -28,7 +28,7 @@ public class GetScheduleTemplatesQueryHandler : IQueryHandler<GetScheduleTemplat
         {
             Id = t.Id,
             OphthalId = t.OphthalId,
-            OrgId = t.OrgId,
+            OrgId = null,
             DayOfWeek = t.DayOfWeek.ToString(),
             StartTime = t.StartTime,
             EndTime = t.EndTime,

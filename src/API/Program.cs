@@ -511,11 +511,6 @@ if (enableHangfireServer)
         fullTimeSlotGenerationCron,
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
-    recurringJobManager.AddOrUpdate<MonthlySalaryJob>(
-        "monthly-salary-payout",
-        job => job.ExecuteAsync(CancellationToken.None),
-        monthlySalaryCron,
-        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
     try
     {

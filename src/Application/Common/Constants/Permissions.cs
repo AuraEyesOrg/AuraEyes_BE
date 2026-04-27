@@ -1,11 +1,11 @@
 namespace Application.Common.Constants;
 
 /// <summary>
-/// Centralized permission name constants â€” Digital Clinic model.
+/// Centralized permission name constants — Digital Clinic model.
 ///
 /// Convention: "{resource}:{action}"
 /// These names are seeded into the Permissions table on first startup.
-/// They match what the app actually supports â€” do NOT create permissions here
+/// They match what the app actually supports — do NOT create permissions here
 /// unless you have an endpoint / business rule that checks for them.
 ///
 /// Default role assignments are also seeded (see DatabaseSeeder.SeedPermissionsAsync).
@@ -13,54 +13,54 @@ namespace Application.Common.Constants;
 /// </summary>
 public static class Permissions
 {
-    // â”€â”€â”€ Users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Users ──────────────────────────────────────────────────────────────────
     public const string UsersRead        = "users:read";
     public const string UsersCreate      = "users:create";
     public const string UsersUpdate      = "users:update";
     public const string UsersDelete      = "users:delete";
     public const string UsersManageRoles = "users:manage-roles";
 
-    // â”€â”€â”€ Permissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Permissions ────────────────────────────────────────────────────────────
     public const string PermissionsRead   = "permissions:read";
     public const string PermissionsManage = "permissions:manage";
 
-    // â”€â”€â”€ Patients â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Patients ───────────────────────────────────────────────────────────────
     public const string PatientsRead   = "patients:read";
     public const string PatientsCreate = "patients:create";
     public const string PatientsUpdate = "patients:update";
     public const string PatientsDelete = "patients:delete";
 
-    // â”€â”€â”€ Ophthalmologists â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Ophthalmologists ───────────────────────────────────────────────────────
     public const string OphthalmologistsRead   = "ophthalmologists:read";
     public const string OphthalmologistsCreate = "ophthalmologists:create";
     public const string OphthalmologistsUpdate = "ophthalmologists:update";
     public const string OphthalmologistsVerify = "ophthalmologists:verify";
     public const string OphthalmologistsDelete = "ophthalmologists:delete";
 
-    // â”€â”€â”€ Clinic Staff â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Clinic Staff ───────────────────────────────────────────────────────────
     public const string ClinicStaffRead   = "clinic-staff:read";
     public const string ClinicStaffCreate = "clinic-staff:create";
     public const string ClinicStaffUpdate = "clinic-staff:update";
     public const string ClinicStaffDelete = "clinic-staff:delete";
 
-    // â”€â”€â”€ Screening â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Screening ──────────────────────────────────────────────────────────────
     public const string ScreeningRead    = "screening:read";
     public const string ScreeningCreate  = "screening:create";
     public const string ScreeningApprove = "screening:approve";
 
-    // â”€â”€â”€ Consultations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Consultations ──────────────────────────────────────────────────────────
     public const string ConsultationsRead   = "consultations:read";
     public const string ConsultationsCreate = "consultations:create";
     public const string ConsultationsUpdate = "consultations:update";
 
-    // â”€â”€â”€ Appointments & Scheduling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Appointments & Scheduling ──────────────────────────────────────────────
     public const string AppointmentsRead   = "appointments:read";
     public const string AppointmentsCreate = "appointments:create";
     public const string AppointmentsManage = "appointments:manage";
     public const string ApptSlotsManage    = "appt-slots:manage";
     public const string SchedulesManage    = "schedules:manage";
 
-    // â”€â”€â”€ Visit Records â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Visit Records ──────────────────────────────────────────────────────────
     public const string VisitsRead   = "visits:read";
     public const string VisitsManage = "visits:manage";
 
@@ -70,65 +70,37 @@ public static class Permissions
     public const string MedicalRecordsUpdate   = "medical-records:update";
     public const string MedicalRecordsFinalize = "medical-records:finalize";
 
-    // â”€â”€â”€ Orders & Billing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Orders & Billing ───────────────────────────────────────────────────────
     public const string OrdersRead   = "orders:read";
     public const string OrdersManage = "orders:manage";
 
-    // â”€â”€â”€ Payments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Payments ───────────────────────────────────────────────────────────────
     public const string PaymentsRead   = "payments:read";
     public const string PaymentsManage = "payments:manage";
 
-    // â”€â”€â”€ Quotas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    public const string QuotasRead = "quotas:read";
-    public const string QuotasBuy  = "quotas:buy";
-
-    // â”€â”€â”€ Wallets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    public const string WalletsRead     = "wallets:read";
-    public const string WalletsDeposit  = "wallets:deposit";
-    public const string WalletsWithdraw = "wallets:withdraw";
-    public const string WalletsHistory  = "wallets:history";
-    public const string WalletsManage   = "wallets:manage";
-
-    // â”€â”€â”€ Financial Admin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    public const string PayoutsRead   = "payouts:read";
-    public const string PayoutsManage = "payouts:manage";
-    public const string CashflowRead  = "cashflow:read";
-
-    // â”€â”€â”€ Legal & Contracts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    public const string ContractsRead            = "contracts:read";
-    public const string ContractsManage          = "contracts:manage";
-    public const string ContractTemplatesManage  = "contracts:templates-manage";
-
-    // â”€â”€â”€ Platform & Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Platform & Models ─────────────────────────────────────────────────────
     public const string AiModelsRead   = "aimodels:read";
     public const string AiModelsManage = "aimodels:manage";
     public const string NetworkManage  = "network:manage";
     public const string FeedbackRead   = "feedback:read";
     public const string RoadmapsManage = "roadmaps:manage";
 
-    // â”€â”€â”€ Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Settings ───────────────────────────────────────────────────────────────
     public const string SettingsRead   = "settings:read";
     public const string SettingsManage = "settings:manage";
 
-    // ─── Organisations (Clinic Settings) ──────────────────────────────────────────
-    // In the Digital Clinic model, "organisation" endpoints manage clinic-level
-    // settings and are scoped to SystemAdmin only. These aliases ensure backward
-    // compatibility with controllers that predate the architecture change.
-    public const string OrganisationsRead   = SettingsRead;
-    public const string OrganisationsUpdate = SettingsManage;
-
-    // â”€â”€â”€ Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Notifications ──────────────────────────────────────────────────────────
     public const string NotificationsManage = "notifications:manage";
 
-    // â”€â”€â”€ Audit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Audit ──────────────────────────────────────────────────────────────────
     public const string AuditLogsRead = "audit-logs:read";
 
-    // â”€â”€â”€ Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Dashboard ──────────────────────────────────────────────────────────────
     public const string DashboardRead = "dashboard:read";
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ────────────────────────────────────────────────────────────────────────────
     // Grouped for seeding and UI display
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ────────────────────────────────────────────────────────────────────────────
 
     /// <summary>All permissions with metadata for seeding.</summary>
     public static readonly PermissionDefinition[] All =
@@ -192,26 +164,6 @@ public static class Permissions
         new(PaymentsRead,   "Read Payments",   "View payment records",                   "Payments"),
         new(PaymentsManage, "Manage Payments", "Process patient payments at the clinic",  "Payments"),
 
-        // Quotas
-        new(QuotasRead, "Read Quotas", "View AI quota balance",                   "Quotas"),
-        new(QuotasBuy,  "Buy Quotas",  "Purchase additional AI quota credits",    "Quotas"),
-
-        // Wallets & Financial
-        new(WalletsRead,     "Read Wallets",      "View wallet balance and account info",  "Wallets"),
-        new(WalletsDeposit,  "Deposit Funds",     "Deposit money into wallet via PayOS",   "Wallets"),
-        new(WalletsWithdraw, "Withdraw Funds",    "Request withdrawal of funds",           "Wallets"),
-        new(WalletsHistory,  "Wallet History",    "View transaction and deposit history",  "Wallets"),
-        new(WalletsManage,   "Manage All Wallets","View and audit all user wallets",        "Wallets"),
-
-        new(PayoutsRead,   "Read Payouts",   "View withdrawal requests",                  "Financial"),
-        new(PayoutsManage, "Manage Payouts", "Approve or reject withdrawal requests",       "Financial"),
-        new(CashflowRead,  "Read Cashflow",  "View system financial analytics",            "Financial"),
-
-        // Contracts
-        new(ContractsRead,           "Read Contracts",   "View clinic contracts",                "Contracts"),
-        new(ContractsManage,         "Manage Contracts", "Issue or cancel contracts",            "Contracts"),
-        new(ContractTemplatesManage, "Manage Templates", "Manage contract legal templates",      "Contracts"),
-
         // Platform
         new(AiModelsRead,   "Read AI Models",  "View available AI screening models",        "Platform"),
         new(AiModelsManage, "Manage AI Models","Update model metadata or active status",    "Platform"),
@@ -261,10 +213,6 @@ public static class Permissions
             MedicalRecordsRead, MedicalRecordsCreate, MedicalRecordsUpdate, MedicalRecordsFinalize,
             OrdersRead, OrdersManage,
             PaymentsRead, PaymentsManage,
-            QuotasRead, QuotasBuy,
-            WalletsRead, WalletsDeposit, WalletsWithdraw, WalletsHistory, WalletsManage,
-            PayoutsRead, PayoutsManage, CashflowRead,
-            ContractsRead, ContractsManage, ContractTemplatesManage,
             AiModelsRead, AiModelsManage, NetworkManage, FeedbackRead, RoadmapsManage,
             SettingsRead, SettingsManage,
             NotificationsManage,
@@ -272,7 +220,7 @@ public static class Permissions
             DashboardRead,
         ],
 
-        // â”€â”€ Ophthalmologist â€” medical work + own scheduling/contracts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Ophthalmologist — medical work + own scheduling —────────────────────────
         [Roles.Ophthalmologist] =
         [
             DashboardRead,
@@ -284,16 +232,10 @@ public static class Permissions
             SchedulesManage, ApptSlotsManage,
             VisitsRead,
             MedicalRecordsRead, MedicalRecordsUpdate,
-            ContractsRead,
-            WalletsRead, WalletsWithdraw, WalletsHistory,
             SettingsRead,
         ],
 
-        // â”€â”€ ClinicStaff baseline â€” all sub-roles get these â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        // Receptionist-specific: AppointmentsManage, VisitsManage
-        // Coordinator-specific:  ScreeningCreate, ScreeningApprove
-        // Cashier-specific:      OrdersManage, PaymentsManage
-        // Admin grants extras via UserPermission for each staff member.
+        // ─── ClinicStaff baseline — all sub-roles get these ──────────────────────────
         [Roles.ClinicStaff] =
         [
             DashboardRead,
@@ -307,21 +249,19 @@ public static class Permissions
             SettingsRead,
         ],
 
-        // â”€â”€ Patient â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Patient ────────────────────────────────────────────────────────────────
         [Roles.Patient] =
         [
             DashboardRead,
             ScreeningRead, ScreeningCreate,
             ConsultationsRead, ConsultationsCreate,
             AppointmentsRead, AppointmentsCreate,
-            WalletsRead, WalletsDeposit, WalletsHistory,
-            QuotasRead,
             PatientsRead, PatientsUpdate,
             SettingsRead,
         ],
     };
 
-    // â”€â”€ Convenience permission groups for sub-role assignment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Convenience permission groups for sub-role assignment ──────────────────────
 
     /// <summary>Extra permissions assigned to a Receptionist sub-role.</summary>
     public static readonly string[] ReceptionistExtras = [];
@@ -332,11 +272,7 @@ public static class Permissions
         ScreeningApprove,
     ];
 
-    /// <summary>Extra permissions assigned to a Cashier sub-role.</summary>
-    public static readonly string[] CashierExtras =
-    [
-        CashflowRead,
-    ];
+    public static readonly string[] CashierExtras = [];
 }
 
 /// <summary>Seed metadata for a single permission.</summary>

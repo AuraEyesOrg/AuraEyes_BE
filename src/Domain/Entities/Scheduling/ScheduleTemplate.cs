@@ -6,15 +6,12 @@ namespace Domain.Entities.Scheduling;
 /// <summary>
 /// ScheduleTemplate - A clinic-level recurring availability pattern.
 /// Defines when slots are available (e.g., "Every Monday 9am-5pm, 30min slots").
-/// Single-clinic model: no OrgId/OphthalId ownership.
+/// Single-clinic model: no OrgId ownership.
 /// </summary>
 public class ScheduleTemplate : BaseEntity, IAggregateRoot
 {
     /// <summary>FK to the Ophthalmologist owner (for personal schedules).</summary>
     public Guid? OphthalId { get; private set; }
-
-    /// <summary>FK to the Organisation (if it's an organisation-level template).</summary>
-    public Guid? OrgId { get; private set; }
 
     /// <summary>Day of week (0=Sunday, 1=Monday, etc.).</summary>
     public DayOfWeek DayOfWeek { get; private set; }
@@ -54,7 +51,6 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         int maxCapacity,
         decimal? cost = null,
         Guid? ophthalId = null,
-        Guid? orgId = null,
         ScheduleTemplateSource source = ScheduleTemplateSource.Doctor)
     {
         if (endTime <= startTime)
@@ -71,7 +67,6 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         MaxCapacity = maxCapacity;
         Cost = cost;
         OphthalId = ophthalId;
-        OrgId = orgId;
         Source = source;
         IsActive = true;
     }
@@ -84,7 +79,6 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         int maxCapacity,
         decimal? cost = null,
         Guid? ophthalId = null,
-        Guid? orgId = null,
         bool isActive = true)
     {
         if (endTime <= startTime)
@@ -101,7 +95,6 @@ public class ScheduleTemplate : BaseEntity, IAggregateRoot
         MaxCapacity = maxCapacity;
         Cost = cost;
         OphthalId = ophthalId;
-        OrgId = orgId;
         IsActive = isActive;
         UpdatedAt = DateTime.UtcNow;
     }

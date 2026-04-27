@@ -25,7 +25,6 @@ public interface IIdentityService
         string password,
         string fullName,
         string role,
-        Guid? organizationId = null,
         UserProfileWalkInDto? userProfile = null,
         CancellationToken cancellationToken = default);
 
@@ -37,13 +36,11 @@ public interface IIdentityService
     Task<UserDto?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UserDto>> GetUsersByIdsAsync(IEnumerable<Guid> userIds, CancellationToken cancellationToken = default);
 
-    Task<bool> IsPhoneNumberInUseByOrganizationAsync(
-        Guid organizationId,
+    Task<bool> IsPhoneNumberInUseAsync(
         string phoneNumber,
         CancellationToken cancellationToken = default);
 
-    Task<bool> IsCitizenIdInUseByOrganizationAsync(
-        Guid organizationId,
+    Task<bool> IsCitizenIdInUseAsync(
         string citizenId,
         CancellationToken cancellationToken = default);
 
@@ -69,11 +66,10 @@ public interface IIdentityService
     Task<bool> IsInRoleAsync(Guid userId, string role);
 
     /// <summary>
-    /// Get active, non-deleted user IDs by role and organization.
+    /// Get active, non-deleted user IDs by role.
     /// </summary>
-    Task<IReadOnlyList<Guid>> GetUserIdsByRoleAndOrganizationAsync(
+    Task<IReadOnlyList<Guid>> GetUserIdsByRoleAsync(
         string role,
-        Guid organizationId,
         CancellationToken cancellationToken = default);
 
     // Account Management
@@ -180,14 +176,6 @@ public interface IIdentityService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Update user OrganizationId.
-    /// </summary>
-    Task<(bool Succeeded, string[] Errors)> UpdateUserOrganizationAsync(
-        Guid userId,
-        Guid? organizationId,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Get all effective permissions for a user (Role-based + User-based).
     /// </summary>
     Task<IList<string>> GetUserPermissionsAsync(Guid userId);
@@ -227,7 +215,6 @@ public record UserDto(
     bool EmailConfirmed,
     bool IsActive,
     bool IsDeleted,
-    Guid? OrganizationId,
     bool TwoFactorEnabled = false,
     string? AvatarUrl = null
 );

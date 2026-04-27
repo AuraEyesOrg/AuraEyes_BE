@@ -1,6 +1,5 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
-using Application.SystemAdmin.Ophthalmologists.Interfaces;
 using Domain.Enums;
 using Domain.Repositories;
 using MediatR;
@@ -16,8 +15,6 @@ namespace Application.SystemAdmin.Ophthalmologists.Commands.VerifyOphthalmologis
 public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthalmologistCommand, Result<string>>
 {
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
-    private readonly IContractRepository _contractRepository;
-    private readonly IOphthalmologistContractProvisioningService _contractProvisioningService;
     private readonly Domain.Common.IUnitOfWork _unitOfWork;
     private readonly IIdentityService _identityService;
     private readonly IEmailService _emailService;
@@ -26,8 +23,6 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
 
     public VerifyOphthalmologistCommandHandler(
         IOphthalmologistRepository ophthalmologistRepository,
-        IContractRepository contractRepository,
-        IOphthalmologistContractProvisioningService contractProvisioningService,
         Domain.Common.IUnitOfWork unitOfWork,
         IIdentityService identityService,
         IEmailService emailService,
@@ -35,8 +30,6 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
         ILogger<VerifyOphthalmologistCommandHandler> logger)
     {
         _ophthalmologistRepository = ophthalmologistRepository;
-        _contractRepository = contractRepository;
-        _contractProvisioningService = contractProvisioningService;
         _unitOfWork = unitOfWork;
         _identityService = identityService;
         _emailService = emailService;
@@ -72,20 +65,6 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // On approval: create a contract and send email with contract template
-        if (request.Approve)
-        {
-            try
-            {
-                await CreateContractForOphthalmologistAsync(ophthalmologist, cancellationToken);
-            }
-            catch (Exception contractEx)
-            {
-                _logger.LogWarning(contractEx,
-                    "Failed to create contract for ophthalmologist {Id}. Approval is still valid.",
-                    request.OphthalmologistId);
-            }
-        }
 
         // Best-effort: Send notification email to the ophthalmologist
         try
@@ -115,20 +94,11 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
                 {
                     await _emailService.SendAsync(
                         userDto.Email,
-                        "[AURA] Hồ sơ chứng chỉ đã được duyệt - Bước tiếp theo là ký và chốt điều khoản hợp đồng",
+                        "[AURA] Hồ sơ chứng chỉ đã được duyệt",
                         $"""
                         <h2>Chúc mừng, {userDto.FullName}!</h2>
                         <p>Hồ sơ chứng chỉ hành nghề của bạn đã được xác minh và phê duyệt thành công.</p>
-                        <p>Tiếp theo, bạn cần hoàn tất quy trình hợp đồng để chốt điều khoản hợp tác (hoa hồng và lương thực tế):</p>
-                        <ol>
-                            <li>Đăng nhập vào hệ thống AURA</li>
-                            <li>Xem và tải mẫu hợp đồng hợp tác đã được gửi kèm</li>
-                            <li>In hợp đồng, ký tên và đóng dấu (nếu có)</li>
-                            <li>Chụp ảnh hoặc scan hợp đồng đã ký</li>
-                            <li>Upload hợp đồng đã ký lên hệ thống để admin kiểm tra</li>
-                        </ol>
-                        <p>Sau khi admin xác nhận hợp đồng và hoàn tất chốt Commission Rate + Actual Salary theo thỏa thuận, tài khoản của bạn sẽ được kích hoạt đầy đủ.</p>
-                        <p>Bạn vẫn có thể xem lại hợp đồng đã xác nhận trực tiếp trên trang hợp đồng của bác sĩ.</p>
+                        <p>Bây giờ bạn có thể bắt đầu sử dụng các tính năng dành cho bác sĩ trên hệ thống AURA.</p>
                         <p>— Hệ thống AURA</p>
                         """,
                         isHtml: true,
@@ -162,38 +132,4 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
             : "Ophthalmologist rejected successfully");
     }
 
-    /// <summary>
-    /// Creates a contract for the newly approved ophthalmologist.
-    /// </summary>
-    private async Task CreateContractForOphthalmologistAsync(
-        Domain.Entities.Users.Ophthalmologist ophthalmologist,
-        CancellationToken cancellationToken)
-    {
-        var userId = ophthalmologist.UserId;
-
-        // Check if a contract already exists for this user
-        var existingContract = await _contractRepository.GetByUserIdAsync(userId, cancellationToken);
-        if (existingContract != null)
-        {
-            _logger.LogInformation("Contract already exists for user {UserId}, skipping creation.", userId);
-            return;
-        }
-
-        var contract = await _contractProvisioningService.CreatePendingContractForEmploymentTypeAsync(
-            ophthalmologist,
-            cancellationToken);
-
-        if (contract is null)
-        {
-            _logger.LogWarning("No active OphthalmologistContract template found. Cannot create contract for user {UserId}.", userId);
-            return;
-        }
-
-        await _contractRepository.AddAsync(contract, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Contract {Number} created and sent for signature for user {UserId}.",
-            contract.ContractNumber,
-            userId);
-    }
 }

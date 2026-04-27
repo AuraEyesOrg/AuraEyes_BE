@@ -37,7 +37,6 @@ public class DashboardMetricsDto
 public class DashboardPendingActionsDto
 {
     public int PendingOphthalmologistVerifications { get; set; }
-    public int PendingWithdrawalRequests { get; set; }
     public int PendingOrganisationOnboarding { get; set; }
 }
 
