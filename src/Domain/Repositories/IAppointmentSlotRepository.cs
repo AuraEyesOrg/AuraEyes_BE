@@ -20,6 +20,11 @@ public interface IAppointmentSlotRepository : IRepository<AppointmentSlot>
         DateOnly toDate,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<AppointmentSlot>> GetByDateRangeAsync(
+        DateOnly fromDate,
+        DateOnly toDate,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<AppointmentSlot>> GetAvailableSlotsAsync(
         Guid? scheduleTemplateId,
         DateOnly? fromDate = null,
