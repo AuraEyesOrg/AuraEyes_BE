@@ -32,6 +32,12 @@ public class MedicalRecord : BaseEntity, IAggregateRoot
         PatientId = patientId;
         MedicalRecordNumber = medicalRecordNumber;
         Status = MedicalRecordStatus.DraftAdmin;
+        
+        // Initialize non-nullable fields with empty/default values to prevent DB null constraint violations
+        AdministrativeDataJson = "{}";
+        ClinicalDataJson = "{}";
+        FinalDiagnosis = string.Empty;
+        TreatmentPlan = string.Empty;
     }
 
     private bool IsFinalizedState()
