@@ -92,7 +92,7 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health > /dev/null || exit 1"]
       interval: 30s
-      timeout: 10s
+      timeout: 15s
       retries: 3
       start_period: 60s
 
@@ -101,7 +101,9 @@ services:
       - external
 
     logging: *logging
-
+    environment:
+      - LOKI_URL=http://loki:3100
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     deploy:
       resources:
         limits:
@@ -175,11 +177,122 @@ services:
           memory: 512M
           cpus: "0.50"
 
+  # ── Monitoring Stack ──────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: auraeye_prometheus
+    restart: unless-stopped
+    volumes:
+      - ./deploy/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/console_templates'
+    networks:
+      - internal
+    logging: *logging
+
+  loki:
+    image: grafana/loki:latest
+    container_name: auraeye_loki
+    restart: unless-stopped
+    # Không cần mở port 3100 ra ngoài vì API và Alloy dùng mạng nội bộ
+    volumes:
+      - ./deploy/monitoring/loki-config.yml:/etc/loki/local-config.yaml:ro
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - internal
+    logging: *logging
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: auraeye_tempo
+    restart: unless-stopped
+    # Truy cập nội bộ qua port 4317
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./deploy/monitoring/tempo-config.yml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    networks:
+      - internal
+    logging: *logging
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: auraeye_grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deploy/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    networks:
+      - internal
+      - external
+    logging: *logging
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: auraeye_node_exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - internal
+    logging: *logging
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: auraeye_otel_collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./deploy/monitoring/otel-collector-config.yml:/etc/otel-collector-config.yaml:ro
+    networks:
+      - internal
+    logging: *logging
+
+  alloy:
+    image: grafana/alloy:latest
+    container_name: auraeye_alloy
+    restart: unless-stopped
+    ports:
+      - "12347:12347"
+    volumes:
+      - ./deploy/monitoring/alloy-config.alloy:/etc/alloy/config.alloy:ro
+    command: [ "run", "--storage.path=/var/lib/alloy/data", "/etc/alloy/config.alloy" ]
+    networks:
+      - internal
+      - external
+    logging: *logging
+
 volumes:
   pgdata:
     name: auraeye_pgdata
   pgadmin_data:
     name: auraeye_pgadmin_data
+  prometheus_data:
+    name: auraeye_prometheus_data
+  grafana_data:
+    name: auraeye_grafana_data
+  tempo_data:
+    name: auraeye_tempo_data
 
 networks:
   internal:
