@@ -453,7 +453,13 @@ else
 }
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
-app.UseMiddleware<RequestLoggingMiddleware>();
+// app.UseMiddleware<RequestLoggingMiddleware>(); // Thay bằng Serilog Request Logging bên dưới
+
+// Serilog Request Logging: Log chi tiết mọi HTTP request (Method, Path, Status Code, Response Time...)
+app.UseSerilogRequestLogging(options =>
+{
+    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+});
 
 app.UseHttpsRedirection();
 
