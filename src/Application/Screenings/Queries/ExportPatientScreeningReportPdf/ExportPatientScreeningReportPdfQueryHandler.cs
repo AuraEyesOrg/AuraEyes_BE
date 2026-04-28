@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.Screenings.Queries.ExportPatientScreeningReportPdf;
 
+
 public sealed class ExportPatientScreeningReportPdfQueryHandler
     : IQueryHandler<ExportPatientScreeningReportPdfQuery, PatientScreeningReportPdfFileDto>
 {
@@ -59,24 +60,34 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
             .FirstOrDefaultAsync(cancellationToken);
 
         Guid? requesterPatientId = requesterPatient?.Id;
-        if (requesterPatient is null && request.RequesterProfileId.HasValue)
-        {
-            var isDoctorReviewer = await _consultationSessionRepository
-                .Query()
-                .AnyAsync(
-                    s => s.AiScreeningId == request.ScreeningId &&
-                         s.OphthalmologistId == request.RequesterProfileId.Value &&
-                         !s.IsDeleted,
-                    cancellationToken);
 
-            if (!isDoctorReviewer)
-                return Result<PatientScreeningReportPdfFileDto>.Forbidden("You are not allowed to export this screening report.");
+        if (!request.BypassAccessCheck)
+        {
+            if (requesterPatient is null && request.RequesterProfileId.HasValue)
+            {
+                var isDoctorReviewer = await _consultationSessionRepository
+                    .Query()
+                    .AnyAsync(
+                        s => s.AiScreeningId == request.ScreeningId &&
+                             s.OphthalmologistId == request.RequesterProfileId.Value &&
+                             !s.IsDeleted,
+                        cancellationToken);
+
+                if (!isDoctorReviewer)
+                    return Result<PatientScreeningReportPdfFileDto>.Forbidden("You are not allowed to export this screening report.");
+            }
         }
 
-        var detail = await _screeningRepository
+        var detailQuery = _screeningRepository
             .Query()
-            .Where(x => x.Id == request.ScreeningId && !x.IsDeleted)
-            .Where(x => !requesterPatientId.HasValue || x.PatientId == requesterPatientId.Value)
+            .Where(x => x.Id == request.ScreeningId && !x.IsDeleted);
+
+        if (!request.BypassAccessCheck && requesterPatientId.HasValue)
+        {
+            detailQuery = detailQuery.Where(x => x.PatientId == requesterPatientId.Value);
+        }
+
+        var detail = await detailQuery
             .Select(x => new
             {
                 ScreeningId = x.Id,

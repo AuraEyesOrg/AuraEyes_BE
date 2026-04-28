@@ -23,4 +23,10 @@ public class MedicalRecordRepository : Repository<MedicalRecord>, IMedicalRecord
         return await _dbSet
             .FirstOrDefaultAsync(x => x.MedicalRecordNumber == recordNumber, cancellationToken);
     }
+
+    public async Task<MedicalRecord?> GetByVisitIdAsync(Guid visitId, CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .FirstOrDefaultAsync(x => x.PatientVisitId == visitId, cancellationToken);
+    }
 }

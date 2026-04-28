@@ -63,7 +63,8 @@ public sealed class GetOphthalmologistScreeningDetailQueryHandler
                     Findings = readModel.LatestResult.Findings,
                     AssessedAt = readModel.LatestResult.AssessedAt
                 }
-                : null
+                : null,
+            MedicalRecordId = readModel.MedicalRecordId
         };
 
         return Result<OphthalmologistScreeningDetailDto?>.Success(dto);

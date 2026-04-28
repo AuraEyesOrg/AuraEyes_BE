@@ -25,6 +25,7 @@ public class SendToDoctorCommandHandler
     private readonly IPatientVisitRepository _patientVisitRepository;
     private readonly IRepository<AiScreening> _screeningRepository;
     private readonly IConsultationSessionRepository _consultationSessionRepository;
+    private readonly IMedicalRecordRepository _medicalRecordRepository;
     private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
@@ -33,6 +34,7 @@ public class SendToDoctorCommandHandler
         IPatientVisitRepository patientVisitRepository,
         IRepository<AiScreening> screeningRepository,
         IConsultationSessionRepository consultationSessionRepository,
+        IMedicalRecordRepository medicalRecordRepository,
         IRepository<Ophthalmologist> ophthalmologistRepository,
         IUnitOfWork unitOfWork,
         INotificationService notificationService)
@@ -40,6 +42,7 @@ public class SendToDoctorCommandHandler
         _patientVisitRepository = patientVisitRepository;
         _screeningRepository = screeningRepository;
         _consultationSessionRepository = consultationSessionRepository;
+        _medicalRecordRepository = medicalRecordRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
@@ -137,6 +140,16 @@ public class SendToDoctorCommandHandler
             }
 
             await _consultationSessionRepository.UpdateAsync(existingConsultation, cancellationToken);
+            
+            // Link existing medical record to session if not already linked
+            var medicalRecord = await ((Domain.Repositories.IMedicalRecordRepository)_medicalRecordRepository).GetByVisitIdAsync(visit.Id, cancellationToken);
+            if (medicalRecord != null)
+            {
+                medicalRecord.LinkToConsultation(existingConsultation.Id);
+                medicalRecord.StartDoctorFilling();
+                await _medicalRecordRepository.UpdateAsync(medicalRecord, cancellationToken);
+            }
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result<SendToDoctorResponse>.Success(new SendToDoctorResponse
@@ -162,6 +175,16 @@ public class SendToDoctorCommandHandler
             visit.AssignDoctor(request.DoctorId.Value);
 
         await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
+
+        // Link medical record to the new session
+        var mr = await ((Domain.Repositories.IMedicalRecordRepository)_medicalRecordRepository).GetByVisitIdAsync(visit.Id, cancellationToken);
+        if (mr != null)
+        {
+            mr.LinkToConsultation(consultationSession.Id);
+            mr.StartDoctorFilling();
+            await _medicalRecordRepository.UpdateAsync(mr, cancellationToken);
+        }
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         // Notify doctor if assigned
