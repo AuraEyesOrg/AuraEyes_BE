@@ -11,21 +11,27 @@ faro.receiver "default" {
   }
 
   output {
-    logs   = [loki.write.local.receiver]
+    logs   = [loki.process.faro_process.receiver]
     traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+loki.process "faro_process" {
+  forward_to = [loki.write.local.receiver]
+
+  stage.static_labels {
+    values = {
+      "app" = "auraeyes-web",
+      "kind" = "frontend",
+      "environment" = "production",
+      "service_name" = "auraeyes-web",
+    }
   }
 }
 
 loki.write "local" {
   endpoint {
     url = "http://loki:3100/loki/api/v1/push"
-  }
-  // Thêm các nhãn mặc định để Dashboard Faro (17311) nhận diện được
-  external_labels = {
-    "app" = "auraeyes-web",
-    "kind" = "frontend",
-    "environment" = "production",
-    "service_name" = "auraeyes-web",
   }
 }
 
