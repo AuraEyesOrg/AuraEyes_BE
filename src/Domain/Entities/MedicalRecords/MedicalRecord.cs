@@ -31,53 +31,52 @@ public class MedicalRecord : BaseEntity, IAggregateRoot
     {
         PatientId = patientId;
         MedicalRecordNumber = medicalRecordNumber;
-        Status = MedicalRecordStatus.Draft;
-        AdministrativeDataJson = "{}";
-        ClinicalDataJson = "{}";
-        FinalDiagnosis = string.Empty;
-        TreatmentPlan = string.Empty;
+        Status = MedicalRecordStatus.DraftAdmin;
     }
 
-    private void EnsureNotLocked()
+    private bool IsFinalizedState()
     {
-        if (Status == MedicalRecordStatus.Locked)
-        {
-            throw new InvalidOperationException("Cannot modify a locked medical record.");
-        }
+        // Backward compatibility: older deployments may still have numeric status values > Finalized.
+        return (int)Status >= (int)MedicalRecordStatus.Finalized;
+    }
+
+    private void EnsureNotFinalized()
+    {
+        if (IsFinalizedState())
+            throw new InvalidOperationException("Cannot modify a finalized medical record.");
     }
 
     public void UpdateAdministrativeInfo(string jsonData)
     {
-        EnsureNotLocked();
+        EnsureNotFinalized();
         AdministrativeDataJson = jsonData;
-        if (Status == MedicalRecordStatus.Draft)
-        {
-            Status = MedicalRecordStatus.ClinicFilling;
-        }
+        Status = MedicalRecordStatus.PendingClinical;
     }
 
     public void UpdateClinicalInfo(string jsonData, string finalDiagnosis, string treatmentPlan)
     {
-        EnsureNotLocked();
+        EnsureNotFinalized();
         ClinicalDataJson = jsonData;
         FinalDiagnosis = finalDiagnosis;
         TreatmentPlan = treatmentPlan;
-        Status = MedicalRecordStatus.Completed;
+        Status = MedicalRecordStatus.PendingClinical;
     }
 
     public void StartDoctorFilling()
     {
-        EnsureNotLocked();
-        if (Status == MedicalRecordStatus.Draft || Status == MedicalRecordStatus.ClinicFilling)
-        {
-            Status = MedicalRecordStatus.DoctorFilling;
-        }
+        EnsureNotFinalized();
+        if (Status == MedicalRecordStatus.DraftAdmin)
+            Status = MedicalRecordStatus.PendingClinical;
     }
 
     public void FinalizeRecord()
     {
-        EnsureNotLocked();
-        Status = MedicalRecordStatus.Locked;
+        EnsureNotFinalized();
+
+        if (string.IsNullOrWhiteSpace(ClinicalDataJson) || string.IsNullOrWhiteSpace(FinalDiagnosis))
+            throw new InvalidOperationException("Clinical data must be completed before finalizing the EMR.");
+
+        Status = MedicalRecordStatus.Finalized;
     }
 
     public void LinkToConsultation(Guid sessionId)

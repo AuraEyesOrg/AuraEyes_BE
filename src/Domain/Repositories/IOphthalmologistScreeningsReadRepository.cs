@@ -59,6 +59,7 @@ public sealed record OphthalmologistScreeningDetailReadModel
     public OphthalmologistScreeningResultReadModel? LatestResult { get; init; }
     /// <summary>pending-review | reviewed | approved | flagged</summary>
     public required string ReviewStatus { get; init; }
+    public Guid? MedicalRecordId { get; init; }
 }
 
 public sealed record OphthalmologistRetinalImageReadModel

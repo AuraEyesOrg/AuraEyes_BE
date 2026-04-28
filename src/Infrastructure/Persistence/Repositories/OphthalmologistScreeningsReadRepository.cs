@@ -132,6 +132,7 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
             .Where(cs => cs.OphthalmologistId == ophthalmologistProfileId && cs.AiScreeningId == screeningId)
             .Select(cs => new
             {
+                Id = cs.Id,
                 Type = cs.Type,
                 HasAssignedDoctor = cs.OphthalmologistId.HasValue,
                 IsAIResultShared = cs.IsAIResultShared,
@@ -230,7 +231,12 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
             RawJsonOutput = canViewAiResults ? screening.RawJsonOutput : null,
             Images = images,
             LatestResult = latest,
-            ReviewStatus = MapReviewStatus(latestDiagnosis)
+            ReviewStatus = MapReviewStatus(latestDiagnosis),
+            MedicalRecordId = await _context.Set<Domain.Entities.MedicalRecords.MedicalRecord>()
+                .AsNoTracking()
+                .Where(mr => mr.ConsultationSessionId == consultation.Id)
+                .Select(mr => mr.Id)
+                .FirstOrDefaultAsync(cancellationToken)
         };
     }
 

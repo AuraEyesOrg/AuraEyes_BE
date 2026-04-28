@@ -6,7 +6,10 @@ public sealed record ExportPatientScreeningReportPdfQuery(
     Guid RequesterUserId,
     Guid ScreeningId,
     Guid? RequesterProfileId = null)
-    : IQuery<PatientScreeningReportPdfFileDto>;
+    : IQuery<PatientScreeningReportPdfFileDto>
+{
+    public bool BypassAccessCheck { get; init; } = false;
+}
 
 public sealed record PatientScreeningReportPdfFileDto
 {
