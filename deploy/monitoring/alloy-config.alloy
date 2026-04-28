@@ -19,6 +19,12 @@ faro.receiver "default" {
 loki.process "faro_process" {
   forward_to = [loki.write.local.receiver]
 
+  // Bước 1: Xóa nhãn service_name cũ (nếu có) để tránh bị unknown_service
+  stage.label_drop {
+    values = ["service_name", "service_instance_id"]
+  }
+
+  // Bước 2: Dán nhãn chuẩn cho Dashboard
   stage.static_labels {
     values = {
       "app" = "auraeyes-web",
@@ -32,6 +38,11 @@ loki.process "faro_process" {
 loki.write "local" {
   endpoint {
     url = "http://loki:3100/loki/api/v1/push"
+  }
+  // Thêm nhãn bảo hiểm ở tầng cuối cùng
+  external_labels = {
+    "app" = "auraeyes-web",
+    "environment" = "production",
   }
 }
 
