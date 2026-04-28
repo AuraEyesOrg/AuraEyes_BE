@@ -10,7 +10,6 @@ using Microsoft.EntityFrameworkCore;
 using Domain.Entities.Users;
 using Domain.Entities.Consultation;
 using Domain.Entities.Scheduling;
-using Application.Common.Models;
 
 namespace Application.Financial.Commands.CompleteOrderPayment;
 
@@ -21,7 +20,11 @@ public record CompleteOrderPaymentResponse(
     string? PaymentUrl = null, 
     string? PaymentOrderCode = null);
 
-public record CompleteOrderPaymentCommand(Guid OrderId, PaymentMethod Method = PaymentMethod.Cash) : IRequest<Result<CompleteOrderPaymentResponse>>;
+public record CompleteOrderPaymentCommand(
+    Guid OrderId, 
+    PaymentMethod Method = PaymentMethod.Cash,
+    string? ReturnUrl = null,
+    string? CancelUrl = null) : IRequest<Result<CompleteOrderPaymentResponse>>;
 
 public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderPaymentCommand, Result<CompleteOrderPaymentResponse>>
 {
@@ -101,7 +104,9 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
         }
 
         // Create final payment
-        var description = $"Thanh toán nốt cho đơn {order.Id.ToString().Substring(0, 8)}";
+        var description = order.PaidAmount > 0 
+            ? $"Thanh toán nốt khám - Đơn {order.Id.ToString().Substring(0, 8)}"
+            : $"Thanh toán đủ khám - Đơn {order.Id.ToString().Substring(0, 8)}";
         var payment = new Payment(order.Id, remainingAmount, request.Method, description);
         
         await _paymentRepository.AddAsync(payment, cancellationToken);
@@ -127,8 +132,16 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
             // Generate PayOS link
             try 
             {
-                var returnUrl = _payOSSettings.DefaultReturnUrl;
-                var cancelUrl = _payOSSettings.DefaultCancelUrl;
+                var returnUrl = request.ReturnUrl ?? _payOSSettings.DefaultReturnUrl;
+                var cancelUrl = request.CancelUrl ?? _payOSSettings.DefaultCancelUrl;
+
+                // Append IDs to returnUrl so the callback page knows which order/appointment to process
+                var separator = returnUrl.Contains("?") ? "&" : "?";
+                var queryParams = $"orderId={order.Id}&appointmentId={order.AppointmentId}&type=clinic-booking";
+                returnUrl = $"{returnUrl}{separator}{queryParams}";
+                
+                var cancelSeparator = cancelUrl.Contains("?") ? "&" : "?";
+                cancelUrl = $"{cancelUrl}{cancelSeparator}{queryParams}&cancel=true";
 
                 var (paymentUrl, orderCode) = await _payOSService.CreatePaymentLinkAsync(
                     payment.Id,

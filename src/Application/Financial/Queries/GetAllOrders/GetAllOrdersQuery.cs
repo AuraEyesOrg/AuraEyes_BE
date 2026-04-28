@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Financial.Common.DTOs;
+using Domain.Enums;
 using Domain.Repositories;
 using MediatR;
 
@@ -49,6 +50,10 @@ public class GetAllOrdersQueryHandler : IRequestHandler<GetAllOrdersQuery, AllOr
             
             userMap.TryGetValue(order.UserId, out var patientName);
 
+            var paidAmount = order.Payments
+                .Where(p => p.Status == PaymentStatus.Completed)
+                .Sum(p => p.Amount);
+
             return new OrderDto(
                 order.Id,
                 order.UserId,
@@ -56,8 +61,14 @@ public class GetAllOrdersQueryHandler : IRequestHandler<GetAllOrdersQuery, AllOr
                 order.DepositAmount,
                 patientName,
                 displayDescription,
-                order.Status,
+                order.Status switch
+                {
+                    OrderStatus.Confirmed => "PartiallyPaid",
+                    OrderStatus.Completed => "FullyPaid",
+                    _ => order.Status.ToString()
+                },
                 order.CreatedAt,
+                paidAmount,
                 order.Payments.Select(p => new PaymentDto(
                     p.Id,
                     p.OrderId,
@@ -66,7 +77,8 @@ public class GetAllOrdersQueryHandler : IRequestHandler<GetAllOrdersQuery, AllOr
                     p.Method,
                     p.PaidAt,
                     p.PaymentUrl,
-                    displayDescription)).ToList());
+                    p.Description ?? displayDescription,
+                    p.PaymentOrderCode)).ToList());
         }).ToList();
 
         return new AllOrdersResult(dtos, totalCount, request.PageNumber, request.PageSize);

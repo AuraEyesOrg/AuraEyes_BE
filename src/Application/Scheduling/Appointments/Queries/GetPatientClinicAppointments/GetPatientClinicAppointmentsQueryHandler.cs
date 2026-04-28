@@ -131,7 +131,12 @@ public class GetPatientClinicAppointmentsQueryHandler
                     
                     // Billing info
                     OrderId = orderMap.TryGetValue(a.Id, out var ord) ? ord.Id : null,
-                    OrderStatus = ord?.Status,
+                    OrderStatus = ord?.Status switch
+                    {
+                        OrderStatus.Confirmed => "PartiallyPaid",
+                        OrderStatus.Completed => "FullyPaid",
+                        _ => ord?.Status.ToString()
+                    },
                     TotalAmount = ord?.TotalAmount,
                     DepositAmount = ord?.DepositAmount,
                     IsPaidDeposit = ord?.Status == OrderStatus.Confirmed || ord?.Status == OrderStatus.Completed

@@ -34,7 +34,8 @@ public class ClinicAppointmentDto
     public decimal? DepositAmount { get; init; }
     public bool IsPaidDeposit { get; init; }
     public decimal? RemainingAmount { get; init; }
-    public OrderStatus? OrderStatus { get; init; }
+    public decimal? PaidAmount { get; init; }
+    public string? OrderStatus { get; init; }
 }
 
 public class ClinicAvailableSlotDto

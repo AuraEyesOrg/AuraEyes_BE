@@ -15,6 +15,10 @@ public class Order : BaseEntity, IAggregateRoot
     public string? Description { get; private set; }
     public OrderStatus Status { get; private set; }
 
+    public decimal PaidAmount => _payments
+        .Where(p => p.Status == PaymentStatus.Completed)
+        .Sum(p => p.Amount);
+
     // Navigation properties
     private readonly List<Payment> _payments = new();
     public IReadOnlyCollection<Payment> Payments => _payments.AsReadOnly();

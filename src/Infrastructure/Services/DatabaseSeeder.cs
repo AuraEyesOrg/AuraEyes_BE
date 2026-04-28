@@ -57,6 +57,9 @@ public static class DatabaseSeeder
         // Step 4: Seed permissions + default role assignments
         await SeedPermissionsAsync(context, roleManager, logger);
 
+        // Step 4.5: Seed specific permissions for staff sub-roles (Receptionist, etc.)
+        await SeedStaffSubRolePermissionsAsync(context, userManager, logger);
+
         // Step 5: Seed test data for clinic queue (Cashier page) (idempotent)
         await SeedClinicQueueTestDataAsync(context, userManager, logger);
 
@@ -308,48 +311,10 @@ public static class DatabaseSeeder
             }
         }
 
-        // Step 4: Seed ScheduleTemplate
-        await SeedScheduleTemplatesAsync(context, logger);
-
         logger?.LogInformation("Domain entity seeding completed.");
     }
 
 
-    private static async Task SeedScheduleTemplatesAsync(
-        ApplicationDbContext context,
-        ILogger? logger)
-    {
-        logger?.LogInformation("Seeding schedule templates...");
-
-        var existingTemplate = await context.ScheduleTemplates.FirstOrDefaultAsync();
-
-        if (existingTemplate == null)
-        {
-            int[] weekdays = [1, 2, 3, 4, 5]; // Monday to Friday
-
-            foreach (var day in weekdays)
-            {
-                var template = new Domain.Entities.Scheduling.ScheduleTemplate(
-                    dayOfWeek: (DayOfWeek)day,
-                    startTime: new TimeOnly(9, 0),
-                    endTime: new TimeOnly(17, 0),
-                    slotDuration: 30,
-                    maxCapacity: 2
-                );
-
-                await context.ScheduleTemplates.AddAsync(template);
-            }
-
-            await context.SaveChangesAsync();
-            logger?.LogInformation("âœ“ Created 5 schedule templates (Mon-Fri 9am-5pm, 30min slots) â†’ ScheduleTemplates table");
-        }
-        else
-        {
-            logger?.LogInformation("Schedule templates already exist. Skipping.");
-        }
-
-        logger?.LogInformation("Schedule template seeding completed.");
-    }
 
     private static async Task SeedPermissionsAsync(
         ApplicationDbContext context,
@@ -426,6 +391,53 @@ public static class DatabaseSeeder
         }
 
         logger?.LogInformation("Permission seeding completed.");
+    }
+
+    private static async Task SeedStaffSubRolePermissionsAsync(
+        ApplicationDbContext context,
+        UserManager<ApplicationUser> userManager,
+        ILogger? logger)
+    {
+        logger?.LogInformation("Seeding sub-role specific permissions for clinic staff users...");
+
+        var staffAssignments = new[]
+        {
+            ("receptionist@auraeyes.vn", Permissions.ReceptionistExtras),
+            ("coordinator@auraeyes.vn",  Permissions.CoordinatorExtras),
+            ("cashier@auraeyes.vn",      Permissions.CashierExtras)
+        };
+
+        var allPermissions = await context.Permissions.ToDictionaryAsync(p => p.Name, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (email, extras) in staffAssignments)
+        {
+            var user = await userManager.FindByEmailAsync(email);
+            if (user == null) continue;
+
+            var existingUserPerms = await context.UserPermissions
+                .Where(up => up.UserId == user.Id)
+                .Select(up => up.PermissionId)
+                .ToListAsync();
+
+            var existingSet = new HashSet<Guid>(existingUserPerms);
+
+            foreach (var permName in extras)
+            {
+                if (!allPermissions.TryGetValue(permName, out var permission))
+                {
+                    logger?.LogWarning("Permission '{Perm}' not found for user {Email}.", permName, email);
+                    continue;
+                }
+
+                if (existingSet.Contains(permission.Id))
+                    continue;
+
+                await context.UserPermissions.AddAsync(new UserPermission(user.Id, permission.Id, isGranted: true));
+            }
+        }
+
+        await context.SaveChangesAsync();
+        logger?.LogInformation("Clinic staff sub-role permission seeding completed.");
     }
 
     private static async Task SeedClinicQueueTestDataAsync(
@@ -507,42 +519,6 @@ public static class DatabaseSeeder
 
         await context.MedicalDiagnoses.AddAsync(diagnosis);
         await context.SaveChangesAsync();
-
-        // 4. Create Appointment Slot and Appointment
-        var template = await context.ScheduleTemplates.FirstOrDefaultAsync();
-        if (template != null)
-        {
-            var slot = new AppointmentSlot(
-                scheduleTemplateId: template.Id,
-                date: DateOnly.FromDateTime(DateTime.UtcNow),
-                startTime: new TimeOnly(14, 0),
-                endTime: new TimeOnly(14, 30),
-                maxCapacity: 1
-            );
-            slot.UpdateOphthalId(ophthalmologist.Id);
-            slot.UpdateCost(500000);
-            await context.AppointmentSlots.AddAsync(slot);
-            await context.SaveChangesAsync();
-
-            var appointment = new Appointment(
-                patientId: patient.Id,
-                appointmentSlotId: slot.Id,
-                price: 500000,
-                requestedDoctorId: ophthalmologist.Id,
-                visitReason: "Tư vấn bệnh võng mạc"
-            );
-            appointment.Confirm();
-            await context.Appointments.AddAsync(appointment);
-            await context.SaveChangesAsync();
-
-            // 5. Create Patient Visit from Appointment
-            var visit = PatientVisit.CreateFromAppointment(appointment);
-            visit.Start();
-            visit.FinishConsultation("Dữ liệu mẫu cho trang Cashier");
-
-            await context.PatientVisits.AddAsync(visit);
-            await context.SaveChangesAsync();
-        }
 
         logger?.LogInformation("âœ“ Successfully seeded clinic queue test data for {Email}", patientUser.Email);
     }

@@ -258,14 +258,16 @@ public class CreateClinicAppointmentCommandHandler
                 var payment = new Payment(order.Id, depositAmount!.Value, PaymentMethod.PayOS, orderDescription);
                 await _paymentRepository.AddAsync(payment, cancellationToken);
 
-                var defaultReturnUrl = _configuration["PayOS:DefaultReturnUrl"] ?? "http://localhost:3000";
-                var uri = new Uri(defaultReturnUrl);
-                var baseUrl = $"{uri.Scheme}://{uri.Authority}";
-                
-                var returnUrl = $"{baseUrl}/patient/wallet/payment-callback" +
-                    $"?type=clinic-booking&orderId={order.Id}&appointmentId={appointment.Id}";
-                var cancelUrl = $"{baseUrl}/patient/wallet/payment-callback" +
-                    $"?type=clinic-booking&orderId={order.Id}&appointmentId={appointment.Id}&cancel=true";
+                var returnUrl = _configuration["PayOS:DefaultReturnUrl"] ?? "";
+                var cancelUrl = _configuration["PayOS:DefaultCancelUrl"] ?? "";
+
+                // Append IDs to returnUrl so the callback page knows which order/appointment to process
+                var separator = returnUrl.Contains("?") ? "&" : "?";
+                var queryParams = $"orderId={order.Id}&appointmentId={appointment.Id}&type=clinic-booking";
+                returnUrl = $"{returnUrl}{separator}{queryParams}";
+
+                var cancelSeparator = cancelUrl.Contains("?") ? "&" : "?";
+                cancelUrl = $"{cancelUrl}{cancelSeparator}{queryParams}&cancel=true";
 
                 var (pUrl, orderCode) = await _payOSService.CreatePaymentLinkAsync(
                     payment.Id,

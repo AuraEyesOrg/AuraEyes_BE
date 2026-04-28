@@ -128,8 +128,14 @@ public class GetClinicAppointmentsByDateQueryHandler
                     TotalAmount = totalAmount > 0 ? totalAmount : null,
                     DepositAmount = primaryOrder?.DepositAmount,
                     IsPaidDeposit = isPaidDeposit,
+                    PaidAmount = paidAmount,
                     RemainingAmount = totalAmount > 0 ? (remaining > 0 ? remaining : 0) : null,
-                    OrderStatus = primaryOrder?.Status
+                    OrderStatus = primaryOrder?.Status switch
+                    {
+                        Domain.Enums.OrderStatus.Confirmed => "PartiallyPaid",
+                        Domain.Enums.OrderStatus.Completed => "FullyPaid",
+                        _ => primaryOrder?.Status.ToString()
+                    }
                 };
             })
             .OrderBy(x => x.Date)
