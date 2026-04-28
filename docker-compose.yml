@@ -211,9 +211,9 @@ services:
     container_name: auraeye_tempo
     restart: unless-stopped
     # Truy cập nội bộ qua port 4317
-    command: [ "-config.file=/etc/tempo.yaml" ]
+    command: [ "-config.file=/etc/tempo/tempo.yaml" ]
     volumes:
-      - ./deploy/monitoring/tempo-config.yml:/etc/tempo.yaml:ro
+      - ./deploy/monitoring/tempo-config.yml:/etc/tempo/tempo.yaml:ro
       - tempo_data:/var/tempo
     networks:
       - internal
@@ -261,9 +261,9 @@ services:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: auraeye_otel_collector
     restart: unless-stopped
-    command: ["--config=/etc/otel-collector-config.yaml"]
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
-      - ./deploy/monitoring/otel-collector-config.yml:/etc/otel-collector-config.yaml:ro
+      - ./deploy/monitoring/otel-collector-config.yml:/etc/otelcol-contrib/config.yaml:ro
     networks:
       - internal
     logging: *logging
