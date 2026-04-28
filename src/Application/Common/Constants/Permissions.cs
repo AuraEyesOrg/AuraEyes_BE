@@ -262,7 +262,6 @@ public static class Permissions
     [
         PatientsRead, PatientsCreate, PatientsUpdate,
         AppointmentsRead, AppointmentsCreate, AppointmentsManage,
-        VisitsRead, VisitsManage,
         OrdersRead, PaymentsRead,
     ];
 
@@ -271,6 +270,7 @@ public static class Permissions
     [
         ScreeningRead, ScreeningCreate, ScreeningApprove,
         MedicalRecordsRead, MedicalRecordsCreate, MedicalRecordsFinalize,
+        VisitsRead, VisitsManage,
     ];
 
     /// <summary>Extra permissions assigned to a Cashier sub-role.</summary>
