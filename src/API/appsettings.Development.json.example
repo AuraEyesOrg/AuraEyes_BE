@@ -4,62 +4,115 @@
       "Default": "Debug",
       "Override": {
         "Microsoft": "Information",
+        "Microsoft.EntityFrameworkCore": "Information",
         "System": "Information"
       }
     }
   },
-  "BaseUrl": "http://localhost:3000",
+  "ConnectionStrings": {
+  "DefaultConnection": "Host=localhost;Port=5432;Database=auraeyes_db;Username=postgres;Password=AuraSecurePassword123!"
+  },
+  "JwtSettings": {
+    "SecretKey": "",
+    "Issuer": "",
+    "Audience": "",
+    "AccessTokenExpiryMinutes": ,
+    "RefreshTokenExpiryDays": ,
+    "ValidateIssuer": ,
+    "ValidateAudience": ,
+    "ValidateLifetime": ,
+    "ClockSkewSeconds":
+  },
   "AiAsset": {
-    "BaseUrl": "https://ai"
+    "BaseUrl": ""
+  },
+  "Smtp": {
+    "Host": "",
+    "Port": ,
+    "Username": "",
+    "Password": "",
+    "UseSsl": false,
+    "UseStartTls": true,
+    "FromName": "",
+    "FromEmail": ""
+  },
+  "PayOS": {
+    "ClientId": "",
+    "ApiKey": "",
+    "ChecksumKey": "",
+    "DefaultReturnUrl": "",
+    "DefaultCancelUrl": "",
+    "PayoutClientId": "",
+    "PayoutApiKey": "",
+    "PayoutChecksumKey": ""
+  },
+  "SupabaseStorage": {
+    "Url": "",
+    "ServiceKey": "",
+    "BucketName": ""
+  },
+  "GoogleMeet": {
+    "ClientId": "",
+    "ClientSecret": "",
+    "RefreshToken": "",
+    "CalendarId": "",
+    "ApplicationName": "",
+    "DefaultDurationMinutes": 
+  },
+  "GoogleAuth": {
+    "ClientId": ""
+  },
+  "SerpApi": {
+    "ApiKey": "",
+    "BaseUrl": "https://serpapi.com/search.json"
+  },
+  "Swagger": {
+    "Username": "",
+    "Password": ""
   },
   "Hangfire": {
     "ServerEnabled": false,
     "WorkerCount": 1
   },
-  "RateLimiting": {
-    "ReadPermitLimit": 120,
-    "ReadWindowSeconds": 60,
-    "ReadQueueLimit": 0,
-    "WritePermitLimit": 60,
-    "WriteWindowSeconds": 60,
-    "WriteQueueLimit": 0,
-    "SensitivePermitLimit": 8,
-    "SensitiveWindowSeconds": 60,
-    "SensitiveQueueLimit": 0
+  "GoogleAiStudio": {
+    "ApiKey": ""
   },
   "BetterStack": {
     "Dashboard": {
-      "EmbedUrl": ""
+      "EmbedUrl": "https://status.auraeyes.site"
     },
     "Heartbeats": {
       "DailyQuotaReset": {
-        "PingUrl": "",
-        "StartUrl": "",
-        "FailUrl": ""
       },
       "SlotMaintenance": {
-        "PingUrl": "",
-        "StartUrl": "",
-        "FailUrl": ""
       },
       "SessionReminderWorker": {
-        "PingUrl": "",
-        "StartUrl": "",
-        "FailUrl": ""
       },
       "ReservationExpirationWorker": {
-        "PingUrl": "",
-        "StartUrl": "",
-        "FailUrl": ""
       },
       "ConsultationStateWorker": {
-        "PingUrl": "",
-        "StartUrl": "",
-        "FailUrl": ""
       }
     }
   },
   "AdminNotifications": {
-    "OrganisationOnboardingEmail": "systemadmin@gmail.com"
-  }
+    "OrganisationOnboardingEmail": ""
+  },
+  "Cloudinary": {
+    "CloudName": "",
+    "ApiKey": "",
+    "ApiSecret": "",
+    "Folder": ""
+  },
+  "RateLimiting": {
+    "ReadPermitLimit": ,
+    "ReadWindowSeconds": ,
+    "ReadQueueLimit": ,
+    "WritePermitLimit": ,
+    "WriteWindowSeconds": ,
+    "WriteQueueLimit": ,
+    "SensitivePermitLimit": ,
+    "SensitiveWindowSeconds": ,
+    "SensitiveQueueLimit": 
+  },
+  "BaseUrl": ""
 }
