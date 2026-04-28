@@ -32,7 +32,7 @@ public class ClinicScreeningsController : BaseApiController
     private readonly IIdentityService _identityService;
     private readonly ICurrentUserService _currentUserService;
 
-    public ClinicScreeningsController(IMediator mediator)
+    public ClinicScreeningsController(IMediator mediator, IRepository<AiScreening> screeningRepository, IRepository<Domain.Entities.Users.Patient> patientRepository, IIdentityService identityService, ICurrentUserService currentUserService)
     {
         _mediator = mediator;
         _screeningRepository = screeningRepository;
@@ -46,10 +46,10 @@ public class ClinicScreeningsController : BaseApiController
     /// </summary>
     [HttpGet("history")]
     [AuthorizePermission(Permissions.ScreeningRead)]
-    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ClinicScreeningHistoryDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<Application.ClinicScreenings.Queries.GetClinicScreeningHistory.ClinicScreeningHistoryDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetHistory([FromQuery] int take = 50, CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetClinicScreeningHistoryQuery { Take = take }, cancellationToken);
+        var result = await _mediator.Send(new Application.ClinicScreenings.Queries.GetClinicScreeningHistory.GetClinicScreeningHistoryQuery { Take = take }, cancellationToken);
         return HandleResult(result, "Clinic screening history loaded");
     }
 }
