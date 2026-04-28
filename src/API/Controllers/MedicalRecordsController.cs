@@ -14,6 +14,7 @@ using Domain.Entities.MedicalRecords;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using Infrastructure.Identity.Authorization;
 
 namespace API.Controllers;
 
@@ -37,7 +38,7 @@ public class MedicalRecordsController : BaseApiController
     /// Called by Receptionist/Clinic Staff.
     /// </summary>
     [HttpPost]
-    // [Authorize(Policy = Permissions.MedicalRecordsCreate)]
+    [AuthorizePermission(Permissions.MedicalRecordsCreate)]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Create([FromBody] CreateMedicalRecordCommand command)
     {
@@ -89,7 +90,7 @@ public class MedicalRecordsController : BaseApiController
     /// </summary>
     [HttpPut("{id:guid}/clinical")]
     [HttpPut("{id:guid}/diagnosis")] // Alias for exact prompt requirement
-    // [Authorize(Policy = Permissions.MedicalRecordsUpdate)]
+    [AuthorizePermission(Permissions.MedicalRecordsUpdate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateClinical(Guid id, [FromBody] UpdateMedicalRecordClinicalRequest request)
     {
@@ -116,7 +117,7 @@ public class MedicalRecordsController : BaseApiController
     /// </summary>
     [HttpPatch("{id:guid}/finalize")]
     [HttpPost("{id:guid}/finalize")] // Supporting exact prompt requirement
-    // [Authorize(Policy = Permissions.MedicalRecordsFinalize)]
+    [AuthorizePermission(Permissions.MedicalRecordsFinalize)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Finalize(Guid id)
     {
@@ -131,6 +132,7 @@ public class MedicalRecordsController : BaseApiController
     /// Download finalized EMR as PDF.
     /// </summary>
     [HttpGet("{id:guid}/pdf")]
+    [AuthorizePermission(Permissions.MedicalRecordsRead)]
     [Produces("application/pdf")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -149,7 +151,7 @@ public class MedicalRecordsController : BaseApiController
     /// Retrieve medical record details.
     /// </summary>
     [HttpGet("{id:guid}")]
-    // [Authorize(Policy = Permissions.MedicalRecordsRead)]
+    [AuthorizePermission(Permissions.MedicalRecordsRead)]
     [ProducesResponseType(typeof(ApiResponse<MedicalRecordDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetById(Guid id)
     {
@@ -161,7 +163,7 @@ public class MedicalRecordsController : BaseApiController
     /// Step 4: Retrieve all medical records with filtering (Staff/Admin).
     /// </summary>
     [HttpGet("all")]
-    // [Authorize(Policy = Permissions.MedicalRecordsRead)]
+    [AuthorizePermission(Permissions.MedicalRecordsRead)]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<MedicalRecordDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
         [FromQuery] MedicalRecordStatus? status = null,

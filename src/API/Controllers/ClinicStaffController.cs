@@ -144,44 +144,61 @@ public class ClinicStaffController : BaseApiController
         [FromBody] CreateWalkInPatientRequest request,
         CancellationToken cancellationToken)
     {
-        var command = new CreateWalkInPatientCommand
-        {
-            FullName = request.FullName,
-            Email = request.Email,
-            PhoneNumber = request.PhoneNumber,
-            CitizenId = request.CitizenId,
-            DateOfBirth = request.DateOfBirth,
-            Gender = request.Gender,
-            Address = request.Address
-        };
+        var genderInt = ParseGender(request.Gender);
 
-        var result = await _mediator.Send(command, cancellationToken);
-        return HandleResult(result, "Walk-in patient registered successfully.");
-    }
+    var command = new CreateWalkInPatientCommand
+    {
+        FullName = request.FullName,
+        Email = request.Email,
+        PhoneNumber = request.PhoneNumber,
+        CitizenId = request.CitizenId,
+        DateOfBirth = request.DateOfBirth,
+        Gender = genderInt,
+        Address = request.Address
+    };
+
+    var result = await _mediator.Send(command, cancellationToken);
+    return HandleResult(result, "Walk-in patient registered successfully.");
+}
+
+private static int? ParseGender(string? gender)
+{
+    if (string.IsNullOrWhiteSpace(gender)) return null;
+
+    if (int.TryParse(gender, out var result)) return result;
+
+    return gender.ToLower() switch
+    {
+        "male" => (int)Gender.Male,
+        "female" => (int)Gender.Female,
+        "other" => (int)Gender.Other,
+        _ => null
+    };
+}
 }
 
 // ─── Request models ────────────────────────────────────────────────────────
 
 /// <summary>Request body for creating a new clinic staff profile.</summary>
 public record CreateClinicStaffRequest(
-    Guid UserId,
-    IReadOnlyList<ClinicStaffRole> SubRoles,
-    string? Department,
-    string? EmployeeCode,
-    string? Phone);
+Guid UserId,
+IReadOnlyList<ClinicStaffRole> SubRoles,
+string? Department,
+string? EmployeeCode,
+string? Phone);
 
 /// <summary>Request body for updating a clinic staff profile.</summary>
 public record UpdateClinicStaffRequest(
-    IReadOnlyList<ClinicStaffRole> SubRoles,
-    string? Department,
-    string? EmployeeCode,
-    string? Phone);
+IReadOnlyList<ClinicStaffRole> SubRoles,
+string? Department,
+string? EmployeeCode,
+string? Phone);
 
 public record CreateWalkInPatientRequest(
-    string FullName,
-    string? Email,
-    string? PhoneNumber,
-    string? CitizenId,
-    DateTime? DateOfBirth,
-    int? Gender,
-    string? Address);
+string FullName,
+string? Email = null,
+string? PhoneNumber = null,
+string? CitizenId = null,
+DateTime? DateOfBirth = null,
+string? Gender = null,
+string? Address = null);

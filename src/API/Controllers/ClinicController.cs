@@ -1,5 +1,6 @@
 using Application.Common.Constants;
 using Application.Common.Models;
+using Application.Patients.Commands.UpdateClinicPatient;
 using Application.Patients.Queries.GetRecentClinicPatients;
 using Application.Clinic.Queries.GetDashboardMetrics;
 using MediatR;
@@ -43,4 +44,46 @@ public class ClinicController : BaseApiController
         var result = await _mediator.Send(new GetClinicDashboardMetricsQuery());
         return HandleResult(result);
     }
+
+    /// <summary>
+    /// Clinic staff update a patient's demographic and/or medical info.
+    /// Demographics are applied via IIdentityService; BMI/DiseaseHistory
+    /// are stored on the Patient domain entity.
+    /// </summary>
+    [HttpPut("patients/{patientId:guid}")]
+    [AuthorizePermission(Permissions.PatientsUpdate)]
+    [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateClinicPatient(
+        Guid patientId,
+        [FromBody] UpdateClinicPatientRequest request)
+    {
+        var command = new UpdateClinicPatientCommand
+        {
+            PatientId = patientId,
+            FullName = request.FullName,
+            PhoneNumber = request.PhoneNumber,
+            CitizenId = request.CitizenId,
+            DateOfBirth = request.DateOfBirth,
+            Gender = request.Gender,
+            Address = request.Address,
+            Bmi = request.Bmi,
+            DiseaseHistory = request.DiseaseHistory,
+        };
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result);
+    }
+}
+
+public record UpdateClinicPatientRequest
+{
+    public string? FullName { get; init; }
+    public string? PhoneNumber { get; init; }
+    public string? CitizenId { get; init; }
+    public string? DateOfBirth { get; init; }
+    public string? Gender { get; init; }
+    public string? Address { get; init; }
+    public decimal? Bmi { get; init; }
+    public string? DiseaseHistory { get; init; }
 }

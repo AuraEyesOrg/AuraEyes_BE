@@ -19,7 +19,7 @@ public class ClinicScreeningHistoryDto
     public string Status { get; init; } = "pending";
 }
 
-public class GetClinicScreeningHistoryQuery : IRequest<Result<IReadOnlyList<ClinicScreeningHistoryDto>>>
+public class GetClinicScreeningHistoryQuery : IQuery<IReadOnlyList<ClinicScreeningHistoryDto>>
 {
     public int Take { get; init; } = 50;
 }

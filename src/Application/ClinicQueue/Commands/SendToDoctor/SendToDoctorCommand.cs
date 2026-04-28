@@ -142,7 +142,7 @@ public class SendToDoctorCommandHandler
             await _consultationSessionRepository.UpdateAsync(existingConsultation, cancellationToken);
             
             // Link existing medical record to session if not already linked
-            var medicalRecord = await _medicalRecordRepository.GetByVisitIdAsync(visit.Id, cancellationToken);
+            var medicalRecord = await ((Domain.Repositories.IMedicalRecordRepository)_medicalRecordRepository).GetByVisitIdAsync(visit.Id, cancellationToken);
             if (medicalRecord != null)
             {
                 medicalRecord.LinkToConsultation(existingConsultation.Id);
@@ -177,7 +177,7 @@ public class SendToDoctorCommandHandler
         await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
 
         // Link medical record to the new session
-        var mr = await _medicalRecordRepository.GetByVisitIdAsync(visit.Id, cancellationToken);
+        var mr = await ((Domain.Repositories.IMedicalRecordRepository)_medicalRecordRepository).GetByVisitIdAsync(visit.Id, cancellationToken);
         if (mr != null)
         {
             mr.LinkToConsultation(consultationSession.Id);

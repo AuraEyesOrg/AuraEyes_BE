@@ -27,6 +27,7 @@ public record CreateWalkInPatientResult
     public string FullName { get; init; } = string.Empty;
     public string? LoginEmail { get; init; }
     public bool IsGeneratedEmail { get; init; }
+    public bool EmailSent { get; init; }
     public string? TemporaryPassword { get; init; }
 }
 
@@ -77,7 +78,9 @@ public class CreateWalkInPatientCommandHandler : IRequestHandler<CreateWalkInPat
         // For walk-ins, we generate a random password or a default one
         // Since they will likely need to login later, we use a predictable pattern or let them reset it
         var defaultPassword = "Patient@WalkIn123!"; 
-        var email = request.Email ?? $"{Guid.NewGuid():N}@auraeyes.com"; // Fallback email if not provided
+        var email = !string.IsNullOrWhiteSpace(request.Email) 
+            ? request.Email 
+            : $"{Guid.NewGuid():N}@auraeyes.com"; // Fallback email if not provided
 
         var profileDto = new UserProfileWalkInDto(
             FullName: request.FullName,
@@ -117,6 +120,7 @@ public class CreateWalkInPatientCommandHandler : IRequestHandler<CreateWalkInPat
             FullName = request.FullName,
             LoginEmail = email,
             IsGeneratedEmail = string.IsNullOrWhiteSpace(request.Email),
+            EmailSent = false, // Walk-in patients receive credentials in person, not via email
             TemporaryPassword = defaultPassword
         });
     }
