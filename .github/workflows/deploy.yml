@@ -42,7 +42,8 @@ jobs:
           mkdir -p "$DEPLOY_DIR/deploy/nginx"
           cp -r deploy/nginx/* "$DEPLOY_DIR/deploy/nginx/"
           
-          # Copy Monitoring configs
+          # Copy Monitoring configs (Clean up old fake directories first)
+          rm -rf "$DEPLOY_DIR/deploy/monitoring"
           mkdir -p "$DEPLOY_DIR/deploy/monitoring"
           cp -r deploy/monitoring/* "$DEPLOY_DIR/deploy/monitoring/"
           
