@@ -106,6 +106,7 @@ builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics => metrics
         .SetResourceBuilder(otelResource)
         .AddRuntimeInstrumentation()
+        .AddProcessInstrumentation()
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
         .AddPrometheusExporter());
