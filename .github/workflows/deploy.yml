@@ -42,6 +42,10 @@ jobs:
           mkdir -p "$DEPLOY_DIR/deploy/nginx"
           cp -r deploy/nginx/* "$DEPLOY_DIR/deploy/nginx/"
           
+          # Copy Monitoring configs
+          mkdir -p "$DEPLOY_DIR/deploy/monitoring"
+          cp -r deploy/monitoring/* "$DEPLOY_DIR/deploy/monitoring/"
+          
           # Create certbot challenge directory
           mkdir -p "$DEPLOY_DIR/deploy/certbot/www"
       
