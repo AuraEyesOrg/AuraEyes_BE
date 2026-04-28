@@ -1,3 +1,4 @@
+file_format: "0.1"
 receivers:
   otlp:
     protocols:
@@ -10,6 +11,14 @@ processors:
   batch:
     timeout: 5s
     send_batch_size: 1024
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: "production"
+        action: insert
+      - key: service.namespace
+        value: "AuraEyes"
+        action: insert
 
 exporters:
   otlp/tempo:
@@ -29,9 +38,9 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
+      processors: [batch, resource]
       exporters: [otlp/tempo, logging]
     metrics:
       receivers: [otlp]
-      processors: [batch]
+      processors: [batch, resource]
       exporters: [prometheus, logging]

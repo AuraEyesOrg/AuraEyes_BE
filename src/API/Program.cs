@@ -22,6 +22,8 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog.Sinks.Grafana.Loki;
+using System.Collections.Generic;
+using System;
 
 static string ResolveHangfireSchema(string? configuredSchema, bool isDevelopment)
 {
@@ -69,7 +71,7 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.File("logs/log-.txt", rollingInterval: RollingInterval.Day)
     .WriteTo.GrafanaLoki(
         builder.Configuration["LOKI_URL"] ?? "http://loki:3100",
-        new List<LokiLabel> { new() { Key = "app", Value = "auraeyes-api" } })
+        new List<LokiLabel> { new LokiLabel { Key = "app", Value = "auraeyes-api" } })
     .CreateLogger();
 
 builder.Host.UseSerilog();
@@ -83,7 +85,7 @@ builder.Services.AddHttpClient();
 var otelResource = ResourceBuilder.CreateDefault()
     .AddService(
         serviceName: "auraeyes-api",
-        serviceInstanceId: Environment.MachineName)
+        serviceInstanceId: System.Environment.MachineName)
     .AddAttributes(new Dictionary<string, object>
     {
         ["deployment.environment"] = builder.Configuration["ASPNETCORE_ENVIRONMENT"] ?? "Production",
