@@ -91,6 +91,17 @@ public class GetClinicQueueQueryHandler
             : Array.Empty<UserDto>();
         var doctorNameByUserId = doctorUsers.ToDictionary(u => u.Id, u => u.FullName?.Trim() ?? string.Empty);
 
+        var patientUserIds = visits
+            .Where(v => v.Patient != null && v.Patient.UserId.HasValue)
+            .Select(v => v.Patient!.UserId!.Value)
+            .Distinct()
+            .ToList();
+
+        var patientUsers = patientUserIds.Count > 0
+            ? await _identityService.GetUsersByIdsAsync(patientUserIds, cancellationToken)
+            : Array.Empty<UserDto>();
+        var patientNameByUserId = patientUsers.ToDictionary(u => u.Id, u => u.FullName?.Trim() ?? "Unknown Patient");
+
         var queueItems = new List<ClinicQueueItemDto>();
 
         foreach (var visit in visits)
@@ -114,11 +125,24 @@ public class GetClinicQueueQueryHandler
                 ? doctorName
                 : null;
 
+            string patientName = "Unknown Patient";
+            if (visit.Patient != null)
+            {
+                if (visit.Patient.UserId.HasValue && patientNameByUserId.TryGetValue(visit.Patient.UserId.Value, out var name))
+                {
+                    patientName = name;
+                }
+                else if (visit.Patient.IsWalkIn && !string.IsNullOrWhiteSpace(visit.Patient.FullName))
+                {
+                    patientName = visit.Patient.FullName;
+                }
+            }
+
             var item = new ClinicQueueItemDto
             {
                 VisitId = visit.Id,
                 PatientId = visit.PatientId,
-                PatientName = visit.Patient?.FullName ?? "Unknown Patient",
+                PatientName = patientName,
                 AppointmentId = visit.AppointmentId,
                 VisitStatus = visit.Status.ToString(),
                 CheckedInAt = visit.CheckedInAt ?? DateTime.UtcNow,
