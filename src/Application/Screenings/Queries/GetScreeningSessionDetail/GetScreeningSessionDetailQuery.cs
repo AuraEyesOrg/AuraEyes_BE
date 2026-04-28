@@ -2,7 +2,10 @@ using Application.Common.Interfaces;
 
 namespace Application.Screenings.Queries.GetScreeningSessionDetail;
 
-public record GetScreeningSessionDetailQuery(Guid ScreeningId) : IQuery<ScreeningSessionDetailDto>;
+public record GetScreeningSessionDetailQuery(Guid ScreeningId) : IQuery<ScreeningSessionDetailDto>
+{
+    public bool BypassPatientCheck { get; init; } = false;
+}
 
 public record ScreeningSessionDetailDto
 {
