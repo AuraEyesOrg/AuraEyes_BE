@@ -606,7 +606,7 @@ public static class EmailTemplates
             </table>
 
             <div style=""text-align: center; margin-bottom: 32px;"">
-                <a href=""https://auraeyes.vn/auth/login"" class=""button"" style=""display: inline-block; background-color: {BrandPrimary}; color: {BrandDarkText}; font-size: 15px; font-weight: 600; padding: 14px 40px; border-radius: 6px; text-decoration: none; box-shadow: 0 4px 6px rgba(0, 229, 255, 0.2);"">
+                <a href=""https://web.auraeyes.site/auth/login"" class=""button"" style=""display: inline-block; background-color: {BrandPrimary}; color: {BrandDarkText}; font-size: 15px; font-weight: 600; padding: 14px 40px; border-radius: 6px; text-decoration: none; box-shadow: 0 4px 6px rgba(0, 229, 255, 0.2);"">
                     Đăng nhập ngay
                 </a>
             </div>
