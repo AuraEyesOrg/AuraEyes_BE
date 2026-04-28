@@ -400,7 +400,8 @@ public class IdentityService : IIdentityService
             user.IsActive,
             user.IsDeleted,
             user.TwoFactorEnabled,
-            avatarUrl
+            avatarUrl,
+            user.PhoneNumber
         );
     }
 

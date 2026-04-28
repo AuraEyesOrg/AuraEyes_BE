@@ -223,7 +223,8 @@ public record UserDto(
     bool IsActive,
     bool IsDeleted,
     bool TwoFactorEnabled = false,
-    string? AvatarUrl = null
+    string? AvatarUrl = null,
+    string? PhoneNumber = null
 );
 
 /// <summary>
