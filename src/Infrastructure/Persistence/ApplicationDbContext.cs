@@ -10,6 +10,7 @@ using Domain.Entities.Platform;
 using Domain.Entities.Scheduling;
 using Domain.Entities.Screening;
 using Domain.Entities.Users;
+using Domain.Entities.MasterData;
 using Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -98,6 +99,12 @@ public class ApplicationDbContext : IdentityDbContext<
     // Care Plan (Healthcare Roadmap)
     public DbSet<HealthRoadmap> HealthRoadmaps => Set<HealthRoadmap>();
     public DbSet<HealthRoadmapStep> HealthRoadmapSteps => Set<HealthRoadmapStep>();
+    
+    // Master Data
+    public DbSet<Country> Countries => Set<Country>();
+    public DbSet<Province> Provinces => Set<Province>();
+    public DbSet<District> Districts => Set<District>();
+    public DbSet<Ward> Wards => Set<Ward>();
 
     #endregion
 

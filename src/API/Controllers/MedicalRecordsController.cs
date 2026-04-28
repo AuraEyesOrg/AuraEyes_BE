@@ -22,6 +22,7 @@ namespace API.Controllers;
 /// EMR 23/BV-01 Medical Records management.
 /// Lifecycle: Draft_Admin -> Pending_Clinical -> Finalized.
 /// </summary>
+[Route("api/medical-records")]
 public class MedicalRecordsController : BaseApiController
 {
     private readonly IMediator _mediator;
