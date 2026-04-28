@@ -81,12 +81,13 @@ builder.Services.AddHttpClient();
 
 // ── OpenTelemetry & Monitoring ─────────────────────────────────────────────
 var otelResource = ResourceBuilder.CreateDefault()
-    .AddService("AuraEyes.API")
-    .AddTelemetrySdk()
+    .AddService(
+        serviceName: "auraeyes-api",
+        serviceInstanceId: Environment.MachineName)
     .AddAttributes(new Dictionary<string, object>
     {
-        ["deployment.environment"] = builder.Environment.EnvironmentName.ToLowerInvariant(),
-        ["host.name"] = Environment.MachineName
+        ["deployment.environment"] = builder.Configuration["ASPNETCORE_ENVIRONMENT"] ?? "Production",
+        ["service.namespace"] = "AuraEyes"
     });
 
 builder.Services.AddOpenTelemetry()

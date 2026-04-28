@@ -24,6 +24,8 @@ loki.write "local" {
   external_labels = {
     "app" = "auraeyes-web",
     "kind" = "frontend",
+    "environment" = "production",
+    "service_name" = "auraeyes-web",
   }
 }
 
