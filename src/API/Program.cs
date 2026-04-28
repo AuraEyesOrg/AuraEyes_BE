@@ -619,4 +619,6 @@ else
     Log.Warning("Hangfire server is disabled. Recurring jobs are not running in this environment.");
 }
 
+app.MapPrometheusScrapingEndpoint();
+
 app.Run();

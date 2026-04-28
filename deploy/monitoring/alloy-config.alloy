@@ -20,6 +20,11 @@ loki.write "local" {
   endpoint {
     url = "http://loki:3100/loki/api/v1/push"
   }
+  // Thêm các nhãn mặc định để Dashboard Faro (17311) nhận diện được
+  external_labels = {
+    "app" = "auraeyes-web",
+    "kind" = "frontend",
+  }
 }
 
 otelcol.exporter.otlp "tempo" {
