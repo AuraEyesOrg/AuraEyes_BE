@@ -3,6 +3,7 @@ logging {
   format = "logfmt"
 }
 
+// 1. Nhận dữ liệu từ Web (Sửa tên app cho khớp với frontend)
 faro.receiver "default" {
   server {
     listen_address = "0.0.0.0"
@@ -11,41 +12,25 @@ faro.receiver "default" {
   }
 
   output {
-    logs   = [loki.process.faro_process.receiver]
+    logs   = [loki.write.faro_only.receiver]
     traces = [otelcol.exporter.otlp.tempo.input]
   }
 }
 
-loki.process "faro_process" {
-  forward_to = [loki.write.local.receiver]
-
-  // Bước 1: Xóa nhãn service_name cũ (nếu có) để tránh bị unknown_service
-  stage.label_drop {
-    values = ["service_name", "service_instance_id"]
-  }
-
-  // Bước 2: Dán nhãn chuẩn cho Dashboard
-  stage.static_labels {
-    values = {
-      "app" = "auraeyes-web",
-      "kind" = "frontend",
-      "environment" = "production",
-      "service_name" = "auraeyes-web",
-    }
-  }
-}
-
-loki.write "local" {
+// 2. Bộ ghi chuyên dụng (Dùng tên auraeyes-frontend)
+loki.write "faro_only" {
   endpoint {
     url = "http://loki:3100/loki/api/v1/push"
   }
-  // Thêm nhãn bảo hiểm ở tầng cuối cùng
   external_labels = {
-    "app" = "auraeyes-web",
+    "app" = "auraeyes-frontend",
+    "service_name" = "auraeyes-frontend",
+    "kind" = "frontend",
     "environment" = "production",
   }
 }
 
+// 3. Đẩy Traces sang Tempo
 otelcol.exporter.otlp "tempo" {
   client {
     endpoint = "tempo:4317"
