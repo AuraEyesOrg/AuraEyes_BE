@@ -13,39 +13,27 @@ faro.receiver "integrations_faro" {
 loki.process "faro_logs" {
   forward_to = [loki.write.grafana_loki.receiver]
 
+  // Ép nhãn Job để phân biệt hẳn với API
   stage.static_labels {
     values = {
-      "job" = "faro",
+      "job" = "faro-frontend",
     }
   }
 
-  // Bước 1: Parse toàn bộ JSON để lấy object 'meta'
+  // Bóc tách đơn giản nhất
   stage.json {
     expressions = {
-      "meta_obj" = "meta",
-      "kind"     = "kind",
+      "app" = "meta.app.name",
+      "env" = "meta.app.environment",
     }
   }
 
-  // Bước 2: Parse tiếp object 'meta' (dưới dạng chuỗi) để lấy app name và env
-  stage.json {
-    expressions = {
-      "app_name" = "app.name",
-      "app_env"  = "app.environment",
-      "browser"  = "browser.name",
-    }
-    source = "meta_obj"
-  }
-
+  // Ép nhãn App nếu nó bóc tách được, nếu không thì để trống để ta debug
   stage.labels {
     values = {
-      "app"         = "app_name",
-      "application" = "app_name",
-      "service_name"= "app_name",
-      "env"         = "app_env",
-      "environment" = "app_env",
-      "browser_name"= "browser",
-      "kind"         = "kind",
+      "app"         = "app",
+      "application" = "app",
+      "env"         = "env",
     }
   }
 }
