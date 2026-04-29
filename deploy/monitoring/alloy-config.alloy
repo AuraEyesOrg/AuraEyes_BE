@@ -3,7 +3,7 @@ logging {
   format = "logfmt"
 }
 
-// 1. Nhận dữ liệu từ Web (Sửa tên app cho khớp với frontend)
+// 1. Nhận dữ liệu từ Web (Logs, Traces, Metrics)
 faro.receiver "default" {
   server {
     listen_address = "0.0.0.0"
@@ -12,12 +12,34 @@ faro.receiver "default" {
   }
 
   output {
-    logs   = [loki.write.faro_only.receiver]
-    traces = [otelcol.exporter.otlp.tempo.input]
+    logs    = [loki.write.faro_only.receiver]
+    traces  = [otelcol.exporter.otlp.tempo.input]
+    metrics = [prometheus.relabel.faro_metrics.receiver] // Bổ sung Metrics
   }
 }
 
-// 2. Bộ ghi chuyên dụng (Dùng tên auraeyes-frontend)
+// 2. Xử lý Metrics từ Faro trước khi gửi sang Prometheus
+prometheus.relabel "faro_metrics" {
+  forward_to = [prometheus.remote_write.mimir.receiver]
+
+  rule {
+    target_label = "app"
+    replacement  = "auraeyes-frontend"
+  }
+  rule {
+    target_label = "service_name"
+    replacement  = "auraeyes-frontend"
+  }
+}
+
+// 3. Gửi Metrics sang Prometheus (Dùng remote_write)
+prometheus.remote_write "mimir" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
+  }
+}
+
+// 4. Bộ ghi chuyên dụng cho Logs
 loki.write "faro_only" {
   endpoint {
     url = "http://loki:3100/loki/api/v1/push"
@@ -30,7 +52,7 @@ loki.write "faro_only" {
   }
 }
 
-// 3. Đẩy Traces sang Tempo
+// 5. Đẩy Traces sang Tempo
 otelcol.exporter.otlp "tempo" {
   client {
     endpoint = "tempo:4317"
