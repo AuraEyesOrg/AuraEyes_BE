@@ -11,5 +11,4 @@ public record VerifyOphthalmologistCommand : IRequest<Result<string>>
 {
     public Guid OphthalmologistId { get; init; }
     public bool Approve { get; init; }
-    public string? RejectionReason { get; init; }
 }

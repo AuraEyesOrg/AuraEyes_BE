@@ -13,12 +13,6 @@ public class UpdateOphthalmologistCommandValidator : AbstractValidator<UpdateOph
             .NotEmpty()
             .WithMessage("Ophthalmologist ID is required.");
 
-        RuleFor(x => x.YearsOfExperience)
-            .GreaterThanOrEqualTo(0)
-            .WithMessage("Years of experience cannot be negative.")
-            .LessThanOrEqualTo(70)
-            .WithMessage("Years of experience cannot exceed 70 years.");
-
         RuleFor(x => x.Bio)
             .MaximumLength(2000)
             .WithMessage("Bio cannot exceed 2000 characters.");
@@ -27,16 +21,6 @@ public class UpdateOphthalmologistCommandValidator : AbstractValidator<UpdateOph
             .IsInEnum()
             .When(x => x.EmploymentType.HasValue)
             .WithMessage("Employment type is invalid.");
-
-        RuleFor(x => x.WorkingHoursPerWeek)
-            .InclusiveBetween(1, 112)
-            .When(x => x.WorkingHoursPerWeek.HasValue)
-            .WithMessage("Working hours per week must be between 1 and 112.");
-
-        RuleFor(x => x.ExpectedMonthlySalary)
-            .GreaterThanOrEqualTo(0)
-            .When(x => x.ExpectedMonthlySalary.HasValue)
-            .WithMessage("Expected monthly salary cannot be negative.");
 
         When(x => x.UserId.HasValue, () =>
         {

@@ -1,0 +1,404 @@
+Project AuraEyesBackendERD {
+  database_type: "PostgreSQL"
+  Note: '''
+  Unified DBML for dbdiagram.io.
+  Generated from docs/ERD_ALL_IN_ONE.md and EF Core mapping.
+  '''
+}
+
+TableGroup ClinicalCore {
+  Patient
+  Organisation
+  Ophthalmologist
+  OrganisationPatientLink
+  Certificate
+  Consent
+  AiScreening
+  RetinalImage
+  ScreeningResult
+  ConsultationSession
+  Conversation
+  ChatMessage
+  MedicalDiagnosis
+  PatientRoadmap
+  ScheduleTemplate
+  AppointmentSlot
+  Appointment
+  WebsiteFeedback
+  OrganisationFeedback
+  OphthalmologistFeedback
+  OphthalmologistLeaveRequest
+  OphthalmologistEmploymentTypeChangeRequest
+}
+
+TableGroup IdentityFinancialContractsPlatform {
+  AspNetUsers
+  AspNetRoles
+  RefreshToken
+  Permission
+  RolePermission
+  UserPermission
+  Wallet
+  WalletTransaction
+  DepositRequest
+  WithdrawalRequest
+  Orders
+  Payment
+  ContractTemplate
+  Contract
+  Notification
+  AuditLog
+  SystemSetting
+}
+
+TableGroup ProfessionalNetwork {
+  ProfessionalPost
+  PostReaction
+  PostComment
+  PostAttachment
+  SavedPost
+}
+
+Table Patient {
+  Id uuid [pk]
+  UserId uuid [unique, note: 'Logical reference to AspNetUsers.Id, no DB FK']
+}
+
+Table Organisation {
+  Id uuid [pk]
+  OwnerId uuid [note: 'Logical reference to AspNetUsers.Id, no DB FK']
+}
+
+Table Ophthalmologist {
+  Id uuid [pk]
+  UserId uuid [unique, note: 'Logical reference to AspNetUsers.Id, no DB FK']
+}
+
+Table OrganisationPatientLink {
+  Id uuid [pk]
+  OrganisationId uuid [not null]
+  PatientId uuid [not null]
+
+  indexes {
+    (OrganisationId, PatientId) [unique, name: 'UX_OrganisationPatientLink_Organisation_Patient']
+  }
+}
+
+Table Certificate {
+  Id uuid [pk]
+  OphthalmologistId uuid [not null]
+}
+
+Table Consent {
+  Id uuid [pk]
+  AiScreeningId uuid [not null, unique]
+  PatientId uuid [not null]
+}
+
+Table AiScreening {
+  Id uuid [pk]
+  PatientId uuid [not null]
+  OrganisationId uuid
+}
+
+Table RetinalImage {
+  Id uuid [pk]
+  PatientId uuid [not null]
+  AiScreeningId uuid
+}
+
+Table ScreeningResult {
+  Id uuid [pk]
+  AiScreeningId uuid [not null]
+}
+
+Table ConsultationSession {
+  Id uuid [pk]
+  PatientId uuid [not null]
+  OphthalmologistId uuid
+  OrganisationId uuid
+  AiScreeningId uuid
+  AppointmentSlotId uuid
+}
+
+Table Conversation {
+  Id uuid [pk]
+  OphthalmologistId uuid [not null]
+  ConsultationSessionId uuid [not null]
+}
+
+Table ChatMessage {
+  Id uuid [pk]
+  ConversationId uuid [not null]
+  SenderUserId uuid [note: 'Logical reference to AspNetUsers.Id, no DB FK']
+}
+
+Table MedicalDiagnosis {
+  Id uuid [pk]
+  AiScreeningId uuid [not null]
+  ConsultationSessionId uuid [not null]
+  DoctorId uuid [note: 'Logical reference to Ophthalmologist.Id, no DB FK']
+}
+
+Table PatientRoadmap {
+  Id uuid [pk]
+  PatientId uuid [not null]
+  MedicalDiagnosisId uuid [not null, unique]
+}
+
+Table ScheduleTemplate {
+  Id uuid [pk]
+  OrgId uuid [note: 'Logical reference to Organisation.Id, no DB FK']
+  OphthalId uuid [note: 'Logical reference to Ophthalmologist.Id, no DB FK']
+}
+
+Table AppointmentSlot {
+  Id uuid [pk]
+  ScheduleTemplateId uuid [not null]
+  Date date [not null]
+  StartTime time [not null]
+  EndTime time [not null]
+
+  indexes {
+    (ScheduleTemplateId) [name: 'IX_AppointmentSlots_ScheduleTemplateId']
+    (ScheduleTemplateId, Date, StartTime, EndTime) [unique, name: 'UX_AppointmentSlots_Template_Date_Time']
+  }
+}
+
+Table Appointment {
+  Id uuid [pk]
+  PatientId uuid [not null]
+  AppointmentSlotId uuid [not null]
+  OrganisationId uuid
+  DoctorId uuid
+  ConsultationSessionId uuid
+
+  indexes {
+    (PatientId, AppointmentSlotId) [unique, name: 'UX_Appointments_Patient_Slot']
+  }
+}
+
+Table WebsiteFeedback {
+  Id uuid [pk]
+  PatientId uuid [not null]
+}
+
+Table OrganisationFeedback {
+  Id uuid [pk]
+  PatientId uuid [not null]
+  OrganisationId uuid [not null]
+  AppointmentId uuid [not null]
+
+  indexes {
+    (PatientId, AppointmentId) [unique, name: 'UX_OrganisationFeedback_Patient_Appointment']
+  }
+}
+
+Table OphthalmologistFeedback {
+  Id uuid [pk]
+  PatientId uuid [not null]
+  OphthalmologistId uuid [not null]
+  ConsultationSessionId uuid [not null]
+
+  indexes {
+    (PatientId, ConsultationSessionId) [unique, name: 'UX_OphthalmologistFeedback_Patient_Session']
+  }
+}
+
+Table OphthalmologistLeaveRequest {
+  Id uuid [pk]
+  OphthalmologistId uuid [not null]
+}
+
+Table OphthalmologistEmploymentTypeChangeRequest {
+  Id uuid [pk]
+  OphthalmologistId uuid [not null]
+}
+
+Table AspNetUsers {
+  Id uuid [pk]
+}
+
+Table AspNetRoles {
+  Id uuid [pk]
+}
+
+Table RefreshToken {
+  Id uuid [pk]
+  UserId uuid [not null]
+}
+
+Table Permission {
+  Id uuid [pk]
+  Name varchar [not null, unique]
+}
+
+Table RolePermission {
+  Id uuid [pk]
+  RoleId uuid [not null]
+  PermissionId uuid [not null]
+
+  indexes {
+    (RoleId, PermissionId) [unique, name: 'UX_RolePermission_Role_Permission']
+  }
+}
+
+Table UserPermission {
+  Id uuid [pk]
+  UserId uuid [not null, note: 'Logical reference to AspNetUsers.Id, no DB FK']
+  PermissionId uuid [not null]
+
+  indexes {
+    (UserId, PermissionId) [unique, name: 'UX_UserPermission_User_Permission']
+  }
+}
+
+Table Wallet {
+  Id uuid [pk]
+  UserId uuid [unique, note: 'Logical reference to AspNetUsers.Id, no DB FK']
+}
+
+Table WalletTransaction {
+  Id uuid [pk]
+  WalletId uuid [not null]
+}
+
+Table DepositRequest {
+  Id uuid [pk]
+  WalletId uuid [not null]
+  UserId uuid [note: 'Logical reference to AspNetUsers.Id, no DB FK']
+}
+
+Table WithdrawalRequest {
+  Id uuid [pk]
+  WalletId uuid [not null]
+  UserId uuid [note: 'Logical reference to AspNetUsers.Id, no DB FK']
+}
+
+Table Orders {
+  Id uuid [pk]
+  UserId uuid [note: 'Logical reference to AspNetUsers.Id, no DB FK']
+}
+
+Table Payment {
+  Id uuid [pk]
+  OrderId uuid [not null]
+}
+
+Table ContractTemplate {
+  Id uuid [pk]
+}
+
+Table Contract {
+  Id uuid [pk]
+  TemplateId uuid [not null]
+  UserId uuid [note: 'Logical reference to AspNetUsers.Id, no DB FK']
+}
+
+Table Notification {
+  Id uuid [pk]
+  UserId uuid [note: 'Logical reference to AspNetUsers.Id, no DB FK']
+}
+
+Table AuditLog {
+  Id uuid [pk]
+  UserId uuid [note: 'Logical reference to AspNetUsers.Id, no DB FK']
+}
+
+Table SystemSetting {
+  Key varchar [pk]
+}
+
+Table ProfessionalPost {
+  Id uuid [pk]
+  AuthorId uuid [note: 'Logical reference to AspNetUsers/Profile, no DB FK']
+  OrganisationId uuid [note: 'Logical reference to Organisation.Id, no DB FK']
+  OriginalPostId uuid
+  ConsultationSessionId uuid [note: 'Logical reference to ConsultationSession.Id, no DB FK']
+  AiScreeningId uuid [note: 'Logical reference to AiScreening.Id, no DB FK']
+}
+
+Table PostReaction {
+  Id uuid [pk]
+  PostId uuid [not null]
+  UserId uuid [not null, note: 'Logical reference to AspNetUsers.Id, no DB FK']
+
+  indexes {
+    (PostId, UserId) [unique, name: 'UX_PostReaction_Post_User']
+  }
+}
+
+Table PostComment {
+  Id uuid [pk]
+  PostId uuid [not null]
+  AuthorId uuid [not null, note: 'Logical reference to AspNetUsers/Profile, no DB FK']
+  ParentCommentId uuid
+}
+
+Table PostAttachment {
+  Id uuid [pk]
+  PostId uuid [not null]
+}
+
+Table SavedPost {
+  Id uuid [pk]
+  PostId uuid [not null]
+  UserId uuid [not null, note: 'Logical reference to AspNetUsers.Id, no DB FK']
+
+  indexes {
+    (UserId, PostId) [unique, name: 'UX_SavedPost_User_Post']
+  }
+}
+
+Ref: OrganisationPatientLink.OrganisationId > Organisation.Id
+Ref: OrganisationPatientLink.PatientId > Patient.Id
+Ref: Certificate.OphthalmologistId > Ophthalmologist.Id
+Ref: AiScreening.PatientId > Patient.Id
+Ref: AiScreening.OrganisationId > Organisation.Id
+Ref: RetinalImage.PatientId > Patient.Id
+Ref: RetinalImage.AiScreeningId > AiScreening.Id
+Ref: ScreeningResult.AiScreeningId > AiScreening.Id
+Ref: Consent.AiScreeningId > AiScreening.Id
+Ref: Consent.PatientId > Patient.Id
+Ref: ConsultationSession.PatientId > Patient.Id
+Ref: ConsultationSession.OphthalmologistId > Ophthalmologist.Id
+Ref: ConsultationSession.OrganisationId > Organisation.Id
+Ref: ConsultationSession.AiScreeningId > AiScreening.Id
+Ref: ConsultationSession.AppointmentSlotId > AppointmentSlot.Id
+Ref: Conversation.OphthalmologistId > Ophthalmologist.Id
+Ref: Conversation.ConsultationSessionId > ConsultationSession.Id
+Ref: ChatMessage.ConversationId > Conversation.Id
+Ref: MedicalDiagnosis.AiScreeningId > AiScreening.Id
+Ref: MedicalDiagnosis.ConsultationSessionId > ConsultationSession.Id
+Ref: PatientRoadmap.PatientId > Patient.Id
+Ref: PatientRoadmap.MedicalDiagnosisId > MedicalDiagnosis.Id
+Ref: AppointmentSlot.ScheduleTemplateId > ScheduleTemplate.Id
+Ref: Appointment.PatientId > Patient.Id
+Ref: Appointment.AppointmentSlotId > AppointmentSlot.Id
+Ref: Appointment.OrganisationId > Organisation.Id
+Ref: Appointment.DoctorId > Ophthalmologist.Id
+Ref: Appointment.ConsultationSessionId > ConsultationSession.Id
+Ref: WebsiteFeedback.PatientId > Patient.Id
+Ref: OrganisationFeedback.PatientId > Patient.Id
+Ref: OrganisationFeedback.OrganisationId > Organisation.Id
+Ref: OrganisationFeedback.AppointmentId > Appointment.Id
+Ref: OphthalmologistFeedback.PatientId > Patient.Id
+Ref: OphthalmologistFeedback.OphthalmologistId > Ophthalmologist.Id
+Ref: OphthalmologistFeedback.ConsultationSessionId > ConsultationSession.Id
+Ref: OphthalmologistLeaveRequest.OphthalmologistId > Ophthalmologist.Id
+Ref: OphthalmologistEmploymentTypeChangeRequest.OphthalmologistId > Ophthalmologist.Id
+Ref: RefreshToken.UserId > AspNetUsers.Id
+Ref: RolePermission.RoleId > AspNetRoles.Id
+Ref: RolePermission.PermissionId > Permission.Id
+Ref: UserPermission.PermissionId > Permission.Id
+Ref: WalletTransaction.WalletId > Wallet.Id
+Ref: DepositRequest.WalletId > Wallet.Id
+Ref: WithdrawalRequest.WalletId > Wallet.Id
+Ref: Payment.OrderId > Orders.Id
+Ref: Contract.TemplateId > ContractTemplate.Id
+Ref: ProfessionalPost.OriginalPostId > ProfessionalPost.Id
+Ref: PostReaction.PostId > ProfessionalPost.Id
+Ref: PostComment.PostId > ProfessionalPost.Id
+Ref: PostComment.ParentCommentId > PostComment.Id
+Ref: PostAttachment.PostId > ProfessionalPost.Id
+Ref: SavedPost.PostId > ProfessionalPost.Id

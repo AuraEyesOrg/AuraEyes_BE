@@ -254,7 +254,7 @@ public class ConsultationStateWorker : BackgroundService
         {
             if (!session.OphthalmologistId.HasValue)
             {
-                session.CompleteBySystem("ClinicFollowupWindowExpired");
+                session.CompleteBySystem();
                 await sessionRepo.UpdateAsync(session, cancellationToken);
                 closedSessions.Add((session.Id, session.PatientId, session.OphthalmologistId));
                 continue;

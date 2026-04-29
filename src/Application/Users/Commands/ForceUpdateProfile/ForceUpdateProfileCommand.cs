@@ -19,7 +19,6 @@ public record ForceUpdateProfileCommand : ICommand<bool>
 
     // Ophthalmologist specific
     public string? Bio { get; init; }
-    public int? YearsOfExperience { get; init; }
     public decimal? ConsultationFee { get; init; }
 
     // Clinic Staff specific

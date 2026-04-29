@@ -129,8 +129,7 @@ public class GetConsultationSessionsQueryHandler
                  (hasCurrentProfile &&
                   s.OphthalmologistId == currentProfile &&
                   (s.Type == Domain.Enums.ConsultationSessionType.Verification ||
-                   s.Type == Domain.Enums.ConsultationSessionType.ClinicBooking)) ||
-                 s.IsAIResultShared))
+                   s.Type == Domain.Enums.ConsultationSessionType.ClinicBooking))))
             .Select(s => s.AiScreeningId!.Value)
             .Distinct()
             .ToList();
@@ -160,7 +159,7 @@ public class GetConsultationSessionsQueryHandler
                 (session.Type == Domain.Enums.ConsultationSessionType.Verification ||
                  session.Type == Domain.Enums.ConsultationSessionType.ClinicBooking);
 
-            var canViewAi = canAlwaysViewAi || isPatient || isAssignedDoctorOnInternalSession || session.IsAIResultShared;
+            var canViewAi = canAlwaysViewAi || isPatient || isAssignedDoctorOnInternalSession;
             if (!canViewAi) continue;
 
             if (!screeningMap.TryGetValue(session.AiScreeningId.Value, out var screening)) continue;

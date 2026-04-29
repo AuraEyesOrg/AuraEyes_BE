@@ -27,7 +27,9 @@ public static class Policies
     /// <summary>Requires medical staff role (Patient or Ophthalmologist).</summary>
     public const string MedicalStaff = nameof(MedicalStaff);
 
-    /// <summary>Requires verified Ophthalmologist (IsVerified claim = True).</summary>
+    /// <summary>
+    /// Requires the user to have the Ophthalmologist role.
+    /// </summary>
     public const string VerifiedOphthalmologist = nameof(VerifiedOphthalmologist);
 
     /// <summary>Requires Ophthalmologist or ClinicStaff role — all clinic team members.</summary>

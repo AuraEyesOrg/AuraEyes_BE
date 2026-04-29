@@ -24,7 +24,6 @@ public interface IOphthalmologistRepository : IRepository<Ophthalmologist>
     /// </summary>
     Task<(IReadOnlyList<Ophthalmologist> Items, int TotalCount)> GetPagedAsync(
         string? searchTerm = null,
-        bool? isVerified = null,
         int pageNumber = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default);
@@ -33,11 +32,6 @@ public interface IOphthalmologistRepository : IRepository<Ophthalmologist>
     /// Check if ophthalmologist exists for a specific user.
     /// </summary>
     Task<bool> ExistsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Get all verified ophthalmologists.
-    /// </summary>
-    Task<IReadOnlyList<Ophthalmologist>> GetVerifiedAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get display names keyed by ophthalmologist ID.

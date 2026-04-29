@@ -10,8 +10,6 @@ public class UserProfileDto
     public string? AvatarUrl { get; set; }
     public string? Bio { get; set; }
     public int PostCount { get; set; }
-    public int YearsOfExperience { get; set; }
-    public bool IsVerified { get; set; }
     public List<UserProfileCertificateDto> Certificates { get; set; } = new();
 }
 

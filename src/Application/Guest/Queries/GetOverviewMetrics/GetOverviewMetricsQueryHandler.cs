@@ -27,9 +27,7 @@ public class GetOverviewMetricsQueryHandler : IQueryHandler<GetOverviewMetricsQu
     public async Task<Result<GuestOverviewMetricsDto>> Handle(GetOverviewMetricsQuery request, CancellationToken cancellationToken)
     {
         // Run sequentially to avoid parallel operations on the same scoped DbContext instance.
-        var ophthalmologistCount = await _ophthalmologistRepository.CountAsync(
-            x => x.IsVerified == true,
-            cancellationToken);
+        var ophthalmologistCount = await _ophthalmologistRepository.CountAsync(cancellationToken: cancellationToken);
 
         var screeningCount = await _aiScreeningRepository.CountAsync(cancellationToken: cancellationToken);
 

@@ -47,7 +47,7 @@ public class FullTimeSlotGenerationJob
 
         // Fetch doctors once for clinic-wide templates
         var doctors = await _context.Ophthalmologists
-            .Where(o => o.VerificationStatus != VerificationStatus.Rejected && !o.IsDeleted)
+            .Where(o => !o.IsDeleted)
             .ToListAsync(cancellationToken);
 
         var createdSlots = 0;
@@ -124,8 +124,7 @@ public class FullTimeSlotGenerationJob
                                         currentDate,
                                         slotStart,
                                         slotEnd,
-                                        1,
-                                        SlotSource.System);
+                                        1);
                                     
                                     slot.UpdateOphthalId(doctor.Id);
                                     var cost = doctor.ConsultationFee > 0 ? doctor.ConsultationFee : (template.Cost ?? 0);
@@ -147,8 +146,7 @@ public class FullTimeSlotGenerationJob
                                     currentDate,
                                     slotStart,
                                     slotEnd,
-                                    template.MaxCapacity,
-                                    SlotSource.System));
+                                    template.MaxCapacity));
 
                                 createdSlots++;
                             }

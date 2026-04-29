@@ -28,7 +28,6 @@ public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologists
     {
         var (items, totalCount) = await _ophthalmologistRepository.GetPagedAsync(
             request.SearchTerm,
-            request.IsVerified,
             request.PageNumber,
             request.PageSize,
             cancellationToken);
@@ -47,8 +46,6 @@ public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologists
                 UserEmail = user?.Email,
                 UserAvatarUrl = user?.AvatarUrl,
                 Bio = ophthalmologist.Bio,
-                YearsOfExperience = ophthalmologist.YearsOfExperience,
-                IsVerified = ophthalmologist.IsVerified,
                 CertificateCount = ophthalmologist.Certificates.Count,
                 CreatedAt = ophthalmologist.CreatedAt,
                 LicenseUrl = ophthalmologist.LicenseUrl,

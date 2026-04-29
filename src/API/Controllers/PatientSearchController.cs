@@ -46,7 +46,6 @@ public class PatientSearchController : BaseApiController
         var query = new GetOphthalmologistsQuery
         {
             SearchTerm = searchTerm,
-            IsVerified = true,
             PageNumber = pageNumber,
             PageSize = pageSize
         };

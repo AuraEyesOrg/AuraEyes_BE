@@ -21,26 +21,20 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
     private static readonly TimeSpan CancellationCutoff = TimeSpan.FromHours(3);
 
     private readonly IConsultationSessionRepository _sessionRepository;
-    private readonly IAppointmentSlotRepository _slotRepository;
     private readonly IRepository<Patient> _patientRepository;
-    private readonly IGoogleMeetService _googleMeetService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<CancelSessionCommandHandler> _logger;
 
     public CancelSessionCommandHandler(
         IConsultationSessionRepository sessionRepository,
-        IAppointmentSlotRepository slotRepository,
         IRepository<Patient> patientRepository,
-        IGoogleMeetService googleMeetService,
         IUnitOfWork unitOfWork,
         ICurrentUserService currentUserService,
         ILogger<CancelSessionCommandHandler> logger)
     {
         _sessionRepository = sessionRepository;
-        _slotRepository = slotRepository;
         _patientRepository = patientRepository;
-        _googleMeetService = googleMeetService;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
         _logger = logger;
@@ -103,53 +97,7 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
         try
         {
             // ── 4. Cancel the session ──
-            var reason = request.Reason ?? (isCancelledByDoctor ? "DoctorCancelled" : "PatientCancelled");
-            session.Cancel(cancelledByProfileId, reason);
-
-            // ── 5. Delete Google Meet event ──
-            if (!string.IsNullOrEmpty(session.CalendarEventId))
-            {
-                try
-                {
-                    await _googleMeetService.DeleteMeetingAsync(session.CalendarEventId, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex,
-                        "Failed to delete calendar event {CalendarEventId} for session {SessionId}.",
-                        session.CalendarEventId, session.Id);
-                }
-                session.ClearMeetingInfo();
-            }
-
-            // ── 6. Slot: burn (doctor) or release (patient) ──
-            if (session.AppointmentSlotId.HasValue)
-            {
-                var slot = await _slotRepository.GetByIdWithLockAsync(
-                    session.AppointmentSlotId.Value, cancellationToken);
-
-                if (slot is not null && slot.BookedCount > 0)
-                {
-                    if (isCancelledByDoctor)
-                    {
-                        slot.CancelBooking(); // Release back to Available first to allow cancellation
-                        if (slot.BookedCount == 0) 
-                        {
-                            slot.Block(); // "Burn" the slot — Blocked, no rebooking
-                        }
-                        _logger.LogInformation(
-                            "Slot {SlotId} burned/released (doctor-cancelled session {SessionId}).",
-                            slot.Id, session.Id);
-                    }
-                    else
-                    {
-                        slot.CancelBooking(); // Release back to Available
-                        _logger.LogInformation(
-                            "Slot {SlotId} released back to Available (patient-cancelled session {SessionId}).",
-                            slot.Id, session.Id);
-                    }
-                }
-            }
+            session.Cancel();
 
             await _sessionRepository.UpdateAsync(session, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);

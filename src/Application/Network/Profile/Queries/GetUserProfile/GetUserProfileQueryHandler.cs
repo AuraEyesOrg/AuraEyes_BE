@@ -51,8 +51,6 @@ public class GetUserProfileQueryHandler : IQueryHandler<GetUserProfileQuery, Use
             AvatarUrl = user.AvatarUrl,
             Bio = bio,
             PostCount = postCount,
-            YearsOfExperience = ophthalmologist?.YearsOfExperience ?? 0,
-            IsVerified = ophthalmologist?.IsVerified ?? false,
             Certificates = ophthalmologist?.Certificates
                 .Select(c => new UserProfileCertificateDto
                 {

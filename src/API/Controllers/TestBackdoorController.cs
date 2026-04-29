@@ -245,11 +245,7 @@ public class TestBackdoorController : ControllerBase
 
         if (roles.Contains(Roles.Ophthalmologist))
         {
-            if (result.Data.IsVerified.HasValue)
-                claims.Add(new Claim("IsVerified", result.Data.IsVerified.Value.ToString()));
-
-            if (!string.IsNullOrWhiteSpace(result.Data.VerificationStatus))
-                claims.Add(new Claim("verification_status", result.Data.VerificationStatus));
+            // No verification status claims
         }
 
         // Add granular permissions

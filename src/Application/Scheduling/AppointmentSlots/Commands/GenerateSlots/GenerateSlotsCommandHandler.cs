@@ -98,27 +98,16 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
             currentDate = currentDate.AddDays(1);
         }
 
-        // Get verified doctors if it's a general clinic template
-        IReadOnlyList<Ophthalmologist>? doctors = null;
+        // Get verified doctors for clinic-level slot generation
         var doctorLeaves = new Dictionary<Guid, List<OphthalmologistLeaveRequest>>();
 
-        if (template.OphthalId.HasValue)
+        var doctors = await _ophthalmologistRepository.GetAllAsync(cancellationToken);
+
+        foreach (var doc in doctors)
         {
             var leaves = await _leaveRequestRepository.GetApprovedOverlappingAsync(
-                template.OphthalId.Value, request.FromDate, request.ToDate, cancellationToken);
-            doctorLeaves[template.OphthalId.Value] = leaves.ToList();
-        }
-        else
-        {
-            var allDoctors = await _ophthalmologistRepository.GetAllAsync(cancellationToken);
-            doctors = allDoctors.Where(d => d.VerificationStatus != VerificationStatus.Rejected).ToList();
-            
-            foreach (var doc in doctors)
-            {
-                var leaves = await _leaveRequestRepository.GetApprovedOverlappingAsync(
-                    doc.Id, request.FromDate, request.ToDate, cancellationToken);
-                doctorLeaves[doc.Id] = leaves.ToList();
-            }
+                doc.Id, request.FromDate, request.ToDate, cancellationToken);
+            doctorLeaves[doc.Id] = leaves.ToList();
         }
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
@@ -131,27 +120,7 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
             {
                 foreach (var timeWindow in kvp.Value)
                 {
-                    if (template.OphthalId.HasValue)
-                    {
-                        var docId = template.OphthalId.Value;
-                        var isOnLeave = doctorLeaves[docId].Any(l => l.Overlaps(kvp.Key, kvp.Key));
-
-                        if (!isOnLeave)
-                        {
-                            var slot = new AppointmentSlot(
-                                template.Id,
-                                kvp.Key,
-                                timeWindow.Start,
-                                timeWindow.End,
-                                template.MaxCapacity,
-                                SlotSource.System);
-                            
-                            slot.UpdateOphthalId(docId);
-                            await _appointmentSlotRepository.AddAsync(slot, cancellationToken);
-                            slotsCreated++;
-                        }
-                    }
-                    else if (doctors != null && doctors.Any())
+                    if (doctors != null && doctors.Any())
                     {
                         foreach (var doctor in doctors)
                         {
@@ -164,8 +133,7 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
                                     kvp.Key,
                                     timeWindow.Start,
                                     timeWindow.End,
-                                    1, // Max capacity 1 per doctor
-                                    SlotSource.System);
+                                    1); // Max capacity 1 per doctor
                                 
                                 slot.UpdateOphthalId(doctor.Id);
                                 
@@ -188,8 +156,7 @@ public class GenerateSlotsCommandHandler : ICommandHandler<GenerateSlotsCommand,
                             kvp.Key,
                             timeWindow.Start,
                             timeWindow.End,
-                            template.MaxCapacity,
-                            SlotSource.System);
+                            template.MaxCapacity);
 
                         await _appointmentSlotRepository.AddAsync(slot, cancellationToken);
                         slotsCreated++;

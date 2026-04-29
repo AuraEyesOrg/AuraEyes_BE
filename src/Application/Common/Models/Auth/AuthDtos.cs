@@ -99,17 +99,8 @@ public class RegisterOphthalmologistRequest
 
     public string? Bio { get; set; }
 
-    [Range(0, 70)]
-    public int YearsOfExperience { get; set; }
-
     [Required]
     public OphthalmologistEmploymentType EmploymentType { get; set; } = OphthalmologistEmploymentType.FullTime;
-
-    [Range(1, 112)]
-    public int? WorkingHoursPerWeek { get; set; }
-
-    [Range(typeof(decimal), "0", "999999999")]
-    public decimal? ExpectedMonthlySalary { get; set; }
 
     /// <summary>
     /// Unified credentials list for both degrees and licenses/certificates.
@@ -239,18 +230,6 @@ public record UserInfoResponse
     /// Indicates if 2FA is enabled for this user.
     /// </summary>
     public bool TwoFactorEnabled { get; init; }
-
-    /// <summary>
-    /// Indicates if the ophthalmologist's credentials have been verified.
-    /// Null for non-ophthalmologist roles.
-    /// </summary>
-    public bool? IsVerified { get; init; }
-
-    /// <summary>
-    /// Ophthalmologist verification status (PendingVerification, Approved, Rejected).
-    /// Null for non-ophthalmologist roles.
-    /// </summary>
-    public string? VerificationStatus { get; init; }
 
     /// <summary>
     /// Indicates whether the user must update their profile information before accessing protected features.

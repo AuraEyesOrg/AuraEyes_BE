@@ -141,8 +141,7 @@ public class DashboardMetricsService : IDashboardMetricsService
         var monthlyNewDoctorCounts = Enumerable.Range(1, 12).Select(m => doctorMonthMap.GetValueOrDefault(m, 0)).ToList();
         var monthlyNewPatientCounts = Enumerable.Range(1, 12).Select(m => patientMonthMap.GetValueOrDefault(m, 0)).ToList();
 
-        var pendingDoctorVerifications = await _context.Ophthalmologists
-            .CountAsync(o => o.VerificationStatus == VerificationStatus.PendingVerification, cancellationToken);
+        var pendingDoctorVerifications = 0;
 
         var liveConsultations = await _context.ConsultationSessions
             .CountAsync(

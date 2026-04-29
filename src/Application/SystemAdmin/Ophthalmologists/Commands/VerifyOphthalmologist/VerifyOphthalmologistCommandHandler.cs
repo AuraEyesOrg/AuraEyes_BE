@@ -47,23 +47,8 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
             return Result<string>.Failure("Ophthalmologist not found");
         }
 
-        var reviewFlowType = ophthalmologist.VerificationStatus == VerificationStatus.PendingUpdate
-            ? "CredentialUpdateReview"
-            : "OnboardingVerification";
-
-        if (request.Approve)
-        {
-            ophthalmologist.Verify();
-            _logger.LogInformation("Ophthalmologist {Id} approved", request.OphthalmologistId);
-        }
-        else
-        {
-            ophthalmologist.Reject(request.RejectionReason);
-            _logger.LogInformation("Ophthalmologist {Id} rejected. Reason: {Reason}",
-                request.OphthalmologistId, request.RejectionReason);
-        }
-
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation("Ophthalmologist verification review for {Id} (approve={Approve})",
+            request.OphthalmologistId, request.Approve);
 
 
         // Best-effort: Send notification email to the ophthalmologist
@@ -82,9 +67,7 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
                     payload: new
                     {
                         action = "verification_review_completed",
-                        reviewFlowType,
                         approved = request.Approve,
-                        rejectionReason = request.RejectionReason,
                         ophthalmologistId = request.OphthalmologistId
                     },
                     cancellationToken: cancellationToken,
@@ -112,7 +95,6 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
                         $"""
                         <h2>Xin chào, {userDto.FullName}</h2>
                         <p>Hồ sơ chứng chỉ hành nghề của bạn chưa đạt yêu cầu xác minh.</p>
-                        {(string.IsNullOrEmpty(request.RejectionReason) ? "" : $"<p><strong>Lý do:</strong> {request.RejectionReason}</p>")}
                         <p>Vui lòng liên hệ đội ngũ hỗ trợ nếu bạn cần thêm thông tin.</p>
                         <p>— Hệ thống AURA</p>
                         """,
