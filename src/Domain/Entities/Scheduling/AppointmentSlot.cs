@@ -30,17 +30,11 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     /// <summary>The cost/fee for this specific slot.</summary>
     public decimal? Cost { get; private set; }
 
-    /// <summary>Optional timestamp for when a temporary reservation expires.</summary>
-    public DateTime? ReservationExpireAt { get; private set; }
-
     /// <summary>Slot creation source (staff or system).</summary>
     public int MaxCapacity { get; private set; }
 
     /// <summary>Number of patients currently booked in this slot.</summary>
     public int BookedCount { get; private set; }
-
-    /// <summary>Slot creation source (staff or system).</summary>
-    public SlotSource Source { get; private set; }
 
     /// <summary>Navigation property to the template.</summary>
     public ScheduleTemplate? ScheduleTemplate { get; private set; }
@@ -60,8 +54,7 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
         DateOnly date,
         TimeOnly startTime,
         TimeOnly endTime,
-        int maxCapacity = 1,
-        SlotSource source = SlotSource.Doctor)
+        int maxCapacity = 1)
     {
         if (endTime <= startTime)
             throw new ArgumentException("End time must be after start time");
@@ -73,7 +66,6 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
         StartTime = startTime;
         EndTime = endTime;
         MaxCapacity = maxCapacity;
-        Source = source;
         Status = ScheduleStatus.Available;
         BookedCount = 0;
     }
@@ -182,9 +174,4 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void UpdateReservationExpireAt(DateTime? reservationExpireAt)
-    {
-        ReservationExpireAt = reservationExpireAt;
-        UpdatedAt = DateTime.UtcNow;
-    }
 }

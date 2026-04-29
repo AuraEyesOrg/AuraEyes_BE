@@ -217,8 +217,7 @@ public static class DatabaseSeeder
             {
                 var ophthalmologist = new Ophthalmologist(
                     userId: ophthalmologistUser.Id,
-                    bio: "BÃ¡c sÄ© chuyÃªn khoa máº¯t vá»›i kinh nghiá»‡m trong lÄ©nh vá»±c sÃ ng lá» c bá»‡nh vÃµng máº¡c.",
-                    yearsOfExperience: 5,
+                    bio: "Bác sĩ chuyên khoa mắt với kinh nghiệm trong lĩnh vực sàng lọc bệnh võng mạc.",
                     phone: "+84123456789",
                     licenseUrl: null,
                     degreeUrl: null

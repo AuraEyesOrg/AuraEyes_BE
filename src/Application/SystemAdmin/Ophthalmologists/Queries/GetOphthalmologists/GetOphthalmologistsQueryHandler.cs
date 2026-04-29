@@ -24,7 +24,6 @@ public class GetOphthalmologistsQueryHandler
     {
         var result = await _queryService.GetOphthalmologistsAsync(
             request.SearchTerm,
-            request.VerificationStatus,
             request.PageNumber,
             request.PageSize,
             cancellationToken);

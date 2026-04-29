@@ -40,24 +40,9 @@ public record UpdateOphthalmologistCommand : ICommand
     public string? Bio { get; init; }
 
     /// <summary>
-    /// Updated years of experience.
-    /// </summary>
-    public int YearsOfExperience { get; init; }
-
-    /// <summary>
     /// Optional employment type update.
     /// </summary>
     public OphthalmologistEmploymentType? EmploymentType { get; init; }
-
-    /// <summary>
-    /// Optional working hours per week update.
-    /// </summary>
-    public int? WorkingHoursPerWeek { get; init; }
-
-    /// <summary>
-    /// Optional expected monthly salary update.
-    /// </summary>
-    public decimal? ExpectedMonthlySalary { get; init; }
 
     /// <summary>
     /// Optional consultation fee update.

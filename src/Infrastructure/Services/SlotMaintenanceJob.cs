@@ -53,17 +53,7 @@ public class SlotMaintenanceJob
                 localDate,
                 localTime);
 
-            // 1. Clear expired temporary reservations (stored in UTC, compared in UTC).
-            var expiredReservationCount = await _context.AppointmentSlots
-                .Where(slot =>
-                    slot.ReservationExpireAt != null &&
-                    slot.ReservationExpireAt < utcNow)
-                .ExecuteUpdateAsync(updates => updates
-                    .SetProperty(slot => slot.ReservationExpireAt, (DateTime?)null)
-                    .SetProperty(slot => slot.UpdatedAt, utcNow),
-                    cancellationToken);
-
-            // 2. Block past slots (Date/StartTime stored in local VN time, compare with local time).
+            // Block past slots (Date/StartTime stored in local VN time, compare with local time).
             var expiredCount = await _context.AppointmentSlots
                 .Where(slot =>
                     slot.Status == ScheduleStatus.Available &&
@@ -75,9 +65,8 @@ public class SlotMaintenanceJob
                     cancellationToken);
 
             _logger.LogInformation(
-                "Slot expiration maintenance completed. Blocked {ExpiredCount} past slot(s). Cleared {ExpiredResCount} expired reservation(s).",
-                expiredCount,
-                expiredReservationCount);
+                "Slot expiration maintenance completed. Blocked {ExpiredCount} past slot(s).",
+                expiredCount);
 
             await _betterStackHeartbeat.NotifySucceededAsync(BetterStackMonitor.SlotMaintenance, cancellationToken);
         }

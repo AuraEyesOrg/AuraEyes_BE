@@ -394,30 +394,13 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("AiScreeningId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AppointmentSlotId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime?>("AppointmentTime")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CalendarEventId")
-                        .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
 
                     b.Property<string>("ChatStatus")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
-
-                    b.Property<DateTime?>("ClosedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ClosedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ClosingReason")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -428,30 +411,13 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime?>("EndTime")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool>("IsAIResultShared")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
                     b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("IsRetinalImagesShared")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
                     b.Property<DateTime>("LastActivityAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("LastReminderSentAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("MeetingLink")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
 
                     b.Property<Guid?>("OphthalmologistId")
                         .HasColumnType("uuid");
@@ -486,17 +452,15 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("AiScreeningId");
 
-                    b.HasIndex("AppointmentSlotId");
-
                     b.HasIndex("OphthalmologistId");
 
                     b.HasIndex("PatientId");
 
+                    b.HasIndex("Status", "ChatStatus", "LastActivityAt")
+                        .HasDatabaseName("IX_ConsultationSessions_StaleSessionLookup");
+
                     b.HasIndex("OphthalmologistId", "Status", "StartTime", "EndTime")
                         .HasDatabaseName("IX_ConsultationSessions_WorkloadLookup");
-
-                    b.HasIndex("Status", "ChatStatus", "LastActivityAt", "LastReminderSentAt")
-                        .HasDatabaseName("IX_ConsultationSessions_StaleSessionLookup");
 
                     b.ToTable("ConsultationSessions", null, t =>
                         {
@@ -653,6 +617,166 @@ namespace Infrastructure.Migrations
                     b.HasIndex("OrderId");
 
                     b.ToTable("Payments");
+                });
+
+            modelBuilder.Entity("Domain.Entities.MasterData.Country", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("IsoCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsoCode")
+                        .IsUnique();
+
+                    b.ToTable("Countries");
+                });
+
+            modelBuilder.Entity("Domain.Entities.MasterData.District", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Code")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("ProvinceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("ProvinceId");
+
+                    b.ToTable("Districts");
+                });
+
+            modelBuilder.Entity("Domain.Entities.MasterData.Province", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Code")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Provinces");
+                });
+
+            modelBuilder.Entity("Domain.Entities.MasterData.Ward", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Code")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("DistrictId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("DistrictId");
+
+                    b.ToTable("Wards");
                 });
 
             modelBuilder.Entity("Domain.Entities.MedicalRecords.MedicalRecord", b =>
@@ -1512,18 +1636,8 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("OphthalId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime?>("ReservationExpireAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<Guid>("ScheduleTemplateId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("Doctor");
 
                     b.Property<TimeOnly>("StartTime")
                         .HasColumnType("time without time zone");
@@ -1728,18 +1842,8 @@ namespace Infrastructure.Migrations
                     b.Property<int>("MaxCapacity")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("OphthalId")
-                        .HasColumnType("uuid");
-
                     b.Property<int>("SlotDuration")
                         .HasColumnType("integer");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasDefaultValue("Doctor");
 
                     b.Property<TimeOnly>("StartTime")
                         .HasColumnType("time without time zone");
@@ -2182,17 +2286,9 @@ namespace Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<decimal?>("ActualMonthlySalary")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
                     b.Property<string>("Bio")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
-
-                    b.Property<decimal?>("CommissionRate")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)");
 
                     b.Property<decimal>("ConsultationFee")
                         .ValueGeneratedOnAdd()
@@ -2217,16 +2313,7 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("FullTime");
 
-                    b.Property<decimal?>("ExpectedMonthlySalary")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
                     b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("IsVerified")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
@@ -2250,10 +2337,6 @@ namespace Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
 
-                    b.Property<string>("RejectionReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2262,21 +2345,6 @@ namespace Infrastructure.Migrations
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("VerificationStatus")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasDefaultValue("PendingVerification");
-
-                    b.Property<int?>("WorkingHoursPerWeek")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("YearsOfExperience")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
 
                     b.HasKey("Id");
 
@@ -2335,17 +2403,11 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<int>("PurchasedAiQuota")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("text");
-
-                    b.Property<int>("UsedAiQuota")
-                        .HasColumnType("integer");
 
                     b.Property<Guid?>("UserId")
                         .HasColumnType("uuid");
@@ -2793,11 +2855,6 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("AiScreeningId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Domain.Entities.Scheduling.AppointmentSlot", "AppointmentSlot")
-                        .WithMany()
-                        .HasForeignKey("AppointmentSlotId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("Domain.Entities.Users.Ophthalmologist", null)
                         .WithMany()
                         .HasForeignKey("OphthalmologistId")
@@ -2808,8 +2865,6 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("AppointmentSlot");
                 });
 
             modelBuilder.Entity("Domain.Entities.Consultation.Conversation", b =>
@@ -2834,6 +2889,28 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.Entities.MasterData.District", b =>
+                {
+                    b.HasOne("Domain.Entities.MasterData.Province", "Province")
+                        .WithMany("Districts")
+                        .HasForeignKey("ProvinceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Province");
+                });
+
+            modelBuilder.Entity("Domain.Entities.MasterData.Ward", b =>
+                {
+                    b.HasOne("Domain.Entities.MasterData.District", "District")
+                        .WithMany("Wards")
+                        .HasForeignKey("DistrictId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("District");
                 });
 
             modelBuilder.Entity("Domain.Entities.MedicalRecords.MedicalRecord", b =>
@@ -3157,6 +3234,16 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Entities.Financial.Order", b =>
                 {
                     b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("Domain.Entities.MasterData.District", b =>
+                {
+                    b.Navigation("Wards");
+                });
+
+            modelBuilder.Entity("Domain.Entities.MasterData.Province", b =>
+                {
+                    b.Navigation("Districts");
                 });
 
             modelBuilder.Entity("Domain.Entities.Network.InternalChat.InternalGroupChat", b =>

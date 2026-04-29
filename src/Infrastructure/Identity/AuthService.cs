@@ -259,11 +259,12 @@ public class AuthService : IAuthService
             string? degreeUrl = null;
 
             var ophthalmologist = new Ophthalmologist(
-                user.Id, request.Bio, request.YearsOfExperience,
-                request.Phone, licenseUrl, degreeUrl,
-                request.EmploymentType,
-                request.WorkingHoursPerWeek,
-                request.ExpectedMonthlySalary);
+                user.Id,
+                request.Bio,
+                request.Phone,
+                licenseUrl,
+                degreeUrl,
+                request.EmploymentType);
 
             foreach (var certificate in normalizedCredentials)
             {
@@ -345,10 +346,8 @@ public class AuthService : IAuthService
                             <ul>
                                 <li><strong>Name:</strong> {request.FullName}</li>
                                 <li><strong>Email:</strong> {request.Email}</li>
-                                <li><strong>Years of Experience:</strong> {request.YearsOfExperience}</li>
-                                <li><strong>Employment Type:</strong> {request.EmploymentType}</li>
-                                <li><strong>Working Hours / Week:</strong> {(request.WorkingHoursPerWeek?.ToString() ?? "N/A")}</li>
-                                <li><strong>Expected Salary:</strong> {(request.ExpectedMonthlySalary?.ToString("N0") ?? "N/A")}</li>
+                                <li><strong>Loại hình làm việc:</strong> {request.EmploymentType}</li>
+                                <li><strong>Giới thiệu:</strong> {request.Bio ?? "Không có"}</li>
                             </ul>
                             <p>Please review their submitted credentials (degrees and licenses/certificates) in the System Admin panel.</p>
                             <p>— AURA System</p>
@@ -655,19 +654,6 @@ public class AuthService : IAuthService
                 return Result<LoginResponse>.Unauthorized("Invalid email or password");
             }
 
-            // Check ophthalmologist verification status — reject if credentials were denied
-            var userRoles = await _userManager.GetRolesAsync(user);
-            if (userRoles.Contains(Roles.Ophthalmologist))
-            {
-                var doctors = await _ophthalmologistRepository.FindAsync(
-                    o => o.UserId == user.Id, cancellationToken);
-                if (doctors.Count > 0 && doctors[0].VerificationStatus == VerificationStatus.Rejected)
-                {
-                    return Result<LoginResponse>.Unauthorized(
-                        "Your credential verification has been rejected. Please contact support for more information.");
-                }
-            }
-
             // 2FA may be requested by SignInManager pre-check or enabled at user level.
             if (signInResult.RequiresTwoFactor || await _userManager.GetTwoFactorEnabledAsync(user))
             {
@@ -828,8 +814,6 @@ public class AuthService : IAuthService
 
         // Resolve role-specific profile entity
         Guid? roleId = null;
-        bool? isVerified = null;
-        string? verificationStatus = null;
         string? employmentType = null;
         string? staffSubRoles = null;
 
@@ -847,8 +831,6 @@ public class AuthService : IAuthService
             if (doctors.Count > 0)
             {
                 roleId = doctors[0].Id;
-                isVerified = doctors[0].IsVerified;
-                verificationStatus = doctors[0].VerificationStatus.ToString();
                 employmentType = doctors[0].EmploymentType.ToString();
             }
         }
@@ -884,8 +866,6 @@ public class AuthService : IAuthService
                 EmailConfirmed = user.EmailConfirmed,
                 RoleId = roleId,
                 TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
-                IsVerified = isVerified,
-                VerificationStatus = verificationStatus,
                 EmploymentType = employmentType,
                 StaffSubRoles = staffSubRoles,
                 Permissions = permissions.ToArray()
@@ -963,8 +943,6 @@ public class AuthService : IAuthService
 
             // Resolve role-specific profile entity
             Guid? roleId = null;
-            bool? isVerified = null;
-            string? verificationStatus = null;
             string? employmentType = null;
             string? staffSubRoles = null;
 
@@ -982,8 +960,6 @@ public class AuthService : IAuthService
                 if (doctors.Count > 0)
                 {
                     roleId = doctors[0].Id;
-                    isVerified = doctors[0].IsVerified;
-                    verificationStatus = doctors[0].VerificationStatus.ToString();
                     employmentType = doctors[0].EmploymentType.ToString();
                 }
             }
@@ -1019,8 +995,6 @@ public class AuthService : IAuthService
                     EmailConfirmed = user.EmailConfirmed,
                     RoleId = roleId,
                     TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
-                    IsVerified = isVerified,
-                    VerificationStatus = verificationStatus,
                     MustUpdateProfile = user.MustUpdateProfile,
                     EmploymentType = employmentType,
                     StaffSubRoles = staffSubRoles,
@@ -1213,8 +1187,6 @@ public class AuthService : IAuthService
 
             // Resolve role-specific profile entity
             Guid? roleId = null;
-            bool? isVerified = null;
-            string? verificationStatus = null;
             string? employmentType = null;
             string? staffSubRoles = null;
 
@@ -1232,8 +1204,6 @@ public class AuthService : IAuthService
                 if (doctors.Count > 0)
                 {
                     roleId = doctors[0].Id;
-                    isVerified = doctors[0].IsVerified;
-                    verificationStatus = doctors[0].VerificationStatus.ToString();
                     employmentType = doctors[0].EmploymentType.ToString();
                 }
             }
@@ -1260,8 +1230,6 @@ public class AuthService : IAuthService
                 EmailConfirmed = userDto.EmailConfirmed,
                 RoleId = roleId,
                 TwoFactorEnabled = twoFactorEnabled,
-                IsVerified = isVerified,
-                VerificationStatus = verificationStatus,
                 MustUpdateProfile = identityUser?.MustUpdateProfile ?? false,
                 EmploymentType = employmentType,
                 StaffSubRoles = staffSubRoles,
@@ -1319,8 +1287,6 @@ public class AuthService : IAuthService
             if (doctors.Count > 0)
             {
                 claims.Add(new Claim("profile_id", doctors[0].Id.ToString()));
-                claims.Add(new Claim("IsVerified", doctors[0].IsVerified.ToString()));
-                claims.Add(new Claim("verification_status", doctors[0].VerificationStatus.ToString()));
             }
         }
 
@@ -1333,12 +1299,9 @@ public class AuthService : IAuthService
         return claims;
     }
 
-    private async Task<(Guid? RoleId, bool? IsVerified, string? VerificationStatus)>
-        ResolveRoleContextAsync(Guid userId, IList<string> roles, CancellationToken cancellationToken)
+    private async Task<Guid?> ResolveRoleContextAsync(Guid userId, IList<string> roles, CancellationToken cancellationToken)
     {
         Guid? roleId = null;
-        bool? isVerified = null;
-        string? verificationStatus = null;
 
         if (roles.Contains(Roles.Patient))
         {
@@ -1360,13 +1323,11 @@ public class AuthService : IAuthService
             if (doctors.Count > 0)
             {
                 roleId = doctors[0].Id;
-                isVerified = doctors[0].IsVerified;
-                verificationStatus = doctors[0].VerificationStatus.ToString();
             }
         }
 
 
-        return (roleId, isVerified, verificationStatus);
+        return roleId;
     }
 
     private async Task<Result> LinkGoogleLoginAsync(ApplicationUser user, string providerKey)

@@ -231,6 +231,7 @@ public static class DependencyInjection
         services.AddHostedService<SessionReminderWorker>();
         services.AddHostedService<ConsultationStateWorker>();
 
+
         // Register Hangfire daily job
 
         services.AddScoped<SlotMaintenanceJob>();

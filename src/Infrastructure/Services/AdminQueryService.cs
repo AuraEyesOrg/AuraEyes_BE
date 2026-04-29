@@ -25,7 +25,6 @@ public class AdminQueryService : IAdminQueryService
 
     public async Task<PagedResult<OphthalmologistListDto>> GetOphthalmologistsAsync(
         string? searchTerm,
-        string? verificationStatus,
         int pageNumber,
         int pageSize,
         CancellationToken cancellationToken = default)
@@ -43,22 +42,6 @@ public class AdminQueryService : IAdminQueryService
                 (x.Ophthalmologist.Phone != null && EF.Functions.ILike(x.Ophthalmologist.Phone, term)));
         }
 
-        if (!string.IsNullOrWhiteSpace(verificationStatus))
-        {
-            var statusFilters = verificationStatus
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Select(value => Enum.TryParse<VerificationStatus>(value, true, out var parsed) ? parsed : (VerificationStatus?)null)
-                .Where(value => value.HasValue)
-                .Select(value => value!.Value)
-                .Distinct()
-                .ToList();
-
-            if (statusFilters.Count > 0)
-            {
-                query = query.Where(x => statusFilters.Contains(x.Ophthalmologist.VerificationStatus));
-            }
-        }
-
         var totalCount = await query.CountAsync(cancellationToken);
 
         var pageRows = await query
@@ -73,17 +56,9 @@ public class AdminQueryService : IAdminQueryService
                 Email = x.User.Email!,
                 Phone = x.Ophthalmologist.Phone,
                 Bio = x.Ophthalmologist.Bio,
-                YearsOfExperience = x.Ophthalmologist.YearsOfExperience,
                 EmploymentType = x.Ophthalmologist.EmploymentType.ToString(),
-                WorkingHoursPerWeek = x.Ophthalmologist.WorkingHoursPerWeek,
-                ExpectedMonthlySalary = x.Ophthalmologist.ExpectedMonthlySalary,
-                CommissionRate = x.Ophthalmologist.CommissionRate,
-                ActualMonthlySalary = x.Ophthalmologist.ActualMonthlySalary,
-                VerificationStatus = x.Ophthalmologist.VerificationStatus.ToString(),
-                IsVerified = x.Ophthalmologist.IsVerified,
                 LicenseUrl = x.Ophthalmologist.LicenseUrl,
                 DegreeUrl = x.Ophthalmologist.DegreeUrl,
-                RejectionReason = x.Ophthalmologist.RejectionReason,
                 IsActive = x.User.IsActive,
                 CreatedAt = x.Ophthalmologist.CreatedAt
             })
@@ -144,19 +119,11 @@ public class AdminQueryService : IAdminQueryService
                     Email = row.Email,
                     Phone = row.Phone,
                     Bio = row.Bio,
-                    YearsOfExperience = row.YearsOfExperience,
                     EmploymentType = row.EmploymentType,
-                    WorkingHoursPerWeek = row.WorkingHoursPerWeek,
-                    ExpectedMonthlySalary = row.ExpectedMonthlySalary,
-                    CommissionRate = row.CommissionRate,
-                    ActualMonthlySalary = row.ActualMonthlySalary,
-                    VerificationStatus = row.VerificationStatus,
-                    IsVerified = row.IsVerified,
                     LicenseUrl = row.LicenseUrl,
                     DegreeUrl = row.DegreeUrl,
                     Licenses = licenses,
                     Degrees = degrees,
-                    RejectionReason = row.RejectionReason,
                     OrganisationName = null,
                     IsActive = row.IsActive,
                     CreatedAt = row.CreatedAt

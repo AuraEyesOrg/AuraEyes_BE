@@ -423,6 +423,7 @@ using (var scope = app.Services.CreateScope())
             roleManager,
             builder.Configuration,
             seederLogger);
+
         Log.Information("Database seeding completed successfully");
     }
     catch (Exception ex)

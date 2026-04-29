@@ -15,7 +15,6 @@ public interface IAdminQueryService
 {
     Task<PagedResult<OphthalmologistListDto>> GetOphthalmologistsAsync(
         string? searchTerm,
-        string? verificationStatus,
         int pageNumber,
         int pageSize,
         CancellationToken cancellationToken = default);

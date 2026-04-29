@@ -29,7 +29,6 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
 
     public async Task<(IReadOnlyList<Ophthalmologist> Items, int TotalCount)> GetPagedAsync(
         string? searchTerm = null,
-        bool? isVerified = null,
         int pageNumber = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default)
@@ -38,24 +37,20 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
             .Include(o => o.Certificates)
             .AsQueryable();
 
-        // Apply verification filter
-        if (isVerified.HasValue)
-        {
-            query = query.Where(o => o.IsVerified == isVerified.Value);
-        }
-
-        // Note: searchTerm would typically search on User's FullName or Email
-        // This requires joining with ApplicationUser which is in a different table
-        // For now, we filter by Bio if searchTerm is provided
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
-            query = query.Where(o => o.Bio != null && o.Bio.Contains(searchTerm));
+            var lower = searchTerm.ToLower();
+            query = query
+                .Join(_context.Users, o => o.UserId, u => u.Id, (o, u) => new { o, u })
+                .Where(x => x.u.FullName.ToLower().Contains(lower) ||
+                            x.u.Email.ToLower().Contains(lower) ||
+                            x.o.Phone.ToLower().Contains(lower))
+                .Select(x => x.o);
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
-            .OrderByDescending(o => o.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -66,14 +61,6 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
     public async Task<bool> ExistsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbSet.AnyAsync(o => o.UserId == userId, cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<Ophthalmologist>> GetVerifiedAsync(CancellationToken cancellationToken = default)
-    {
-        return await _dbSet
-            .Where(o => o.IsVerified)
-            .OrderByDescending(o => o.YearsOfExperience)
-            .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyDictionary<Guid, string>> GetDisplayNamesByIdsAsync(

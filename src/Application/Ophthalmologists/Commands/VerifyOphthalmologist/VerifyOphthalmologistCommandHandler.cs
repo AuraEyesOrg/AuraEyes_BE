@@ -38,13 +38,6 @@ public class VerifyOphthalmologistCommandHandler : ICommandHandler<VerifyOphthal
             return Result.NotFound($"Ophthalmologist with ID '{request.Id}' was not found.");
         }
 
-        if (ophthalmologist.IsVerified)
-        {
-            return Result.Failure("Ophthalmologist is already verified.");
-        }
-
-        ophthalmologist.Verify();
-
         await _ophthalmologistRepository.UpdateAsync(ophthalmologist, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

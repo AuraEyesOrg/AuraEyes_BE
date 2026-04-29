@@ -16,24 +16,15 @@ namespace Application.ConsultationSessions.Commands.EndSession;
 public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
 {
     private readonly IConsultationSessionRepository _sessionRepository;
-    private readonly IAppointmentSlotRepository _slotRepository;
-    private readonly IOphthalmologistRepository _ophthalmologistRepository;
-    private readonly IRepository<Patient> _patientRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<EndSessionCommandHandler> _logger;
 
     public EndSessionCommandHandler(
         IConsultationSessionRepository sessionRepository,
-        IAppointmentSlotRepository slotRepository,
-        IOphthalmologistRepository ophthalmologistRepository,
-        IRepository<Patient> patientRepository,
         IUnitOfWork unitOfWork,
         ILogger<EndSessionCommandHandler> logger)
     {
         _sessionRepository = sessionRepository;
-        _slotRepository = slotRepository;
-        _ophthalmologistRepository = ophthalmologistRepository;
-        _patientRepository = patientRepository;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -54,22 +45,7 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
         try
         {
             // ── 1. Complete the session ──
-            var closingReason = string.IsNullOrWhiteSpace(request.Reason)
-                ? "DoctorFinished"
-                : request.Reason.Trim();
-            session.EndSession(request.DoctorId, closingReason);
-
-            // ── 2. Complete the linked slot ──
-            if (session.AppointmentSlotId.HasValue)
-            {
-                var slot = await _slotRepository.GetByIdWithLockAsync(
-                    session.AppointmentSlotId.Value, cancellationToken);
-
-                if (slot is not null && slot.BookedCount > 0)
-                {
-                    // Slot completion is now implicit based on time/visit.
-                }
-            }
+            session.EndSession(request.DoctorId);
 
             await _sessionRepository.UpdateAsync(session, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);

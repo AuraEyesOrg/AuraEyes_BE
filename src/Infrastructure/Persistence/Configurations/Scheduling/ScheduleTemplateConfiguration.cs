@@ -20,11 +20,6 @@ public class ScheduleTemplateConfiguration : IEntityTypeConfiguration<ScheduleTe
         builder.Property(e => e.MaxCapacity)
             .IsRequired();
 
-        builder.Property(e => e.Source)
-            .HasConversion<string>()
-            .HasMaxLength(30)
-            .HasDefaultValue(Domain.Enums.ScheduleTemplateSource.Doctor);
-
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 

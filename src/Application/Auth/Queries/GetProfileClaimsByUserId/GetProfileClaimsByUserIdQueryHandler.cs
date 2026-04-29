@@ -53,8 +53,6 @@ public class GetProfileClaimsByUserIdQueryHandler
             return Result<ProfileClaimsDto>.Success(new ProfileClaimsDto
             {
                 ProfileId = doctor.Id,
-                IsVerified = doctor.IsVerified,
-                VerificationStatus = doctor.VerificationStatus.ToString(),
             });
         }
 
