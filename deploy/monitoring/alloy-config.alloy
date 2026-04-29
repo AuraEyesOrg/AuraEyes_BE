@@ -1,30 +1,47 @@
-logging {
-  level  = "info"
-  format = "logfmt"
-}
-
-faro.receiver "default" {
+faro.receiver "integrations_faro" {
   server {
     listen_address = "0.0.0.0"
-    listen_port    = 12347
+    listen_port = 12347
     cors_allowed_origins = ["*"]
   }
-
   output {
-    logs    = [loki.write.faro_only.receiver]
-    traces  = [otelcol.exporter.otlp.tempo.input]
+    logs   = [loki.process.faro_logs.receiver]
+    traces = [otelcol.exporter.otlp.tempo.input]
   }
 }
 
-loki.write "faro_only" {
+loki.process "faro_logs" {
+  forward_to = [loki.write.grafana_loki.receiver]
+
+  // Bước 1: Thêm label tĩnh job="faro"
+  stage.static_labels {
+    values = {
+      "job" = "faro",
+    }
+  }
+
+  // Bước 2: Thử giải mã JSON từ Faro
+  stage.json {
+    expressions = {
+      "app" = "app",
+      "service_name" = "service.name",
+      "env" = "namespace",
+    }
+  }
+
+  // Bước 3: Áp dụng label trích xuất được
+  stage.labels {
+    values = {
+      "app" = "app",
+      "service_name" = "service_name",
+      "environment" = "env",
+    }
+  }
+}
+
+loki.write "grafana_loki" {
   endpoint {
     url = "http://loki:3100/loki/api/v1/push"
-  }
-  external_labels = {
-    "job"          = "faro",
-    "app"          = "auraeyes-frontend",
-    "service_name" = "auraeyes-frontend",
-    "environment"  = "production",
   }
 }
 

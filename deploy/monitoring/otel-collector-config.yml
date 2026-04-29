@@ -10,24 +10,31 @@ processors:
   batch:
     timeout: 1s
     send_batch_size: 1024
+  resourcedetection:
+    detectors: [env, system]
+  resource:
+    attributes:
+      - key: service.name
+        value: "auraeyes-api"
+        action: upsert
 
 exporters:
-  prometheus:
-    endpoint: 0.0.0.0:8889
-    resource_to_telemetry_conversion:
-      enabled: true
+  debug:
+    verbosity: basic
   otlp/tempo:
     endpoint: tempo:4317
     tls:
       insecure: true
+  prometheus:
+    endpoint: 0.0.0.0:8889
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
-      exporters: [otlp/tempo]
+      processors: [batch, resource]
+      exporters: [otlp/tempo, debug]
     metrics:
       receivers: [otlp]
-      processors: [batch]
-      exporters: [prometheus]
+      processors: [batch, resource]
+      exporters: [prometheus, debug]

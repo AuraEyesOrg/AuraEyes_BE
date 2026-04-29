@@ -1,5 +1,6 @@
 server:
   http_listen_port: 3200
+  grpc_listen_port: 9095
 
 distributor:
   receivers:
@@ -10,6 +11,18 @@ distributor:
         http:
           endpoint: 0.0.0.0:4318
 
+ingester:
+  lifecycler:
+    address: 127.0.0.1
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+    final_sleep: 0s
+  chunk_idle_period: 1m
+  max_chunk_age: 1h
+  chunk_retain_period: 30s
+
 storage:
   trace:
     backend: local
@@ -17,3 +30,6 @@ storage:
       path: /var/tempo/wal
     local:
       path: /var/tempo/blocks
+
+overrides:
+  metrics_generator_processors: [service-graphs, span-metrics]
