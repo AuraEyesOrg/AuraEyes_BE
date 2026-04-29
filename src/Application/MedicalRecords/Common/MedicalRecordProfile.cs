@@ -9,6 +9,8 @@ public class MedicalRecordProfile : Profile
     {
         CreateMap<MedicalRecord, MedicalRecordDto>()
             .ForMember(dest => dest.Status, opt => opt.MapFrom(src => MapStatus(src.Status)));
+
+        CreateMap<Domain.Entities.Users.Patient, PatientDto>();
     }
 
     private static string MapStatus(MedicalRecordStatus status)

@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Consultation;
+using Domain.Entities.MedicalRecords;
 using Domain.Entities.Scheduling;
 using Domain.Entities.Screening;
 using Domain.Enums;
@@ -91,6 +92,17 @@ public class GetClinicQueueQueryHandler
             : Array.Empty<UserDto>();
         var doctorNameByUserId = doctorUsers.ToDictionary(u => u.Id, u => u.FullName?.Trim() ?? string.Empty);
 
+        var patientUserIds = visits
+            .Where(v => v.Patient != null && v.Patient.UserId.HasValue)
+            .Select(v => v.Patient!.UserId!.Value)
+            .Distinct()
+            .ToList();
+
+        var patientUsers = patientUserIds.Count > 0
+            ? await _identityService.GetUsersByIdsAsync(patientUserIds, cancellationToken)
+            : Array.Empty<UserDto>();
+        var patientNameByUserId = patientUsers.ToDictionary(u => u.Id, u => u.FullName?.Trim() ?? "Unknown Patient");
+
         var queueItems = new List<ClinicQueueItemDto>();
 
         foreach (var visit in visits)
@@ -114,11 +126,27 @@ public class GetClinicQueueQueryHandler
                 ? doctorName
                 : null;
 
+            string patientName = "Unknown Patient";
+            if (visit.Patient != null)
+            {
+                if (visit.Patient.UserId.HasValue && patientNameByUserId.TryGetValue(visit.Patient.UserId.Value, out var name))
+                {
+                    patientName = name;
+                }
+                else if (visit.Patient.IsWalkIn && !string.IsNullOrWhiteSpace(visit.Patient.FullName))
+                {
+                    patientName = visit.Patient.FullName;
+                }
+            }
+
             var item = new ClinicQueueItemDto
             {
                 VisitId = visit.Id,
                 PatientId = visit.PatientId,
-                PatientName = visit.Patient?.FullName ?? "Unknown Patient",
+                PatientName = patientName,
+                PatientAge = visit.Patient != null ? CalculateAge(visit.Patient.DateOfBirth) : null,
+                PatientGender = visit.Patient != null ? ((Gender?)visit.Patient.GenderId)?.ToString() : null,
+                CitizenId = visit.Patient?.CitizenId,
                 AppointmentId = visit.AppointmentId,
                 VisitStatus = visit.Status.ToString(),
                 CheckedInAt = visit.CheckedInAt ?? DateTime.UtcNow,
@@ -130,6 +158,7 @@ public class GetClinicQueueQueryHandler
                 AssignedDoctorId = visit.AssignedDoctorId ?? consultation?.OphthalmologistId,
                 AssignedDoctorName = assignedDoctorName,
                 MedicalRecordId = visit.MedicalRecord?.Id,
+                IsAdminCompleted = visit.MedicalRecord != null && visit.MedicalRecord.Status != MedicalRecordStatus.DraftAdmin,
 
                 FlowState = DetermineFlowState(visit, screening, consultation)
             };
@@ -138,6 +167,15 @@ public class GetClinicQueueQueryHandler
         }
 
         return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(queueItems);
+    }
+
+    private static int? CalculateAge(DateTime? dob)
+    {
+        if (!dob.HasValue) return null;
+        var today = DateTime.UtcNow;
+        var age = today.Year - dob.Value.Year;
+        if (dob.Value.Date > today.AddYears(-age)) age--;
+        return age;
     }
 
     private static string DetermineFlowState(
@@ -183,6 +221,9 @@ public class ClinicQueueItemDto
     public Guid VisitId { get; set; }
     public Guid PatientId { get; set; }
     public string PatientName { get; set; } = string.Empty;
+    public int? PatientAge { get; set; }
+    public string? PatientGender { get; set; }
+    public string? CitizenId { get; set; }
     public Guid? AppointmentId { get; set; }
     public string VisitStatus { get; set; } = string.Empty;
     public DateTime CheckedInAt { get; set; }
@@ -195,4 +236,5 @@ public class ClinicQueueItemDto
     public string? AssignedDoctorName { get; set; }
     public Guid? MedicalRecordId { get; set; }
     public string FlowState { get; set; } = string.Empty;
+    public bool IsAdminCompleted { get; set; }
 }

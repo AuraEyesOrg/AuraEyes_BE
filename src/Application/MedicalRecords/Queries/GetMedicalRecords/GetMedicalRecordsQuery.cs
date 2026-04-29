@@ -1,3 +1,4 @@
+using System.Linq;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.MedicalRecords.Common;
@@ -25,11 +26,16 @@ public record GetMedicalRecordsQuery : IQuery<PagedResult<MedicalRecordDto>>
 public class GetMedicalRecordsQueryHandler : IQueryHandler<GetMedicalRecordsQuery, PagedResult<MedicalRecordDto>>
 {
     private readonly IMedicalRecordRepository _medicalRecordRepository;
+    private readonly IIdentityService _identityService;
     private readonly IMapper _mapper;
 
-    public GetMedicalRecordsQueryHandler(IMedicalRecordRepository medicalRecordRepository, IMapper mapper)
+    public GetMedicalRecordsQueryHandler(
+        IMedicalRecordRepository medicalRecordRepository, 
+        IIdentityService identityService,
+        IMapper mapper)
     {
         _medicalRecordRepository = medicalRecordRepository;
+        _identityService = identityService;
         _mapper = mapper;
     }
 
@@ -70,6 +76,30 @@ public class GetMedicalRecordsQueryHandler : IQueryHandler<GetMedicalRecordsQuer
             .ToListAsync(cancellationToken);
 
         var dtos = _mapper.Map<List<MedicalRecordDto>>(items);
+
+        // Populate patient info for registered users from Identity
+        var registeredPatients = items
+            .Where(x => x.Patient != null && x.Patient.UserId.HasValue)
+            .Select(x => x.Patient)
+            .ToList();
+
+        if (registeredPatients.Any())
+        {
+            var userIds = registeredPatients.Select(x => x.UserId!.Value).Distinct();
+            var users = await _identityService.GetUsersByIdsAsync(userIds, cancellationToken);
+            var userDict = users.ToDictionary(x => x.Id);
+
+            foreach (var dto in dtos)
+            {
+                var originalItem = items.First(x => x.Id == dto.Id);
+                if (originalItem.Patient?.UserId != null && userDict.TryGetValue(originalItem.Patient.UserId.Value, out var user))
+                {
+                    dto.Patient ??= new PatientDto();
+                    dto.Patient.FullName = user.FullName;
+                    dto.Patient.Phone = user.PhoneNumber ?? originalItem.Patient.PhoneNumber ?? "";
+                }
+            }
+        }
 
         return Result<PagedResult<MedicalRecordDto>>.Success(
             new PagedResult<MedicalRecordDto>(dtos, totalCount, request.PageNumber, request.PageSize));

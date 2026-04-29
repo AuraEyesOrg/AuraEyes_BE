@@ -262,15 +262,17 @@ public static class Permissions
     [
         PatientsRead, PatientsCreate, PatientsUpdate,
         AppointmentsRead, AppointmentsCreate, AppointmentsManage,
-        VisitsRead, VisitsManage,
         OrdersRead, PaymentsRead,
     ];
 
     /// <summary>Extra permissions assigned to a Coordinator sub-role.</summary>
     public static readonly string[] CoordinatorExtras =
     [
+        PatientsRead,
         ScreeningRead, ScreeningCreate, ScreeningApprove,
         MedicalRecordsRead, MedicalRecordsCreate, MedicalRecordsFinalize,
+        VisitsRead, VisitsManage,
+        DashboardRead,
     ];
 
     /// <summary>Extra permissions assigned to a Cashier sub-role.</summary>

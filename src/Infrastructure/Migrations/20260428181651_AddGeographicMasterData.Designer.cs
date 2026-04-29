@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260428181651_AddGeographicMasterData")]
+    partial class AddGeographicMasterData
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -394,13 +397,30 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("AiScreeningId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("AppointmentSlotId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("AppointmentTime")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CalendarEventId")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
 
                     b.Property<string>("ChatStatus")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ClosedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ClosingReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -411,13 +431,30 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime?>("EndTime")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("IsAIResultShared")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsRetinalImagesShared")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
                     b.Property<DateTime>("LastActivityAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastReminderSentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MeetingLink")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<Guid?>("OphthalmologistId")
                         .HasColumnType("uuid");
@@ -452,15 +489,17 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("AiScreeningId");
 
+                    b.HasIndex("AppointmentSlotId");
+
                     b.HasIndex("OphthalmologistId");
 
                     b.HasIndex("PatientId");
 
-                    b.HasIndex("Status", "ChatStatus", "LastActivityAt")
-                        .HasDatabaseName("IX_ConsultationSessions_StaleSessionLookup");
-
                     b.HasIndex("OphthalmologistId", "Status", "StartTime", "EndTime")
                         .HasDatabaseName("IX_ConsultationSessions_WorkloadLookup");
+
+                    b.HasIndex("Status", "ChatStatus", "LastActivityAt", "LastReminderSentAt")
+                        .HasDatabaseName("IX_ConsultationSessions_StaleSessionLookup");
 
                     b.ToTable("ConsultationSessions", null, t =>
                         {
@@ -1636,8 +1675,18 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("OphthalId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("ReservationExpireAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("ScheduleTemplateId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Doctor");
 
                     b.Property<TimeOnly>("StartTime")
                         .HasColumnType("time without time zone");
@@ -1842,8 +1891,18 @@ namespace Infrastructure.Migrations
                     b.Property<int>("MaxCapacity")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("OphthalId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("SlotDuration")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Doctor");
 
                     b.Property<TimeOnly>("StartTime")
                         .HasColumnType("time without time zone");
@@ -2286,9 +2345,17 @@ namespace Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("ActualMonthlySalary")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<string>("Bio")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
+
+                    b.Property<decimal?>("CommissionRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
 
                     b.Property<decimal>("ConsultationFee")
                         .ValueGeneratedOnAdd()
@@ -2313,7 +2380,16 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("FullTime");
 
+                    b.Property<decimal?>("ExpectedMonthlySalary")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsVerified")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
@@ -2337,6 +2413,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
 
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2345,6 +2425,21 @@ namespace Infrastructure.Migrations
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("VerificationStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("PendingVerification");
+
+                    b.Property<int?>("WorkingHoursPerWeek")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("YearsOfExperience")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.HasKey("Id");
 
@@ -2403,11 +2498,17 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<int>("PurchasedAiQuota")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("text");
+
+                    b.Property<int>("UsedAiQuota")
+                        .HasColumnType("integer");
 
                     b.Property<Guid?>("UserId")
                         .HasColumnType("uuid");
@@ -2855,6 +2956,11 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("AiScreeningId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Domain.Entities.Scheduling.AppointmentSlot", "AppointmentSlot")
+                        .WithMany()
+                        .HasForeignKey("AppointmentSlotId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Domain.Entities.Users.Ophthalmologist", null)
                         .WithMany()
                         .HasForeignKey("OphthalmologistId")
@@ -2865,6 +2971,8 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("AppointmentSlot");
                 });
 
             modelBuilder.Entity("Domain.Entities.Consultation.Conversation", b =>

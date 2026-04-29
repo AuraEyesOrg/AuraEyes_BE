@@ -13,15 +13,18 @@ public class GetScreeningSessionDetailQueryHandler
     private readonly IRepository<AiScreening> _screeningRepository;
     private readonly IRepository<Patient> _patientRepository;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IIdentityService _identityService;
 
     public GetScreeningSessionDetailQueryHandler(
         IRepository<AiScreening> screeningRepository,
         IRepository<Patient> patientRepository,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IIdentityService identityService)
     {
         _screeningRepository = screeningRepository;
         _patientRepository = patientRepository;
         _currentUserService = currentUserService;
+        _identityService = identityService;
     }
 
     public async Task<Result<ScreeningSessionDetailDto>> Handle(
@@ -31,17 +34,24 @@ public class GetScreeningSessionDetailQueryHandler
         if (_currentUserService.UserId is null)
             return Result<ScreeningSessionDetailDto>.Unauthorized("User not authenticated");
 
-        var patients = await _patientRepository.FindAsync(
-            p => p.UserId == _currentUserService.UserId.Value,
-            cancellationToken);
-
-        var patient = patients.FirstOrDefault();
-        if (patient is null)
-            return Result<ScreeningSessionDetailDto>.NotFound("Patient profile not found");
-
-        var session = await _screeningRepository
+        var screeningQuery = _screeningRepository
             .Query()
-            .Where(s => s.Id == request.ScreeningId && s.PatientId == patient.Id && !s.IsDeleted)
+            .Where(s => s.Id == request.ScreeningId && !s.IsDeleted);
+
+        if (!request.BypassPatientCheck)
+        {
+            var patients = await _patientRepository.FindAsync(
+                p => p.UserId == _currentUserService.UserId.Value,
+                cancellationToken);
+
+            var patient = patients.FirstOrDefault();
+            if (patient is null)
+                return Result<ScreeningSessionDetailDto>.NotFound("Patient profile not found");
+
+            screeningQuery = screeningQuery.Where(s => s.PatientId == patient.Id);
+        }
+
+        var session = await screeningQuery
             .Select(s => new ScreeningSessionDetailDto
             {
                 ScreeningId = s.Id,
@@ -80,6 +90,34 @@ public class GetScreeningSessionDetailQueryHandler
 
         if (session is null)
             return Result<ScreeningSessionDetailDto>.NotFound("Screening session not found");
+
+        // Populate patient info if bypass check is used (for clinic staff)
+        if (request.BypassPatientCheck)
+        {
+            var patient = await _patientRepository.GetByIdAsync(session.PatientId, cancellationToken);
+            if (patient != null)
+            {
+                string? patientName = patient.FullName;
+                string? patientEmail = null;
+
+                if (!patient.IsWalkIn && patient.UserId.HasValue)
+                {
+                    var user = await _identityService.GetUserByIdAsync(patient.UserId.Value, cancellationToken);
+                    if (user != null)
+                    {
+                        patientName = user.FullName ?? patientName;
+                        patientEmail = user.Email;
+                    }
+                }
+
+                session = session with
+                {
+                    PatientName = patientName,
+                    PatientEmail = patientEmail,
+                    IsWalkIn = patient.IsWalkIn
+                };
+            }
+        }
 
         return Result<ScreeningSessionDetailDto>.Success(session);
     }
