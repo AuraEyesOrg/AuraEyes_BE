@@ -112,8 +112,6 @@ public class SendToDoctorCommandHandler
 
         if (existingConsultation != null)
         {
-            existingConsultation.ShareScreeningDataWithDoctor();
-
             if (request.DoctorId.HasValue &&
                 existingConsultation.OphthalmologistId != request.DoctorId.Value)
             {
@@ -164,9 +162,7 @@ public class SendToDoctorCommandHandler
             patientId: visit.PatientId,
             aiScreeningId: request.ScreeningId,
             ophthalmologistId: request.DoctorId,
-            price: 0m,
-            shareRetinalImages: true,
-            shareAiResults: true
+            price: 0m
         );
 
         await _consultationSessionRepository.AddAsync(consultationSession, cancellationToken);

@@ -38,26 +38,8 @@ public class ConsultationSessionConfiguration : IEntityTypeConfiguration<Consult
         builder.Property(e => e.Price)
             .HasPrecision(18, 2);
 
-        builder.Property(e => e.IsRetinalImagesShared)
-            .HasDefaultValue(false);
-
-        builder.Property(e => e.IsAIResultShared)
-            .HasDefaultValue(false);
-
-        builder.Property(e => e.MeetingLink)
-            .HasMaxLength(500);
-
-        builder.Property(e => e.CalendarEventId)
-            .HasMaxLength(1024);
-
-        builder.Property(e => e.ClosingReason)
-            .HasMaxLength(200);
-
         builder.Property(e => e.LastActivityAt)
             .IsRequired();
-
-        builder.Property(e => e.LastReminderSentAt)
-            .IsRequired(false);
 
         builder.Property(e => e.StartTime)
             .IsRequired(false);
@@ -86,18 +68,12 @@ public class ConsultationSessionConfiguration : IEntityTypeConfiguration<Consult
             .HasForeignKey(e => e.AiScreeningId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(e => e.AppointmentSlot)
-            .WithMany()
-            .HasForeignKey(e => e.AppointmentSlotId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         // Indexes for common query patterns
         builder.HasIndex(e => e.PatientId);
         builder.HasIndex(e => e.OphthalmologistId);
-        builder.HasIndex(e => e.AppointmentSlotId);
         builder.HasIndex(e => new { e.OphthalmologistId, e.Status, e.StartTime, e.EndTime })
             .HasDatabaseName("IX_ConsultationSessions_WorkloadLookup");
-        builder.HasIndex(e => new { e.Status, e.ChatStatus, e.LastActivityAt, e.LastReminderSentAt })
+        builder.HasIndex(e => new { e.Status, e.ChatStatus, e.LastActivityAt })
             .HasDatabaseName("IX_ConsultationSessions_StaleSessionLookup");
     }
 }

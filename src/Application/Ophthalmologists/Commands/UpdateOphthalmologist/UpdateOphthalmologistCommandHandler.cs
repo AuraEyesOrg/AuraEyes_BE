@@ -45,16 +45,12 @@ public class UpdateOphthalmologistCommandHandler : ICommandHandler<UpdateOphthal
 
         try
         {
-            ophthalmologist.UpdateProfile(request.Bio, request.YearsOfExperience);
+            ophthalmologist.UpdateProfile(request.Bio);
 
-            var targetEmploymentType = request.EmploymentType ?? ophthalmologist.EmploymentType;
-            var targetWorkingHours = request.WorkingHoursPerWeek ?? ophthalmologist.WorkingHoursPerWeek;
-            var targetExpectedSalary = request.ExpectedMonthlySalary ?? ophthalmologist.ExpectedMonthlySalary;
-
-            ophthalmologist.UpdateEmploymentPreferences(
-                targetEmploymentType,
-                targetWorkingHours,
-                targetExpectedSalary);
+            if (request.EmploymentType.HasValue)
+            {
+                ophthalmologist.UpdateEmploymentType(request.EmploymentType.Value);
+            }
 
             if (request.ConsultationFee.HasValue && request.ConsultationFee.Value != ophthalmologist.ConsultationFee)
             {

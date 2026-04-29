@@ -8,6 +8,4 @@ public record GetProfileClaimsByUserIdQuery(Guid UserId, IReadOnlyList<string> R
 public record ProfileClaimsDto
 {
     public Guid? ProfileId { get; init; }
-    public bool? IsVerified { get; init; }
-    public string? VerificationStatus { get; init; }
 }

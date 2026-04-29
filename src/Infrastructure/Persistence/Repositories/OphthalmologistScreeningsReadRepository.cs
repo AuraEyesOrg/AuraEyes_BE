@@ -134,9 +134,7 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
             {
                 Id = cs.Id,
                 Type = cs.Type,
-                HasAssignedDoctor = cs.OphthalmologistId.HasValue,
-                IsAIResultShared = cs.IsAIResultShared,
-                IsRetinalImagesShared = cs.IsRetinalImagesShared
+                HasAssignedDoctor = cs.OphthalmologistId.HasValue
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -149,8 +147,8 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
             (consultation.Type == ConsultationSessionType.Verification ||
              consultation.Type == ConsultationSessionType.ClinicBooking);
 
-        var canViewRetinalImages = bypassRedactionForAssignedDoctor || consultation.IsRetinalImagesShared;
-        var canViewAiResults = bypassRedactionForAssignedDoctor || consultation.IsAIResultShared;
+        var canViewRetinalImages = bypassRedactionForAssignedDoctor;
+        var canViewAiResults = bypassRedactionForAssignedDoctor;
 
         var row = await (
             from scr in _context.Set<AiScreening>().AsNoTracking()

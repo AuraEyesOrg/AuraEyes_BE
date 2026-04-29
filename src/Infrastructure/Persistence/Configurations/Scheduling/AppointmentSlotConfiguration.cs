@@ -20,11 +20,6 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
             .HasConversion<string>()
             .HasMaxLength(20);
 
-        builder.Property(e => e.Source)
-            .HasConversion<string>()
-            .HasMaxLength(20)
-            .HasDefaultValue(Domain.Enums.SlotSource.Doctor);
-
         builder.Property(e => e.MaxCapacity)
             .HasDefaultValue(1);
 

@@ -2,7 +2,6 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Scheduling;
-using Domain.Enums;
 using Domain.Repositories;
 using Microsoft.Extensions.Logging;
 
@@ -57,8 +56,7 @@ public class CreateAppointmentSlotCommandHandler : ICommandHandler<CreateAppoint
                 request.Date,
                 request.StartTime,
                 request.EndTime,
-                template.MaxCapacity,
-                SlotSource.Doctor);
+                template.MaxCapacity);
 
             await _repository.AddAsync(slot, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);

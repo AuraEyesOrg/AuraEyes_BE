@@ -70,7 +70,6 @@ public class ForceUpdateProfileCommandHandler : ICommandHandler<ForceUpdateProfi
                     Phone = request.Phone,
                     Address = request.Address,
                     Bio = request.Bio,
-                    YearsOfExperience = request.YearsOfExperience ?? 0,
                     ConsultationFee = request.ConsultationFee
                 };
                 

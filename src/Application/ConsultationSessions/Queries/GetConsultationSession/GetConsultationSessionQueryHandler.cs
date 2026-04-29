@@ -76,8 +76,8 @@ public class GetConsultationSessionQueryHandler
             session,
             cancellationToken);
 
-        var canViewRetinalImages = isAdmin || isPatient || session.IsRetinalImagesShared;
-        var canViewAiResults = isAdmin || isPatient || session.IsAIResultShared;
+        var canViewRetinalImages = isAdmin || isPatient;
+        var canViewAiResults = isAdmin || isPatient;
         var isAssignedDoctorOnInternalSession = _currentUser.ProfileId.HasValue
             && session.OphthalmologistId == _currentUser.ProfileId.Value
             && (session.Type == Domain.Enums.ConsultationSessionType.Verification
@@ -97,8 +97,6 @@ public class GetConsultationSessionQueryHandler
 
         dto = dto with
         {
-            IsRetinalImagesShared = session.IsRetinalImagesShared,
-            IsAIResultShared = session.IsAIResultShared,
             CaseSnapshot = caseSnapshot
         };
 

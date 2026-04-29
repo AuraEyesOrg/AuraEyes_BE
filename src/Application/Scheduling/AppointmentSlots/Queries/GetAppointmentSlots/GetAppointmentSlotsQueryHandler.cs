@@ -56,7 +56,6 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
                 BookedCount = slot.BookedCount,
                 AvailableCapacity = availableCapacity,
                 Cost = slot.Cost,
-                ReservationExpireAt = slot.ReservationExpireAt,
                 CreatedAt = slot.CreatedAt
             };
         }).ToList();

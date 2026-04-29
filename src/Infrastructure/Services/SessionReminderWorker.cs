@@ -116,7 +116,6 @@ public class SessionReminderWorker : BackgroundService
                 cancellationToken,
                 session.Id);
 
-            session.RecordReminderSent();
             remindersSent++;
 
             _logger.LogInformation(

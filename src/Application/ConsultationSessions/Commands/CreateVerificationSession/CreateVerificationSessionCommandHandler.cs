@@ -36,9 +36,7 @@ public class CreateVerificationSessionCommandHandler
             request.PatientId,
             request.AiScreeningId,
             request.Price,
-            request.OphthalmologistId,
-            shareRetinalImages: true,
-            shareAiResults: true);
+            request.OphthalmologistId);
 
         await _sessionRepository.AddAsync(session, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

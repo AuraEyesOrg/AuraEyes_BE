@@ -51,10 +51,7 @@ public class CreateOphthalmologistCommandHandler : ICommandHandler<CreateOphthal
             var ophthalmologist = new Ophthalmologist(
                 request.UserId,
                 request.Bio,
-                request.YearsOfExperience,
-                employmentType: request.EmploymentType,
-                workingHoursPerWeek: request.WorkingHoursPerWeek,
-                expectedMonthlySalary: request.ExpectedMonthlySalary);
+                employmentType: request.EmploymentType);
 
             await _ophthalmologistRepository.AddAsync(ophthalmologist, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);

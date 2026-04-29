@@ -9,7 +9,6 @@ namespace Application.SystemAdmin.Ophthalmologists.Queries.GetOphthalmologists;
 public record GetOphthalmologistsQuery : IQuery<PagedResult<OphthalmologistListDto>>
 {
     public string? SearchTerm { get; init; }
-    public string? VerificationStatus { get; init; }
     public int PageNumber { get; init; } = 1;
     public int PageSize { get; init; } = 10;
 }

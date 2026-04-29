@@ -54,7 +54,6 @@ public class UpdateScheduleTemplateCommandHandler : ICommandHandler<UpdateSchedu
             request.SlotDuration,
             request.MaxCapacity,
             request.Cost,
-            request.OphthalId,
             request.IsActive);
 
         await _scheduleTemplateRepository.UpdateAsync(template, cancellationToken);

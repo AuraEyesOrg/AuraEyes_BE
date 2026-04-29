@@ -104,8 +104,7 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
                 s.Status != SessionStatus.Completed &&
                 s.Status != SessionStatus.Cancelled &&
                 s.ChatStatus == ChatStatus.Open &&
-                s.LastActivityAt < activityCutoff &&
-                (s.LastReminderSentAt == null || s.LastReminderSentAt < reminderCutoff))
+                s.LastActivityAt < activityCutoff)
             .ToListAsync(cancellationToken);
     }
 
@@ -152,8 +151,7 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
             .CountAsync(s =>
                 s.PatientId == patientId &&
                 s.Status == SessionStatus.Cancelled &&
-                s.ClosedAt != null &&
-                s.ClosedAt.Value >= todayUtc,
+                s.UpdatedAt >= todayUtc,
                 cancellationToken);
     }
 
