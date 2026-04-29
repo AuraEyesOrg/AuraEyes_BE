@@ -13,28 +13,39 @@ faro.receiver "integrations_faro" {
 loki.process "faro_logs" {
   forward_to = [loki.write.grafana_loki.receiver]
 
-  // Trả về nhãn job cũ để Dashboard nhận data
   stage.static_labels {
     values = {
       "job" = "faro",
     }
   }
 
-  // Bóc tách nhãn từ JSON của Faro (Dữ liệu đã được gộp vào gốc)
+  // Thử mọi đường dẫn có thể có trong JSON của Faro để lấy tên App
   stage.json {
     expressions = {
-      "f_app" = "app.name",
-      "f_env" = "app.environment",
+      "app_v1" = "app.name",
+      "app_v2" = "meta.app.name",
+      "env_v1" = "app.environment",
+      "env_v2" = "meta.app.environment",
     }
   }
 
-  // Gán đúng các nhãn mà Dashboard của bạn đang yêu cầu
+  // Gán nhãn lần 1 (Ưu tiên các trường ở gốc JSON)
   stage.labels {
     values = {
-      "app"          = "f_app",
-      "service_name" = "f_app",
-      "environment"  = "f_env",
-      "env"          = "f_env", // Thêm cả env cho các dashboard khác
+      "app"          = "app_v1",
+      "service_name" = "app_v1",
+      "environment"  = "env_v1",
+      "env"          = "env_v1",
+    }
+  }
+
+  // Gán nhãn lần 2 (Nếu bản v1 trống, nó sẽ lấy từ meta)
+  stage.labels {
+    values = {
+      "app"          = "app_v2",
+      "service_name" = "app_v2",
+      "environment"  = "env_v2",
+      "env"          = "env_v2",
     }
   }
 }
