@@ -3,7 +3,7 @@ logging {
   format = "logfmt"
 }
 
-// 1. Nhận dữ liệu từ Web (Logs, Traces, Metrics)
+// 1. Nhận dữ liệu từ Web
 faro.receiver "default" {
   server {
     listen_address = "0.0.0.0"
@@ -14,17 +14,33 @@ faro.receiver "default" {
   output {
     logs    = [loki.write.faro_only.receiver]
     traces  = [otelcol.exporter.otlp.tempo.input]
-    metrics = [prometheus.relabel.faro_metrics.receiver] // Bổ sung Metrics
+    metrics = [prometheus.relabel.faro_metrics.receiver]
   }
 }
 
-// 2. Xử lý Metrics từ Faro trước khi gửi sang Prometheus
+// 2. Ép nhãn Metrics cho Prometheus Dashboard
 prometheus.relabel "faro_metrics" {
   forward_to = [prometheus.remote_write.mimir.receiver]
 
   rule {
+    target_label = "job"
+    replacement  = "faro"
+  }
+  rule {
     target_label = "app"
     replacement  = "auraeyes-frontend"
+  }
+  rule {
+    target_label = "application"
+    replacement  = "auraeyes-frontend"
+  }
+  rule {
+    target_label = "env"
+    replacement  = "production"
+  }
+  rule {
+    target_label = "environment"
+    replacement  = "production"
   }
   rule {
     target_label = "service_name"
@@ -32,23 +48,25 @@ prometheus.relabel "faro_metrics" {
   }
 }
 
-// 3. Gửi Metrics sang Prometheus (Dùng remote_write)
+// 3. Gửi Metrics sang Prometheus
 prometheus.remote_write "mimir" {
   endpoint {
     url = "http://prometheus:9090/api/v1/write"
   }
 }
 
-// 4. Bộ ghi chuyên dụng cho Logs
+// 4. Ép nhãn Logs cho Loki Dashboard
 loki.write "faro_only" {
   endpoint {
     url = "http://loki:3100/loki/api/v1/push"
   }
   external_labels = {
-    "app" = "auraeyes-frontend",
+    "job"          = "faro",
+    "app"          = "auraeyes-frontend",
+    "application"  = "auraeyes-frontend",
     "service_name" = "auraeyes-frontend",
-    "kind" = "frontend",
-    "environment" = "production",
+    "env"          = "production",
+    "environment"  = "production",
   }
 }
 
