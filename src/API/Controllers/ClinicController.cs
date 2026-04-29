@@ -2,6 +2,8 @@ using Application.Common.Constants;
 using Application.Common.Models;
 using Application.Patients.Commands.UpdateClinicPatient;
 using Application.Patients.Queries.GetRecentClinicPatients;
+using Application.Patients.Queries.GetPatientProfileById;
+using Application.Patients.Common;
 using Application.Clinic.Queries.GetDashboardMetrics;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -36,6 +38,17 @@ public class ClinicController : BaseApiController
     /// Get operational metrics for the clinic staff dashboard.
     /// Replaces the old /api/organisations/dashboard-metrics endpoint.
     /// </summary>
+    /// <summary>
+    /// Get full patient profile by ID for EMR pre-filling.
+    /// </summary>
+    [HttpGet("patients/{id:guid}")]
+    [ProducesResponseType(typeof(ApiResponse<PatientProfileDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPatientProfile(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new GetPatientProfileByIdQuery(id), cancellationToken);
+        return HandleResult(result, "Patient profile retrieved successfully");
+    }
+
     [HttpGet("dashboard-metrics")]
     [AuthorizePermission(Permissions.DashboardRead)]
     [ProducesResponseType(typeof(ApiResponse<ClinicDashboardMetricsDto>), StatusCodes.Status200OK)]

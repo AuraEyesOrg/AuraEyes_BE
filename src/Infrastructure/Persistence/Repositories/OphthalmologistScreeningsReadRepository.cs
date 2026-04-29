@@ -235,7 +235,7 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
             MedicalRecordId = await _context.Set<Domain.Entities.MedicalRecords.MedicalRecord>()
                 .AsNoTracking()
                 .Where(mr => mr.ConsultationSessionId == consultation.Id)
-                .Select(mr => mr.Id)
+                .Select(mr => (Guid?)mr.Id)
                 .FirstOrDefaultAsync(cancellationToken)
         };
     }
