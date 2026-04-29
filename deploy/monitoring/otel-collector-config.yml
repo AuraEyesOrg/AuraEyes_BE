@@ -1,4 +1,4 @@
-file_format: "0.1" # Sửa lỗi Missing property
+file_format: "0.1"
 
 receivers:
   otlp:
@@ -12,7 +12,6 @@ processors:
   batch:
     timeout: 1s
     send_batch_size: 1024
-  # Thêm processor để chuẩn hóa nhãn cho Backend
   resource:
     attributes:
       - key: app
@@ -20,9 +19,6 @@ processors:
         action: insert
       - key: service_name
         value: "auraeyes-api"
-        action: insert
-      - key: environment
-        value: "production"
         action: insert
 
 exporters:
