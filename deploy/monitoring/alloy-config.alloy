@@ -13,27 +13,28 @@ faro.receiver "integrations_faro" {
 loki.process "faro_logs" {
   forward_to = [loki.write.grafana_loki.receiver]
 
-  // Ép nhãn Job để phân biệt hẳn với API
+  // Trả về nhãn job cũ để Dashboard nhận data
   stage.static_labels {
     values = {
-      "job" = "faro-frontend",
+      "job" = "faro",
     }
   }
 
-  // Bóc tách đơn giản nhất
+  // Bóc tách nhãn từ JSON của Faro (Dữ liệu đã được gộp vào gốc)
   stage.json {
     expressions = {
-      "app" = "meta.app.name",
-      "env" = "meta.app.environment",
+      "f_app" = "app.name",
+      "f_env" = "app.environment",
     }
   }
 
-  // Ép nhãn App nếu nó bóc tách được, nếu không thì để trống để ta debug
+  // Gán đúng các nhãn mà Dashboard của bạn đang yêu cầu
   stage.labels {
     values = {
-      "app"         = "app",
-      "application" = "app",
-      "env"         = "env",
+      "app"          = "f_app",
+      "service_name" = "f_app",
+      "environment"  = "f_env",
+      "env"          = "f_env", // Thêm cả env cho các dashboard khác
     }
   }
 }
