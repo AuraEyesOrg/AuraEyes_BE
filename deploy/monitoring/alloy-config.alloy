@@ -13,17 +13,6 @@ faro.receiver "default" {
   output {
     logs    = [loki.write.faro_only.receiver]
     traces  = [otelcol.exporter.otlp.tempo.input]
-    metrics = [prometheus.remote_write.mimir.receiver]
-  }
-}
-
-prometheus.remote_write "mimir" {
-  endpoint {
-    url = "http://prometheus:9090/api/v1/write"
-  }
-  external_labels = {
-    "job" = "faro",
-    "app" = "auraeyes-frontend",
   }
 }
 
@@ -35,6 +24,7 @@ loki.write "faro_only" {
     "job"          = "faro",
     "app"          = "auraeyes-frontend",
     "service_name" = "auraeyes-frontend",
+    "environment"  = "production",
   }
 }
 

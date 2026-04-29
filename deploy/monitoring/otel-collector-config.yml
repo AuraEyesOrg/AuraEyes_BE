@@ -1,3 +1,5 @@
+file_format: "0.1" # Sửa lỗi Missing property
+
 receivers:
   otlp:
     protocols:
@@ -8,6 +10,20 @@ receivers:
 
 processors:
   batch:
+    timeout: 1s
+    send_batch_size: 1024
+  # Thêm processor để chuẩn hóa nhãn cho Backend
+  resource:
+    attributes:
+      - key: app
+        value: "auraeyes-api"
+        action: insert
+      - key: service_name
+        value: "auraeyes-api"
+        action: insert
+      - key: environment
+        value: "production"
+        action: insert
 
 exporters:
   prometheus:
@@ -18,16 +34,16 @@ exporters:
     endpoint: tempo:4317
     tls:
       insecure: true
-  logging:
+  debug:
     verbosity: basic
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
-      exporters: [otlp/tempo, logging]
+      processors: [batch, resource]
+      exporters: [otlp/tempo, debug]
     metrics:
       receivers: [otlp]
-      processors: [batch]
-      exporters: [prometheus, logging]
+      processors: [batch, resource]
+      exporters: [prometheus, debug]
