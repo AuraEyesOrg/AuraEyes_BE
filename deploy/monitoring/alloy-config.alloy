@@ -13,28 +13,28 @@ faro.receiver "integrations_faro" {
 loki.process "faro_logs" {
   forward_to = [loki.write.grafana_loki.receiver]
 
-  // Bước 1: Thêm label tĩnh job="faro"
   stage.static_labels {
     values = {
       "job" = "faro",
     }
   }
 
-  // Bước 2: Thử giải mã JSON từ Faro
+  // Faro gửi data lồng trong object 'meta'
   stage.json {
     expressions = {
-      "app" = "app",
-      "service_name" = "service.name",
-      "env" = "namespace",
+      "app" = "meta.app.name",
+      "service_name" = "meta.app.name",
+      "env" = "meta.app.environment",
+      "browser" = "meta.browser.name",
     }
   }
 
-  // Bước 3: Áp dụng label trích xuất được
   stage.labels {
     values = {
       "app" = "app",
       "service_name" = "service_name",
       "environment" = "env",
+      "browser_name" = "browser",
     }
   }
 }
