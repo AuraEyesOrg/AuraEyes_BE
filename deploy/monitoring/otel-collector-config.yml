@@ -1,5 +1,3 @@
-file_format: "0.1"
-
 receivers:
   otlp:
     protocols:
@@ -12,14 +10,6 @@ processors:
   batch:
     timeout: 1s
     send_batch_size: 1024
-  resource:
-    attributes:
-      - key: app
-        value: "auraeyes-api"
-        action: insert
-      - key: service_name
-        value: "auraeyes-api"
-        action: insert
 
 exporters:
   prometheus:
@@ -30,16 +20,14 @@ exporters:
     endpoint: tempo:4317
     tls:
       insecure: true
-  debug:
-    verbosity: basic
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch, resource]
-      exporters: [otlp/tempo, debug]
+      processors: [batch]
+      exporters: [otlp/tempo]
     metrics:
       receivers: [otlp]
-      processors: [batch, resource]
-      exporters: [prometheus, debug]
+      processors: [batch]
+      exporters: [prometheus]
