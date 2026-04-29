@@ -160,6 +160,7 @@ jobs:
         run: |
           docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" pull api
           docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" up -d
+          docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" restart prometheus alloy loki tempo
 
       - name: Health check
         run: |
