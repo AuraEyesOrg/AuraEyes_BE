@@ -31,15 +31,9 @@ public record ConsultationSessionDto
     public string ChatStatusName => ChatStatus.ToString();
     public decimal Price { get; init; }
     public DateTime? AppointmentTime { get; init; }
-    public string? MeetingLink { get; init; }
     public DateTime LastActivityAt { get; init; }
-    public DateTime? ClosedAt { get; init; }
-    public Guid? ClosedBy { get; init; }
-    public string? ClosingReason { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
-    public bool IsRetinalImagesShared { get; init; }
-    public bool IsAIResultShared { get; init; }
     public ConsultationCaseSnapshotDto? CaseSnapshot { get; init; }
     public IReadOnlyList<ChatMessageDto> Messages { get; init; } = [];
 }
@@ -63,14 +57,8 @@ public record ConsultationSessionListDto
     public string ChatStatusName => ChatStatus.ToString();
     public decimal Price { get; init; }
     public DateTime? AppointmentTime { get; init; }
-    public string? MeetingLink { get; init; }
     public DateTime LastActivityAt { get; init; }
     public DateTime CreatedAt { get; init; }
-    public DateTime? ClosedAt { get; init; }
-
-    // Consent flags
-    public bool IsRetinalImagesShared { get; init; }
-    public bool IsAIResultShared { get; init; }
 
     // Lightweight AI snapshot for listing/searching (populated in query handler).
     public ConsultationCaseSnapshotDto? CaseSnapshot { get; init; }

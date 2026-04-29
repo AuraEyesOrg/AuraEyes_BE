@@ -19,22 +19,8 @@ public record CreateOphthalmologistCommand : ICommand<Guid>
     public string? Bio { get; init; }
 
     /// <summary>
-    /// Number of years of professional experience.
-    /// </summary>
-    public int YearsOfExperience { get; init; }
-
-    /// <summary>
     /// Employment type of the ophthalmologist profile.
     /// </summary>
     public OphthalmologistEmploymentType EmploymentType { get; init; } = OphthalmologistEmploymentType.FullTime;
 
-    /// <summary>
-    /// Optional preferred working hours per week.
-    /// </summary>
-    public int? WorkingHoursPerWeek { get; init; }
-
-    /// <summary>
-    /// Optional expected monthly salary.
-    /// </summary>
-    public decimal? ExpectedMonthlySalary { get; init; }
 }

@@ -2,7 +2,6 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Scheduling;
-using Domain.Enums;
 using Domain.Repositories;
 
 namespace Application.Scheduling.ScheduleTemplates.Commands.CreateScheduleTemplate;
@@ -40,9 +39,7 @@ public class CreateScheduleTemplateCommandHandler : ICommandHandler<CreateSchedu
             request.EndTime,
             request.SlotDuration,
             request.MaxCapacity,
-            request.Cost,
-            request.OphthalId,
-            ScheduleTemplateSource.Doctor);
+            request.Cost);
 
         await _repository.AddAsync(template, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

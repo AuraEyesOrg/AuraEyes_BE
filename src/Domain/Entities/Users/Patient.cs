@@ -34,12 +34,6 @@ public class Patient : BaseEntity, IAggregateRoot
     /// <summary>Free-text history of prior diseases (e.g. "Type-2 Diabetes, Hypertension").</summary>
     public string? DiseaseHistory { get; private set; }
 
-    /// <summary>Current purchased AI screening credits balance.</summary>
-    public int PurchasedAiQuota { get; private set; }
-
-    /// <summary>AI screening credits used today (reset to 0 daily by Hangfire job).</summary>
-    public int UsedAiQuota { get; private set; }
-
     /// <summary>True when the patient has no Identity user (walk-in).</summary>
     public bool IsWalkIn => UserId is null;
 
@@ -143,42 +137,4 @@ public class Patient : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void AddPurchasedQuota(int amount)
-    {
-        if (amount <= 0)
-            throw new ArgumentException("Amount must be positive", nameof(amount));
-
-        PurchasedAiQuota += amount;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    public bool HasAvailableQuota(int freeQuota)
-    {
-        return UsedAiQuota < freeQuota || PurchasedAiQuota > 0;
-    }
-
-    public void ConsumeQuota(int freeQuota)
-    {
-        if (freeQuota < 0)
-            throw new ArgumentOutOfRangeException(nameof(freeQuota));
-
-        if (UsedAiQuota < freeQuota)
-        {
-            UsedAiQuota++;
-            UpdatedAt = DateTime.UtcNow;
-            return;
-        }
-
-        if (PurchasedAiQuota <= 0)
-            throw new InvalidOperationException("No AI quota available.");
-
-        PurchasedAiQuota--;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    public void ResetDailyQuota()
-    {
-        UsedAiQuota = 0;
-        UpdatedAt = DateTime.UtcNow;
-    }
 }

@@ -50,7 +50,6 @@ public class OphthalmologistsController : BaseApiController
     /// Get ophthalmologists with pagination and filtering.
     /// </summary>
     /// <param name="searchTerm">Search term for filtering.</param>
-    /// <param name="isVerified">Filter by verification status.</param>
     /// <param name="pageNumber">Page number (default: 1).</param>
     /// <param name="pageSize">Page size (default: 10).</param>
     /// <returns>Paginated list of ophthalmologists.</returns>
@@ -60,14 +59,12 @@ public class OphthalmologistsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetOphthalmologists(
         [FromQuery] string? searchTerm = null,
-        [FromQuery] string? verificationStatus = null,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10)
     {
         var query = new GetOphthalmologistsQuery
         {
             SearchTerm = searchTerm,
-            VerificationStatus = verificationStatus,
             PageNumber = pageNumber,
             PageSize = pageSize
         };
@@ -190,7 +187,6 @@ public class OphthalmologistsController : BaseApiController
             Phone = request.Phone,
             Address = request.Address,
             Bio = request.Bio,
-            YearsOfExperience = existingProfileResult.Data.YearsOfExperience,
         };
 
         var result = await _mediator.Send(command, cancellationToken);
@@ -267,8 +263,7 @@ public class OphthalmologistsController : BaseApiController
         var command = new SystemAdminVerify.VerifyOphthalmologistCommand
         {
             OphthalmologistId = id,
-            Approve = request.Approve,
-            RejectionReason = request.RejectionReason
+            Approve = request.Approve
         };
 
         var result = await _mediator.Send(command);
@@ -391,7 +386,6 @@ public class OphthalmologistsController : BaseApiController
 public class VerifyOphthalmologistRequest
 {
     public bool Approve { get; set; }
-    public string? RejectionReason { get; set; }
 }
 
 
@@ -406,5 +400,4 @@ public record UpdateOphthalmologistProfileRequest
     public string? Phone { get; init; }
     public string? Address { get; init; }
     public string? Bio { get; init; }
-    public int YearsOfExperience { get; init; }
 }
