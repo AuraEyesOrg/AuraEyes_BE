@@ -19,15 +19,22 @@ loki.process "faro_logs" {
     }
   }
 
-  // Faro gửi data lồng trong object 'meta'
+  // Bước 1: Parse toàn bộ JSON để lấy object 'meta'
+  stage.json {
+    expressions = {
+      "meta_obj" = "meta",
+      "kind"     = "kind",
+    }
+  }
+
+  // Bước 2: Parse tiếp object 'meta' (dưới dạng chuỗi) để lấy app name và env
   stage.json {
     expressions = {
       "app_name" = "app.name",
       "app_env"  = "app.environment",
       "browser"  = "browser.name",
-      "kind"     = "kind",
     }
-    source = "meta"
+    source = "meta_obj"
   }
 
   stage.labels {
@@ -35,8 +42,8 @@ loki.process "faro_logs" {
       "app"         = "app_name",
       "application" = "app_name",
       "service_name"= "app_name",
-      "env"         = "app_env",      // Đổi thành 'env' để khớp với biến Dashboard
-      "environment" = "app_env",      // Giữ lại cái này cho chắc
+      "env"         = "app_env",
+      "environment" = "app_env",
       "browser_name"= "browser",
       "kind"         = "kind",
     }
