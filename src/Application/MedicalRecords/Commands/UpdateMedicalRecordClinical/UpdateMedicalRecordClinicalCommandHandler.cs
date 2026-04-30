@@ -34,6 +34,7 @@ public class UpdateMedicalRecordClinicalCommandHandler : IRequestHandler<UpdateM
         {
             record.UpdateClinicalInfo(
                 request.ClinicalDataJson, 
+                request.AdministrativeDataJson,
                 request.FinalDiagnosis, 
                 request.TreatmentPlan);
 

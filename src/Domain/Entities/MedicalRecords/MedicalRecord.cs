@@ -59,10 +59,11 @@ public class MedicalRecord : BaseEntity, IAggregateRoot
         Status = MedicalRecordStatus.PendingClinical;
     }
 
-    public void UpdateClinicalInfo(string jsonData, string finalDiagnosis, string treatmentPlan)
+    public void UpdateClinicalInfo(string clinicalJson, string administrativeJson, string finalDiagnosis, string treatmentPlan)
     {
         EnsureNotFinalized();
-        ClinicalDataJson = jsonData;
+        ClinicalDataJson = clinicalJson;
+        AdministrativeDataJson = administrativeJson;
         FinalDiagnosis = finalDiagnosis;
         TreatmentPlan = treatmentPlan;
         Status = MedicalRecordStatus.PendingClinical;
