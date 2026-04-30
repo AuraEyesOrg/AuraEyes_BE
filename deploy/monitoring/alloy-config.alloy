@@ -19,33 +19,44 @@ loki.process "faro_logs" {
     }
   }
 
-  // Thử mọi đường dẫn có thể có trong JSON của Faro để lấy tên App
+  // Bóc tách mọi ngóc ngách của JSON Faro
   stage.json {
     expressions = {
-      "app_v1" = "app.name",
-      "app_v2" = "meta.app.name",
-      "env_v1" = "app.environment",
-      "env_v2" = "meta.app.environment",
+      "app_name" = "app.name",
+      "meta_app_name" = "meta.app.name",
+      "env_name" = "app.environment",
+      "meta_env_name" = "meta.app.environment",
+      "kind" = "kind",
     }
   }
 
-  // Gán nhãn lần 1 (Ưu tiên các trường ở gốc JSON)
+  // Bước 1: Thử lấy từ gốc JSON
   stage.labels {
     values = {
-      "app"          = "app_v1",
-      "service_name" = "app_v1",
-      "environment"  = "env_v1",
-      "env"          = "env_v1",
+      "app"          = "app_name",
+      "service_name" = "app_name",
+      "environment"  = "env_name",
+      "env"          = "env_name",
     }
   }
 
-  // Gán nhãn lần 2 (Nếu bản v1 trống, nó sẽ lấy từ meta)
+  // Bước 2: Nếu gốc trống, lấy từ meta (Ghi đè nếu có)
   stage.labels {
     values = {
-      "app"          = "app_v2",
-      "service_name" = "app_v2",
-      "environment"  = "env_v2",
-      "env"          = "env_v2",
+      "app"          = "meta_app_name",
+      "service_name" = "meta_app_name",
+      "environment"  = "meta_env_name",
+      "env"          = "meta_env_name",
+    }
+  }
+
+  // Bước 3: FALLBACK - Nếu vẫn trống (như trường hợp bạn đang bị service_name="faro")
+  // Chúng ta sẽ gán giá trị mặc định cho Frontend nếu job là faro mà app vẫn trống
+  stage.static_labels {
+    values = {
+      "app"          = "auraeyes-frontend",
+      "service_name" = "auraeyes-frontend",
+      "environment"  = "production",
     }
   }
 }
