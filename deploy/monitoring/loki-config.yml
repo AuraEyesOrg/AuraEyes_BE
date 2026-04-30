@@ -26,8 +26,13 @@ schema_config:
         prefix: index_
         period: 24h
 
+limits_config:
+  allow_structured_metadata: true
+  reject_old_samples: false
+  reject_old_samples_max_age: 168h
+  creation_grace_period: 10m       # Cho phép log lệch 10 phút về tương lai (fix lỗi múi giờ)
+  enforce_metric_name: false
+  max_entries_limit_per_query: 5000
+
 ruler:
   alertmanager_url: http://localhost:9093
-
-# analytics:
-#   reporting_enabled: false
