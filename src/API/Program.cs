@@ -18,6 +18,12 @@ using System.Reflection;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using Serilog.Sinks.Grafana.Loki;
+using System.Collections.Generic;
+using System;
 
 static string ResolveHangfireSchema(string? configuredSchema, bool isDevelopment)
 {
@@ -59,8 +65,13 @@ var builder = WebApplication.CreateBuilder(args);
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
+    .Enrich.WithProperty("Application", "AuraEyes.API")
+    .Enrich.WithProperty("Environment", builder.Environment.EnvironmentName)
     .WriteTo.Console()
     .WriteTo.File("logs/log-.txt", rollingInterval: RollingInterval.Day)
+    .WriteTo.GrafanaLoki(
+        builder.Configuration["LOKI_URL"] ?? "http://loki:3100",
+        new List<LokiLabel> { new LokiLabel { Key = "app", Value = "auraeyes-api" } })
     .CreateLogger();
 
 builder.Host.UseSerilog();
@@ -69,6 +80,36 @@ builder.Host.UseSerilog();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpClient();
+
+// ── OpenTelemetry & Monitoring ─────────────────────────────────────────────
+var otelResource = ResourceBuilder.CreateDefault()
+    .AddService(
+        serviceName: "auraeyes-api",
+        serviceInstanceId: System.Environment.MachineName)
+    .AddAttributes(new Dictionary<string, object>
+    {
+        ["deployment.environment"] = builder.Configuration["ASPNETCORE_ENVIRONMENT"] ?? "Production",
+        ["service.namespace"] = "AuraEyes"
+    });
+
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing => tracing
+        .SetResourceBuilder(otelResource)
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation(options => {
+            options.SetDbStatementForText = true;
+        })
+        .AddOtlpExporter(opt => {
+            opt.Endpoint = new Uri(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] ?? "http://otel-collector:4317");
+        }))
+    .WithMetrics(metrics => metrics
+        .SetResourceBuilder(otelResource)
+        .AddRuntimeInstrumentation()
+        .AddProcessInstrumentation()
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddPrometheusExporter());
 
 if (builder.Environment.IsEnvironment("Test"))
 {
@@ -417,7 +458,13 @@ else
 }
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
-app.UseMiddleware<RequestLoggingMiddleware>();
+// app.UseMiddleware<RequestLoggingMiddleware>(); // Thay bằng Serilog Request Logging bên dưới
+
+// Serilog Request Logging: Log chi tiết mọi HTTP request (Method, Path, Status Code, Response Time...)
+app.UseSerilogRequestLogging(options =>
+{
+    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+});
 
 app.UseHttpsRedirection();
 
@@ -440,6 +487,9 @@ app.MapHub<ChatHub>("/api/hubs/chat");
 app.MapHub<InternalChatHub>("/api/hubs/internal-chat");
 
 app.MapHealthChecks("/health");
+
+// Prometheus metrics endpoint
+app.UseOpenTelemetryPrometheusScrapingEndpoint();
 
 // Hangfire Dashboard (development only for security)
 if (app.Environment.IsDevelopment())
@@ -573,5 +623,7 @@ else
 {
     Log.Warning("Hangfire server is disabled. Recurring jobs are not running in this environment.");
 }
+
+app.MapPrometheusScrapingEndpoint();
 
 app.Run();
