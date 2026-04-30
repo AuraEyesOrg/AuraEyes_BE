@@ -13,50 +13,41 @@ faro.receiver "integrations_faro" {
 loki.process "faro_logs" {
   forward_to = [loki.write.grafana_loki.receiver]
 
+  // BƯỚC 1: ÉP NHÃN CỨNG (Không phụ thuộc vào bóc tách JSON)
+  // Việc này đảm bảo Dashboard tìm là thấy ngay
   stage.static_labels {
     values = {
-      "job" = "faro",
+      "job"          = "faro",
+      "app"          = "auraeyes-frontend",
+      "service_name" = "auraeyes-frontend",
+      "environment"  = "production",
+      "env"          = "production",
     }
   }
 
-  // Bóc tách mọi ngóc ngách của JSON Faro
+  // BƯỚC 2: Bóc tách JSON (Nếu bóc được thì nó sẽ ghi đè lên các giá trị trên)
   stage.json {
     expressions = {
       "app_name" = "app.name",
       "meta_app_name" = "meta.app.name",
       "env_name" = "app.environment",
       "meta_env_name" = "meta.app.environment",
-      "kind" = "kind",
     }
   }
 
-  // Bước 1: Thử lấy từ gốc JSON
   stage.labels {
     values = {
       "app"          = "app_name",
       "service_name" = "app_name",
       "environment"  = "env_name",
-      "env"          = "env_name",
     }
   }
 
-  // Bước 2: Nếu gốc trống, lấy từ meta (Ghi đè nếu có)
   stage.labels {
     values = {
       "app"          = "meta_app_name",
       "service_name" = "meta_app_name",
       "environment"  = "meta_env_name",
-      "env"          = "meta_env_name",
-    }
-  }
-
-  // Bước 3: FALLBACK - Nếu vẫn trống (như trường hợp bạn đang bị service_name="faro")
-  // Chúng ta sẽ gán giá trị mặc định cho Frontend nếu job là faro mà app vẫn trống
-  stage.static_labels {
-    values = {
-      "app"          = "auraeyes-frontend",
-      "service_name" = "auraeyes-frontend",
-      "environment"  = "production",
     }
   }
 }
