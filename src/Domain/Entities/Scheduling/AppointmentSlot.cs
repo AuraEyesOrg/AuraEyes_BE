@@ -9,8 +9,8 @@ namespace Domain.Entities.Scheduling;
 /// </summary>
 public class AppointmentSlot : BaseEntity, IAggregateRoot
 {
-    /// <summary>FK to ScheduleTemplate - the template this slot was generated from.</summary>
-    public Guid ScheduleTemplateId { get; private set; }
+    /// <summary>FK to ScheduleTemplate - the template this slot was generated from. Null for ad-hoc slots.</summary>
+    public Guid? ScheduleTemplateId { get; private set; }
 
     /// <summary>Date of this appointment slot.</summary>
     public DateOnly Date { get; private set; }
@@ -50,7 +50,7 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
     private AppointmentSlot() { } // EF Core
 
     public AppointmentSlot(
-        Guid scheduleTemplateId,
+        Guid? scheduleTemplateId,
         DateOnly date,
         TimeOnly startTime,
         TimeOnly endTime,
@@ -68,6 +68,25 @@ public class AppointmentSlot : BaseEntity, IAggregateRoot
         MaxCapacity = maxCapacity;
         Status = ScheduleStatus.Available;
         BookedCount = 0;
+    }
+
+    /// <summary>
+    /// Create an ad-hoc slot (not generated from a ScheduleTemplate).
+    /// </summary>
+    public static AppointmentSlot CreateAdHoc(
+        DateOnly date,
+        TimeOnly startTime,
+        TimeOnly endTime,
+        int maxCapacity = 1,
+        Guid? ophthalId = null,
+        decimal? cost = null)
+    {
+        var slot = new AppointmentSlot(null, date, startTime, endTime, maxCapacity);
+        if (ophthalId.HasValue)
+            slot.OphthalId = ophthalId.Value;
+        if (cost.HasValue)
+            slot.Cost = cost.Value;
+        return slot;
     }
 
     /// <summary>
