@@ -135,51 +135,32 @@ public static class AuraSimulation
         });
     }
 
-    private static ScenarioProps BuildAiScreeningScenario(HttpClient httpClient, string token)
+    private static ScenarioProps BuildDoctorReviewScenario(HttpClient httpClient, string token)
     {
-        return Scenario.Create("ai_screening_scenario", async context =>
+        return Scenario.Create("doctor_review_scenario", async context =>
         {
-            var createSessionBody = new
-            {
-                modelVersion = "AURA_v1.0",
-                retinalImages = new List<object>()
-            };
-
-            var createSessionRequest = Http
-                .CreateRequest("POST", "/api/screenings/create-session")
+            // 1. Xem danh sách các ca tư vấn gần đây (Paging)
+            var getSessionsRequest = Http
+                .CreateRequest("GET", "/api/consultation-sessions?pageNumber=1&pageSize=10")
                 .WithHeader("Authorization", $"Bearer {token}")
-                .WithHeader("Content-Type", "application/json")
-                .WithHeader("X-Correlation-Id", Guid.NewGuid().ToString())
-                .WithJsonBody(createSessionBody);
+                .WithHeader("X-Correlation-Id", Guid.NewGuid().ToString());
 
-            var sessionResponse = await Http.Send(httpClient, createSessionRequest);
+            var sessionsResponse = await Http.Send(httpClient, getSessionsRequest);
 
-            if (!sessionResponse.IsError)
+            if (!sessionsResponse.IsError)
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(2000, 5000)));
+                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(1000, 2000)));
 
-                var fakeImageBytes = new byte[50 * 1024];
-                Random.Shared.NextBytes(fakeImageBytes);
+                // 2. Xem các kết quả tầm soát AI gần đây nhất
+                var getRecentAiRequest = Http
+                    .CreateRequest("GET", "/api/screenings/recent?limit=10")
+                    .WithHeader("Authorization", $"Bearer {token}")
+                    .WithHeader("X-Correlation-Id", Guid.NewGuid().ToString());
 
-                using var formContent = new MultipartFormDataContent();
-                formContent.Add(new ByteArrayContent(fakeImageBytes), "images", "eye_scan.jpg");
-
-                using var uploadHttpRequest = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/api/screenings/upload-images")
-                {
-                    Content = formContent
-                };
-                uploadHttpRequest.Headers.Add("Authorization", $"Bearer {token}");
-                uploadHttpRequest.Headers.Add("X-Correlation-Id", Guid.NewGuid().ToString());
-
-                using var uploadResponse = await httpClient.SendAsync(uploadHttpRequest);
-                var statusCode = ((int)uploadResponse.StatusCode).ToString();
-                
-                return uploadResponse.IsSuccessStatusCode
-                    ? Response.Ok(statusCode: statusCode)
-                    : Response.Fail(statusCode: statusCode, message: "Upload failed", sizeBytes: 0);
+                return await Http.Send(httpClient, getRecentAiRequest);
             }
 
-            return sessionResponse;
+            return sessionsResponse;
         });
     }
 
@@ -217,7 +198,7 @@ public static class AuraSimulation
                 Simulation.Inject(rate: 100, interval: oneSecond, during: peakDuration)
             );
 
-        var aiScreeningScenario = BuildAiScreeningScenario(httpClient, token)
+        var doctorReviewScenario = BuildDoctorReviewScenario(httpClient, token)
             .WithoutWarmUp()
             .WithLoadSimulations(
                 Simulation.RampingInject(rate: 14, interval: oneSecond, during: rampDuration),
@@ -228,7 +209,7 @@ public static class AuraSimulation
             .RegisterScenarios(
                 readQueueScenario,
                 bookingScenario,
-                aiScreeningScenario
+                doctorReviewScenario
             )
             .WithWorkerPlugins(new HttpMetricsPlugin())
             .WithReportFormats(ReportFormat.Html, ReportFormat.Md)

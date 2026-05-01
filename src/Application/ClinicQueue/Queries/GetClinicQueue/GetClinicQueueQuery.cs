@@ -8,6 +8,7 @@ using Domain.Entities.Screening;
 using Domain.Enums;
 using Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Application.ClinicQueue.Queries.GetClinicQueue;
 
@@ -23,18 +24,21 @@ public class GetClinicQueueQueryHandler
     private readonly IRepository<AiScreening> _screeningRepository;
     private readonly IConsultationSessionRepository _consultationSessionRepository;
     private readonly IIdentityService _identityService;
+    private readonly IMemoryCache _cache;
 
     public GetClinicQueueQueryHandler(
         IPatientVisitRepository patientVisitRepository,
         IRepository<AiScreening> screeningRepository,
         IConsultationSessionRepository consultationSessionRepository,
-        IIdentityService identityService
+        IIdentityService identityService,
+        IMemoryCache cache
         )
     {
         _patientVisitRepository = patientVisitRepository;
         _screeningRepository = screeningRepository;
         _consultationSessionRepository = consultationSessionRepository;
         _identityService = identityService;
+        _cache = cache;
     }
 
     public async Task<Result<IReadOnlyList<ClinicQueueItemDto>>> Handle(
@@ -44,10 +48,18 @@ public class GetClinicQueueQueryHandler
         if (request.RequestedByUserId == Guid.Empty)
             return Result<IReadOnlyList<ClinicQueueItemDto>>.Failure("Invalid requester.");
 
+        // High-performance caching for 2 seconds to survive load spikes (350 RPS)
+        string cacheKey = $"clinic_queue_{request.RequestedByUserId}";
+        if (_cache.TryGetValue(cacheKey, out IReadOnlyList<ClinicQueueItemDto>? cachedQueue))
+        {
+            return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(cachedQueue!);
+        }
+
         var cutoffDate = DateTime.UtcNow.AddDays(-1);
 
         var visits = await _patientVisitRepository
             .Query()
+            .AsNoTracking() // Optimization: No change tracking needed for Read
             .Include(v => v.Patient)
             .Include(v => v.Appointment)
                 .ThenInclude(a => a!.AppointmentSlot)
@@ -68,6 +80,7 @@ public class GetClinicQueueQueryHandler
         var patientIds = visits.Select(v => v.PatientId).Distinct().ToList();
         var screenings = await _screeningRepository
             .Query()
+            .AsNoTracking()
             .Include(s => s.ScreeningResults)
             .Where(s => patientIds.Contains(s.PatientId)
                 && s.CreatedAt >= cutoffDate
@@ -76,6 +89,7 @@ public class GetClinicQueueQueryHandler
 
         var consultations = await _consultationSessionRepository
             .Query()
+            .AsNoTracking()
             .Where(cs => patientIds.Contains(cs.PatientId)
                 && cs.CreatedAt >= cutoffDate
                 && cs.Status != SessionStatus.Cancelled
@@ -165,6 +179,8 @@ public class GetClinicQueueQueryHandler
 
             queueItems.Add(item);
         }
+
+        _cache.Set(cacheKey, queueItems, TimeSpan.FromSeconds(2));
 
         return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(queueItems);
     }
