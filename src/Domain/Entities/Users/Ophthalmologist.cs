@@ -18,6 +18,9 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
     public int RatingCount { get; private set; }
     public decimal ConsultationFee { get; private set; }
 
+    /// <summary>Available leave days fund for this doctor (e.g. accumulated from holiday duty).</summary>
+    public decimal AvailableLeaveDays { get; private set; }
+
     // Navigation properties
     private readonly List<Certificate> _certificates = new();
     public IReadOnlyCollection<Certificate> Certificates => _certificates.AsReadOnly();
@@ -84,6 +87,30 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
             throw new ArgumentException("Consultation fee cannot be negative", nameof(fee));
 
         ConsultationFee = fee;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Add leave days to the fund (e.g., +2 for working on a minor holiday).</summary>
+    public void AddLeaveDays(decimal days)
+    {
+        if (days <= 0)
+            throw new ArgumentException("Days to add must be positive.", nameof(days));
+
+        AvailableLeaveDays += days;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Deduct leave days after a leave request is approved.</summary>
+    public void DeductLeaveDays(decimal days)
+    {
+        if (days <= 0)
+            throw new ArgumentException("Days to deduct must be positive.", nameof(days));
+
+        if (days > AvailableLeaveDays)
+            throw new InvalidOperationException(
+                $"Insufficient leave days. Requested: {days}, Available: {AvailableLeaveDays}.");
+
+        AvailableLeaveDays -= days;
         UpdatedAt = DateTime.UtcNow;
     }
 }
