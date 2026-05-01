@@ -4,7 +4,7 @@ public record AppointmentSlotListDto
 {
     public Guid Id { get; init; }
     public Guid OphthalId { get; init; }
-    public Guid ScheduleTemplateId { get; init; }
+    public Guid? ScheduleTemplateId { get; init; }
     public DateOnly Date { get; init; }
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }
@@ -22,7 +22,7 @@ public record AppointmentSlotDto
 {
     public Guid Id { get; init; }
     public Guid OphthalId { get; init; }
-    public Guid ScheduleTemplateId { get; init; }
+    public Guid? ScheduleTemplateId { get; init; }
     public DateOnly Date { get; init; }
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }
