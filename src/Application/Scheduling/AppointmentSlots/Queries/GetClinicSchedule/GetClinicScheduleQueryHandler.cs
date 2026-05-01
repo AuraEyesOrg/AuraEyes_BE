@@ -34,6 +34,7 @@ public class GetClinicScheduleQueryHandler : IQueryHandler<GetClinicScheduleQuer
         var ophthalMap = await _ophthalmologistRepository.GetDoctorDetailsByIdsAsync(ophthalIds, cancellationToken);
 
         var aggregated = slots
+            .Where(s => s.Status != ScheduleStatus.Expired)
             .GroupBy(s => new { s.Date, s.StartTime, s.EndTime })
             .Select(g => new AggregatedSlotDto
             {

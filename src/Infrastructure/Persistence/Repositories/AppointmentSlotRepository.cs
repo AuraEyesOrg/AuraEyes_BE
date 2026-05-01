@@ -146,7 +146,7 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
     {
         var query = _dbSet
             .Where(s => s.Date == date)
-            .Where(s => s.Status != ScheduleStatus.Blocked);
+            .Where(s => s.Status != ScheduleStatus.Blocked && s.Status != ScheduleStatus.Expired);
 
         if (excludeSlotId.HasValue)
             query = query.Where(s => s.Id != excludeSlotId.Value);
