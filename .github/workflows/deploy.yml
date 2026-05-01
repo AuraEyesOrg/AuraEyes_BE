@@ -42,6 +42,10 @@ jobs:
           mkdir -p "$DEPLOY_DIR/deploy/nginx"
           cp -r deploy/nginx/* "$DEPLOY_DIR/deploy/nginx/"
           
+          # Copy Monitoring configs (FORCE CLEAN old fake directories)
+          rm -rf "$DEPLOY_DIR/deploy/monitoring"
+          cp -R deploy/monitoring "$DEPLOY_DIR/deploy/"
+          
           # Create certbot challenge directory
           mkdir -p "$DEPLOY_DIR/deploy/certbot/www"
       
@@ -146,9 +150,8 @@ jobs:
 
           AiAsset__BaseUrl=${{ secrets.AI_BASE_URL }}
 
-          API_PORT=${API_PORT}
+          API_PORT=${{ env.API_PORT }}
           BaseUrl=${{ secrets.FRONTEND_URL }}
-
           DOCKER_IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/auraeyes-api
           WEB_IMAGE=${{ secrets.FE_DOCKER_USERNAME || secrets.DOCKER_USERNAME }}/auraeyes-web:latest
           EOF
@@ -157,6 +160,7 @@ jobs:
         run: |
           docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" pull api
           docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" up -d
+          docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/docker-compose.yml" restart prometheus alloy loki tempo
 
       - name: Health check
         run: |

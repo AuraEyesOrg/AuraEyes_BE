@@ -1,0 +1,73 @@
+faro.receiver "integrations_faro" {
+  server {
+    listen_address = "0.0.0.0"
+    listen_port = 12347
+    cors_allowed_origins = ["*"]
+  }
+  output {
+    logs   = [loki.process.faro_logs.receiver]
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+loki.process "faro_logs" {
+  forward_to = [loki.write.grafana_loki.receiver]
+
+  // BƯỚC 1: ÉP NHÃN CỨNG (Đảm bảo luôn có app và job)
+  stage.static_labels {
+    values = {
+      "job"          = "faro",
+      "app"          = "auraeyes-frontend",
+      "service_name" = "auraeyes-frontend",
+      "environment"  = "production",
+      "env"          = "production",
+    }
+  }
+
+  // BƯỚC 2: Bóc tách JSON Faro
+  stage.json {
+    expressions = {
+      "app_name"      = "app.name",
+      "meta_app_name" = "meta.app.name",
+      "env_name"      = "app.environment",
+      "meta_env_name" = "meta.app.environment",
+      "kind"          = "kind",        // CỰC KỲ QUAN TRỌNG: Dashboard cần cái này
+      "log_level"     = "level",       // Dashboard cần để phân loại lỗi
+    }
+  }
+
+  // BƯỚC 3: Đưa các giá trị bóc được vào Label
+  stage.labels {
+    values = {
+      "app"          = "app_name",
+      "service_name" = "app_name",
+      "environment"  = "env_name",
+      "kind"          = "kind",
+      "level"         = "log_level",
+    }
+  }
+
+  // Dự phòng nếu bóc từ meta
+  stage.labels {
+    values = {
+      "app"          = "meta_app_name",
+      "service_name" = "meta_app_name",
+      "environment"  = "meta_env_name",
+    }
+  }
+}
+
+loki.write "grafana_loki" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}
