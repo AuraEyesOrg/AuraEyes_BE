@@ -204,6 +204,7 @@ public static class DependencyInjection
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IMedicalRecordRepository, MedicalRecordRepository>();
+        services.AddScoped<ILeavePolicyRepository, LeavePolicyRepository>();
 
         // Register Identity Services
         services.AddScoped<IIdentityService, IdentityService>();
