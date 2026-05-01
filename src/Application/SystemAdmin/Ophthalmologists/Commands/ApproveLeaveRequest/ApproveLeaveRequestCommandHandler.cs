@@ -18,8 +18,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IConsultationSessionRepository _consultationSessionRepository;
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
-    private readonly IRepository<Patient> _patientRepository;
-    private readonly IGoogleMeetService _googleMeetService;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ApproveLeaveRequestCommandHandler> _logger;
@@ -29,8 +27,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
         IOphthalmologistRepository ophthalmologistRepository,
         IConsultationSessionRepository consultationSessionRepository,
         IAppointmentSlotRepository appointmentSlotRepository,
-        IRepository<Patient> patientRepository,
-        IGoogleMeetService googleMeetService,
         INotificationService notificationService,
         IUnitOfWork unitOfWork,
         ILogger<ApproveLeaveRequestCommandHandler> logger)
@@ -39,8 +35,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
         _ophthalmologistRepository = ophthalmologistRepository;
         _consultationSessionRepository = consultationSessionRepository;
         _appointmentSlotRepository = appointmentSlotRepository;
-        _patientRepository = patientRepository;
-        _googleMeetService = googleMeetService;
         _notificationService = notificationService;
         _unitOfWork = unitOfWork;
         _logger = logger;
@@ -78,102 +72,60 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
 
         var pendingNotifications = new List<PendingNotification>();
 
+        // Rule 4: Check and deduct leave days fund
+        var requestedDays = (decimal)(leaveRequest.EndDate.ToDateTime(TimeOnly.MinValue) - leaveRequest.StartDate.ToDateTime(TimeOnly.MinValue)).TotalDays + 1;
+        if (ophthalmologist.AvailableLeaveDays < requestedDays)
+        {
+            return Result<ApproveLeaveRequestResultDto>.Conflict(
+                $"Bác sĩ không đủ ngày phép. Cần: {requestedDays}, Hiện có: {ophthalmologist.AvailableLeaveDays}.");
+        }
+
+        // Rule 1: No Pending Appointments - Check for active sessions/appointments
+        var sessionWindowStartUtc = GetUtcStartOfDay(leaveRequest.StartDate);
+        var sessionWindowEndUtcExclusive = GetUtcStartOfDay(leaveRequest.EndDate.AddDays(1));
+
+        var activeSessions = await _consultationSessionRepository.Query()
+            .Where(x => x.OphthalmologistId == leaveRequest.OphthalmologistId)
+            .Where(x => x.Status != SessionStatus.Completed && x.Status != SessionStatus.Cancelled)
+            .Where(x => x.AppointmentTime.HasValue
+                        && x.AppointmentTime.Value >= sessionWindowStartUtc
+                        && x.AppointmentTime.Value < sessionWindowEndUtcExclusive)
+            .AnyAsync(cancellationToken);
+
+        var activeAppointments = await _appointmentSlotRepository.Query()
+            .Include(x => x.Appointments)
+            .Where(x => x.OphthalId == leaveRequest.OphthalmologistId)
+            .Where(x => x.Date >= leaveRequest.StartDate && x.Date <= leaveRequest.EndDate)
+            .SelectMany(x => x.Appointments)
+            .Where(a => a.Status == AppointmentStatus.Confirmed || a.Status == AppointmentStatus.CheckedIn || a.Status == AppointmentStatus.InProgress)
+            .AnyAsync(cancellationToken);
+
+        if (activeSessions || activeAppointments)
+        {
+            return Result<ApproveLeaveRequestResultDto>.Conflict(
+                "Không thể duyệt đơn. Bác sĩ vẫn còn các ca hẹn hoặc phiên tư vấn chưa được xử lý (chuyển giao hoặc đổi lịch).");
+        }
+
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
         try
         {
+            // Deduct leave days
+            ophthalmologist.DeductLeaveDays(requestedDays);
+            await _ophthalmologistRepository.UpdateAsync(ophthalmologist, cancellationToken);
+
             leaveRequest.Approve(request.ReviewedByAdminUserId, request.AdminNote);
 
-            var sessionWindowStartUtc = GetUtcStartOfDay(leaveRequest.StartDate);
-            var sessionWindowEndUtcExclusive = GetUtcStartOfDay(leaveRequest.EndDate.AddDays(1));
-
-            var sessions = await _consultationSessionRepository.Query()
-                .Where(x => x.OphthalmologistId == leaveRequest.OphthalmologistId)
-                .Where(x => x.Status != SessionStatus.Completed && x.Status != SessionStatus.Cancelled)
-                .Where(x => x.AppointmentTime.HasValue
-                            && x.AppointmentTime.Value >= sessionWindowStartUtc
-                            && x.AppointmentTime.Value < sessionWindowEndUtcExclusive)
-                .ToListAsync(cancellationToken);
-
-            // Block appointment slots and cancel linked appointments for the leave period
+            // Block appointment slots for the leave period
             var slots = await _appointmentSlotRepository.Query()
-                .Include(x => x.Appointments)
                 .Where(x => x.OphthalId == leaveRequest.OphthalmologistId)
                 .Where(x => x.Date >= leaveRequest.StartDate && x.Date <= leaveRequest.EndDate)
                 .Where(x => x.Status != ScheduleStatus.Blocked)
                 .ToListAsync(cancellationToken);
 
-            var appointmentPatientIds = slots
-                .SelectMany(s => s.Appointments)
-                .Where(a => a.Status != AppointmentStatus.Cancelled)
-                .Select(a => a.PatientId)
-                .ToHashSet();
-
-            var patientIds = sessions.Select(x => x.PatientId)
-                .Concat(appointmentPatientIds)
-                .ToHashSet();
-
-            var patientUserMap = await _patientRepository.Query()
-                .Where(x => patientIds.Contains(x.Id))
-                .Select(x => new { x.Id, x.UserId })
-                .ToDictionaryAsync(x => x.Id, x => x.UserId, cancellationToken);
-
-            var cancelledSessions = 0;
-            foreach (var session in sessions)
-            {
-                session.Cancel();
-                cancelledSessions++;
-
-                if (patientUserMap.TryGetValue(session.PatientId, out var patientUserId)
-                    && patientUserId.HasValue)
-                {
-                    pendingNotifications.Add(new PendingNotification(
-                        patientUserId.Value,
-                        "Lịch tư vấn bị hủy",
-                        BuildSessionCancellationMessage(session.AppointmentTime),
-                        NotificationType.ScheduleChanged,
-                        new
-                        {
-                            ConsultationSessionId = session.Id,
-                            LeaveRequestId = leaveRequest.Id,
-                            Action = "DoctorLeaveApproved"
-                        },
-                        session.Id));
-                }
-            }
-
-            var cancelledAppointments = 0;
             var blockedSlots = 0;
             foreach (var slot in slots)
             {
-                foreach (var appointment in slot.Appointments.Where(a => a.Status != AppointmentStatus.Cancelled))
-                {
-                    appointment.Cancel(request.ReviewedByAdminUserId, "Doctor on approved leave");
-                    cancelledAppointments++;
-
-                    if (patientUserMap.TryGetValue(appointment.PatientId, out var patientUserId)
-                        && patientUserId.HasValue)
-                    {
-                        pendingNotifications.Add(new PendingNotification(
-                            patientUserId.Value,
-                            "Lịch hẹn bị hủy",
-                            $"Lịch hẹn của bạn ngày {slot.Date:dd/MM/yyyy} lúc {slot.StartTime:HH:mm} đã bị hủy do bác sĩ nghỉ phép.",
-                            NotificationType.ScheduleChanged,
-                            new
-                            {
-                                AppointmentId = appointment.Id,
-                                LeaveRequestId = leaveRequest.Id,
-                                Action = "DoctorLeaveApproved"
-                            },
-                            appointment.Id));
-                    }
-                }
-
-                while (slot.BookedCount > 0)
-                {
-                    slot.CancelBooking();
-                }
-
                 slot.ForceBlock();
                 blockedSlots++;
             }
@@ -201,8 +153,8 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
             return Result<ApproveLeaveRequestResultDto>.Success(new ApproveLeaveRequestResultDto
             {
                 LeaveRequestId = leaveRequest.Id,
-                CancelledConsultationSessions = cancelledSessions,
-                CancelledAppointments = cancelledAppointments,
+                CancelledConsultationSessions = 0,
+                CancelledAppointments = 0,
                 BlockedSlots = blockedSlots
             });
         }
@@ -211,8 +163,9 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
             await _unitOfWork.RollbackTransactionAsync(cancellationToken);
             return Result<ApproveLeaveRequestResultDto>.Conflict(ex.Message);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Error approving leave request {RequestId}", request.LeaveRequestId);
             await _unitOfWork.RollbackTransactionAsync(cancellationToken);
             throw;
         }
@@ -222,25 +175,6 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
     {
         var localDateTime = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
         return TimeZoneInfo.ConvertTimeToUtc(localDateTime, VietnamTimeZoneResolver.TimeZone);
-    }
-
-    private static string BuildSessionCancellationMessage(DateTime? appointmentTimeUtc)
-    {
-        if (!appointmentTimeUtc.HasValue)
-        {
-            return "Lịch tư vấn của bạn đã bị hủy do bác sĩ nghỉ phép được phê duyệt.";
-        }
-
-        var vietnamTime = TimeZoneInfo.ConvertTimeFromUtc(appointmentTimeUtc.Value, VietnamTimeZoneResolver.TimeZone);
-        return $"Lịch tư vấn lúc {vietnamTime:HH:mm} ngày {vietnamTime:dd/MM/yyyy} đã bị hủy do bác sĩ nghỉ phép được phê duyệt.";
-    }
-
-    private static void ReleaseBookedOrReservedState(Domain.Entities.Scheduling.AppointmentSlot slot)
-    {
-        if (slot.BookedCount > 0)
-        {
-            slot.CancelBooking();
-        }
     }
 
     private async Task SendNotificationsAsync(
