@@ -119,9 +119,9 @@ public class FinalizeMedicalRecordCommandHandler : IRequestHandler<FinalizeMedic
             if (record.PatientVisitId.HasValue)
             {
                 var visit = await _patientVisitRepository.GetByIdAsync(record.PatientVisitId.Value, cancellationToken);
-                if (visit != null)
+                if (visit != null && visit.Status == Domain.Enums.PatientVisitStatus.InProgress)
                 {
-                    visit.Complete("Hồ sơ bệnh án đã hoàn thành và khóa.");
+                    visit.FinishConsultation("Hồ sơ bệnh án đã hoàn thành và khóa.");
                     await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
                 }
             }
@@ -166,7 +166,7 @@ public class FinalizeMedicalRecordCommandHandler : IRequestHandler<FinalizeMedic
                 title: "Medical Record Finalized",
                 message: $"Patient {patient.FullName}'s medical record ({record.MedicalRecordNumber}) has been locked and archived.",
                 type: NotificationType.SystemAlert,
-                payload: new { MedicalRecordId = record.Id, VisitId = record.PatientVisitId },
+                payload: new { MedicalRecordId = record.Id, VisitId = record.PatientVisitId, Action = "cashier_payment_ready" },
                 cancellationToken: cancellationToken);
 
             return Result.Success();

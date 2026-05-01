@@ -18,6 +18,11 @@ public interface ICurrentUserService
     Guid? ProfileId { get; }
 
     /// <summary>
+    /// Current user's full name or display name.
+    /// </summary>
+    string? UserName { get; }
+
+    /// <summary>
     /// Current user's email.
     /// </summary>
     string? Email { get; }

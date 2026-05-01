@@ -63,5 +63,11 @@ public enum NotificationType
     /// <summary>
     /// Internal platform alert for admin-facing operational actions.
     /// </summary>
-    SystemAlert = 9
+    SystemAlert = 9,
+
+    /// <summary>
+    /// Doctor receives invitation to join a clinical consilium
+    /// Payload: { "GroupId": "guid", "InviterName": "string", "PatientName": "string" }
+    /// </summary>
+    ConsiliumInvitation = 11
 }

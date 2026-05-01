@@ -11,6 +11,7 @@ public class InternalGroupChatDto
     public Guid Id { get; set; }
     public string? Name { get; set; }
     public InternalGroupType Type { get; set; }
+    public ConsiliumStatus? ConsiliumStatus { get; set; }
     public Guid? ConsultationSessionId { get; set; }
     public string? MeetingLink { get; set; }
     public string? CalendarEventId { get; set; }
@@ -47,6 +48,7 @@ public class GetInternalGroupChatsQueryHandler : IQueryHandler<GetInternalGroupC
                 Id = g.Id,
                 Name = g.Name,
                 Type = g.Type,
+                ConsiliumStatus = g.ConsiliumStatus,
                 ConsultationSessionId = g.ConsultationSessionId,
                 MeetingLink = g.MeetingLink,
                 CalendarEventId = g.CalendarEventId,

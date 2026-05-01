@@ -20,4 +20,5 @@ public class PatientProfileDto
     public DateTime? UpdatedAt { get; set; }
     public bool IsEmailVerified { get; set; }
     public bool IsTwoFactorEnabled { get; set; }
+    public string? MedicalRecordNumber { get; set; }
 }
