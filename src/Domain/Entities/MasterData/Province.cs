@@ -2,7 +2,7 @@ using Domain.Common;
 
 namespace Domain.Entities.MasterData;
 
-public class Province : BaseEntity, Domain.Common.IAggregateRoot
+public class Province : BaseEntity, IAggregateRoot
 {
     public string Name { get; private set; }
     public int Code { get; private set; }

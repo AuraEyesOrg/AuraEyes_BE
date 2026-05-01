@@ -106,6 +106,7 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<District> Districts => Set<District>();
     public DbSet<Ward> Wards => Set<Ward>();
 
+
     #endregion
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -1,8 +1,10 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
+using Domain.Entities.MedicalRecords;
 using Domain.Entities.Screening;
 using Domain.Entities.Users;
+using Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Screenings.Queries.GetScreeningSessionDetail;
@@ -12,19 +14,22 @@ public class GetScreeningSessionDetailQueryHandler
 {
     private readonly IRepository<AiScreening> _screeningRepository;
     private readonly IRepository<Patient> _patientRepository;
+    private readonly IMedicalRecordRepository _medicalRecordRepository;
     private readonly ICurrentUserService _currentUserService;
     private readonly IIdentityService _identityService;
 
     public GetScreeningSessionDetailQueryHandler(
-        IRepository<AiScreening> screeningRepository,
-        IRepository<Patient> patientRepository,
-        ICurrentUserService currentUserService,
-        IIdentityService identityService)
+        IRepository<AiScreening> _screeningRepository,
+        IRepository<Patient> _patientRepository,
+        IMedicalRecordRepository _medicalRecordRepository,
+        ICurrentUserService _currentUserService,
+        IIdentityService _identityService)
     {
-        _screeningRepository = screeningRepository;
-        _patientRepository = patientRepository;
-        _currentUserService = currentUserService;
-        _identityService = identityService;
+        this._screeningRepository = _screeningRepository;
+        this._patientRepository = _patientRepository;
+        this._medicalRecordRepository = _medicalRecordRepository;
+        this._currentUserService = _currentUserService;
+        this._identityService = _identityService;
     }
 
     public async Task<Result<ScreeningSessionDetailDto>> Handle(
@@ -116,6 +121,14 @@ public class GetScreeningSessionDetailQueryHandler
                     PatientEmail = patientEmail,
                     IsWalkIn = patient.IsWalkIn
                 };
+
+                // Link to most recent medical record
+                var medicalRecords = await _medicalRecordRepository.FindAsync(
+                    mr => mr.PatientId == patient.Id, cancellationToken);
+                
+                session.MedicalRecordId = medicalRecords
+                    .OrderByDescending(mr => mr.CreatedAt)
+                    .FirstOrDefault()?.Id;
             }
         }
 

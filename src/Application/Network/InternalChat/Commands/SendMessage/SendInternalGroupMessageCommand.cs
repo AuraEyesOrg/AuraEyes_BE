@@ -42,7 +42,7 @@ public class SendInternalGroupMessageCommandHandler : ICommandHandler<SendIntern
     {
         var currentUserId = _currentUserService.UserId ?? throw new UnauthorizedAccessException();
         var currentUserRole = _currentUserService.Roles.FirstOrDefault();
-        
+
         var senderType = currentUserRole switch
         {
             "Ophthalmologist" => AuthorType.Ophthalmologist,
@@ -65,30 +65,36 @@ public class SendInternalGroupMessageCommandHandler : ICommandHandler<SendIntern
             return Result<Guid>.Failure("You are not a member of this group");
         }
 
-        var message = new InternalGroupMessage(group.Id, currentUserId, senderType, request.Content);
-        
-        group.AddMessage(message);
-
-        await _messageRepository.AddAsync(message, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        // Broadcast realtime message
-        var sender = await _identityService.GetUserByIdAsync(currentUserId, cancellationToken);
-
-        var messageDto = new Application.Network.InternalChat.Queries.GetMessages.InternalGroupMessageDto
+        try
         {
-            Id = message.Id,
-            GroupId = message.GroupId,
-            SenderId = message.SenderId,
-            SenderType = message.SenderType,
-            Content = message.Content,
-            CreatedAt = message.CreatedAt,
-            SenderName = sender?.FullName,
-            SenderAvatar = sender?.AvatarUrl
-        };
-        
-        await _chatHubService.BroadcastMessageAsync(group.Id, messageDto, cancellationToken);
+            var message = new InternalGroupMessage(group.Id, currentUserId, senderType, request.Content);
+            group.AddMessage(message);
 
-        return Result<Guid>.Success(message.Id);
+            await _messageRepository.AddAsync(message, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            // Broadcast realtime message
+            var sender = await _identityService.GetUserByIdAsync(currentUserId, cancellationToken);
+
+            var messageDto = new Application.Network.InternalChat.Queries.GetMessages.InternalGroupMessageDto
+            {
+                Id = message.Id,
+                GroupId = message.GroupId,
+                SenderId = message.SenderId,
+                SenderType = message.SenderType,
+                Content = message.Content,
+                CreatedAt = message.CreatedAt,
+                SenderName = sender?.FullName,
+                SenderAvatar = sender?.AvatarUrl
+            };
+
+            await _chatHubService.BroadcastMessageAsync(group.Id, messageDto, cancellationToken);
+
+            return Result<Guid>.Success(message.Id);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result<Guid>.Failure(ex.Message);
+        }
     }
 }

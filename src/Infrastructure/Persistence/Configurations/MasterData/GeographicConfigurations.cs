@@ -8,10 +8,10 @@ public class CountryConfiguration : IEntityTypeConfiguration<Country>
 {
     public void Configure(EntityTypeBuilder<Country> builder)
     {
-        builder.HasKey(x => x.Id);
-        builder.Property(x => x.Name).IsRequired().HasMaxLength(200);
-        builder.Property(x => x.IsoCode).IsRequired().HasMaxLength(10);
-        builder.HasIndex(x => x.IsoCode).IsUnique();
+        builder.HasKey(c => c.Id);
+        builder.Property(c => c.Name).HasMaxLength(200).IsRequired();
+        builder.Property(c => c.IsoCode).HasMaxLength(10).IsRequired();
+        builder.HasIndex(c => c.IsoCode).IsUnique();
     }
 }
 
@@ -19,15 +19,10 @@ public class ProvinceConfiguration : IEntityTypeConfiguration<Province>
 {
     public void Configure(EntityTypeBuilder<Province> builder)
     {
-        builder.HasKey(x => x.Id);
-        builder.Property(x => x.Name).IsRequired().HasMaxLength(200);
-        builder.Property(x => x.Code).IsRequired();
-        builder.HasIndex(x => x.Code).IsUnique();
-        
-        builder.HasMany(x => x.Districts)
-               .WithOne(x => x.Province)
-               .HasForeignKey(x => x.ProvinceId)
-               .OnDelete(DeleteBehavior.Cascade);
+        builder.HasKey(p => p.Id);
+        builder.Property(p => p.Name).HasMaxLength(200).IsRequired();
+        builder.Property(p => p.Code).IsRequired();
+        builder.HasIndex(p => p.Code).IsUnique();
     }
 }
 
@@ -35,15 +30,15 @@ public class DistrictConfiguration : IEntityTypeConfiguration<District>
 {
     public void Configure(EntityTypeBuilder<District> builder)
     {
-        builder.HasKey(x => x.Id);
-        builder.Property(x => x.Name).IsRequired().HasMaxLength(200);
-        builder.Property(x => x.Code).IsRequired();
-        builder.HasIndex(x => x.Code).IsUnique();
-
-        builder.HasMany(x => x.Wards)
-               .WithOne(x => x.District)
-               .HasForeignKey(x => x.DistrictId)
-               .OnDelete(DeleteBehavior.Cascade);
+        builder.HasKey(d => d.Id);
+        builder.Property(d => d.Name).HasMaxLength(200).IsRequired();
+        builder.Property(d => d.Code).IsRequired();
+        builder.HasIndex(d => d.Code).IsUnique();
+        
+        builder.HasOne<Province>()
+            .WithMany()
+            .HasForeignKey(d => d.ProvinceId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -51,9 +46,14 @@ public class WardConfiguration : IEntityTypeConfiguration<Ward>
 {
     public void Configure(EntityTypeBuilder<Ward> builder)
     {
-        builder.HasKey(x => x.Id);
-        builder.Property(x => x.Name).IsRequired().HasMaxLength(200);
-        builder.Property(x => x.Code).IsRequired();
-        builder.HasIndex(x => x.Code).IsUnique();
+        builder.HasKey(w => w.Id);
+        builder.Property(w => w.Name).HasMaxLength(200).IsRequired();
+        builder.Property(w => w.Code).IsRequired();
+        builder.HasIndex(w => w.Code).IsUnique();
+        
+        builder.HasOne<District>()
+            .WithMany()
+            .HasForeignKey(w => w.DistrictId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
