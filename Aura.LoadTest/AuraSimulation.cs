@@ -5,11 +5,12 @@
 //
 // Ghi chú kỹ thuật:
 //   - Sử dụng NBomber v5.8.
-//   - Đã cập nhật chính xác các Endpoint từ Backend controllers.
-//   - Đã thêm Authentication (JWT Bearer) để vượt qua lớp bảo mật.
+//   - Đã fix lỗi deserialize JSON bằng JsonElement.
+//   - Đã thêm Authentication (JWT Bearer).
 // =============================================================================
 
 using System.Net.Http.Json;
+using System.Text.Json;
 using NBomber.CSharp;
 using NBomber.Contracts;
 using NBomber.Contracts.Stats;
@@ -44,17 +45,34 @@ public static class AuraSimulation
     {
         try
         {
-            var response = await client.PostAsJsonAsync("/api/auth/login", new { Email = TestUser, Password = TestPass });
+            var loginBody = new { Email = TestUser, Password = TestPass };
+            var response = await client.PostAsJsonAsync("/api/auth/login", loginBody);
+            
             if (response.IsSuccessStatusCode)
             {
-                var result = await response.Content.ReadFromJsonAsync<dynamic>();
-                // Dựa trên ApiResponse<AuthResponse> structure
-                return result?.data?.accessToken;
+                var root = await response.Content.ReadFromJsonAsync<JsonElement>();
+                
+                // ApiResponse<T> has 'success' and 'data' (camelCase in JSON)
+                if (root.TryGetProperty("success", out var success) && success.GetBoolean())
+                {
+                    var data = root.GetProperty("data");
+                    if (data.TryGetProperty("accessToken", out var token))
+                    {
+                        return token.GetString();
+                    }
+                }
+                
+                Console.WriteLine($"[ERROR] Login successful but could not parse token. Response: {root}");
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[ERROR] Login failed with status {response.StatusCode}. Response: {errorContent}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ERROR] Login failed: {ex.Message}");
+            Console.WriteLine($"[ERROR] Login exception: {ex.Message}");
         }
         return null;
     }
@@ -63,7 +81,6 @@ public static class AuraSimulation
     {
         return Scenario.Create("read_queue_scenario", async context =>
         {
-            // 1. Xem danh sách hàng đợi (api/clinic-queue)
             var getQueueRequest = Http
                 .CreateRequest("GET", "/api/clinic-queue")
                 .WithHeader("Authorization", $"Bearer {token}")
@@ -74,9 +91,6 @@ public static class AuraSimulation
             if (!queueResponse.IsError)
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(500, 1500)));
-
-                // 2. Giả lập xem chi tiết một hồ sơ trong hàng đợi (nếu có logic bổ sung)
-                // Ở đây ta có thể gọi lại chính endpoint này hoặc endpoint detail nếu cần
             }
 
             return queueResponse;
@@ -87,8 +101,7 @@ public static class AuraSimulation
     {
         return Scenario.Create("booking_scenario", async context =>
         {
-            // 1. Kiểm tra slot trống (api/appointment-slots)
-            var clinicId = Guid.NewGuid(); // Demo ID
+            var clinicId = Guid.NewGuid();
             var checkSlotRequest = Http
                 .CreateRequest("GET", $"/api/appointment-slots?clinicId={clinicId}")
                 .WithHeader("Authorization", $"Bearer {token}")
@@ -100,10 +113,9 @@ public static class AuraSimulation
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(1000, 3000)));
 
-                // 2. Đặt lịch khám (api/clinic-appointments)
                 var bookingBody = new
                 {
-                    slotId = Guid.NewGuid(), // Demo ID
+                    slotId = Guid.NewGuid(),
                     patientId = Guid.NewGuid(),
                     visitReason = "Retinal screening - load test",
                     pricingType = "AutoAssign"
@@ -127,7 +139,6 @@ public static class AuraSimulation
     {
         return Scenario.Create("ai_screening_scenario", async context =>
         {
-            // 1. Tạo session sàng lọc (api/screenings/create-session)
             var createSessionBody = new
             {
                 modelVersion = "AURA_v1.0",
@@ -147,8 +158,7 @@ public static class AuraSimulation
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(2000, 5000)));
 
-                // 2. Upload ảnh võng mạc (api/screenings/upload-images)
-                var fakeImageBytes = new byte[50 * 1024]; // 50KB
+                var fakeImageBytes = new byte[50 * 1024];
                 Random.Shared.NextBytes(fakeImageBytes);
 
                 using var formContent = new MultipartFormDataContent();
