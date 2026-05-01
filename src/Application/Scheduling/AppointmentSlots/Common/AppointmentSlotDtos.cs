@@ -80,3 +80,14 @@ public record DoctorSlotDetailDto
     public bool IsBooked { get; init; }
     public decimal Price { get; init; }
 }
+
+public record AvailableSlotDto
+{
+    public Guid SlotId { get; init; }
+    public string Date { get; init; } = string.Empty;
+    public string StartTime { get; init; } = string.Empty;
+    public string EndTime { get; init; } = string.Empty;
+    public int Remaining { get; init; }
+    public int MaxCapacity { get; init; }
+    public decimal? Cost { get; init; }
+}
