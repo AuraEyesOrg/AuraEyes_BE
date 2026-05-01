@@ -34,22 +34,10 @@ public class UpdateMedicalRecordClinicalCommandHandler : IRequestHandler<UpdateM
         {
             record.UpdateClinicalInfo(
                 request.ClinicalDataJson, 
-                request.AdministrativeDataJson,
                 request.FinalDiagnosis, 
                 request.TreatmentPlan);
 
             await _medicalRecordRepository.UpdateAsync(record, cancellationToken);
-
-            // Update associated PatientVisit status (Step 2 requirement)
-            if (record.PatientVisitId.HasValue)
-            {
-                var visit = await _patientVisitRepository.GetByIdAsync(record.PatientVisitId.Value, cancellationToken);
-                if (visit != null && visit.Status == Domain.Enums.PatientVisitStatus.InProgress)
-                {
-                    visit.FinishConsultation("Clinical diagnosis completed.");
-                    await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
-                }
-            }
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             return Result.Success();

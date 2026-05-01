@@ -231,7 +231,7 @@ public static class Permissions
             AppointmentsRead, AppointmentsCreate,
             SchedulesManage, ApptSlotsManage,
             VisitsRead,
-            MedicalRecordsRead, MedicalRecordsUpdate,
+            MedicalRecordsRead, MedicalRecordsUpdate, MedicalRecordsFinalize,
             SettingsRead,
         ],
 

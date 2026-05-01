@@ -55,17 +55,22 @@ public class MedicalRecord : BaseEntity, IAggregateRoot
     public void UpdateAdministrativeInfo(string jsonData)
     {
         EnsureNotFinalized();
+        if (string.IsNullOrWhiteSpace(jsonData) || jsonData == "null")
+            throw new ArgumentException("Administrative data cannot be empty.");
+
         AdministrativeDataJson = jsonData;
         Status = MedicalRecordStatus.PendingClinical;
     }
 
-    public void UpdateClinicalInfo(string clinicalJson, string administrativeJson, string finalDiagnosis, string treatmentPlan)
+    public void UpdateClinicalInfo(string clinicalJson, string finalDiagnosis, string treatmentPlan)
     {
         EnsureNotFinalized();
+        if (string.IsNullOrWhiteSpace(clinicalJson) || clinicalJson == "null")
+            throw new ArgumentException("Clinical data cannot be empty.");
+
         ClinicalDataJson = clinicalJson;
-        AdministrativeDataJson = administrativeJson;
-        FinalDiagnosis = finalDiagnosis;
-        TreatmentPlan = treatmentPlan;
+        FinalDiagnosis = finalDiagnosis ?? string.Empty;
+        TreatmentPlan = treatmentPlan ?? string.Empty;
         Status = MedicalRecordStatus.PendingClinical;
     }
 

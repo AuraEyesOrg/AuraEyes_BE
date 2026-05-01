@@ -9,10 +9,17 @@ public enum InternalGroupType
     ClinicalCase
 }
 
+public enum ConsiliumStatus
+{
+    Ongoing,
+    Concluded
+}
+
 public class InternalGroupChat : BaseEntity, IAggregateRoot
 {
     public string? Name { get; private set; }
     public InternalGroupType Type { get; private set; }
+    public ConsiliumStatus? ConsiliumStatus { get; private set; }
     
     public Guid? ConsultationSessionId { get; private set; }
     
@@ -37,6 +44,11 @@ public class InternalGroupChat : BaseEntity, IAggregateRoot
         CreatorId = creatorId;
         CreatorType = creatorType;
         ConsultationSessionId = consultationSessionId;
+
+        if (type == InternalGroupType.ClinicalCase)
+        {
+            ConsiliumStatus = Network.InternalChat.ConsiliumStatus.Ongoing;
+        }
     }
     
     public void SetMeetingInfo(string meetingLink, string? calendarEventId = null)
@@ -92,7 +104,35 @@ public class InternalGroupChat : BaseEntity, IAggregateRoot
 
     public void AddMessage(InternalGroupMessage message)
     {
+        if (Type == InternalGroupType.ClinicalCase)
+        {
+            if (ConsiliumStatus == Network.InternalChat.ConsiliumStatus.Concluded)
+            {
+                throw new InvalidOperationException("Hội chẩn đã kết thúc. Không thể gửi tin nhắn.");
+            }
+
+            if (DateTime.UtcNow > CreatedAt.AddMinutes(20))
+            {
+                throw new InvalidOperationException("Hội chẩn đã quá hạn 20 phút. Không thể gửi tin nhắn.");
+            }
+        }
         _messages.Add(message);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void ConcludeConsilium(Guid userId)
+    {
+        if (Type != InternalGroupType.ClinicalCase)
+        {
+            throw new InvalidOperationException("Only clinical case groups can be concluded.");
+        }
+
+        if (CreatorId != userId)
+        {
+            throw new InvalidOperationException("Only the creator of the consilium can conclude it.");
+        }
+
+        ConsiliumStatus = Network.InternalChat.ConsiliumStatus.Concluded;
         UpdatedAt = DateTime.UtcNow;
     }
 }
