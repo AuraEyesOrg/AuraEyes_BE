@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.31903.59
+# Visual Studio Version 18
+VisualStudioVersion = 18.5.11716.220 stable
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{8C7D7F9A-7B5E-4F5C-8C5D-1A3956D46DE8}"
 EndProject
@@ -12,6 +12,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Infrastructure", "src\Infrastructure\Infrastructure.csproj", "{D3234567-89AB-CDEF-0123-456789ABCDEF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "API", "src\API\API.csproj", "{D4234567-89AB-CDEF-0123-456789ABCDEF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aura.LoadTest", "Aura.LoadTest\Aura.LoadTest.csproj", "{FDB4A06B-26E0-4924-9684-CCE902EE8E04}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -71,6 +73,18 @@ Global
 		{D4234567-89AB-CDEF-0123-456789ABCDEF}.Release|x64.Build.0 = Release|Any CPU
 		{D4234567-89AB-CDEF-0123-456789ABCDEF}.Release|x86.ActiveCfg = Release|Any CPU
 		{D4234567-89AB-CDEF-0123-456789ABCDEF}.Release|x86.Build.0 = Release|Any CPU
+		{FDB4A06B-26E0-4924-9684-CCE902EE8E04}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FDB4A06B-26E0-4924-9684-CCE902EE8E04}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FDB4A06B-26E0-4924-9684-CCE902EE8E04}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FDB4A06B-26E0-4924-9684-CCE902EE8E04}.Debug|x64.Build.0 = Debug|Any CPU
+		{FDB4A06B-26E0-4924-9684-CCE902EE8E04}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FDB4A06B-26E0-4924-9684-CCE902EE8E04}.Debug|x86.Build.0 = Debug|Any CPU
+		{FDB4A06B-26E0-4924-9684-CCE902EE8E04}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FDB4A06B-26E0-4924-9684-CCE902EE8E04}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FDB4A06B-26E0-4924-9684-CCE902EE8E04}.Release|x64.ActiveCfg = Release|Any CPU
+		{FDB4A06B-26E0-4924-9684-CCE902EE8E04}.Release|x64.Build.0 = Release|Any CPU
+		{FDB4A06B-26E0-4924-9684-CCE902EE8E04}.Release|x86.ActiveCfg = Release|Any CPU
+		{FDB4A06B-26E0-4924-9684-CCE902EE8E04}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

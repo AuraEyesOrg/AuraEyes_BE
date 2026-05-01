@@ -80,6 +80,7 @@ builder.Host.UseSerilog();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpClient();
+builder.Services.AddMemoryCache();
 
 // ── OpenTelemetry & Monitoring ─────────────────────────────────────────────
 var otelResource = ResourceBuilder.CreateDefault()
