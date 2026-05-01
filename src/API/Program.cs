@@ -470,7 +470,7 @@ app.UseHttpsRedirection();
 
 app.UseResponseCompression();
 
-app.UseRateLimiter();
+// app.UseRateLimiter();
 
 app.UseCors("FrontendCors");
 app.UseOutputCache();
