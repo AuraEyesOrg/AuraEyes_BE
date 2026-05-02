@@ -77,6 +77,7 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+    public DbSet<LeavePolicy> LeavePolicies => Set<LeavePolicy>();
 
     // Identity
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
