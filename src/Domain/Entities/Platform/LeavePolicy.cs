@@ -12,14 +12,14 @@ public class LeavePolicy : BaseEntity, IAggregateRoot
     public string Name { get; private set; } = string.Empty;
 
     /// <summary>Number of leave days to add when this policy is applied.</summary>
-    public decimal AdditionalDays { get; private set; }
+    public int AdditionalDays { get; private set; }
 
     /// <summary>Optional description explaining the context of the policy.</summary>
     public string? Description { get; private set; }
 
     private LeavePolicy() { } // EF Core
 
-    public static LeavePolicy Create(string name, decimal additionalDays, string? description = null)
+    public static LeavePolicy Create(string name, int additionalDays, string? description = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Policy name cannot be empty.", nameof(name));
@@ -35,7 +35,7 @@ public class LeavePolicy : BaseEntity, IAggregateRoot
         };
     }
 
-    public void Update(string name, decimal additionalDays, string? description)
+    public void Update(string name, int additionalDays, string? description)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Policy name cannot be empty.", nameof(name));

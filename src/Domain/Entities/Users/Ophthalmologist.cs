@@ -19,7 +19,7 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
     public decimal ConsultationFee { get; private set; }
 
     /// <summary>Available leave days fund for this doctor (e.g. accumulated from holiday duty).</summary>
-    public decimal AvailableLeaveDays { get; private set; }
+    public int AvailableLeaveDays { get; private set; }
 
     // Navigation properties
     private readonly List<Certificate> _certificates = new();
@@ -91,7 +91,7 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
     }
 
     /// <summary>Add leave days to the fund (e.g., +2 for working on a minor holiday).</summary>
-    public void AddLeaveDays(decimal days)
+    public void AddLeaveDays(int days)
     {
         if (days <= 0)
             throw new ArgumentException("Days to add must be positive.", nameof(days));
@@ -101,7 +101,7 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
     }
 
     /// <summary>Deduct leave days after a leave request is approved.</summary>
-    public void DeductLeaveDays(decimal days)
+    public void DeductLeaveDays(int days)
     {
         if (days <= 0)
             throw new ArgumentException("Days to deduct must be positive.", nameof(days));

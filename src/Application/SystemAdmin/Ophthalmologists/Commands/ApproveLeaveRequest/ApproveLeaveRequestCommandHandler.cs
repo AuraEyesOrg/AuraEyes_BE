@@ -73,11 +73,11 @@ public class ApproveLeaveRequestCommandHandler : ICommandHandler<ApproveLeaveReq
         var pendingNotifications = new List<PendingNotification>();
 
         // Rule 4: Check and deduct leave days fund
-        var requestedDays = (decimal)(leaveRequest.EndDate.ToDateTime(TimeOnly.MinValue) - leaveRequest.StartDate.ToDateTime(TimeOnly.MinValue)).TotalDays + 1;
+        var requestedDays = (int)(leaveRequest.EndDate.ToDateTime(TimeOnly.MinValue) - leaveRequest.StartDate.ToDateTime(TimeOnly.MinValue)).TotalDays + 1;
         if (ophthalmologist.AvailableLeaveDays < requestedDays)
         {
             return Result<ApproveLeaveRequestResultDto>.Conflict(
-                $"Bác sĩ không đủ ngày phép. Cần: {requestedDays}, Hiện có: {ophthalmologist.AvailableLeaveDays}.");
+                $"Bác sĩ không đủ ngày phép. Cần: {requestedDays} Hiện có: {ophthalmologist.AvailableLeaveDays}");
         }
 
         // Rule 1: No Pending Appointments - Check for active sessions/appointments

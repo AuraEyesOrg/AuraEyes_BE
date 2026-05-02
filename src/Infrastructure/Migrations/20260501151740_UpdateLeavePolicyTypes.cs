@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -6,19 +6,19 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddLeavePolicyModule : Migration
+    public partial class UpdateLeavePolicyTypes : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<decimal>(
+            migrationBuilder.AddColumn<int>(
                 name: "AvailableLeaveDays",
                 table: "Ophthalmologists",
-                type: "numeric(10,2)",
+                type: "integer",
                 precision: 10,
                 scale: 2,
                 nullable: false,
-                defaultValue: 0m);
+                defaultValue: 0);
 
             migrationBuilder.CreateTable(
                 name: "LeavePolicies",
@@ -26,7 +26,7 @@ namespace Infrastructure.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    AdditionalDays = table.Column<decimal>(type: "numeric(5,1)", precision: 5, scale: 1, nullable: false),
+                    AdditionalDays = table.Column<int>(type: "integer", precision: 5, scale: 1, nullable: false),
                     Description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),

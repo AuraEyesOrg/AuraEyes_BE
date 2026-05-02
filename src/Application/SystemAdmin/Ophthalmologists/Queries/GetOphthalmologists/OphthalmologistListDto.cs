@@ -26,7 +26,7 @@ public class OphthalmologistListDto
     public List<OphthalmologistCredentialDto> Degrees { get; set; } = new();
     public string? OrganisationName { get; set; }
     public bool IsActive { get; set; }
-    public decimal AvailableLeaveDays { get; set; }
+    public int AvailableLeaveDays { get; set; }
     public decimal ConsultationFee { get; set; }
     public DateTime CreatedAt { get; set; }
 }
