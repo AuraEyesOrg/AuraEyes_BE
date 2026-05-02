@@ -8,6 +8,7 @@ using Domain.Entities.Screening;
 using Domain.Enums;
 using Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Application.ClinicQueue.Queries.GetClinicQueue;
 
@@ -23,20 +24,25 @@ public class GetClinicQueueQueryHandler
     private readonly IRepository<AiScreening> _screeningRepository;
     private readonly IConsultationSessionRepository _consultationSessionRepository;
     private readonly IIdentityService _identityService;
+    private readonly IMemoryCache _cache;
 
     public GetClinicQueueQueryHandler(
         IPatientVisitRepository patientVisitRepository,
         IRepository<AiScreening> screeningRepository,
         IConsultationSessionRepository consultationSessionRepository,
-        IIdentityService identityService
+        IIdentityService identityService,
+        IMemoryCache cache
         )
     {
         _patientVisitRepository = patientVisitRepository;
         _screeningRepository = screeningRepository;
         _consultationSessionRepository = consultationSessionRepository;
         _identityService = identityService;
+        _cache = cache;
     }
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Threading.SemaphoreSlim> _semaphores = new();
+    
     public async Task<Result<IReadOnlyList<ClinicQueueItemDto>>> Handle(
         GetClinicQueueQuery request,
         CancellationToken cancellationToken)
@@ -44,129 +50,164 @@ public class GetClinicQueueQueryHandler
         if (request.RequestedByUserId == Guid.Empty)
             return Result<IReadOnlyList<ClinicQueueItemDto>>.Failure("Invalid requester.");
 
-        var cutoffDate = DateTime.UtcNow.AddDays(-1);
-
-        var visits = await _patientVisitRepository
-            .Query()
-            .Include(v => v.Patient)
-            .Include(v => v.Appointment)
-                .ThenInclude(a => a!.AppointmentSlot)
-                    .ThenInclude(s => s!.ScheduleTemplate)
-            .Include(v => v.AssignedDoctor)
-            .Include(v => v.MedicalRecord)
-            .Where(v =>
-                v.Appointment != null &&
-                v.Appointment.AppointmentSlot != null &&
-                v.CheckedInAt >= cutoffDate &&
-                v.Status != PatientVisitStatus.Completed)
-            .OrderBy(v => v.CheckedInAt)
-            .ToListAsync(cancellationToken);
-
-        if (visits.Count == 0)
-            return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(Array.Empty<ClinicQueueItemDto>());
-
-        var patientIds = visits.Select(v => v.PatientId).Distinct().ToList();
-        var screenings = await _screeningRepository
-            .Query()
-            .Include(s => s.ScreeningResults)
-            .Where(s => patientIds.Contains(s.PatientId)
-                && s.CreatedAt >= cutoffDate
-                && !s.IsDeleted)
-            .ToListAsync(cancellationToken);
-
-        var consultations = await _consultationSessionRepository
-            .Query()
-            .Where(cs => patientIds.Contains(cs.PatientId)
-                && cs.CreatedAt >= cutoffDate
-                && cs.Status != SessionStatus.Cancelled
-                && !cs.IsDeleted)
-            .ToListAsync(cancellationToken);
-
-        var doctorUserIds = visits
-            .Where(v => v.AssignedDoctor != null)
-            .Select(v => v.AssignedDoctor!.UserId)
-            .Distinct()
-            .ToList();
-        var doctorUsers = doctorUserIds.Count > 0
-            ? await _identityService.GetUsersByIdsAsync(doctorUserIds, cancellationToken)
-            : Array.Empty<UserDto>();
-        var doctorNameByUserId = doctorUsers.ToDictionary(u => u.Id, u => u.FullName?.Trim() ?? string.Empty);
-
-        var patientUserIds = visits
-            .Where(v => v.Patient != null && v.Patient.UserId.HasValue)
-            .Select(v => v.Patient!.UserId!.Value)
-            .Distinct()
-            .ToList();
-
-        var patientUsers = patientUserIds.Count > 0
-            ? await _identityService.GetUsersByIdsAsync(patientUserIds, cancellationToken)
-            : Array.Empty<UserDto>();
-        var patientNameByUserId = patientUsers.ToDictionary(u => u.Id, u => u.FullName?.Trim() ?? "Unknown Patient");
-
-        var queueItems = new List<ClinicQueueItemDto>();
-
-        foreach (var visit in visits)
+        string cacheKey = $"clinic_queue_{request.RequestedByUserId}";
+        
+        // 1. Fast path: check cache
+        if (_cache.TryGetValue(cacheKey, out IReadOnlyList<ClinicQueueItemDto>? cachedQueue))
         {
-            // Find most recent screening for this patient
-            var screening = screenings
-                .Where(s => s.PatientId == visit.PatientId)
-                .OrderByDescending(s => s.CreatedAt)
-                .FirstOrDefault();
-
-            // Find most recent consultation for this patient
-            var consultation = consultations
-                .Where(c => c.PatientId == visit.PatientId)
-                .OrderByDescending(c => c.CreatedAt)
-                .FirstOrDefault();
-            var latestResult = screening?.ScreeningResults
-                .OrderByDescending(r => r.CreatedAt)
-                .FirstOrDefault();
-            var assignedDoctorName = visit.AssignedDoctor is not null &&
-                                     doctorNameByUserId.TryGetValue(visit.AssignedDoctor.UserId, out var doctorName)
-                ? doctorName
-                : null;
-
-            string patientName = "Unknown Patient";
-            if (visit.Patient != null)
-            {
-                if (visit.Patient.UserId.HasValue && patientNameByUserId.TryGetValue(visit.Patient.UserId.Value, out var name))
-                {
-                    patientName = name;
-                }
-                else if (visit.Patient.IsWalkIn && !string.IsNullOrWhiteSpace(visit.Patient.FullName))
-                {
-                    patientName = visit.Patient.FullName;
-                }
-            }
-
-            var item = new ClinicQueueItemDto
-            {
-                VisitId = visit.Id,
-                PatientId = visit.PatientId,
-                PatientName = patientName,
-                PatientAge = visit.Patient != null ? CalculateAge(visit.Patient.DateOfBirth) : null,
-                PatientGender = visit.Patient != null ? ((Gender?)visit.Patient.GenderId)?.ToString() : null,
-                CitizenId = visit.Patient?.CitizenId,
-                AppointmentId = visit.AppointmentId,
-                VisitStatus = visit.Status.ToString(),
-                CheckedInAt = visit.CheckedInAt ?? DateTime.UtcNow,
-                ScreeningId = screening?.Id,
-                ScreeningStatus = latestResult is not null ? "completed" : screening is not null ? "pending" : null,
-                ScreeningRiskLevel = latestResult?.RiskLevel.ToString(),
-                ConsultationSessionId = consultation?.Id,
-                ConsultationStatus = consultation?.Status.ToString(),
-                AssignedDoctorId = visit.AssignedDoctorId ?? consultation?.OphthalmologistId,
-                AssignedDoctorName = assignedDoctorName,
-                MedicalRecordId = visit.MedicalRecord?.Id,
-                IsAdminCompleted = visit.MedicalRecord != null && visit.MedicalRecord.Status != MedicalRecordStatus.DraftAdmin,
-
-                FlowState = DetermineFlowState(visit, screening, consultation)
-            };
-
-            queueItems.Add(item);
+            return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(cachedQueue!);
         }
 
-        return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(queueItems);
+        // 2. Slow path: Lock to prevent Cache Stampede (only 1 request goes to DB)
+        var semaphore = _semaphores.GetOrAdd(cacheKey, _ => new System.Threading.SemaphoreSlim(1, 1));
+        await semaphore.WaitAsync(cancellationToken);
+
+        try
+        {
+            // Re-check cache after acquiring lock
+            if (_cache.TryGetValue(cacheKey, out cachedQueue))
+            {
+                return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(cachedQueue!);
+            }
+
+            var cutoffDate = DateTime.UtcNow.AddDays(-1);
+
+            var visits = await _patientVisitRepository
+                .Query()
+                .AsNoTracking()
+                .Include(v => v.Patient)
+                .Include(v => v.Appointment)
+                    .ThenInclude(a => a!.AppointmentSlot)
+                        .ThenInclude(s => s!.ScheduleTemplate)
+                .Include(v => v.AssignedDoctor)
+                .Include(v => v.MedicalRecord)
+                .Where(v =>
+                    v.Appointment != null &&
+                    v.Appointment.AppointmentSlot != null &&
+                    v.CheckedInAt >= cutoffDate &&
+                    v.Status != PatientVisitStatus.Completed)
+                .OrderBy(v => v.CheckedInAt)
+                .ToListAsync(cancellationToken);
+
+            if (visits.Count == 0)
+            {
+                var emptyResult = Array.Empty<ClinicQueueItemDto>();
+                _cache.Set(cacheKey, emptyResult, TimeSpan.FromSeconds(10));
+                return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(emptyResult);
+            }
+
+            var patientIds = visits.Select(v => v.PatientId).Distinct().ToList();
+            var screenings = await _screeningRepository
+                .Query()
+                .AsNoTracking()
+                .Include(s => s.ScreeningResults)
+                .Where(s => patientIds.Contains(s.PatientId)
+                    && s.CreatedAt >= cutoffDate
+                    && !s.IsDeleted)
+                .ToListAsync(cancellationToken);
+
+            var consultations = await _consultationSessionRepository
+                .Query()
+                .AsNoTracking()
+                .Where(cs => patientIds.Contains(cs.PatientId)
+                    && cs.CreatedAt >= cutoffDate
+                    && cs.Status != SessionStatus.Cancelled
+                    && !cs.IsDeleted)
+                .ToListAsync(cancellationToken);
+
+            var doctorUserIds = visits
+                .Where(v => v.AssignedDoctor != null)
+                .Select(v => v.AssignedDoctor!.UserId)
+                .Distinct()
+                .ToList();
+            var doctorUsers = doctorUserIds.Count > 0
+                ? await _identityService.GetUsersByIdsAsync(doctorUserIds, cancellationToken)
+                : Array.Empty<UserDto>();
+            var doctorNameByUserId = doctorUsers.ToDictionary(u => u.Id, u => u.FullName?.Trim() ?? string.Empty);
+
+            var patientUserIds = visits
+                .Where(v => v.Patient != null && v.Patient.UserId.HasValue)
+                .Select(v => v.Patient!.UserId!.Value)
+                .Distinct()
+                .ToList();
+
+            var patientUsers = patientUserIds.Count > 0
+                ? await _identityService.GetUsersByIdsAsync(patientUserIds, cancellationToken)
+                : Array.Empty<UserDto>();
+            var patientNameByUserId = patientUsers.ToDictionary(u => u.Id, u => u.FullName?.Trim() ?? "Unknown Patient");
+
+            var queueItems = new List<ClinicQueueItemDto>();
+
+            foreach (var visit in visits)
+            {
+                var screening = screenings
+                    .Where(s => s.PatientId == visit.PatientId)
+                    .OrderByDescending(s => s.CreatedAt)
+                    .FirstOrDefault();
+
+                var consultation = consultations
+                    .Where(c => c.PatientId == visit.PatientId)
+                    .OrderByDescending(c => c.CreatedAt)
+                    .FirstOrDefault();
+                    
+                var latestResult = screening?.ScreeningResults
+                    .OrderByDescending(r => r.CreatedAt)
+                    .FirstOrDefault();
+                
+                var assignedDoctorName = visit.AssignedDoctor is not null &&
+                                         doctorNameByUserId.TryGetValue(visit.AssignedDoctor.UserId, out var doctorName)
+                    ? doctorName
+                    : null;
+
+                string patientName = "Unknown Patient";
+                if (visit.Patient != null)
+                {
+                    if (visit.Patient.UserId.HasValue && patientNameByUserId.TryGetValue(visit.Patient.UserId.Value, out var name))
+                    {
+                        patientName = name;
+                    }
+                    else if (visit.Patient.IsWalkIn && !string.IsNullOrWhiteSpace(visit.Patient.FullName))
+                    {
+                        patientName = visit.Patient.FullName;
+                    }
+                }
+
+                var item = new ClinicQueueItemDto
+                {
+                    VisitId = visit.Id,
+                    PatientId = visit.PatientId,
+                    PatientName = patientName,
+                    PatientAge = visit.Patient != null ? CalculateAge(visit.Patient.DateOfBirth) : null,
+                    PatientGender = visit.Patient != null ? ((Gender?)visit.Patient.GenderId)?.ToString() : null,
+                    CitizenId = visit.Patient?.CitizenId,
+                    AppointmentId = visit.AppointmentId,
+                    VisitStatus = visit.Status.ToString(),
+                    CheckedInAt = visit.CheckedInAt ?? DateTime.UtcNow,
+                    ScreeningId = screening?.Id,
+                    ScreeningStatus = latestResult is not null ? "completed" : screening is not null ? "pending" : null,
+                    ScreeningRiskLevel = latestResult?.RiskLevel.ToString(),
+                    ConsultationSessionId = consultation?.Id,
+                    ConsultationStatus = consultation?.Status.ToString(),
+                    AssignedDoctorId = visit.AssignedDoctorId ?? consultation?.OphthalmologistId,
+                    AssignedDoctorName = assignedDoctorName,
+                    MedicalRecordId = visit.MedicalRecord?.Id,
+                    IsAdminCompleted = visit.MedicalRecord != null && visit.MedicalRecord.Status != MedicalRecordStatus.DraftAdmin,
+
+                    FlowState = DetermineFlowState(visit, screening, consultation)
+                };
+
+                queueItems.Add(item);
+            }
+
+            // Cache the results for 30 seconds to survive heavy load
+            _cache.Set(cacheKey, queueItems, TimeSpan.FromSeconds(30));
+
+            return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(queueItems);
+        }
+        finally
+        {
+            semaphore.Release();
+        }
     }
 
     private static int? CalculateAge(DateTime? dob)
