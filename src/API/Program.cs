@@ -476,8 +476,6 @@ if (enableHangfireServer)
     var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
     var legacyRecurringJobIds = new[]
     {
-        "monthly-quota-reset",
-        "daily-quota-reset",
         "fulltime-slot-generation",
         "full-time-slot-generation",
         "fulltime-slot-generation-job",
@@ -510,6 +508,12 @@ if (enableHangfireServer)
         "fulltime-slot-rolling-window",
         job => job.ExecuteAsync(CancellationToken.None),
         fullTimeSlotGenerationCron,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+    recurringJobManager.AddOrUpdate<MonthlyLeaveFundJob>(
+        "monthly-leave-fund-increment",
+        job => job.IncrementMonthlyLeaveDaysAsync(CancellationToken.None),
+        "0 0 1 * *",
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
 
