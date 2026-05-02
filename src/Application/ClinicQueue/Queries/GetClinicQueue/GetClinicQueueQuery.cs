@@ -58,17 +58,8 @@ public class GetClinicQueueQueryHandler
             return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(cachedQueue!);
         }
 
-        // 2. Slow path: Lock to prevent Cache Stampede (only 1 request goes to DB)
-        var semaphore = _semaphores.GetOrAdd(cacheKey, _ => new System.Threading.SemaphoreSlim(1, 1));
-        await semaphore.WaitAsync(cancellationToken);
-
         try
         {
-            // Re-check cache after acquiring lock
-            if (_cache.TryGetValue(cacheKey, out cachedQueue))
-            {
-                return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(cachedQueue!);
-            }
 
             var cutoffDate = DateTime.UtcNow.AddDays(-1);
 
@@ -123,7 +114,13 @@ public class GetClinicQueueQueryHandler
             var doctorUsers = doctorUserIds.Count > 0
                 ? await _identityService.GetUsersByIdsAsync(doctorUserIds, cancellationToken)
                 : Array.Empty<UserDto>();
-            var doctorNameByUserId = doctorUsers.ToDictionary(u => u.Id, u => u.FullName?.Trim() ?? string.Empty);
+            
+            // Safer way to build dictionary (handles potential duplicates from service gracefully)
+            var doctorNameByUserId = new Dictionary<Guid, string>();
+            foreach (var u in doctorUsers)
+            {
+                doctorNameByUserId[u.Id] = u.FullName?.Trim() ?? string.Empty;
+            }
 
             var patientUserIds = visits
                 .Where(v => v.Patient != null && v.Patient.UserId.HasValue)
@@ -134,7 +131,12 @@ public class GetClinicQueueQueryHandler
             var patientUsers = patientUserIds.Count > 0
                 ? await _identityService.GetUsersByIdsAsync(patientUserIds, cancellationToken)
                 : Array.Empty<UserDto>();
-            var patientNameByUserId = patientUsers.ToDictionary(u => u.Id, u => u.FullName?.Trim() ?? "Unknown Patient");
+            
+            var patientNameByUserId = new Dictionary<Guid, string>();
+            foreach (var u in patientUsers)
+            {
+                patientNameByUserId[u.Id] = u.FullName?.Trim() ?? "Unknown Patient";
+            }
 
             var queueItems = new List<ClinicQueueItemDto>();
 
@@ -204,9 +206,10 @@ public class GetClinicQueueQueryHandler
 
             return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(queueItems);
         }
-        finally
+        catch (Exception ex)
         {
-            semaphore.Release();
+            Console.WriteLine($"[CRITICAL] Error in GetClinicQueueQueryHandler: {ex.Message} \n {ex.StackTrace}");
+            return Result<IReadOnlyList<ClinicQueueItemDto>>.Failure("An internal error occurred while fetching the clinic queue.");
         }
     }
 
