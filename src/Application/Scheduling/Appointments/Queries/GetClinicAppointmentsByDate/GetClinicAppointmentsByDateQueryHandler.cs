@@ -71,7 +71,7 @@ public class GetClinicAppointmentsByDateQueryHandler
         var doctorMap = await _ophthalmologistRepository.GetDoctorDetailsByIdsAsync(doctorIds, cancellationToken);
 
         var items = appointments
-            .Where(a => a.AppointmentSlot is not null)
+            .Where(a => a.AppointmentSlot is not null && a.Status != AppointmentStatus.Cancelled)
             .Select(a => {
                 var appointmentOrders = orderLookup[a.Id].ToList();
                 var primaryOrder = appointmentOrders.OrderByDescending(o => o.CreatedAt).FirstOrDefault();
