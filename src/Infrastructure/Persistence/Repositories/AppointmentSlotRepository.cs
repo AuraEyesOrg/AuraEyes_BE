@@ -146,7 +146,7 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
     {
         var query = _dbSet
             .Where(s => s.Date == date)
-            .Where(s => s.Status != ScheduleStatus.Blocked);
+            .Where(s => s.Status != ScheduleStatus.Blocked && s.Status != ScheduleStatus.Expired);
 
         if (excludeSlotId.HasValue)
             query = query.Where(s => s.Id != excludeSlotId.Value);
@@ -202,18 +202,7 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
 
     private static DateTime GetVietnamNow()
     {
-        var utcNow = DateTime.UtcNow;
-        foreach (var timeZoneId in new[] { "SE Asia Standard Time", "Asia/Ho_Chi_Minh" })
-        {
-            try
-            {
-                var timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
-                return TimeZoneInfo.ConvertTimeFromUtc(utcNow, timeZone);
-            }
-            catch (TimeZoneNotFoundException) { }
-            catch (InvalidTimeZoneException) { }
-        }
-
-        return utcNow + TimeSpan.FromHours(7);
+        var tz = Application.Common.Helpers.VietnamTimeZoneResolver.TimeZone;
+        return TimeZoneInfo.ConvertTime(DateTime.UtcNow, tz);
     }
 }
