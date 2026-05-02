@@ -111,16 +111,6 @@ public class GetClinicQueueQueryHandler
                 .Select(v => v.AssignedDoctor!.UserId)
                 .Distinct()
                 .ToList();
-            var doctorUsers = doctorUserIds.Count > 0
-                ? await _identityService.GetUsersByIdsAsync(doctorUserIds, cancellationToken)
-                : Array.Empty<UserDto>();
-            
-            // Safer way to build dictionary (handles potential duplicates from service gracefully)
-            var doctorNameByUserId = new Dictionary<Guid, string>();
-            foreach (var u in doctorUsers)
-            {
-                doctorNameByUserId[u.Id] = u.FullName?.Trim() ?? string.Empty;
-            }
 
             var patientUserIds = visits
                 .Where(v => v.Patient != null && v.Patient.UserId.HasValue)
@@ -128,14 +118,30 @@ public class GetClinicQueueQueryHandler
                 .Distinct()
                 .ToList();
 
-            var patientUsers = patientUserIds.Count > 0
-                ? await _identityService.GetUsersByIdsAsync(patientUserIds, cancellationToken)
+            // Combine all IDs to fetch in a single batch to reduce round-trips
+            var allUserIds = doctorUserIds.Concat(patientUserIds).Distinct().ToList();
+            var allUsers = allUserIds.Count > 0
+                ? await _identityService.GetUsersByIdsAsync(allUserIds, cancellationToken)
                 : Array.Empty<UserDto>();
             
-            var patientNameByUserId = new Dictionary<Guid, string>();
-            foreach (var u in patientUsers)
+            var userNameLookup = allUsers.ToDictionary(u => u.Id, u => u.FullName?.Trim());
+
+            var doctorNameByUserId = new Dictionary<Guid, string>();
+            foreach (var id in doctorUserIds)
             {
-                patientNameByUserId[u.Id] = u.FullName?.Trim() ?? "Unknown Patient";
+                if (userNameLookup.TryGetValue(id, out var name))
+                {
+                    doctorNameByUserId[id] = name ?? string.Empty;
+                }
+            }
+
+            var patientNameByUserId = new Dictionary<Guid, string>();
+            foreach (var id in patientUserIds)
+            {
+                if (userNameLookup.TryGetValue(id, out var name))
+                {
+                    patientNameByUserId[id] = name ?? "Unknown Patient";
+                }
             }
 
             var queueItems = new List<ClinicQueueItemDto>();
