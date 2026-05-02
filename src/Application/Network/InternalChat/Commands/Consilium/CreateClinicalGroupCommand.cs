@@ -76,7 +76,7 @@ public class CreateClinicalGroupCommandHandler : ICommandHandler<CreateClinicalG
                 group.Id,
                 currentUserId,
                 AuthorType.Ophthalmologist,
-                $"[HỘI CHẨN LÂM SÀNG]\nLý do: {request.Reason}\nXem chi tiết tại: /ophthalmologist/screenings/{request.ConsultationSessionId}/review"
+                $"[HỘI CHẨN LÂM SÀNG]\nLý do: {request.Reason}\nXem chi tiết tại Hồ sơ bệnh án của phiên khám."
             );
             group.AddMessage(systemMessage);
         }
@@ -91,10 +91,15 @@ public class CreateClinicalGroupCommandHandler : ICommandHandler<CreateClinicalG
 
             await _notificationService.SendAsync(
                 doctorId,
-                "Mời hội chẩn lâm sàng",
-                $"Bác sĩ {_currentUserService.UserName} mời bạn tham gia hội chẩn: {groupName}",
+                "Mời hội chẩn lâm sàng khẩn cấp",
+                $"Bác sĩ {_currentUserService.UserName} mời bạn hội chẩn ca bệnh: {groupName}",
                 NotificationType.ConsiliumInvitation,
-                new { GroupId = group.Id, SessionId = request.ConsultationSessionId },
+                new { 
+                    GroupId = group.Id, 
+                    SessionId = request.ConsultationSessionId,
+                    InviterName = _currentUserService.UserName,
+                    GroupName = groupName
+                },
                 cancellationToken,
                 group.Id);
         }

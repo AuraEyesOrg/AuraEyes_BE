@@ -171,17 +171,34 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
                 {
                     order.Confirm();
 
-            // Log deposit received but keep appointment status as Pending
-            if (order.AppointmentId.HasValue)
-            {
-                _logger.LogInformation("Deposit paid for Appointment {AppointmentId}. Status remains Pending until check-in.", order.AppointmentId.Value);
-            }
+                    await _notificationService.SendAsync(
+                        order.UserId,
+                        "Nạp tiền cọc thành công",
+                        $"Bạn đã thanh toán đặt cọc thành công. Số tiền: {payment.Amount:N0} VNĐ",
+                        NotificationType.WalletDepositSuccess,
+                        new { OrderId = order.Id, Amount = payment.Amount },
+                        cancellationToken);
+
+                    // Log deposit received but keep appointment status as Pending
+                    if (order.AppointmentId.HasValue)
+                    {
+                        _logger.LogInformation("Deposit paid for Appointment {AppointmentId}. Status remains Pending until check-in.", order.AppointmentId.Value);
+                    }
                     _logger.LogInformation("Order {OrderId} confirmed (deposit received).", order.Id);
                 }
                 else
                 {
                     // Basic logic: if this payment completes the total amount, or if no deposit was defined
                     order.Complete();
+
+                    await _notificationService.SendAsync(
+                        order.UserId,
+                        "Thanh toán thành công",
+                        $"Thanh toán hoàn tất. Số tiền: {payment.Amount:N0} VNĐ",
+                        NotificationType.WalletPaymentProcessed,
+                        new { OrderId = order.Id, Amount = payment.Amount },
+                        cancellationToken);
+
                     _logger.LogInformation("Order {OrderId} completed.", order.Id);
                 }
 
