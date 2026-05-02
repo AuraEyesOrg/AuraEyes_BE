@@ -49,6 +49,8 @@ public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQu
             UpdatedAt = ophthalmologist.UpdatedAt,
             RatingAverage = ophthalmologist.RatingAverage,
             RatingCount = ophthalmologist.RatingCount,
+            AvailableLeaveDays = ophthalmologist.AvailableLeaveDays,
+            ConsultationFee = ophthalmologist.ConsultationFee,
             MinPrice = null,
             MaxPrice = null,
             Degrees = ophthalmologist.Certificates

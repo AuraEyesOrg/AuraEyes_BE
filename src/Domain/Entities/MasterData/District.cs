@@ -2,7 +2,7 @@ using Domain.Common;
 
 namespace Domain.Entities.MasterData;
 
-public class District : BaseEntity, Domain.Common.IAggregateRoot
+public class District : BaseEntity, IAggregateRoot
 {
     public string Name { get; private set; }
     public int Code { get; private set; }

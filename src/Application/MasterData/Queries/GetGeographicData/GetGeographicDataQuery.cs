@@ -1,83 +1,94 @@
 using Application.Common.Interfaces;
+using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.MasterData;
-using Domain.Repositories;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.MasterData.Queries.GetGeographicData;
 
-public record GetCountriesQuery : IRequest<List<CountryDto>>;
-public record GetProvincesQuery : IRequest<List<ProvinceDto>>;
-public record GetDistrictsQuery(int ProvinceCode) : IRequest<List<DistrictDto>>;
-public record GetWardsQuery(int DistrictCode) : IRequest<List<WardDto>>;
+public record GetCountriesQuery() : IQuery<List<CountryDto>>;
+public record GetProvincesQuery() : IQuery<List<ProvinceDto>>;
+public record GetDistrictsQuery(int ProvinceCode) : IQuery<List<DistrictDto>>;
+public record GetWardsQuery(int DistrictCode) : IQuery<List<WardDto>>;
 
-public class CountryDto { public string Name { get; set; } = default!; public string IsoCode { get; set; } = default!; }
-public class ProvinceDto { public string Name { get; set; } = default!; public int Code { get; set; } }
-public class DistrictDto { public string Name { get; set; } = default!; public int Code { get; set; } }
-public class WardDto { public string Name { get; set; } = default!; public int Code { get; set; } }
+public record CountryDto(string Name, string IsoCode);
+public record ProvinceDto(string Name, int Code);
+public record DistrictDto(string Name, int Code);
+public record WardDto(string Name, int Code);
 
 public class GetGeographicDataQueryHandler : 
-    IRequestHandler<GetCountriesQuery, List<CountryDto>>,
-    IRequestHandler<GetProvincesQuery, List<ProvinceDto>>,
-    IRequestHandler<GetDistrictsQuery, List<DistrictDto>>,
-    IRequestHandler<GetWardsQuery, List<WardDto>>
+    IRequestHandler<GetCountriesQuery, Result<List<CountryDto>>>,
+    IRequestHandler<GetProvincesQuery, Result<List<ProvinceDto>>>,
+    IRequestHandler<GetDistrictsQuery, Result<List<DistrictDto>>>,
+    IRequestHandler<GetWardsQuery, Result<List<WardDto>>>
 {
-    private readonly IRepository<Country> _countryRepo;
-    private readonly IRepository<Province> _provinceRepo;
-    private readonly IRepository<District> _districtRepo;
-    private readonly IRepository<Ward> _wardRepo;
+    private readonly IRepository<Country> _countryRepository;
+    private readonly IRepository<Province> _provinceRepository;
+    private readonly IRepository<District> _districtRepository;
+    private readonly IRepository<Ward> _wardRepository;
 
     public GetGeographicDataQueryHandler(
-        IRepository<Country> countryRepo,
-        IRepository<Province> provinceRepo,
-        IRepository<District> districtRepo,
-        IRepository<Ward> wardRepo)
+        IRepository<Country> countryRepository,
+        IRepository<Province> provinceRepository,
+        IRepository<District> districtRepository,
+        IRepository<Ward> wardRepository)
     {
-        _countryRepo = countryRepo;
-        _provinceRepo = provinceRepo;
-        _districtRepo = districtRepo;
-        _wardRepo = wardRepo;
+        _countryRepository = countryRepository;
+        _provinceRepository = provinceRepository;
+        _districtRepository = districtRepository;
+        _wardRepository = wardRepository;
     }
 
-    public async Task<List<CountryDto>> Handle(GetCountriesQuery request, CancellationToken cancellationToken)
+    public async Task<Result<List<CountryDto>>> Handle(GetCountriesQuery request, CancellationToken cancellationToken)
     {
-        return await _countryRepo.Query()
-            .Select(c => new CountryDto { Name = c.Name, IsoCode = c.IsoCode })
-            .OrderBy(c => c.Name)
+        var data = await _countryRepository.Query()
+            .OrderBy(x => x.Name)
+            .Select(x => new CountryDto(x.Name, x.IsoCode))
             .ToListAsync(cancellationToken);
+        return Result<List<CountryDto>>.Success(data);
     }
 
-    public async Task<List<ProvinceDto>> Handle(GetProvincesQuery request, CancellationToken cancellationToken)
+    public async Task<Result<List<ProvinceDto>>> Handle(GetProvincesQuery request, CancellationToken cancellationToken)
     {
-        return await _provinceRepo.Query()
-            .Select(p => new ProvinceDto { Name = p.Name, Code = p.Code })
-            .OrderBy(p => p.Name)
+        var data = await _provinceRepository.Query()
+            .OrderBy(x => x.Name)
+            .Select(x => new ProvinceDto(x.Name, x.Code))
             .ToListAsync(cancellationToken);
+        return Result<List<ProvinceDto>>.Success(data);
     }
 
-    public async Task<List<DistrictDto>> Handle(GetDistrictsQuery request, CancellationToken cancellationToken)
+    public async Task<Result<List<DistrictDto>>> Handle(GetDistrictsQuery request, CancellationToken cancellationToken)
     {
-        // Find the province first to get its ID, or join
-        var province = await _provinceRepo.Query().FirstOrDefaultAsync(p => p.Code == request.ProvinceCode, cancellationToken);
-        if (province == null) return new List<DistrictDto>();
+        var provinceId = await _provinceRepository.Query()
+            .Where(p => p.Code == request.ProvinceCode)
+            .Select(p => p.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        return await _districtRepo.Query()
-            .Where(d => d.ProvinceId == province.Id)
-            .Select(d => new DistrictDto { Name = d.Name, Code = d.Code })
-            .OrderBy(d => d.Name)
+        if (provinceId == Guid.Empty) return Result<List<DistrictDto>>.Success(new List<DistrictDto>());
+
+        var data = await _districtRepository.Query()
+            .Where(x => x.ProvinceId == provinceId)
+            .OrderBy(x => x.Name)
+            .Select(x => new DistrictDto(x.Name, x.Code))
             .ToListAsync(cancellationToken);
+        return Result<List<DistrictDto>>.Success(data);
     }
 
-    public async Task<List<WardDto>> Handle(GetWardsQuery request, CancellationToken cancellationToken)
+    public async Task<Result<List<WardDto>>> Handle(GetWardsQuery request, CancellationToken cancellationToken)
     {
-        var district = await _districtRepo.Query().FirstOrDefaultAsync(d => d.Code == request.DistrictCode, cancellationToken);
-        if (district == null) return new List<WardDto>();
+        var districtId = await _districtRepository.Query()
+            .Where(d => d.Code == request.DistrictCode)
+            .Select(d => d.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        return await _wardRepo.Query()
-            .Where(w => w.DistrictId == district.Id)
-            .Select(w => new WardDto { Name = w.Name, Code = w.Code })
-            .OrderBy(w => w.Name)
+        if (districtId == Guid.Empty) return Result<List<WardDto>>.Success(new List<WardDto>());
+
+        var data = await _wardRepository.Query()
+            .Where(x => x.DistrictId == districtId)
+            .OrderBy(x => x.Name)
+            .Select(x => new WardDto(x.Name, x.Code))
             .ToListAsync(cancellationToken);
+        return Result<List<WardDto>>.Success(data);
     }
 }

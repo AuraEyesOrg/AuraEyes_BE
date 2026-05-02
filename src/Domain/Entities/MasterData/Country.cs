@@ -2,7 +2,7 @@ using Domain.Common;
 
 namespace Domain.Entities.MasterData;
 
-public class Country : BaseEntity, Domain.Common.IAggregateRoot
+public class Country : BaseEntity, IAggregateRoot
 {
     public string Name { get; private set; }
     public string IsoCode { get; private set; } // cca2

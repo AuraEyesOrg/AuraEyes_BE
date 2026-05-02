@@ -55,15 +55,16 @@ public class CompleteClinicAppointmentCommandHandler : ICommandHandler<CompleteC
             // The actual Completion will happen after the financial system confirms payment
             visit.FinishConsultation(request.Notes);
             
-            // Appointment can be marked as InProgress or stay as is, 
-            // but we'll mark it as Completed when the Visit is truly done after payment.
-            // For now, let's keep it InProgress to indicate it's not archived yet.
-            // Actually, appointment.Complete() is fine if we consider 'Appointment' the booking part.
-            // But let's keep it consistent with the Visit status.
-            
             await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
-            // appointment.Complete(); // Don't complete appointment yet if visit is not done
             await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
+
+            // ── Grant 20% discount for next online clinic booking ──────────────
+            var patient = await _patientRepository.GetByIdAsync(appointment.PatientId, cancellationToken);
+            if (patient?.UserId != null)
+            {
+                patient.GrantDiscount(0.20m, 30);
+                await _patientRepository.UpdateAsync(patient, cancellationToken);
+            }
 
             // ── 8. Create Consultation Chat Session ───────────────────────────
             // This allows the patient to chat with the doctor for 14 days post-visit
@@ -80,7 +81,6 @@ public class CompleteClinicAppointmentCommandHandler : ICommandHandler<CompleteC
                 await _sessionRepository.AddAsync(session, cancellationToken);
 
                 // Notify patient if they are a registered user
-                var patient = await _patientRepository.GetByIdAsync(appointment.PatientId, cancellationToken);
                 if (patient?.UserId != null)
                 {
                     await _notificationService.SendAsync(

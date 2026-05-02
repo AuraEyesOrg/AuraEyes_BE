@@ -107,15 +107,15 @@ public class CreateClinicAppointmentCommandHandler
                 }
 
                 // Staff booking for another patient
-                var patient = await _patientRepository.GetByIdAsync(request.PatientId.Value, cancellationToken);
-                if (patient == null)
+                var targetPatient = await _patientRepository.GetByIdAsync(request.PatientId.Value, cancellationToken);
+                if (targetPatient == null)
                 {
                     await _unitOfWork.RollbackTransactionAsync(cancellationToken);
                     return Result<CreateClinicAppointmentResult>.NotFound($"Patient profile '{request.PatientId}' not found.");
                 }
-                targetPatientProfileId = patient.Id;
-                orderUserId = patient.UserId ?? _currentUser.UserId.Value;
-                notificationUserId = patient.UserId;
+                targetPatientProfileId = targetPatient.Id;
+                orderUserId = targetPatient.UserId ?? _currentUser.UserId.Value;
+                notificationUserId = targetPatient.UserId;
                 isStaffCreatedWalkIn = true;
             }
             else
@@ -216,6 +216,17 @@ public class CreateClinicAppointmentCommandHandler
                 }
 
                 price = doctor.ConsultationFee;
+            }
+
+            // ── Apply discount if patient has one ──────────────────────────────
+            var discountPatient = await _patientRepository.GetByIdAsync(targetPatientProfileId, cancellationToken);
+            if (discountPatient != null)
+            {
+                var discount = discountPatient.ConsumeDiscount();
+                if (discount.HasValue)
+                {
+                    price = Math.Round(price * (1 - discount.Value), 0);
+                }
             }
 
             // ── 5. Calculate deposit ──────────────────────────────────────────

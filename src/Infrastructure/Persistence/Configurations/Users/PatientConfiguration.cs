@@ -36,6 +36,13 @@ public class PatientConfiguration : IEntityTypeConfiguration<Patient>
         builder.Property(e => e.MedicalRecordNumber)
             .HasMaxLength(50);
 
+        // ── Discount fields ──
+        builder.Property(e => e.DiscountForNextBooking)
+            .HasPrecision(3, 2)
+            .IsRequired(false);
+
+        builder.Property(e => e.DiscountExpiryDate)
+            .IsRequired(false);
 
         // UserId unique index — only for registered patients (non-null UserId)
         builder.HasIndex(e => e.UserId)
