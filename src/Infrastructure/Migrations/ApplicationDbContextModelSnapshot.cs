@@ -1385,6 +1385,47 @@ namespace Infrastructure.Migrations
                     b.ToTable("AuditLogs");
                 });
 
+            modelBuilder.Entity("Domain.Entities.Platform.LeavePolicy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AdditionalDays")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("LeavePolicies");
+                });
+
             modelBuilder.Entity("Domain.Entities.Platform.Notification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1636,7 +1677,7 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("OphthalId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("ScheduleTemplateId")
+                    b.Property<Guid?>("ScheduleTemplateId")
                         .HasColumnType("uuid");
 
                     b.Property<TimeOnly>("StartTime")
@@ -1667,7 +1708,7 @@ namespace Infrastructure.Migrations
                     b.HasIndex("ScheduleTemplateId", "Date", "StartTime", "EndTime", "OphthalId")
                         .IsUnique()
                         .HasDatabaseName("UX_AppointmentSlots_TemplateDateTime")
-                        .HasFilter("\"IsDeleted\" = false");
+                        .HasFilter("\"IsDeleted\" = false AND \"ScheduleTemplateId\" IS NOT NULL");
 
                     b.ToTable("AppointmentSlots", null, t =>
                         {
@@ -2286,6 +2327,12 @@ namespace Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("AvailableLeaveDays")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(10, 2)
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<string>("Bio")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -2380,6 +2427,13 @@ namespace Infrastructure.Migrations
 
                     b.Property<DateTime?>("DateOfBirth")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DiscountExpiryDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("DiscountForNextBooking")
+                        .HasPrecision(3, 2)
+                        .HasColumnType("numeric(3,2)");
 
                     b.Property<string>("DiseaseHistory")
                         .HasMaxLength(1000)
@@ -3043,8 +3097,7 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Entities.Scheduling.ScheduleTemplate", "ScheduleTemplate")
                         .WithMany("AppointmentSlots")
                         .HasForeignKey("ScheduleTemplateId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("ScheduleTemplate");
                 });

@@ -60,6 +60,8 @@ public class AdminQueryService : IAdminQueryService
                 LicenseUrl = x.Ophthalmologist.LicenseUrl,
                 DegreeUrl = x.Ophthalmologist.DegreeUrl,
                 IsActive = x.User.IsActive,
+                AvailableLeaveDays = x.Ophthalmologist.AvailableLeaveDays,
+                ConsultationFee = x.Ophthalmologist.ConsultationFee,
                 CreatedAt = x.Ophthalmologist.CreatedAt
             })
             .ToListAsync(cancellationToken);
@@ -126,6 +128,8 @@ public class AdminQueryService : IAdminQueryService
                     Degrees = degrees,
                     OrganisationName = null,
                     IsActive = row.IsActive,
+                    AvailableLeaveDays = row.AvailableLeaveDays,
+                    ConsultationFee = row.ConsultationFee,
                     CreatedAt = row.CreatedAt
                 };
             })

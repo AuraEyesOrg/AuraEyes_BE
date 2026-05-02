@@ -37,6 +37,12 @@ public class Patient : BaseEntity, IAggregateRoot
     /// <summary>True when the patient has no Identity user (walk-in).</summary>
     public bool IsWalkIn => UserId is null;
 
+    /// <summary>Discount rate (e.g. 0.20 for 20%) for the next clinic booking. Null if none.</summary>
+    public decimal? DiscountForNextBooking { get; private set; }
+
+    /// <summary>UTC expiry of the discount. Must be within 30 days of grant.</summary>
+    public DateTime? DiscountExpiryDate { get; private set; }
+
     // Navigation properties
     private readonly List<RetinalImage> _retinalImages = new();
     public IReadOnlyCollection<RetinalImage> RetinalImages => _retinalImages.AsReadOnly();
@@ -135,6 +141,42 @@ public class Patient : BaseEntity, IAggregateRoot
         GenderId = genderId;
         Address = address?.Trim();
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Grant a discount for the next clinic booking (e.g. 0.20 for 20%).
+    /// </summary>
+    public void GrantDiscount(decimal rate, int expiryDays = 30)
+    {
+        if (rate < 0 || rate > 1)
+            throw new ArgumentException("Discount rate must be between 0 and 1.", nameof(rate));
+
+        DiscountForNextBooking = rate;
+        DiscountExpiryDate = DateTime.UtcNow.AddDays(expiryDays);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Consume the discount if it is still valid. Returns the discount rate or null.
+    /// </summary>
+    public decimal? ConsumeDiscount()
+    {
+        if (DiscountForNextBooking is null)
+            return null;
+
+        if (DiscountExpiryDate.HasValue && DateTime.UtcNow > DiscountExpiryDate.Value)
+        {
+            DiscountForNextBooking = null;
+            DiscountExpiryDate = null;
+            UpdatedAt = DateTime.UtcNow;
+            return null;
+        }
+
+        var rate = DiscountForNextBooking.Value;
+        DiscountForNextBooking = null;
+        DiscountExpiryDate = null;
+        UpdatedAt = DateTime.UtcNow;
+        return rate;
     }
 
 }

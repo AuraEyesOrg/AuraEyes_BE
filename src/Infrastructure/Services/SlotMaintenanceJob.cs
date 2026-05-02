@@ -53,19 +53,21 @@ public class SlotMaintenanceJob
                 localDate,
                 localTime);
 
-            // Block past slots (Date/StartTime stored in local VN time, compare with local time).
+            // Expire slots whose start time has passed (in local VN time) but are not fully booked.
+            // Fully-booked slots remain Available for record-keeping.
             var expiredCount = await _context.AppointmentSlots
                 .Where(slot =>
                     slot.Status == ScheduleStatus.Available &&
+                    slot.BookedCount < slot.MaxCapacity &&
                     (slot.Date < localDate ||
                      (slot.Date == localDate && slot.StartTime < localTime)))
                 .ExecuteUpdateAsync(updates => updates
-                    .SetProperty(slot => slot.Status, ScheduleStatus.Blocked)
+                    .SetProperty(slot => slot.Status, ScheduleStatus.Expired)
                     .SetProperty(slot => slot.UpdatedAt, utcNow),
                     cancellationToken);
 
             _logger.LogInformation(
-                "Slot expiration maintenance completed. Blocked {ExpiredCount} past slot(s).",
+                "Slot expiration maintenance completed. Expired {ExpiredCount} underbooked past slot(s).",
                 expiredCount);
 
             await _betterStackHeartbeat.NotifySucceededAsync(BetterStackMonitor.SlotMaintenance, cancellationToken);

@@ -150,4 +150,18 @@ public class Appointment : BaseEntity, IAggregateRoot
         VisitReason = visitReason;
         UpdatedAt = DateTime.UtcNow;
     }
+
+    /// <summary>
+    /// Mark appointment as cancelled due to late arrival and rebooking.
+    /// </summary>
+    public void MarkLateAndRelease(Guid cancelledBy)
+    {
+        if (Status == AppointmentStatus.Cancelled)
+            throw new InvalidOperationException("Appointment is already cancelled.");
+
+        Status = AppointmentStatus.Cancelled;
+        CancelledBy = cancelledBy;
+        CancellationReason = "Late arrival — rebooked";
+        UpdatedAt = DateTime.UtcNow;
+    }
 }

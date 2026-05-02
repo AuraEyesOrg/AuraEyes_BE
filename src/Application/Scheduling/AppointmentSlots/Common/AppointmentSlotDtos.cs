@@ -4,7 +4,7 @@ public record AppointmentSlotListDto
 {
     public Guid Id { get; init; }
     public Guid OphthalId { get; init; }
-    public Guid ScheduleTemplateId { get; init; }
+    public Guid? ScheduleTemplateId { get; init; }
     public DateOnly Date { get; init; }
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }
@@ -22,7 +22,7 @@ public record AppointmentSlotDto
 {
     public Guid Id { get; init; }
     public Guid OphthalId { get; init; }
-    public Guid ScheduleTemplateId { get; init; }
+    public Guid? ScheduleTemplateId { get; init; }
     public DateOnly Date { get; init; }
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }
@@ -79,4 +79,15 @@ public record DoctorSlotDetailDto
     public string? DoctorAvatar { get; init; }
     public bool IsBooked { get; init; }
     public decimal Price { get; init; }
+}
+
+public record AvailableSlotDto
+{
+    public Guid SlotId { get; init; }
+    public string Date { get; init; } = string.Empty;
+    public string StartTime { get; init; } = string.Empty;
+    public string EndTime { get; init; } = string.Empty;
+    public int Remaining { get; init; }
+    public int MaxCapacity { get; init; }
+    public decimal? Cost { get; init; }
 }

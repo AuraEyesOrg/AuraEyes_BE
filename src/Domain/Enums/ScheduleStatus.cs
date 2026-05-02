@@ -9,5 +9,8 @@ public enum ScheduleStatus
     Available = 1,
 
     /// <summary>Slot is blocked by staff (not available for booking).</summary>
-    Blocked = 7
+    Blocked = 7,
+
+    /// <summary>Slot start time has passed without reaching full capacity.</summary>
+    Expired = 8
 }

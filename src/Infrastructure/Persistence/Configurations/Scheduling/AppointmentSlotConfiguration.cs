@@ -33,7 +33,8 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
         builder.HasOne(e => e.ScheduleTemplate)
             .WithMany(t => t.AppointmentSlots)
             .HasForeignKey(e => e.ScheduleTemplateId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
 
         builder.HasMany(e => e.Appointments)
             .WithOne(a => a.AppointmentSlot)
@@ -48,9 +49,10 @@ public class AppointmentSlotConfiguration : IEntityTypeConfiguration<Appointment
         builder.HasIndex(e => e.ScheduleTemplateId);
         builder.HasIndex(e => e.Date);
         builder.HasIndex(e => e.Status);
+        // Unique index only for template-generated slots (non-null ScheduleTemplateId)
         builder.HasIndex(e => new { e.ScheduleTemplateId, e.Date, e.StartTime, e.EndTime, e.OphthalId })
             .IsUnique()
-            .HasFilter("\"IsDeleted\" = false")
+            .HasFilter("\"IsDeleted\" = false AND \"ScheduleTemplateId\" IS NOT NULL")
             .HasDatabaseName("UX_AppointmentSlots_TemplateDateTime");
         builder.HasIndex(e => new { e.Status, e.BookedCount, e.MaxCapacity })
             .HasDatabaseName("IX_AppointmentSlots_Capacity");

@@ -64,6 +64,48 @@ public class AppointmentSlotsController : BaseApiController
     }
 
     /// <summary>
+    /// Get available appointment slots for a given date (patient-facing).
+    /// </summary>
+    [HttpGet("available")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<List<AvailableSlotDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAvailableSlots(
+        [FromQuery] DateOnly? date = null,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 100)
+    {
+        var query = new GetAppointmentSlotsQuery
+        {
+            Status = ScheduleStatus.Available,
+            ExcludePastSlots = true,
+            FromDate = date,
+            ToDate = date,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+
+        var result = await _mediator.Send(query);
+
+        if (!result.IsSuccess || result.Data == null)
+            return HandleResult(result);
+
+        var slots = result.Data.Items
+            .Select(x => new AvailableSlotDto
+            {
+                SlotId = x.Id,
+                Date = x.Date.ToString("yyyy-MM-dd"),
+                StartTime = x.StartTime.ToString("HH:mm"),
+                EndTime = x.EndTime.ToString("HH:mm"),
+                Remaining = x.AvailableCapacity,
+                MaxCapacity = x.MaxCapacity,
+                Cost = x.Cost
+            })
+            .ToList();
+
+        return Ok(ApiResponseFactory.Success(slots));
+    }
+
+    /// <summary>
     /// Get a specific appointment slot by ID.
     /// </summary>
     [HttpGet("{slotId:guid}")]

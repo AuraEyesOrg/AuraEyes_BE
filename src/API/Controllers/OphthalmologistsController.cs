@@ -483,6 +483,23 @@ public class OphthalmologistsController : BaseApiController
         return HandleResult(result, "Ophthalmologist verification revoked successfully.");
     }
 
+    /// <summary>
+    /// Get ophthalmologists available for a specific time slot on a given date.
+    /// </summary>
+    [HttpGet("available-for-slot")]
+    [AuthorizePermission(Permissions.AppointmentsManage)]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<Application.Scheduling.Appointments.Queries.GetAvailableDoctorsForSlot.AvailableDoctorDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAvailableDoctorsForSlot(
+        [FromQuery] DateOnly date,
+        [FromQuery] TimeOnly startTime,
+        [FromQuery] TimeOnly endTime)
+    {
+        var result = await _mediator.Send(
+            new Application.Scheduling.Appointments.Queries.GetAvailableDoctorsForSlot.GetAvailableDoctorsForSlotQuery(
+                date, startTime, endTime));
+        return HandleResult(result);
+    }
+
     // =========================================================================
     // LEGACY CONTRACT ENDPOINTS (deprecated)
     // =========================================================================

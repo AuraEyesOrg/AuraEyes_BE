@@ -37,6 +37,10 @@ public class OphthalmologistConfiguration : IEntityTypeConfiguration<Ophthalmolo
             .HasPrecision(18, 2)
             .HasDefaultValue(0m);
 
+        builder.Property(e => e.AvailableLeaveDays)
+            .HasPrecision(10, 2)
+            .HasDefaultValue(0m);
+
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
 
