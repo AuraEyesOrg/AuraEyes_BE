@@ -199,8 +199,8 @@ public class GetClinicQueueQueryHandler
                 queueItems.Add(item);
             }
 
-            // Cache the results for 10 seconds to survive heavy load
-            _cache.Set(cacheKey, queueItems, TimeSpan.FromSeconds(10));
+            // Cache the results for 30 seconds to survive heavy load
+            _cache.Set(cacheKey, queueItems, TimeSpan.FromSeconds(30));
 
             return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(queueItems);
         }

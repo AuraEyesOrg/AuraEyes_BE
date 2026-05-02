@@ -56,7 +56,17 @@ public static class AuraSimulation
                 .WithHeader("X-Correlation-Id", Guid.NewGuid().ToString())
                 .WithJsonBody(bookingBody);
 
-            return await Http.Send(httpClient, createBookingRequest);
+            var response = await Http.Send(httpClient, createBookingRequest);
+            
+            // If we get a 409 Conflict, it means the slot is already full.
+            // In a load test with limited slots, this is a VALID system response.
+            // We treat it as OK to prevent NBomber from stopping the test.
+            if (response.StatusCode == "Conflict")
+            {
+                return Response.Ok(sizeBytes: response.SizeBytes, statusCode: "Conflict");
+            }
+
+            return response;
         });
     }
 
