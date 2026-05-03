@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Consultation;
+using Domain.Entities.Scheduling;
 using Domain.Entities.Screening;
 using Domain.Entities.Users;
 using Domain.Enums;
@@ -148,6 +149,8 @@ public class SendToDoctorCommandHandler
                 await _medicalRecordRepository.UpdateAsync(medicalRecord, cancellationToken);
             }
 
+            StartConsultationFlow(visit);
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result<SendToDoctorResponse>.Success(new SendToDoctorResponse
@@ -181,6 +184,8 @@ public class SendToDoctorCommandHandler
             await _medicalRecordRepository.UpdateAsync(mr, cancellationToken);
         }
 
+        StartConsultationFlow(visit);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         // Notify doctor if assigned
@@ -209,6 +214,20 @@ public class SendToDoctorCommandHandler
             AssignedDoctorId = request.DoctorId,
             Message = "Case sent to doctor successfully."
         });
+    }
+
+    /// <summary>
+    /// Canonical transition: coordinator sends patient to doctor — consultation phase begins.
+    /// </summary>
+    private static void StartConsultationFlow(PatientVisit visit)
+    {
+        if (visit.Status != PatientVisitStatus.CheckedIn)
+            return;
+
+        visit.Start();
+
+        if (visit.Appointment is { Status: AppointmentStatus.CheckedIn })
+            visit.Appointment.Start();
     }
 }
 

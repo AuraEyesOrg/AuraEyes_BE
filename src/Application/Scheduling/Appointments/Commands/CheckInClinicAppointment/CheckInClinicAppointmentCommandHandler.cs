@@ -1,3 +1,4 @@
+using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
@@ -5,13 +6,13 @@ using Domain.Entities.MedicalRecords;
 using Domain.Entities.Scheduling;
 using Domain.Enums;
 using Domain.Repositories;
-using Application.Common.Constants;
 
 namespace Application.Scheduling.Appointments.Commands.CheckInClinicAppointment;
 
 public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInClinicAppointmentCommand>
 {
     private readonly IAppointmentRepository _appointmentRepository;
+    private readonly IOrderRepository _orderRepository;
     private readonly IPatientVisitRepository _patientVisitRepository;
     private readonly IMedicalRecordRepository _medicalRecordRepository;
     private readonly IUnitOfWork _unitOfWork;
@@ -20,6 +21,7 @@ public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInCli
 
     public CheckInClinicAppointmentCommandHandler(
         IAppointmentRepository appointmentRepository,
+        IOrderRepository orderRepository,
         IPatientVisitRepository patientVisitRepository,
         IMedicalRecordRepository medicalRecordRepository,
         IUnitOfWork unitOfWork,
@@ -27,6 +29,7 @@ public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInCli
         IIdentityService identityService)
     {
         _appointmentRepository = appointmentRepository;
+        _orderRepository = orderRepository;
         _patientVisitRepository = patientVisitRepository;
         _medicalRecordRepository = medicalRecordRepository;
         _unitOfWork = unitOfWork;
@@ -51,6 +54,18 @@ public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInCli
         if (existingVisit is not null)
         {
             return Result.Success();
+        }
+
+        var orders = await _orderRepository.GetByAppointmentIdsAsync(
+            new[] { request.AppointmentId },
+            cancellationToken);
+
+        foreach (var order in orders)
+        {
+            if (!order.IsClinicDepositSatisfiedForCheckIn())
+            {
+                return Result.PaymentRequired("DepositNotPaid");
+            }
         }
 
         if (appointment.Status == AppointmentStatus.Pending)
