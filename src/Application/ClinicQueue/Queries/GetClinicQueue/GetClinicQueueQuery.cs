@@ -1,3 +1,4 @@
+using Application.ClinicQueue.Common;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
@@ -228,42 +229,6 @@ public class GetClinicQueueQueryHandler
         return age;
     }
 
-    private static string DetermineFlowState(
-        PatientVisit visit,
-        AiScreening? screening,
-        ConsultationSession? consultation)
-    {
-        // Doctor finalized and handed off to cashier.
-        // This is the canonical state for cashier intake.
-        if (visit.Status == PatientVisitStatus.WaitingForPayment)
-            return "Finalized";
-
-        // If visit completed, flow is finalized
-        if (visit.Status == PatientVisitStatus.Completed)
-            return "Finalized";
-
-        // If consultation session exists and is active
-        if (consultation != null)
-        {
-            if (consultation.Status == SessionStatus.Confirmed)
-                return "ConsultationInProgress";
-            if (consultation.Status == SessionStatus.Completed)
-                return "Finalized";
-            return "SentToDoctor"; // Pending consultation
-        }
-
-        // If screening exists
-        if (screening != null)
-        {
-            // Check if screening has results
-            if (screening.ScreeningResults.Count > 0)
-                return "AICompleted";
-            return "ScreeningPending";
-        }
-
-        // Default: just checked in
-        return "CheckedIn";
-    }
 }
 
 public class ClinicQueueItemDto
