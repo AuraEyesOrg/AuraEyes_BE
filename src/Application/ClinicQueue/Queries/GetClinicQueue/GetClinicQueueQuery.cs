@@ -83,7 +83,7 @@ public class GetClinicQueueQueryHandler
 
             var patientIds = visits.Select(v => v.PatientId).Distinct().ToList();
             
-            var screeningsTask = _screeningRepository
+            var screenings = await _screeningRepository
                 .Query()
                 .AsNoTracking()
                 .Include(s => s.ScreeningResults)
@@ -92,7 +92,7 @@ public class GetClinicQueueQueryHandler
                     && !s.IsDeleted)
                 .ToListAsync(cancellationToken);
 
-            var consultationsTask = _consultationSessionRepository
+            var consultations = await _consultationSessionRepository
                 .Query()
                 .AsNoTracking()
                 .Where(cs => patientIds.Contains(cs.PatientId)
@@ -100,10 +100,6 @@ public class GetClinicQueueQueryHandler
                     && cs.Status != SessionStatus.Cancelled
                     && !cs.IsDeleted)
                 .ToListAsync(cancellationToken);
-
-            await Task.WhenAll(screeningsTask, consultationsTask);
-            var screenings = screeningsTask.Result;
-            var consultations = consultationsTask.Result;
 
             // --- Optimized User Lookup (Batch) ---
             var doctorUserIds = visits
