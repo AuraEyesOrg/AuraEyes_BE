@@ -46,118 +46,140 @@ public class ClinicVisitService : IClinicVisitService
     {
         try
         {
-            PatientVisit? visit = null;
+            var visit = await ResolveVisitAsync(order, cancellationToken);
+            if (visit == null || visit.Status != PatientVisitStatus.WaitingForPayment) return;
 
-            // Priority 1: Use AppointmentId if present
-            if (order.AppointmentId.HasValue)
+            _logger.LogInformation("Processing clinic visit completion for Visit {VisitId} after {Method} payment.", visit.Id, paymentMethod);
+
+            visit.Complete($"Payment received via {paymentMethod}");
+            await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
+
+            if (visit.AppointmentId.HasValue)
             {
-                visit = await _patientVisitRepository.GetByAppointmentIdAsync(order.AppointmentId.Value, cancellationToken);
-            }
-
-            // Priority 2: Fallback to finding by Patient UserId
-            if (visit == null)
-            {
-                var patient = await _patientRepository.Query()
-                    .FirstOrDefaultAsync(p => p.UserId == order.UserId, cancellationToken);
-
-                if (patient != null)
-                {
-                    visit = await _patientVisitRepository.Query()
-                        .OrderByDescending(v => v.CreatedAt)
-                        .FirstOrDefaultAsync(v => 
-                            v.PatientId == patient.Id && 
-                            v.Status == PatientVisitStatus.WaitingForPayment, 
-                            cancellationToken);
-                }
-            }
-            
-            if (visit != null && visit.Status == PatientVisitStatus.WaitingForPayment)
-            {
-                _logger.LogInformation("Processing clinic visit completion for Visit {VisitId} after {Method} payment.", visit.Id, paymentMethod);
-                
-                visit.Complete($"Payment received via {paymentMethod}");
-                await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
-
-                if (visit.AppointmentId.HasValue)
-                {
-                    var appointment = await _appointmentRepository.GetByIdWithDetailsAsync(visit.AppointmentId.Value, cancellationToken);
-                    if (appointment != null)
-                    {
-                        appointment.Complete();
-                        await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
-
-                        // Check if consultation session already exists
-                        var existingSession = await _sessionRepository.Query()
-                            .FirstOrDefaultAsync(s => s.PatientId == appointment.PatientId && 
-                                                 s.OphthalmologistId == visit.AssignedDoctorId &&
-                                                 s.ChatStatus != ChatStatus.Archived, 
-                                                 cancellationToken);
-
-                        if (existingSession == null)
-                        {
-                            // Create Consultation Chat Session (Post-visit follow-up)
-                            var session = ConsultationSession.CreateClinicBooking(
-                                appointment.PatientId,
-                                0,
-                                DateTime.UtcNow,
-                                visit.AssignedDoctorId.GetValueOrDefault());
-
-                            session.OpenChat();
-                            await _sessionRepository.AddAsync(session, cancellationToken);
-                            
-                            // Notify patient
-                            var patientData = await _patientRepository.GetByIdAsync(appointment.PatientId, cancellationToken);
-                            if (patientData?.UserId != null)
-                            {
-                                await _notificationService.SendAsync(
-                                    patientData.UserId.Value,
-                                    "Kết quả khám lâm sàng & Tư vấn",
-                                    "Thanh toán hoàn tất. Bạn có thể trao đổi thêm với bác sĩ trong vòng 14 ngày qua mục Chat.",
-                                    NotificationType.ConsultationResultProvided,
-                                    new { ConsultationId = session.Id, AppointmentId = appointment.Id },
-                                    cancellationToken,
-                                    session.Id);
-                            }
-
-                            // Broadcast real-time update
-                            var userIds = new List<Guid>();
-                            if (patientData?.UserId != null) userIds.Add(patientData.UserId.Value);
-                            
-                            if (visit.AssignedDoctorId.HasValue)
-                            {
-                                var ophthal = await _ophthalmologistRepository.GetByIdAsync(visit.AssignedDoctorId.Value, cancellationToken);
-                                if (ophthal?.UserId != null) userIds.Add(ophthal.UserId);
-                            }
-
-                            if (userIds.Count > 0)
-                            {
-                                await _chatHubService.BroadcastRoomStateChangedAsync(
-                                    userIds,
-                                    new RoomStateChangedDto
-                                    {
-                                        SessionId = session.Id,
-                                        Event = "SessionCreated",
-                                        Timestamp = DateTime.UtcNow
-                                    }, cancellationToken);
-                            }
-
-                            // Also notify Clinic Staff role for UI refresh
-                            await _chatHubService.BroadcastRoomStateChangedAsync(
-                                Application.Common.Constants.Roles.ClinicStaff,
-                                new RoomStateChangedDto
-                                {
-                                    SessionId = session.Id,
-                                    Event = "VisitPaymentCompleted",
-                                    Timestamp = DateTime.UtcNow
-                                }, cancellationToken);
-                        }
-                    }
-                }
+                await HandleAppointmentAndConsultationAsync(visit, cancellationToken);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to process clinic visit completion for order {OrderId}.", order.Id);
+        }
+    }
+
+    private async Task<PatientVisit?> ResolveVisitAsync(Order order, CancellationToken cancellationToken)
+    {
+        if (order.AppointmentId.HasValue)
+        {
+            return await _patientVisitRepository.GetByAppointmentIdAsync(order.AppointmentId.Value, cancellationToken);
+        }
+
+        var patient = await _patientRepository.Query()
+            .FirstOrDefaultAsync(p => p.UserId == order.UserId, cancellationToken);
+
+        if (patient == null) return null;
+
+        return await _patientVisitRepository.Query()
+            .OrderByDescending(v => v.CreatedAt)
+            .FirstOrDefaultAsync(v =>
+                v.PatientId == patient.Id &&
+                v.Status == PatientVisitStatus.WaitingForPayment,
+                cancellationToken);
+    }
+
+    private async Task HandleAppointmentAndConsultationAsync(PatientVisit visit, CancellationToken cancellationToken)
+    {
+        var appointment = await _appointmentRepository.GetByIdWithDetailsAsync(visit.AppointmentId!.Value, cancellationToken);
+        if (appointment == null) return;
+
+        appointment.Complete();
+        await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
+
+        var existingSession = await GetExistingSessionAsync(appointment, visit.AssignedDoctorId, cancellationToken);
+        if (existingSession != null) return;
+
+        var session = await CreateFollowUpSessionAsync(appointment, visit.AssignedDoctorId.GetValueOrDefault(), cancellationToken);
+        await NotifyAndBroadcastSessionAsync(session, appointment, visit, cancellationToken);
+    }
+
+    private async Task<ConsultationSession?> GetExistingSessionAsync(Appointment appointment, Guid? doctorId, CancellationToken cancellationToken)
+    {
+        return await _sessionRepository.Query()
+            .FirstOrDefaultAsync(s => s.PatientId == appointment.PatientId &&
+                                 s.OphthalmologistId == doctorId &&
+                                 s.ChatStatus != ChatStatus.Archived,
+                                 cancellationToken);
+    }
+
+    private async Task<ConsultationSession> CreateFollowUpSessionAsync(Appointment appointment, Guid doctorId, CancellationToken cancellationToken)
+    {
+        var session = ConsultationSession.CreateClinicBooking(
+            appointment.PatientId,
+            0,
+            DateTime.UtcNow,
+            doctorId);
+
+        session.OpenChat();
+        await _sessionRepository.AddAsync(session, cancellationToken);
+        return session;
+    }
+
+    private async Task NotifyAndBroadcastSessionAsync(ConsultationSession session, Appointment appointment, PatientVisit visit, CancellationToken cancellationToken)
+    {
+        var patientData = await _patientRepository.GetByIdAsync(appointment.PatientId, cancellationToken);
+        if (patientData?.UserId != null)
+        {
+            await SendPatientNotificationAsync(patientData.UserId.Value, session.Id, appointment.Id, cancellationToken);
+        }
+
+        var participantUserIds = await GetParticipantUserIdsAsync(patientData, visit.AssignedDoctorId, cancellationToken);
+        if (participantUserIds.Count > 0)
+        {
+            await BroadcastRoomUpdateAsync(participantUserIds, session.Id, "SessionCreated", cancellationToken);
+        }
+
+        await BroadcastRoomUpdateAsync(Application.Common.Constants.Roles.ClinicStaff, session.Id, "VisitPaymentCompleted", cancellationToken);
+    }
+
+    private async Task SendPatientNotificationAsync(Guid userId, Guid sessionId, Guid appointmentId, CancellationToken cancellationToken)
+    {
+        await _notificationService.SendAsync(
+            userId,
+            "Kết quả khám lâm sàng & Tư vấn",
+            "Thanh toán hoàn tất. Bạn có thể trao đổi thêm với bác sĩ trong vòng 14 ngày qua mục Chat.",
+            NotificationType.ConsultationResultProvided,
+            new { ConsultationId = sessionId, AppointmentId = appointmentId },
+            cancellationToken,
+            sessionId);
+    }
+
+    private async Task<List<Guid>> GetParticipantUserIdsAsync(Domain.Entities.Users.Patient? patient, Guid? doctorId, CancellationToken cancellationToken)
+    {
+        var userIds = new List<Guid>();
+        if (patient?.UserId != null) userIds.Add(patient.UserId.Value);
+
+        if (doctorId.HasValue)
+        {
+            var ophthal = await _ophthalmologistRepository.GetByIdAsync(doctorId.Value, cancellationToken);
+            if (ophthal?.UserId != null) userIds.Add(ophthal.UserId);
+        }
+        return userIds;
+    }
+
+    private async Task BroadcastRoomUpdateAsync(object target, Guid sessionId, string @event, CancellationToken cancellationToken)
+    {
+        var payload = new RoomStateChangedDto
+        {
+            SessionId = sessionId,
+            Event = @event,
+            Timestamp = DateTime.UtcNow
+        };
+
+        if (target is IEnumerable<Guid> userIds)
+        {
+            await _chatHubService.BroadcastRoomStateChangedAsync(userIds.ToList(), payload, cancellationToken);
+        }
+        else if (target is string role)
+        {
+            await _chatHubService.BroadcastRoomStateChangedAsync(role, payload, cancellationToken);
         }
     }
 }

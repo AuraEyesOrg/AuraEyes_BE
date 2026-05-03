@@ -11,16 +11,13 @@ namespace Infrastructure.Services;
 public class MonthlyLeaveFundJob
 {
     private readonly ApplicationDbContext _context;
-    private readonly IBetterStackHeartbeatService _betterStackHeartbeat;
     private readonly ILogger<MonthlyLeaveFundJob> _logger;
 
     public MonthlyLeaveFundJob(
         ApplicationDbContext context,
-        IBetterStackHeartbeatService betterStackHeartbeat,
         ILogger<MonthlyLeaveFundJob> logger)
     {
         _context = context;
-        _betterStackHeartbeat = betterStackHeartbeat;
         _logger = logger;
     }
 

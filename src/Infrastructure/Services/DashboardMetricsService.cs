@@ -43,119 +43,99 @@ public class DashboardMetricsService : IDashboardMetricsService
     public async Task<DashboardMetricsDto> GetSystemAdminMetricsAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
-
         var (doctorMetrics, patientMetrics) = await GetUserStatisticsAsync(now, cancellationToken);
 
         var yearStart = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var nextYearStart = yearStart.AddYears(1);
-        var sevenDaysStart = now.Date.AddDays(-6);
 
-
-        var paymentMethodBreakdown = new List<PaymentMethodRevenueDto>();
-        var monthlyRevenue = Enumerable.Range(1, 12)
-            .Select(month => new MonthlyRevenuePointDto
-            {
-                Month = month,
-                Label = CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(month),
-                Revenue = 0m
-            })
-            .ToList();
-        var dailyRevenue = Enumerable.Range(0, 7)
-            .Select(offset => sevenDaysStart.AddDays(offset))
-            .Select(date => new DailyRevenuePointDto
-            {
-                Date = DateTime.SpecifyKind(date, DateTimeKind.Utc),
-                Label = date.ToString("dd MMM", CultureInfo.InvariantCulture),
-                Revenue = 0m
-            })
-            .ToList();
-        var monthlyPlatformCommission = monthlyRevenue
-            .Select(item => new MonthlyRevenuePointDto
-            {
-                Month = item.Month,
-                Label = item.Label,
-                Revenue = 0m
-            })
-            .ToList();
-        var dailyPlatformCommission = dailyRevenue
-            .Select(item => new DailyRevenuePointDto
-            {
-                Date = item.Date,
-                Label = item.Label,
-                Revenue = 0m
-            })
-            .ToList();
-
-        var totalDepositRevenueYear = 0m;
-        var totalPlatformCommissionYear = 0m;
-
+        var revenueData = InitializeRevenueData(now);
         var (monthlyNewDoctorCounts, monthlyNewPatientCounts) = await GetMonthlyGrowthCountsAsync(yearStart, nextYearStart, cancellationToken);
-
-        var pendingDoctorVerifications = 0;
-
-        var liveConsultations = await _context.ConsultationSessions
-            .CountAsync(
-                s => s.ChatStatus == ChatStatus.Open
-                     && s.Status != SessionStatus.Completed
-                     && s.Status != SessionStatus.Cancelled,
-                cancellationToken);
-
-        var databaseHealthy = await _context.Database.CanConnectAsync(cancellationToken);
-
-        var topDoctorRows = new List<TopPerformerDoctorDto>();
-
-        var monitorDescriptors = _betterStackHeartbeatService.GetMonitorDescriptors();
 
         return new DashboardMetricsDto
         {
             Doctors = doctorMetrics,
-            Organisations = new UserGrowthMetricDto
-            {
-                Total = 0,
-                CurrentMonth = 0,
-                PreviousMonth = 0,
-                GrowthPercentage = 0
-            },
             Patients = patientMetrics,
-            PaymentMethodBreakdown = paymentMethodBreakdown,
-            MonthlyRevenue = monthlyRevenue,
-            DailyRevenue = dailyRevenue,
-            TotalDepositRevenueYear = totalDepositRevenueYear,
-            TotalPlatformCommissionYear = totalPlatformCommissionYear,
-            MonthlyPlatformCommission = monthlyPlatformCommission,
-            DailyPlatformCommission = dailyPlatformCommission,
+            Organisations = CreateEmptyGrowthMetric(),
+            PaymentMethodBreakdown = new List<PaymentMethodRevenueDto>(),
+            MonthlyRevenue = revenueData.MonthlyRevenue,
+            DailyRevenue = revenueData.DailyRevenue,
+            MonthlyPlatformCommission = revenueData.MonthlyCommission,
+            DailyPlatformCommission = revenueData.DailyCommission,
+            TotalDepositRevenueYear = 0m,
+            TotalPlatformCommissionYear = 0m,
             MonthlyNewDoctorCounts = monthlyNewDoctorCounts,
             MonthlyNewOrganisationCounts = Enumerable.Range(1, 12).Select(_ => 0).ToList(),
             MonthlyNewPatientCounts = monthlyNewPatientCounts,
-            PendingActions = new DashboardPendingActionsDto
-            {
-                PendingOphthalmologistVerifications = pendingDoctorVerifications,
-                PendingOrganisationOnboarding = 0
-            },
-            SystemStatus = new DashboardSystemStatusDto
-            {
-                LiveConsultationSessions = liveConsultations,
-                ApiHealthy = true,
-                DatabaseHealthy = databaseHealthy
-            },
-            BetterStack = new DashboardBetterStackDto
-            {
-                Enabled = monitorDescriptors.Any(item => item.Configured),
-                EmbedUrl = _betterStackHeartbeatService.GetEmbedUrl(),
-                Monitors = monitorDescriptors
-                    .Select(item => new DashboardBackgroundMonitorDto
-                    {
-                        Key = item.Key,
-                        Name = item.DisplayName,
-                        Category = item.Category,
-                        Configured = item.Configured
-                    })
-                    .ToList()
-            },
-            TopDoctorsByConsultationRevenue = topDoctorRows,
+            PendingActions = new DashboardPendingActionsDto { PendingOphthalmologistVerifications = 0, PendingOrganisationOnboarding = 0 },
+            SystemStatus = await GetSystemStatusAsync(cancellationToken),
+            BetterStack = GetBetterStackStatus(),
+            TopDoctorsByConsultationRevenue = new List<TopPerformerDoctorDto>(),
             TopOrganisationsByRating = new List<TopPerformerOrganisationDto>()
         };
     }
+
+    private static RevenueData InitializeRevenueData(DateTime now)
+    {
+        var sevenDaysStart = now.Date.AddDays(-6);
+        var months = Enumerable.Range(1, 12).Select(m => new MonthlyRevenuePointDto 
+        { 
+            Month = m, 
+            Label = CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(m), 
+            Revenue = 0m 
+        }).ToList();
+
+        var days = Enumerable.Range(0, 7).Select(offset => sevenDaysStart.AddDays(offset)).Select(date => new DailyRevenuePointDto
+        {
+            Date = DateTime.SpecifyKind(date, DateTimeKind.Utc),
+            Label = date.ToString("dd MMM", CultureInfo.InvariantCulture),
+            Revenue = 0m
+        }).ToList();
+
+        return new RevenueData(
+            months, 
+            days, 
+            months.Select(m => new MonthlyRevenuePointDto { Month = m.Month, Label = m.Label, Revenue = 0m }).ToList(),
+            days.Select(d => new DailyRevenuePointDto { Date = d.Date, Label = d.Label, Revenue = 0m }).ToList());
+    }
+
+    private async Task<DashboardSystemStatusDto> GetSystemStatusAsync(CancellationToken cancellationToken)
+    {
+        var liveConsultations = await _context.ConsultationSessions
+            .CountAsync(s => s.ChatStatus == ChatStatus.Open && s.Status != SessionStatus.Completed && s.Status != SessionStatus.Cancelled, cancellationToken);
+
+        return new DashboardSystemStatusDto
+        {
+            LiveConsultationSessions = liveConsultations,
+            ApiHealthy = true,
+            DatabaseHealthy = await _context.Database.CanConnectAsync(cancellationToken)
+        };
+    }
+
+    private DashboardBetterStackDto GetBetterStackStatus()
+    {
+        var monitorDescriptors = _betterStackHeartbeatService.GetMonitorDescriptors();
+        return new DashboardBetterStackDto
+        {
+            Enabled = monitorDescriptors.Any(item => item.Configured),
+            EmbedUrl = _betterStackHeartbeatService.GetEmbedUrl(),
+            Monitors = monitorDescriptors.Select(item => new DashboardBackgroundMonitorDto
+            {
+                Key = item.Key,
+                Name = item.DisplayName,
+                Category = item.Category,
+                Configured = item.Configured
+            }).ToList()
+        };
+    }
+
+    private static UserGrowthMetricDto CreateEmptyGrowthMetric() => new() { Total = 0, CurrentMonth = 0, PreviousMonth = 0, GrowthPercentage = 0 };
+
+    private sealed record RevenueData(
+        List<MonthlyRevenuePointDto> MonthlyRevenue, 
+        List<DailyRevenuePointDto> DailyRevenue, 
+        List<MonthlyRevenuePointDto> MonthlyCommission, 
+        List<DailyRevenuePointDto> DailyCommission);
+
 
     private async Task<(UserGrowthMetricDto Doctors, UserGrowthMetricDto Patients)> GetUserStatisticsAsync(
         DateTime now, CancellationToken cancellationToken)
