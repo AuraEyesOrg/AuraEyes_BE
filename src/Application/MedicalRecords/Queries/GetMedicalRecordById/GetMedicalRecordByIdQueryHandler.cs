@@ -31,7 +31,7 @@ public class GetMedicalRecordByIdQueryHandler : IRequestHandler<GetMedicalRecord
 
     public async Task<Result<MedicalRecordDto>> Handle(GetMedicalRecordByIdQuery request, CancellationToken cancellationToken)
     {
-        var record = await _medicalRecordRepository.GetByIdAsync(request.Id, cancellationToken);
+        var record = await _medicalRecordRepository.GetByIdAsNoTrackingAsync(request.Id, cancellationToken);
         
         if (record == null)
         {
@@ -47,7 +47,7 @@ public class GetMedicalRecordByIdQueryHandler : IRequestHandler<GetMedicalRecord
 
             if (!isStaff)
             {
-                var patients = await _patientRepository.FindAsync(p => p.UserId == _currentUserService.UserId.Value, cancellationToken);
+                var patients = await _patientRepository.FindAsNoTrackingAsync(p => p.UserId == _currentUserService.UserId.Value, cancellationToken);
                 var patient = patients.FirstOrDefault();
 
                 if (patient == null || record.PatientId != patient.Id)
@@ -65,3 +65,4 @@ public class GetMedicalRecordByIdQueryHandler : IRequestHandler<GetMedicalRecord
         return Result<MedicalRecordDto>.Success(dto);
     }
 }
+

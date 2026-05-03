@@ -23,7 +23,7 @@ public class GetRecentClinicPatientsQueryHandler : IQueryHandler<GetRecentClinic
 
     public async Task<Result<List<RecentClinicPatientDto>>> Handle(GetRecentClinicPatientsQuery request, CancellationToken cancellationToken)
     {
-        var patients = await _patientRepository.Query()
+        var patients = await _patientRepository.Query().AsNoTracking()
             .OrderByDescending(p => p.CreatedAt)
             .Take(50)
             .ToListAsync(cancellationToken);
@@ -81,3 +81,4 @@ public class GetRecentClinicPatientsQueryHandler : IQueryHandler<GetRecentClinic
         return age;
     }
 }
+

@@ -40,14 +40,14 @@ public sealed class GetPaymentContextQueryHandler
         if (request.VisitId == Guid.Empty)
             return Result<ClinicPaymentContextDto>.Failure("VisitId is required.");
 
-        var visit = await _patientVisitRepository.Query()
+        var visit = await _patientVisitRepository.Query().AsNoTracking()
             .Include(v => v.Patient)
             .FirstOrDefaultAsync(v => v.Id == request.VisitId, cancellationToken);
 
         if (visit is null)
             return Result<ClinicPaymentContextDto>.NotFound($"Visit '{request.VisitId}' not found.");
 
-        var consultation = await _consultationSessionRepository.Query()
+        var consultation = await _consultationSessionRepository.Query().AsNoTracking()
             .Where(c => c.PatientId == visit.PatientId && !c.IsDeleted)
             .OrderByDescending(c => c.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
@@ -55,7 +55,7 @@ public sealed class GetPaymentContextQueryHandler
         if (consultation is null)
             return Result<ClinicPaymentContextDto>.Failure("Consultation session not found for this visit.");
 
-        var diagnosis = await _diagnosisRepository.Query()
+        var diagnosis = await _diagnosisRepository.Query().AsNoTracking()
             .Where(d => d.ConsultationSessionId == consultation.Id && !d.IsDeleted)
             .OrderByDescending(d => d.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
@@ -226,3 +226,4 @@ internal sealed class DiagnosisSnapshotCarrier
     public DiagnosedByDto? DiagnosedBy { get; init; }
     public DateTime? FinalizedAt { get; init; }
 }
+

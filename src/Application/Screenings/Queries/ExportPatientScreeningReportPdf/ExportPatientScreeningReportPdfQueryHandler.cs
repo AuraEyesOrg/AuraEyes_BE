@@ -50,7 +50,7 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
         CancellationToken cancellationToken)
     {
         var requesterPatient = await _patientRepository
-            .Query()
+            .Query().AsNoTracking()
             .Where(x => x.UserId == request.RequesterUserId && !x.IsDeleted)
             .Select(x => new
             {
@@ -66,7 +66,7 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
             if (requesterPatient is null && request.RequesterProfileId.HasValue)
             {
                 var isDoctorReviewer = await _consultationSessionRepository
-                    .Query()
+                    .Query().AsNoTracking()
                     .AnyAsync(
                         s => s.AiScreeningId == request.ScreeningId &&
                              s.OphthalmologistId == request.RequesterProfileId.Value &&
@@ -79,7 +79,7 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
         }
 
         var detailQuery = _screeningRepository
-            .Query()
+            .Query().AsNoTracking()
             .Where(x => x.Id == request.ScreeningId && !x.IsDeleted);
 
         if (!request.BypassAccessCheck && requesterPatientId.HasValue)
@@ -120,7 +120,7 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
         }
 
         var patientSnapshot = await _patientRepository
-            .Query()
+            .Query().AsNoTracking()
             .Where(p => p.Id == detail.PatientId && !p.IsDeleted)
             .Select(p => new
             {
@@ -130,7 +130,7 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
             .FirstOrDefaultAsync(cancellationToken);
 
         var diagnosisSnapshot = await _medicalDiagnosisRepository
-            .Query()
+            .Query().AsNoTracking()
             .Where(d => d.AiScreeningId == detail.ScreeningId && !d.IsDeleted)
             .OrderByDescending(d => d.FinalizedAt ?? d.CreatedAt)
             .Select(d => new
@@ -155,7 +155,7 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
         var doctorName = "N/A";
         if (diagnosisSnapshot?.DoctorId is Guid doctorId)
         {
-            var doctor = await _ophthalmologistRepository.GetByIdAsync(doctorId, cancellationToken);
+            var doctor = await _ophthalmologistRepository.GetByIdAsNoTrackingAsync(doctorId, cancellationToken);
             if (doctor is not null)
             {
                 var doctorUser = await _identityService.GetUserByIdAsync(doctor.UserId, cancellationToken);
@@ -686,3 +686,5 @@ public sealed class ExportPatientScreeningReportPdfQueryHandler
         public static VisualAssets Empty { get; } = new(null, null);
     }
 }
+
+

@@ -40,12 +40,12 @@ public class GetScreeningSessionDetailQueryHandler
             return Result<ScreeningSessionDetailDto>.Unauthorized("User not authenticated");
 
         var screeningQuery = _screeningRepository
-            .Query()
+            .Query().AsNoTracking()
             .Where(s => s.Id == request.ScreeningId && !s.IsDeleted);
 
         if (!request.BypassPatientCheck)
         {
-            var patients = await _patientRepository.FindAsync(
+            var patients = await _patientRepository.FindAsNoTrackingAsync(
                 p => p.UserId == _currentUserService.UserId.Value,
                 cancellationToken);
 
@@ -99,7 +99,7 @@ public class GetScreeningSessionDetailQueryHandler
         // Populate patient info if bypass check is used (for clinic staff)
         if (request.BypassPatientCheck)
         {
-            var patient = await _patientRepository.GetByIdAsync(session.PatientId, cancellationToken);
+            var patient = await _patientRepository.GetByIdAsNoTrackingAsync(session.PatientId, cancellationToken);
             if (patient != null)
             {
                 string? patientName = patient.FullName;
@@ -123,7 +123,7 @@ public class GetScreeningSessionDetailQueryHandler
                 };
 
                 // Link to most recent medical record
-                var medicalRecords = await _medicalRecordRepository.FindAsync(
+                var medicalRecords = await _medicalRecordRepository.FindAsNoTrackingAsync(
                     mr => mr.PatientId == patient.Id, cancellationToken);
                 
                 session.MedicalRecordId = medicalRecords
@@ -135,3 +135,5 @@ public class GetScreeningSessionDetailQueryHandler
         return Result<ScreeningSessionDetailDto>.Success(session);
     }
 }
+
+

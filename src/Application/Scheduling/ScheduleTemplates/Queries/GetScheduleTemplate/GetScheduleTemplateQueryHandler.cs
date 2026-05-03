@@ -16,7 +16,7 @@ public class GetScheduleTemplateQueryHandler : IQueryHandler<GetScheduleTemplate
 
     public async Task<Result<ScheduleTemplateDto>> Handle(GetScheduleTemplateQuery request, CancellationToken cancellationToken)
     {
-        var template = await _repository.GetByIdAsync(request.TemplateId, cancellationToken);
+        var template = await _repository.GetByIdAsNoTrackingAsync(request.TemplateId, cancellationToken);
         if (template is null)
             return Result<ScheduleTemplateDto>.NotFound($"Schedule template with ID '{request.TemplateId}' was not found.");
 
@@ -37,3 +37,4 @@ public class GetScheduleTemplateQueryHandler : IQueryHandler<GetScheduleTemplate
         return Result<ScheduleTemplateDto>.Success(dto);
     }
 }
+

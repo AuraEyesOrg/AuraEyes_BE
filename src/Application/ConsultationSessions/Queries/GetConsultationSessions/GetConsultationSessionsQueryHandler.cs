@@ -80,7 +80,7 @@ public class GetConsultationSessionsQueryHandler
 
         var sessionIds = sessions.Select(s => s.Id).ToList();
 
-        var latestMessages = await _sessionRepository.Query()
+        var latestMessages = await _sessionRepository.Query().AsNoTracking()
             .Where(s => sessionIds.Contains(s.Id))
             .Select(s => new
             {
@@ -138,7 +138,7 @@ public class GetConsultationSessionsQueryHandler
 
         // Load screenings + latest results for snapshot. Do NOT include images/raw json for list.
         var screenings = await _aiScreeningRepository
-            .Query()
+            .Query().AsNoTracking()
             .Where(x => screeningIds.Contains(x.Id))
             .Include(x => x.ScreeningResults)
             .ToListAsync(cancellationToken);
@@ -189,3 +189,4 @@ public class GetConsultationSessionsQueryHandler
         return dtos;
     }
 }
+

@@ -54,7 +54,7 @@ public class GetClinicAppointmentsByDateQueryHandler
         var appointmentIds = appointments.Select(a => a.Id).ToList();
         var orders = await _orderRepository.GetByAppointmentIdsAsync(appointmentIds, cancellationToken);
         var orderLookup = orders.ToLookup(o => o.AppointmentId!.Value);
-        var visits = await _patientVisitRepository.Query()
+        var visits = await _patientVisitRepository.Query().AsNoTracking()
             .Where(v => v.AppointmentId.HasValue && appointmentIds.Contains(v.AppointmentId.Value))
             .ToListAsync(cancellationToken);
         var visitMap = visits.ToDictionary(v => v.AppointmentId!.Value);
@@ -65,7 +65,7 @@ public class GetClinicAppointmentsByDateQueryHandler
         var screenings = visitPatientIds.Count == 0
             ? new List<AiScreening>()
             : await _screeningRepository
-                .Query()
+                .Query().AsNoTracking()
                 .Include(s => s.ScreeningResults)
                 .Where(s =>
                     visitPatientIds.Contains(s.PatientId)
@@ -76,7 +76,7 @@ public class GetClinicAppointmentsByDateQueryHandler
         var consultations = visitPatientIds.Count == 0
             ? new List<ConsultationSession>()
             : await _consultationSessionRepository
-                .Query()
+                .Query().AsNoTracking()
                 .Where(cs =>
                     visitPatientIds.Contains(cs.PatientId)
                     && cs.CreatedAt >= cutoffDate
@@ -205,3 +205,4 @@ public class GetClinicAppointmentsByDateQueryHandler
         return Result<IReadOnlyList<ClinicAppointmentDto>>.Success(items);
     }
 }
+

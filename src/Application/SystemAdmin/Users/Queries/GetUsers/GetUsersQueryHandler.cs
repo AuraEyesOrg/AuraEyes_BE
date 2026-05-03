@@ -35,10 +35,10 @@ public class GetUsersQueryHandler : IQueryHandler<GetUsersQuery, PagedResult<Use
             request.PageSize,
             cancellationToken);
 
-        var ophthalmologists = await _ophthalmologistRepository.GetAllAsync(cancellationToken);
+        var ophthalmologists = await _ophthalmologistRepository.GetAllAsNoTrackingAsync(cancellationToken);
         var ophthalmologistLookup = ophthalmologists.ToDictionary(o => o.UserId, o => o);
 
-        var clinicStaffs = await _clinicStaffRepository.GetAllAsync(cancellationToken);
+        var clinicStaffs = await _clinicStaffRepository.GetAllAsNoTrackingAsync(cancellationToken);
         var clinicStaffLookup = clinicStaffs.ToDictionary(cs => cs.UserId, cs => cs);
 
         var items = users.Select(u => {
@@ -70,3 +70,4 @@ public class GetUsersQueryHandler : IQueryHandler<GetUsersQuery, PagedResult<Use
         return Result<PagedResult<UserListDto>>.Success(pagedResult);
     }
 }
+

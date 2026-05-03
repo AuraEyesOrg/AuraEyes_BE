@@ -37,7 +37,7 @@ public class GetLeaveRequestsQueryHandler : IQueryHandler<GetLeaveRequestsQuery,
             .Distinct()
             .ToList();
 
-        var ophthalmologists = await _ophthalmologistRepository.Query()
+        var ophthalmologists = await _ophthalmologistRepository.Query().AsNoTracking()
             .Where(x => ophthalmologistIds.Contains(x.Id))
             .Select(x => new { x.Id, x.UserId })
             .ToListAsync(cancellationToken);
@@ -85,3 +85,4 @@ public class GetLeaveRequestsQueryHandler : IQueryHandler<GetLeaveRequestsQuery,
         return Result<PagedResult<AdminOphthalmologistLeaveRequestDto>>.Success(pagedResult);
     }
 }
+

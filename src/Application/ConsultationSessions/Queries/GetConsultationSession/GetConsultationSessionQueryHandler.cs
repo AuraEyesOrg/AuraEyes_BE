@@ -112,7 +112,7 @@ public class GetConsultationSessionQueryHandler
         if (!screeningId.HasValue || (!canViewRetinalImages && !canViewAiResults)) return null;
 
         var screening = await _aiScreeningRepository
-            .Query()
+            .Query().AsNoTracking()
             .Include(x => x.RetinalImages)
             .Include(x => x.ScreeningResults)
             .FirstOrDefaultAsync(x => x.Id == screeningId.Value, cancellationToken);
@@ -207,3 +207,4 @@ public class GetConsultationSessionQueryHandler
         };
     }
 }
+

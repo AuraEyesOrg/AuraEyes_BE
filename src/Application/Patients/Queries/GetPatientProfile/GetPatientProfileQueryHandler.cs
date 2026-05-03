@@ -35,7 +35,7 @@ public class GetPatientProfileQueryHandler : IQueryHandler<GetPatientProfileQuer
         if (user is null)
             return Result<PatientProfileDto>.NotFound("User not found");
 
-        var patients = await _patientRepository.FindAsync(
+        var patients = await _patientRepository.FindAsNoTrackingAsync(
             p => p.UserId == request.UserId, cancellationToken);
         var patient = patients.FirstOrDefault();
 
@@ -72,3 +72,4 @@ public class GetPatientProfileQueryHandler : IQueryHandler<GetPatientProfileQuer
         return Result<PatientProfileDto>.Success(dto);
     }
 }
+
