@@ -38,6 +38,15 @@ public class Appointment : BaseEntity, IAggregateRoot
     /// <summary>Snapshot of the price at the time of booking.</summary>
     public decimal Price { get; private set; }
 
+    /// <summary>Bank number for refund if cancelled.</summary>
+    public string? RefundBankNumber { get; private set; }
+
+    /// <summary>Account name for refund if cancelled.</summary>
+    public string? RefundAccountName { get; private set; }
+
+    /// <summary>Bank name for refund if cancelled.</summary>
+    public string? RefundBankName { get; private set; }
+
     // Navigation properties
     public Patient? Patient { get; private set; }
     public AppointmentSlot? AppointmentSlot { get; private set; }
@@ -126,6 +135,25 @@ public class Appointment : BaseEntity, IAggregateRoot
 
         Status = AppointmentStatus.Cancelled;
         CancelledBy = cancelledBy;
+        CancellationReason = reason;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Request a cancellation (by patient).
+    /// </summary>
+    public void RequestCancellation(string? bankNumber, string? accountName, string? bankName, string? reason = null)
+    {
+        if (Status is AppointmentStatus.Cancelled or AppointmentStatus.CancellationRequested)
+            throw new InvalidOperationException("Appointment is already cancelled or cancellation is already requested.");
+
+        if (Status is AppointmentStatus.Completed or AppointmentStatus.InProgress or AppointmentStatus.CheckedIn)
+            throw new InvalidOperationException($"Cannot cancel an appointment that is {Status}.");
+
+        Status = AppointmentStatus.CancellationRequested;
+        RefundBankNumber = bankNumber;
+        RefundAccountName = accountName;
+        RefundBankName = bankName;
         CancellationReason = reason;
         UpdatedAt = DateTime.UtcNow;
     }
