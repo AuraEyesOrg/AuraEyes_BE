@@ -135,6 +135,8 @@ public class PatientProfileController : BaseApiController
         if (_currentUserService.UserId is null)
             return Unauthorized(ApiResponseFactory.Unauthorized("User not authenticated"));
 
+        _logger.LogInformation("User {UserId} is changing their password.", _currentUserService.UserId.Value);
+
         var command = new ChangePasswordCommand
         {
             UserId = _currentUserService.UserId.Value,
