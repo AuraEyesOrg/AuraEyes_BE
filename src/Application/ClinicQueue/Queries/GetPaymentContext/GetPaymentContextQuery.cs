@@ -42,15 +42,19 @@ public sealed class GetPaymentContextQueryHandler
 
         var visit = await _patientVisitRepository.Query().AsNoTracking()
             .Include(v => v.Patient)
+            .Include(v => v.MedicalRecord)
             .FirstOrDefaultAsync(v => v.Id == request.VisitId, cancellationToken);
 
         if (visit is null)
             return Result<ClinicPaymentContextDto>.NotFound($"Visit '{request.VisitId}' not found.");
 
+        if (visit.MedicalRecord?.ConsultationSessionId == null)
+            return Result<ClinicPaymentContextDto>.Failure("Consultation session not linked to this visit yet.");
+
+        var consultationSessionId = visit.MedicalRecord.ConsultationSessionId.Value;
+
         var consultation = await _consultationSessionRepository.Query().AsNoTracking()
-            .Where(c => c.PatientId == visit.PatientId && !c.IsDeleted)
-            .OrderByDescending(c => c.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(c => c.Id == consultationSessionId && !c.IsDeleted, cancellationToken);
 
         if (consultation is null)
             return Result<ClinicPaymentContextDto>.Failure("Consultation session not found for this visit.");
@@ -71,11 +75,22 @@ public sealed class GetPaymentContextQueryHandler
             diagnosedByDoctorName = doctorUser?.FullName?.Trim();
         }
 
+        var patientName = visit.Patient?.FullName;
+        if (string.IsNullOrWhiteSpace(patientName) && visit.Patient?.UserId != null)
+        {
+            var patientUser = await _identityService.GetUserByIdAsync(visit.Patient.UserId.Value, cancellationToken);
+            patientName = patientUser?.FullName?.Trim();
+        }
+        if (string.IsNullOrWhiteSpace(patientName))
+        {
+            patientName = "Unknown Patient";
+        }
+
         var dto = new ClinicPaymentContextDto
         {
             VisitId = visit.Id,
             PatientId = visit.PatientId,
-            PatientName = visit.Patient?.FullName ?? "Unknown Patient",
+            PatientName = patientName,
             ConsultationSessionId = consultation.Id,
             ScreeningId = diagnosis.AiScreeningId,
             Diagnosis = new DiagnosisSnapshotDto
