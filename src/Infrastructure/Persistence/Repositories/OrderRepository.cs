@@ -53,7 +53,6 @@ public class OrderRepository : Repository<Order>, IOrderRepository
     public async Task<IReadOnlyList<Order>> GetByAppointmentIdsAsync(IEnumerable<Guid> appointmentIds, CancellationToken cancellationToken = default)
     {
         return await _dbSet
-            .AsNoTracking()
             .Include(o => o.Payments)
             .Where(o => o.AppointmentId.HasValue && appointmentIds.Contains(o.AppointmentId.Value))
             .ToListAsync(cancellationToken);

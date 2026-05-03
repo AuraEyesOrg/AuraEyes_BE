@@ -44,6 +44,12 @@ public class ClinicAppointmentDto
     public decimal? RemainingAmount { get; init; }
     public decimal? PaidAmount { get; init; }
     public string? OrderStatus { get; init; }
+
+    // Refund bank info
+    public string? RefundBankNumber { get; init; }
+    public string? RefundAccountName { get; init; }
+    public string? RefundBankName { get; init; }
+    public string? CancellationReason { get; init; }
 }
 
 public class ClinicAvailableSlotDto

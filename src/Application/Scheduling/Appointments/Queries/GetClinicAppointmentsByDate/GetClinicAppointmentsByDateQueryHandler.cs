@@ -119,7 +119,7 @@ public class GetClinicAppointmentsByDateQueryHandler
 
         var items = new List<ClinicAppointmentDto>();
 
-        foreach (var a in appointments.Where(x => x.AppointmentSlot is not null && x.Status != AppointmentStatus.Cancelled))
+        foreach (var a in appointments.Where(x => x.AppointmentSlot is not null && x.Status != AppointmentStatus.Cancelled && x.Status != AppointmentStatus.NoShow))
         {
             var appointmentOrders = orderLookup[a.Id].ToList();
             var primaryOrder = appointmentOrders.OrderByDescending(o => o.CreatedAt).FirstOrDefault();
@@ -188,12 +188,18 @@ public class GetClinicAppointmentsByDateQueryHandler
                 IsPaidDeposit = isPaidDeposit,
                 PaidAmount = paidAmount,
                 RemainingAmount = totalAmount > 0 ? (remaining > 0 ? remaining : 0) : null,
-                OrderStatus = primaryOrder?.Status switch
+                    OrderStatus = primaryOrder?.Status switch
                 {
                     OrderStatus.Confirmed => "PartiallyPaid",
                     OrderStatus.Completed => "FullyPaid",
                     _ => primaryOrder?.Status.ToString()
-                }
+                },
+
+                // Refund info
+                RefundBankNumber = a.RefundBankNumber,
+                RefundAccountName = a.RefundAccountName,
+                RefundBankName = a.RefundBankName,
+                CancellationReason = a.CancellationReason
             });
         }
 
