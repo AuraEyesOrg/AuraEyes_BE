@@ -38,16 +38,8 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
         }
 
         // 2. Lock to prevent Cache Stampede
-        var semaphore = _semaphores.GetOrAdd(cacheKey, _ => new System.Threading.SemaphoreSlim(1, 1));
-        await semaphore.WaitAsync(cancellationToken);
-
         try
         {
-            // Re-check cache
-            if (_cache.TryGetValue(cacheKey, out cachedResult))
-            {
-                return Result<PagedResult<AppointmentSlotListDto>>.Success(cachedResult!);
-            }
 
             var (items, totalCount) = await _repository.GetPagedAsync(
                 request.ScheduleTemplateId,
@@ -100,7 +92,7 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
         }
         finally
         {
-            semaphore.Release();
+            // No lock to release
         }
     }
 }

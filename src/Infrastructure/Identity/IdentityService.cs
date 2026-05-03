@@ -184,17 +184,24 @@ public class IdentityService : IIdentityService
 
     public async Task<IReadOnlyList<UserDto>> GetUsersByIdsAsync(IEnumerable<Guid> userIds, CancellationToken cancellationToken = default)
     {
+        // Optimization: Use a single query to fetch only the fields needed for DTO
+        // and avoid the N+1 problem caused by fetching claims for each user in MapToDtoAsync
         var users = await _userManager.Users
+            .AsNoTracking()
             .Where(u => userIds.Contains(u.Id) && !u.IsDeleted)
+            .Select(u => new UserDto(
+                u.Id,
+                u.Email ?? string.Empty,
+                u.FullName,
+                u.EmailConfirmed,
+                u.IsActive,
+                u.IsDeleted,
+                u.TwoFactorEnabled,
+                u.AvatarUrl, // Direct from user table, ignores provider claims for performance
+                u.PhoneNumber))
             .ToListAsync(cancellationToken);
 
-        var dtos = new List<UserDto>();
-        foreach (var user in users)
-        {
-            dtos.Add(await MapToDtoAsync(user));
-        }
-
-        return dtos.AsReadOnly();
+        return users.AsReadOnly();
     }
 
     public async Task<bool> IsPhoneNumberInUseAsync(
