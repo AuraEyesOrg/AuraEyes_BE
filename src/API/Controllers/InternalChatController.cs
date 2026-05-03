@@ -5,6 +5,7 @@ using Application.Network.InternalChat.Commands.CreateGroupChat;
 using Application.Network.InternalChat.Commands.SendMessage;
 using Application.Network.InternalChat.Queries.GetGroups;
 using Application.Network.InternalChat.Queries.GetMessages;
+using Application.SystemAdmin.Users.Queries.GetUsers;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -44,6 +45,28 @@ public class InternalChatController : BaseApiController
     public async Task<IActionResult> GetGroups()
     {
         var result = await _mediator.Send(new GetInternalGroupChatsQuery());
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Get candidate users for internal chat group membership.
+    /// </summary>
+    [HttpGet("candidates")]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<UserListDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetCandidates(
+        [FromQuery] string? searchTerm = null,
+        [FromQuery] string? role = null,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 500)
+    {
+        var query = new GetUsersQuery
+        {
+            SearchTerm = searchTerm,
+            RoleFilter = role,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+        var result = await _mediator.Send(query);
         return HandleResult(result);
     }
 
