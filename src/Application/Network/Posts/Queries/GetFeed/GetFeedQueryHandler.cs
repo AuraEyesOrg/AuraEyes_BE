@@ -44,7 +44,21 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
         var savedPostIds = await _postRepository.GetUserSavedPostIdsAsync(
             request.CurrentUserId, postIds, cancellationToken);
 
-        // Build author info — gather both post authors and original-post authors
+        var authors = await BatchLoadAuthorsAsync(posts, cancellationToken);
+
+        var items = posts.Select(p => MapToDto(
+            p, authors, userReactions, savedPostIds, request.CurrentUserId, request.IsSystemAdmin)).ToList();
+
+        var pagedResult = new PagedResult<PostFeedDto>(
+            items, totalCount, request.PageNumber, request.PageSize);
+
+        return Result<PagedResult<PostFeedDto>>.Success(pagedResult);
+    }
+
+    private async Task<Dictionary<Guid, AuthorDto>> BatchLoadAuthorsAsync(
+        IReadOnlyList<Domain.Entities.Network.ProfessionalPost> posts,
+        CancellationToken cancellationToken)
+    {
         var authorIds = posts
             .SelectMany(p => p.OriginalPost is not null
                 ? new[] { p.AuthorId, p.OriginalPost.AuthorId }
@@ -58,6 +72,7 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
             var user = await _identityService.GetUserByIdAsync(authorId, cancellationToken);
             var matchingPost = posts.FirstOrDefault(p => p.AuthorId == authorId)
                                ?? posts.FirstOrDefault(p => p.OriginalPost?.AuthorId == authorId);
+            
             authors[authorId] = new AuthorDto
             {
                 Id = authorId,
@@ -68,14 +83,7 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
                 AvatarUrl = user?.AvatarUrl
             };
         }
-
-        var items = posts.Select(p => MapToDto(
-            p, authors, userReactions, savedPostIds, request.CurrentUserId, request.IsSystemAdmin)).ToList();
-
-        var pagedResult = new PagedResult<PostFeedDto>(
-            items, totalCount, request.PageNumber, request.PageSize);
-
-        return Result<PagedResult<PostFeedDto>>.Success(pagedResult);
+        return authors;
     }
 
     private static PostFeedDto MapToDto(

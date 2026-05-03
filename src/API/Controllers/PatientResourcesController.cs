@@ -93,46 +93,59 @@ public class PatientResourcesController : BaseApiController
         foreach (var query in searchQueries.Take(4))
         {
             if (candidates.Count >= maxItems) break;
-
-            var queryParams = new Dictionary<string, string?>
-            {
-                { "engine", "google" },
-                { "hl", "vi" },
-                { "gl", "vn" },
-                { "safe", "active" },
-                { "num", Math.Max(maxItems * 2, 6).ToString() },
-                { "q", query },
-                { "api_key", apiKey }
-            };
-
-            var searchUrl = QueryHelpers.AddQueryString(serpBaseUrl, queryParams);
-
-            try
-            {
-                using var response = await client.GetAsync(searchUrl, cancellationToken);
-                if (!response.IsSuccessStatusCode)
-                {
-                    _logger.LogWarning("SerpApi request failed for query {Query} with status {StatusCode}.", query, (int)response.StatusCode);
-                    continue;
-                }
-
-                var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                using var doc = JsonDocument.Parse(json);
-                if (!doc.RootElement.TryGetProperty("organic_results", out var organicResults) ||
-                    organicResults.ValueKind != JsonValueKind.Array)
-                {
-                    continue;
-                }
-
-                ParseOrganicResults(organicResults, candidates, seenLinks, trustedDomains, maxItems);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed SerpApi request for query {Query}.", query);
-            }
+            await FetchAndParseQueryResultsAsync(client, query, serpBaseUrl, apiKey, candidates, seenLinks, trustedDomains, maxItems, cancellationToken);
         }
 
         return candidates;
+    }
+
+    private async Task FetchAndParseQueryResultsAsync(
+        HttpClient client,
+        string query,
+        string serpBaseUrl,
+        string apiKey,
+        List<PatientEducationalResourceDto> candidates,
+        HashSet<string> seenLinks,
+        IReadOnlyCollection<string> trustedDomains,
+        int maxItems,
+        CancellationToken cancellationToken)
+    {
+        var queryParams = new Dictionary<string, string?>
+        {
+            { "engine", "google" },
+            { "hl", "vi" },
+            { "gl", "vn" },
+            { "safe", "active" },
+            { "num", Math.Max(maxItems * 2, 6).ToString() },
+            { "q", query },
+            { "api_key", apiKey }
+        };
+
+        var searchUrl = QueryHelpers.AddQueryString(serpBaseUrl, queryParams);
+
+        try
+        {
+            using var response = await client.GetAsync(searchUrl, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("SerpApi request failed for query {Query} with status {StatusCode}.", query, (int)response.StatusCode);
+                return;
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("organic_results", out var organicResults) ||
+                organicResults.ValueKind != JsonValueKind.Array)
+            {
+                return;
+            }
+
+            ParseOrganicResults(organicResults, candidates, seenLinks, trustedDomains, maxItems);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed SerpApi request for query {Query}.", query);
+        }
     }
 
     private static void ParseOrganicResults(

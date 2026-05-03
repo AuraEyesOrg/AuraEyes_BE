@@ -273,7 +273,14 @@ public class DashboardMetricsService : IDashboardMetricsService
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        var items = pageRows.Select(item => new RecentScreeningDto
+        var items = pageRows.Select(MapToRecentScreeningDto).ToList();
+
+        return new PagedResult<RecentScreeningDto>(items, totalCount, pageNumber, pageSize);
+    }
+
+    private static RecentScreeningDto MapToRecentScreeningDto(dynamic item)
+    {
+        return new RecentScreeningDto
         {
             Id = item.Id,
             ScreeningCode = $"SCR-{item.CreatedAt:yyyyMMdd}-{item.Id.ToString().Substring(0, 6).ToUpperInvariant()}",
@@ -286,9 +293,7 @@ public class DashboardMetricsService : IDashboardMetricsService
             IsCritical = item.RiskLevel == RiskLevel.High || item.RiskLevel == RiskLevel.Critical,
             CreatedAt = item.CreatedAt,
             CompletedAt = item.ProcessedAt
-        }).ToList();
-
-        return new PagedResult<RecentScreeningDto>(items, totalCount, pageNumber, pageSize);
+        };
     }
 
     public async Task<ScreeningVolumeTrendsDto> GetScreeningVolumeTrendsAsync(string timeRange, int periods, CancellationToken cancellationToken = default)
@@ -496,91 +501,61 @@ public class DashboardMetricsService : IDashboardMetricsService
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
-            var normalizedSearchTerm = $"%{searchTerm.Trim()}%";
-            doctorsQuery = doctorsQuery.Where(x =>
-                EF.Functions.ILike(x.Name, normalizedSearchTerm)
-                || (x.Email != null && EF.Functions.ILike(x.Email, normalizedSearchTerm)));
+            var normalizedSearch = $"%{searchTerm.Trim()}%";
+            doctorsQuery = doctorsQuery.Where(x => EF.Functions.ILike(x.Name, normalizedSearch) || (x.Email != null && EF.Functions.ILike(x.Email, normalizedSearch)));
         }
 
-        if (employmentType.HasValue)
-        {
-            doctorsQuery = doctorsQuery.Where(x => x.EmploymentType == employmentType.Value);
-        }
+        if (employmentType.HasValue) doctorsQuery = doctorsQuery.Where(x => x.EmploymentType == employmentType.Value);
 
         var doctors = await doctorsQuery.ToListAsync(cancellationToken);
-        if (doctors.Count == 0)
-        {
-            return new PagedResult<DoctorWorkloadListItemDto>(
-                new List<DoctorWorkloadListItemDto>(),
-                0,
-                pageNumber,
-                pageSize);
-        }
+        if (doctors.Count == 0) return new PagedResult<DoctorWorkloadListItemDto>(new List<DoctorWorkloadListItemDto>(), 0, pageNumber, pageSize);
 
-        var intervals = await QueryCompletedSessionIntervalsAsync(
-            doctors.Select(x => x.Id).ToList(),
-            periodBounds.StartUtc,
-            periodBounds.EndUtcExclusive,
-            cancellationToken);
-
-        var intervalsByDoctor = intervals
-            .GroupBy(x => x.DoctorId)
-            .ToDictionary(g => g.Key, g => g.ToList());
-
-        var requiredHoursByEmploymentType = await GetRequiredHoursByEmploymentTypeAsync(periodType, cancellationToken);
+        var intervals = await QueryCompletedSessionIntervalsAsync(doctors.Select(x => x.Id).ToList(), periodBounds.StartUtc, periodBounds.EndUtcExclusive, cancellationToken);
+        var intervalsByDoctor = intervals.GroupBy(x => x.DoctorId).ToDictionary(g => g.Key, g => g.ToList());
+        var requiredHoursByType = await GetRequiredHoursByEmploymentTypeAsync(periodType, cancellationToken);
 
         var computed = new List<DoctorWorkloadListItemDto>(doctors.Count);
         foreach (var doctor in doctors)
         {
-            var doctorIntervals = intervalsByDoctor.TryGetValue(doctor.Id, out var value)
-                ? value
-                : new List<SessionIntervalProjection>();
+            var item = ComputeDoctorWorkloadItem(doctor, intervalsByDoctor.GetValueOrDefault(doctor.Id), requiredHoursByType.GetValueOrDefault(doctor.EmploymentType, 0m), periodType, periodBounds);
+            if (item == null) continue;
+            if (normalizedStatus != null && !string.Equals(item.Status, normalizedStatus, StringComparison.Ordinal)) continue;
+            if (warningOnly && !item.WarningFlag) continue;
 
-            var actualHours = CalculateMergedHours(doctorIntervals, periodBounds.StartUtc, periodBounds.EndUtcExclusive);
-            var requiredHours = requiredHoursByEmploymentType.TryGetValue(doctor.EmploymentType, out var required)
-                ? required
-                : 0m;
-
-            var completionRate = CalculateCompletionRate(actualHours, requiredHours);
-            var workloadStatus = actualHours >= requiredHours ? "OK" : "UNDER";
-            var warningFlag = completionRate < 0.8m;
-
-            if (normalizedStatus is not null && !string.Equals(workloadStatus, normalizedStatus, StringComparison.Ordinal))
-                continue;
-
-            if (warningOnly && !warningFlag)
-                continue;
-
-            computed.Add(new DoctorWorkloadListItemDto
-            {
-                DoctorId = doctor.Id,
-                DoctorName = doctor.Name,
-                Email = doctor.Email,
-                EmploymentType = ToApiEmploymentType(doctor.EmploymentType),
-                PeriodType = ToApiPeriodType(periodType),
-                PeriodStart = periodBounds.StartUtc,
-                PeriodEnd = periodBounds.EndUtcInclusive,
-                RequiredHours = requiredHours,
-                ActualHours = actualHours,
-                CompletionRate = completionRate,
-                Status = workloadStatus,
-                WarningFlag = warningFlag
-            });
+            computed.Add(item);
         }
 
-        var ordered = computed
-            .OrderByDescending(item => item.WarningFlag)
-            .ThenBy(item => item.CompletionRate)
-            .ThenBy(item => item.DoctorName)
-            .ToList();
+        var ordered = computed.OrderByDescending(item => item.WarningFlag).ThenBy(item => item.CompletionRate).ThenBy(item => item.DoctorName).ToList();
+        return new PagedResult<DoctorWorkloadListItemDto>(ordered.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList(), ordered.Count, pageNumber, pageSize);
+    }
 
-        var totalCount = ordered.Count;
-        var pageItems = ordered
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .ToList();
+    private DoctorWorkloadListItemDto ComputeDoctorWorkloadItem(
+        DoctorProjection doctor,
+        List<SessionIntervalProjection>? doctorIntervals,
+        decimal requiredHours,
+        WorkloadPeriodType periodType,
+        (DateTime StartUtc, DateTime EndUtcInclusive, DateTime EndUtcExclusive) periodBounds)
+    {
+        var actualHours = CalculateMergedHours(doctorIntervals ?? new List<SessionIntervalProjection>(), periodBounds.StartUtc, periodBounds.EndUtcExclusive);
+        var completionRate = CalculateCompletionRate(actualHours, requiredHours);
+        var workloadStatus = actualHours >= requiredHours ? "OK" : "UNDER";
+        var warningFlag = completionRate < 0.8m;
 
-        return new PagedResult<DoctorWorkloadListItemDto>(pageItems, totalCount, pageNumber, pageSize);
+        return new DoctorWorkloadListItemDto
+        {
+            DoctorId = doctor.Id,
+            DoctorName = doctor.Name,
+            Email = doctor.Email,
+            EmploymentType = ToApiEmploymentType(doctor.EmploymentType),
+            PeriodType = ToApiPeriodType(periodType),
+            PeriodStart = periodBounds.StartUtc,
+            PeriodEnd = periodBounds.EndUtcInclusive,
+            RequiredHours = requiredHours,
+            ActualHours = actualHours,
+            CompletionRate = completionRate,
+            Status = workloadStatus,
+            WarningFlag = warningFlag
+        };
     }
 
     public async Task<OphthalmologistDashboardMetricsDto> GetOphthalmologistMetricsAsync(Guid userId, CancellationToken cancellationToken = default)

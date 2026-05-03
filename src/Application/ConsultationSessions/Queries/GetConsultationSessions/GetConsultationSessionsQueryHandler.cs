@@ -117,10 +117,6 @@ public class GetConsultationSessionsQueryHandler
     {
         if (dtos.Count == 0) return dtos;
 
-        var canAlwaysViewAi = isAdmin;
-        var hasCurrentProfile = currentProfileId.HasValue;
-        var currentProfile = currentProfileId.GetValueOrDefault();
-        // Only load screenings for sessions the caller is authorized to view.
         var screeningIds = sessions
             .Where(s => s.AiScreeningId.HasValue && CanViewAiResults(s, isAdmin, currentProfileId))
             .Select(s => s.AiScreeningId!.Value)
@@ -129,7 +125,6 @@ public class GetConsultationSessionsQueryHandler
 
         if (screeningIds.Count == 0) return dtos;
 
-        // Load screenings + latest results for snapshot. Do NOT include images/raw json for list.
         var screenings = await _aiScreeningRepository
             .Query().AsNoTracking()
             .Where(x => screeningIds.Contains(x.Id))
@@ -140,38 +135,40 @@ public class GetConsultationSessionsQueryHandler
 
         for (var i = 0; i < dtos.Count; i++)
         {
-            var dto = dtos[i];
             var session = sessions[i];
-
-            if (!session.AiScreeningId.HasValue) continue;
-
-            if (!CanViewAiResults(session, isAdmin, currentProfileId)) continue;
-
+            if (!session.AiScreeningId.HasValue || !CanViewAiResults(session, isAdmin, currentProfileId)) continue;
             if (!screeningMap.TryGetValue(session.AiScreeningId.Value, out var screening)) continue;
-            var latestResult = screening.ScreeningResults
-                .OrderByDescending(x => x.CreatedAt)
-                .FirstOrDefault();
 
-            if (latestResult is null) continue;
-
-            dtos[i] = dto with
+            var snapshot = MapToCaseSnapshot(screening);
+            if (snapshot != null)
             {
-                CaseSnapshot = new ConsultationCaseSnapshotDto
-                {
-                    ScreeningId = screening.Id,
-                    RiskLevel = latestResult.RiskLevel.ToString(),
-                    ConfidenceScore = latestResult.ConfidenceScore,
-                    Summary = latestResult.Summary,
-                    Findings = latestResult.Findings,
-                    AnnotatedImageUrl = null,
-                    RawJsonOutput = null,
-                    OriginalImageUrls = [],
-                    Symptoms = []
-                }
-            };
+                dtos[i] = dtos[i] with { CaseSnapshot = snapshot };
+            }
         }
 
         return dtos;
+    }
+
+    private static ConsultationCaseSnapshotDto? MapToCaseSnapshot(AiScreening screening)
+    {
+        var latestResult = screening.ScreeningResults
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefault();
+
+        if (latestResult is null) return null;
+
+        return new ConsultationCaseSnapshotDto
+        {
+            ScreeningId = screening.Id,
+            RiskLevel = latestResult.RiskLevel.ToString(),
+            ConfidenceScore = latestResult.ConfidenceScore,
+            Summary = latestResult.Summary,
+            Findings = latestResult.Findings,
+            AnnotatedImageUrl = null,
+            RawJsonOutput = null,
+            OriginalImageUrls = [],
+            Symptoms = []
+        };
     }
 
     private static bool CanViewAiResults(

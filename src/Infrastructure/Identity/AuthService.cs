@@ -477,26 +477,9 @@ public class AuthService : IAuthService
     {
         try
         {
-            // Validate Google ID token
-            var settings = new GoogleJsonWebSignature.ValidationSettings
-            {
-                Audience = new[] { _googleAuthSettings.ClientId }
-            };
-
-            GoogleJsonWebSignature.Payload payload;
-            try
-            {
-                payload = await GoogleJsonWebSignature.ValidateAsync(request.Credential, settings);
-            }
-            catch (InvalidJwtException)
-            {
-                return Result<LoginResponse>.Unauthorized("Invalid Google token");
-            }
-
-            if (string.IsNullOrEmpty(payload.Email))
-            {
-                return Result<LoginResponse>.Failure("Google account does not have an email address");
-            }
+            var payload = await ValidateGoogleTokenAsync(request.Credential);
+            if (payload == null) return Result<LoginResponse>.Unauthorized("Invalid Google token");
+            if (string.IsNullOrEmpty(payload.Email)) return Result<LoginResponse>.Failure("Google account does not have an email address");
 
             var normalizedEmail = payload.Email.Trim();
             var user = await _userManager.FindByEmailAsync(normalizedEmail)
@@ -504,114 +487,109 @@ public class AuthService : IAuthService
 
             if (user != null)
             {
-                // Existing user
-                if (user.IsDeleted)
-                {
-                    return Result<LoginResponse>.Unauthorized("Account has been deleted");
-                }
-
-                if (!user.IsActive)
-                {
-                    return Result<LoginResponse>.Unauthorized("Account is deactivated. Please contact support.");
-                }
-
-                // Auto-confirm email for Google users if not yet confirmed
-                if (!user.EmailConfirmed)
-                {
-                    user.EmailConfirmed = true;
-                    await _userManager.UpdateAsync(user);
-                }
-
-                var linkResult = await LinkGoogleLoginAsync(user, payload.Subject);
-                if (!linkResult.IsSuccess)
-                {
-                    return Result<LoginResponse>.Failure(
-                        string.IsNullOrWhiteSpace(linkResult.ErrorMessage)
-                            ? "Unable to link Google account"
-                            : linkResult.ErrorMessage);
-                }
-
-                var providerAvatarResult = await UpsertProviderAvatarClaimAsync(user, payload.Picture);
-                if (!providerAvatarResult.IsSuccess)
-                {
-                    _logger.LogWarning(
-                        "Failed to update provider avatar claim for user {UserId}: {Error}",
-                        user.Id,
-                        providerAvatarResult.ErrorMessage);
-                }
-
-                // Check if 2FA is enabled
-                if (await _userManager.GetTwoFactorEnabledAsync(user))
-                {
-                    _logger.LogInformation("2FA required for Google user: {Email}", payload.Email);
-                    return Result<LoginResponse>.Success(LoginResponse.TwoFactorRequired(user.Id));
-                }
-
-                var authResponse = await CompleteLoginAsync(user, request.DeviceInfo, ipAddress, cancellationToken);
-                return Result<LoginResponse>.Success(LoginResponse.Success(authResponse));
+                return await HandleExistingGoogleUserAsync(user, payload, request.DeviceInfo, ipAddress, cancellationToken);
             }
 
-            // New user — create Patient account
-            await _unitOfWork.BeginTransactionAsync(cancellationToken);
-
-            var newUser = new ApplicationUser
-            {
-                UserName = normalizedEmail,
-                Email = normalizedEmail,
-                FullName = payload.Name ?? normalizedEmail,
-                AvatarUrl = null,
-                EmailConfirmed = true // Google already verified the email
-            };
-
-            var createResult = await _userManager.CreateAsync(newUser);
-            if (!createResult.Succeeded)
-            {
-                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                return Result<LoginResponse>.Failure(createResult.Errors.Select(e => e.Description));
-            }
-
-            // Add Google login provider info
-            var addLoginResult = await LinkGoogleLoginAsync(newUser, payload.Subject);
-            if (!addLoginResult.IsSuccess)
-            {
-                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                return Result<LoginResponse>.Failure(
-                    string.IsNullOrWhiteSpace(addLoginResult.ErrorMessage)
-                        ? "Unable to link Google account"
-                        : addLoginResult.ErrorMessage);
-            }
-
-            var newProviderAvatarResult = await UpsertProviderAvatarClaimAsync(newUser, payload.Picture);
-            if (!newProviderAvatarResult.IsSuccess)
-            {
-                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                return Result<LoginResponse>.Failure(
-                    string.IsNullOrWhiteSpace(newProviderAvatarResult.ErrorMessage)
-                        ? "Unable to persist provider avatar"
-                        : newProviderAvatarResult.ErrorMessage);
-            }
-
-            await _identityService.AddToRoleAsync(newUser.Id, Roles.Patient);
-
-            var patient = Patient.CreateRegistered(newUser.Id);
-            await _patientRepository.AddAsync(patient, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            await _unitOfWork.CommitTransactionAsync(cancellationToken);
-
-            _logger.LogInformation("New patient registered via Google: {Email}", payload.Email);
-
-            var newAuthResponse = await CompleteLoginAsync(newUser, request.DeviceInfo, ipAddress, cancellationToken);
-            return Result<LoginResponse>.Success(LoginResponse.Success(newAuthResponse));
+            return await HandleNewGoogleUserAsync(normalizedEmail, payload, request.DeviceInfo, ipAddress, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during Google login");
-
-            try { await _unitOfWork.RollbackTransactionAsync(cancellationToken); }
-            catch { /* transaction may not have started */ }
-
+            try { await _unitOfWork.RollbackTransactionAsync(cancellationToken); } catch { }
             return Result<LoginResponse>.Failure("An error occurred during Google login");
         }
+    }
+
+    private async Task<GoogleJsonWebSignature.Payload?> ValidateGoogleTokenAsync(string credential)
+    {
+        try
+        {
+            var settings = new GoogleJsonWebSignature.ValidationSettings { Audience = new[] { _googleAuthSettings.ClientId } };
+            return await GoogleJsonWebSignature.ValidateAsync(credential, settings);
+        }
+        catch (InvalidJwtException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<Result<LoginResponse>> HandleExistingGoogleUserAsync(
+        ApplicationUser user,
+        GoogleJsonWebSignature.Payload payload,
+        string? deviceInfo,
+        string? ipAddress,
+        CancellationToken cancellationToken)
+    {
+        if (user.IsDeleted) return Result<LoginResponse>.Unauthorized("Account has been deleted");
+        if (!user.IsActive) return Result<LoginResponse>.Unauthorized("Account is deactivated. Please contact support.");
+
+        if (!user.EmailConfirmed)
+        {
+            user.EmailConfirmed = true;
+            await _userManager.UpdateAsync(user);
+        }
+
+        var linkResult = await LinkGoogleLoginAsync(user, payload.Subject);
+        if (!linkResult.IsSuccess) return Result<LoginResponse>.Failure(linkResult.ErrorMessage ?? "Unable to link Google account");
+
+        await UpsertProviderAvatarClaimAsync(user, payload.Picture);
+
+        if (await _userManager.GetTwoFactorEnabledAsync(user))
+        {
+            _logger.LogInformation("2FA required for Google user: {Email}", payload.Email);
+            return Result<LoginResponse>.Success(LoginResponse.TwoFactorRequired(user.Id));
+        }
+
+        var authResponse = await CompleteLoginAsync(user, deviceInfo, ipAddress, cancellationToken);
+        return Result<LoginResponse>.Success(LoginResponse.Success(authResponse));
+    }
+
+    private async Task<Result<LoginResponse>> HandleNewGoogleUserAsync(
+        string normalizedEmail,
+        GoogleJsonWebSignature.Payload payload,
+        string? deviceInfo,
+        string? ipAddress,
+        CancellationToken cancellationToken)
+    {
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+
+        var newUser = new ApplicationUser
+        {
+            UserName = normalizedEmail,
+            Email = normalizedEmail,
+            FullName = payload.Name ?? normalizedEmail,
+            EmailConfirmed = true
+        };
+
+        var createResult = await _userManager.CreateAsync(newUser);
+        if (!createResult.Succeeded)
+        {
+            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+            return Result<LoginResponse>.Failure(createResult.Errors.Select(e => e.Description));
+        }
+
+        var addLoginResult = await LinkGoogleLoginAsync(newUser, payload.Subject);
+        if (!addLoginResult.IsSuccess)
+        {
+            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+            return Result<LoginResponse>.Failure(addLoginResult.ErrorMessage ?? "Unable to link Google account");
+        }
+
+        var avatarResult = await UpsertProviderAvatarClaimAsync(newUser, payload.Picture);
+        if (!avatarResult.IsSuccess)
+        {
+            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+            return Result<LoginResponse>.Failure(avatarResult.ErrorMessage ?? "Unable to persist provider avatar");
+        }
+
+        await _identityService.AddToRoleAsync(newUser.Id, Roles.Patient);
+        await _patientRepository.AddAsync(Patient.CreateRegistered(newUser.Id), cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+        _logger.LogInformation("New patient registered via Google: {Email}", payload.Email);
+        var authResponse = await CompleteLoginAsync(newUser, deviceInfo, ipAddress, cancellationToken);
+        return Result<LoginResponse>.Success(LoginResponse.Success(authResponse));
     }
 
     /// <inheritdoc />
