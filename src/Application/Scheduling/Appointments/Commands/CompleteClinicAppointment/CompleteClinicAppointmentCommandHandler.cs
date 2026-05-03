@@ -58,16 +58,9 @@ public class CompleteClinicAppointmentCommandHandler : ICommandHandler<CompleteC
             await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
             await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
 
-            // ── Grant 20% discount for next online clinic booking ──────────────
-            var patient = await _patientRepository.GetByIdAsync(appointment.PatientId, cancellationToken);
-            if (patient?.UserId != null)
-            {
-                patient.GrantDiscount(0.20m, 30);
-                await _patientRepository.UpdateAsync(patient, cancellationToken);
-            }
-
             // ── 8. Create Consultation Chat Session ───────────────────────────
             // This allows the patient to chat with the doctor for 14 days post-visit
+            var patient = await _patientRepository.GetByIdAsync(appointment.PatientId, cancellationToken);
             if (appointment.AppointmentSlot?.ScheduleTemplate != null)
             {
                 var session = ConsultationSession.CreateClinicBooking(

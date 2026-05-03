@@ -1,6 +1,7 @@
 using Application.Common.Constants;
 using Application.Common.Models;
 using Application.Scheduling.Appointments.Commands.CancelClinicAppointment;
+using Application.Scheduling.Appointments.Commands.CancelLateAndGrantDiscount;
 using Application.Scheduling.Appointments.Commands.CheckInClinicAppointment;
 using Application.Scheduling.Appointments.Commands.CompleteClinicAppointment;
 using Application.Scheduling.Appointments.Commands.CreateAdHocSlotAndRebook;
@@ -130,6 +131,15 @@ public class ClinicAppointmentsController : BaseApiController
     {
         var result = await _mediator.Send(
             new RebookLatePatientToExistingSlotCommand(appointmentId, request.SlotId));
+        return HandleResult(result);
+    }
+
+    [HttpPost("{appointmentId:guid}/cancel-late-discount")]
+    [AuthorizePermission(Permissions.AppointmentsManage)]
+    [ProducesResponseType(typeof(ApiResponse<CancelLateAndGrantDiscountResult>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CancelLateAndGrantDiscount(Guid appointmentId)
+    {
+        var result = await _mediator.Send(new CancelLateAndGrantDiscountCommand(appointmentId));
         return HandleResult(result);
     }
 
