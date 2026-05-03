@@ -56,6 +56,7 @@ public class GetClinicAppointmentsByDateQueryHandler
         var orderLookup = orders.ToLookup(o => o.AppointmentId!.Value);
         var visits = await _patientVisitRepository.Query().AsNoTracking()
             .Where(v => v.AppointmentId.HasValue && appointmentIds.Contains(v.AppointmentId.Value))
+            .Include(v => v.MedicalRecord)
             .ToListAsync(cancellationToken);
         var visitMap = visits.ToDictionary(v => v.AppointmentId!.Value);
 
@@ -84,17 +85,8 @@ public class GetClinicAppointmentsByDateQueryHandler
                     && !cs.IsDeleted)
                 .ToListAsync(cancellationToken);
 
-        var latestScreeningByPatientId = screenings
-            .GroupBy(s => s.PatientId)
-            .ToDictionary(
-                g => g.Key,
-                g => g.OrderByDescending(s => s.CreatedAt).First());
-
-        var latestConsultationByPatientId = consultations
-            .GroupBy(c => c.PatientId)
-            .ToDictionary(
-                g => g.Key,
-                g => g.OrderByDescending(c => c.CreatedAt).First());
+        // NOTE: We do NOT pre-group by patientId anymore, because we need to filter
+        // per-visit using CheckedInAt to avoid old sessions from polluting the current visit.
 
         // Fetch registered user names for patient profiles
         var registeredUserIds = appointments
@@ -117,6 +109,7 @@ public class GetClinicAppointmentsByDateQueryHandler
 
         var doctorMap = await _ophthalmologistRepository.GetDoctorDetailsByIdsAsync(doctorIds, cancellationToken);
 
+        var sortedVisits = visits.OrderBy(v => v.CheckedInAt).ThenBy(v => v.Id).ToList();
         var items = new List<ClinicAppointmentDto>();
 
         foreach (var a in appointments.Where(x => x.AppointmentSlot is not null && x.Status != AppointmentStatus.Cancelled))
@@ -140,9 +133,30 @@ public class GetClinicAppointmentsByDateQueryHandler
             if (visit != null)
             {
                 visitStatus = visit.Status.ToString();
-                latestScreeningByPatientId.TryGetValue(visit.PatientId, out var screening);
-                latestConsultationByPatientId.TryGetValue(visit.PatientId, out var consultation);
-                flowState = ClinicFlowStateResolver.Resolve(visit, screening, consultation);
+                var visitCheckedInAt = visit.CheckedInAt ?? DateTime.UtcNow;
+
+                // Find the next visit of the same patient in the sorted list to define the time boundary
+                var nextVisitOfSamePatient = sortedVisits
+                    .Skip(sortedVisits.IndexOf(visit) + 1)
+                    .FirstOrDefault(v => v.PatientId == visit.PatientId);
+                
+                var nextVisitTime = nextVisitOfSamePatient?.CheckedInAt;
+
+                var screening = screenings
+                    .Where(s => s.PatientId == visit.PatientId && 
+                                s.CreatedAt >= visitCheckedInAt && 
+                                (nextVisitTime == null || s.CreatedAt < nextVisitTime))
+                    .OrderByDescending(s => s.CreatedAt)
+                    .FirstOrDefault();
+
+                var consultation = consultations
+                    .Where(c => c.PatientId == visit.PatientId && 
+                                c.CreatedAt >= visitCheckedInAt && 
+                                (nextVisitTime == null || c.CreatedAt < nextVisitTime))
+                    .OrderByDescending(c => c.CreatedAt)
+                    .FirstOrDefault();
+
+                flowState = ClinicFlowStateResolver.Resolve(visit, screening, consultation, visit.MedicalRecord);
             }
 
             var finalDocId = visit?.AssignedDoctorId ?? a.RequestedDoctorId ?? a.AppointmentSlot?.OphthalId;

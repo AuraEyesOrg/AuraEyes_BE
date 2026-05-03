@@ -137,15 +137,30 @@ public class GetClinicQueueQueryHandler
 
             var queueItems = new List<ClinicQueueItemDto>();
 
+            var sortedVisits = visits.OrderBy(v => v.CheckedInAt).ThenBy(v => v.Id).ToList();
+
             foreach (var visit in visits)
             {
+                var visitCheckedInAt = visit.CheckedInAt ?? DateTime.UtcNow;
+
+                // Find the next visit of the same patient in the sorted list to define the time boundary
+                var nextVisitOfSamePatient = sortedVisits
+                    .Skip(sortedVisits.IndexOf(visit) + 1)
+                    .FirstOrDefault(v => v.PatientId == visit.PatientId);
+                
+                var nextVisitTime = nextVisitOfSamePatient?.CheckedInAt;
+
                 var screening = screenings
-                    .Where(s => s.PatientId == visit.PatientId)
+                    .Where(s => s.PatientId == visit.PatientId && 
+                                s.CreatedAt >= visitCheckedInAt && 
+                                (nextVisitTime == null || s.CreatedAt < nextVisitTime))
                     .OrderByDescending(s => s.CreatedAt)
                     .FirstOrDefault();
 
                 var consultation = consultations
-                    .Where(c => c.PatientId == visit.PatientId)
+                    .Where(c => c.PatientId == visit.PatientId && 
+                                c.CreatedAt >= visitCheckedInAt && 
+                                (nextVisitTime == null || c.CreatedAt < nextVisitTime))
                     .OrderByDescending(c => c.CreatedAt)
                     .FirstOrDefault();
                     
@@ -193,7 +208,7 @@ public class GetClinicQueueQueryHandler
                     IsAdminCompleted = visit.MedicalRecord != null && visit.MedicalRecord.Status != MedicalRecordStatus.DraftAdmin,
 
                     // Integration with the new business logic resolver
-                    FlowState = ClinicFlowStateResolver.Resolve(visit, screening, consultation)
+                    FlowState = ClinicFlowStateResolver.Resolve(visit, screening, consultation, visit.MedicalRecord)
                 };
 
                 queueItems.Add(item);
