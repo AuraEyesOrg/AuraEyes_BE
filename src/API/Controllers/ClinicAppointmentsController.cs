@@ -150,12 +150,19 @@ public class ClinicAppointmentsController : BaseApiController
         Guid appointmentId,
         [FromBody] RebookAdHocRequest request)
     {
+        if (!DateOnly.TryParse(request.Date, out var date))
+            return BadRequest(new { error = "Invalid date format. Expected: YYYY-MM-DD" });
+        if (!TimeOnly.TryParse(request.StartTime, out var startTime))
+            return BadRequest(new { error = "Invalid startTime format. Expected: HH:mm or HH:mm:ss" });
+        if (!TimeOnly.TryParse(request.EndTime, out var endTime))
+            return BadRequest(new { error = "Invalid endTime format. Expected: HH:mm or HH:mm:ss" });
+
         var result = await _mediator.Send(
             new CreateAdHocSlotAndRebookCommand(
                 appointmentId,
-                request.Date,
-                request.StartTime,
-                request.EndTime,
+                date,
+                startTime,
+                endTime,
                 request.MaxCapacity,
                 request.Cost,
                 request.DoctorId));
@@ -189,9 +196,9 @@ public record RebookExistingRequest
 
 public record RebookAdHocRequest
 {
-    public DateOnly Date { get; init; }
-    public TimeOnly StartTime { get; init; }
-    public TimeOnly EndTime { get; init; }
+    public string Date { get; init; } = string.Empty;
+    public string StartTime { get; init; } = string.Empty;
+    public string EndTime { get; init; } = string.Empty;
     public int MaxCapacity { get; init; }
     public decimal? Cost { get; init; }
     public Guid? DoctorId { get; init; }
