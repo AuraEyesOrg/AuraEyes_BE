@@ -13,17 +13,20 @@ public sealed class ExportMedicalRecordPdfQueryHandler
     private readonly IMedicalRecordRepository _medicalRecordRepository;
     private readonly IRepository<Patient> _patientRepository;
     private readonly IIdentityService _identityService;
+    private readonly ICurrentUserService _currentUserService;
     private readonly IMedicalRecordPdfService _medicalRecordPdfService;
 
     public ExportMedicalRecordPdfQueryHandler(
         IMedicalRecordRepository medicalRecordRepository,
         IRepository<Patient> patientRepository,
         IIdentityService identityService,
+        ICurrentUserService currentUserService,
         IMedicalRecordPdfService medicalRecordPdfService)
     {
         _medicalRecordRepository = medicalRecordRepository;
         _patientRepository = patientRepository;
         _identityService = identityService;
+        _currentUserService = currentUserService;
         _medicalRecordPdfService = medicalRecordPdfService;
     }
 
@@ -34,6 +37,18 @@ public sealed class ExportMedicalRecordPdfQueryHandler
         var record = await _medicalRecordRepository.GetByIdAsync(request.MedicalRecordId, cancellationToken);
         if (record is null)
             return Result<MedicalRecordPdfFileDto>.NotFound("Medical record not found.");
+
+        // Security Check: If user is a Patient, they can only see their own record
+        if (_currentUserService.UserId.HasValue)
+        {
+            var patients = await _patientRepository.FindAsync(p => p.UserId == _currentUserService.UserId.Value, cancellationToken);
+            var currentPatient = patients.FirstOrDefault();
+            
+            if (currentPatient != null && record.PatientId != currentPatient.Id && !_currentUserService.IsInRole("SystemAdmin") && !_currentUserService.IsInRole("Ophthalmologist") && !_currentUserService.IsInRole("ClinicStaff"))
+            {
+                return Result<MedicalRecordPdfFileDto>.Forbidden("You are not authorized to export this medical record.");
+            }
+        }
 
         if ((int)record.Status < (int)MedicalRecordStatus.Finalized)
             return Result<MedicalRecordPdfFileDto>.Failure("EMR must be finalized before downloading PDF.");
@@ -56,13 +71,29 @@ public sealed class ExportMedicalRecordPdfQueryHandler
             _ => "Other"
         };
 
+        var adminData = string.IsNullOrEmpty(record.AdministrativeDataJson)
+            ? new Dictionary<string, object>()
+            : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(record.AdministrativeDataJson);
+
+        var name = adminData?.GetValueOrDefault("fullName")?.ToString();
+        if (string.IsNullOrWhiteSpace(name)) name = patient.FullName;
+
+        var dob = adminData?.GetValueOrDefault("birthDate")?.ToString();
+        if (string.IsNullOrWhiteSpace(dob)) dob = patient.DateOfBirth?.ToString("dd/MM/yyyy");
+
+        var addr = adminData?.GetValueOrDefault("address")?.ToString();
+        if (string.IsNullOrWhiteSpace(addr)) addr = patient.Address;
+
+        var gnd = adminData?.GetValueOrDefault("gender")?.ToString();
+        if (string.IsNullOrWhiteSpace(gnd)) gnd = gender;
+
         var pdfBytes = _medicalRecordPdfService.GenerateMedicalRecordPdf(new MedicalRecordPdfModel
         {
             MedicalRecordNumber = record.MedicalRecordNumber,
-            PatientName = patient.FullName ?? "Unknown",
-            DateOfBirth = patient.DateOfBirth?.ToString("dd/MM/yyyy"),
-            Gender = gender,
-            Address = patient.Address,
+            PatientName = name ?? "Unknown",
+            DateOfBirth = dob,
+            Gender = gnd,
+            Address = addr,
             CreatedAt = record.CreatedAt,
             FinalDiagnosis = record.FinalDiagnosis,
             TreatmentPlan = record.TreatmentPlan,

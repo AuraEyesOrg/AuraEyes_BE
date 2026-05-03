@@ -90,14 +90,30 @@ public class FinalizeMedicalRecordCommandHandler : IRequestHandler<FinalizeMedic
                 // If PhoneNumber is used as identifier, we might skip email.
             }
 
+            var adminData = string.IsNullOrEmpty(record.AdministrativeDataJson)
+                ? new Dictionary<string, object>()
+                : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(record.AdministrativeDataJson);
+
+            var name = adminData?.GetValueOrDefault("fullName")?.ToString();
+            if (string.IsNullOrWhiteSpace(name)) name = patient.FullName;
+
+            var dob = adminData?.GetValueOrDefault("birthDate")?.ToString();
+            if (string.IsNullOrWhiteSpace(dob)) dob = patient.DateOfBirth?.ToString("dd/MM/yyyy");
+
+            var addr = adminData?.GetValueOrDefault("address")?.ToString();
+            if (string.IsNullOrWhiteSpace(addr)) addr = patient.Address;
+
+            var gnd = adminData?.GetValueOrDefault("gender")?.ToString();
+            if (string.IsNullOrWhiteSpace(gnd)) gnd = gender;
+
             // 2. Generate PDF
             var pdfModel = new MedicalRecordPdfModel
             {
                 MedicalRecordNumber = record.MedicalRecordNumber,
-                PatientName = patient.FullName ?? "Unknown",
-                DateOfBirth = patient.DateOfBirth?.ToString("dd/MM/yyyy"),
-                Gender = gender,
-                Address = patient.Address,
+                PatientName = name ?? "Unknown",
+                DateOfBirth = dob,
+                Gender = gnd,
+                Address = addr,
                 CreatedAt = record.CreatedAt,
                 FinalDiagnosis = record.FinalDiagnosis,
                 TreatmentPlan = record.TreatmentPlan,

@@ -250,6 +250,7 @@ public static class Permissions
             ConsultationsRead, ConsultationsCreate,
             AppointmentsRead, AppointmentsCreate,
             PatientsRead, PatientsUpdate,
+            MedicalRecordsRead,
             OrdersRead, PaymentsRead,
             SettingsRead,
         ],
