@@ -76,7 +76,7 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
 
     private async Task TryProactiveStatusSyncAsync(Order order, CancellationToken cancellationToken)
     {
-        if (order.Status != OrderStatus.Pending) return;
+        if (order.Status != OrderStatus.Pending && order.Status != OrderStatus.Confirmed) return;
 
         var pendingPayOsPayment = order.Payments.FirstOrDefault(p => p.Status == PaymentStatus.Pending && p.Method == PaymentMethod.PayOS);
         if (pendingPayOsPayment == null || string.IsNullOrEmpty(pendingPayOsPayment.PaymentOrderCode)) return;
@@ -133,7 +133,9 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
 
     private static bool IsDepositPayment(Order order, Payment payment)
     {
-        return order.DepositAmount.HasValue && Math.Abs(payment.Amount - order.DepositAmount.Value) < 0.01m;
+        return order.Status == OrderStatus.Pending && 
+               order.DepositAmount.HasValue && 
+               Math.Abs(payment.Amount - order.DepositAmount.Value) < 0.01m;
     }
 
     private async Task SyncAppointmentOnConfirmationAsync(Order order, CancellationToken cancellationToken)
