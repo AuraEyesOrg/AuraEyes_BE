@@ -83,12 +83,20 @@ public class GetClinicQueueQueryHandler
 
             var patientIds = visits.Select(v => v.PatientId).Distinct().ToList();
             
+            // Use the earliest CheckedInAt among active visits as the cutoff — avoids missing data
+            // for visits that started before the rolling 24h window.
+            var screeningCutoff = visits
+                .Where(v => v.CheckedInAt.HasValue)
+                .Select(v => v.CheckedInAt!.Value)
+                .DefaultIfEmpty(DateTime.UtcNow.AddDays(-1))
+                .Min();
+
             var screenings = await _screeningRepository
                 .Query()
                 .AsNoTracking()
                 .Include(s => s.ScreeningResults)
                 .Where(s => patientIds.Contains(s.PatientId)
-                    && s.CreatedAt >= cutoffDate
+                    && s.CreatedAt >= screeningCutoff
                     && !s.IsDeleted)
                 .ToListAsync(cancellationToken);
 
@@ -96,7 +104,7 @@ public class GetClinicQueueQueryHandler
                 .Query()
                 .AsNoTracking()
                 .Where(cs => patientIds.Contains(cs.PatientId)
-                    && cs.CreatedAt >= cutoffDate
+                    && cs.CreatedAt >= screeningCutoff
                     && cs.Status != SessionStatus.Cancelled
                     && !cs.IsDeleted)
                 .ToListAsync(cancellationToken);
