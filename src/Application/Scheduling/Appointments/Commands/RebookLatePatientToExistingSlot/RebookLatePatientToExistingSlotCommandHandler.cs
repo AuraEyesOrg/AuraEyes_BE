@@ -2,8 +2,10 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Scheduling;
+using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
+using Microsoft.Extensions.Logging;
 
 namespace Application.Scheduling.Appointments.Commands.RebookLatePatientToExistingSlot;
 
@@ -12,16 +14,28 @@ public class RebookLatePatientToExistingSlotCommandHandler
 {
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
+    private readonly IRepository<Patient> _patientRepository;
+    private readonly IIdentityService _identityService;
+    private readonly IEmailService _emailService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<RebookLatePatientToExistingSlotCommandHandler> _logger;
 
     public RebookLatePatientToExistingSlotCommandHandler(
         IAppointmentRepository appointmentRepository,
         IAppointmentSlotRepository appointmentSlotRepository,
-        IUnitOfWork unitOfWork)
+        IRepository<Patient> patientRepository,
+        IIdentityService identityService,
+        IEmailService emailService,
+        IUnitOfWork unitOfWork,
+        ILogger<RebookLatePatientToExistingSlotCommandHandler> logger)
     {
         _appointmentRepository = appointmentRepository;
         _appointmentSlotRepository = appointmentSlotRepository;
+        _patientRepository = patientRepository;
+        _identityService = identityService;
+        _emailService = emailService;
         _unitOfWork = unitOfWork;
+        _logger = logger;
     }
 
     public async Task<Result<RebookLatePatientResult>> Handle(
@@ -72,6 +86,8 @@ public class RebookLatePatientToExistingSlotCommandHandler
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
+            await SendRebookConfirmationEmailAsync(newAppointment, newSlot, cancellationToken);
+
             return Result<RebookLatePatientResult>.Success(new RebookLatePatientResult
             {
                 NewAppointmentId = newAppointment.Id,
@@ -88,6 +104,44 @@ public class RebookLatePatientToExistingSlotCommandHandler
         {
             await _unitOfWork.RollbackTransactionAsync(cancellationToken);
             return Result<RebookLatePatientResult>.Failure(ex.Message);
+        }
+    }
+
+    private async Task SendRebookConfirmationEmailAsync(
+        Appointment appointment,
+        AppointmentSlot slot,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var patient = await _patientRepository.GetByIdAsync(appointment.PatientId, cancellationToken);
+            if (patient is null || !patient.UserId.HasValue) return;
+
+            var user = await _identityService.GetUserByIdAsync(patient.UserId.Value, cancellationToken);
+            if (user is null || string.IsNullOrWhiteSpace(user.Email)) return;
+
+            var patientName = string.IsNullOrWhiteSpace(user.FullName) ? "bệnh nhân" : user.FullName;
+            var qrPayload =
+                $"AURA-CLINIC-APPOINTMENT|{appointment.Id}|{appointment.PatientId}||{slot.Date:yyyy-MM-dd}|{slot.StartTime:HH:mm}|{slot.EndTime:HH:mm}";
+            var checkInCode = appointment.Id.ToString("N")[..10].ToUpperInvariant();
+
+            await _emailService.SendClinicAppointmentConfirmationAsync(
+                user.Email,
+                new ClinicAppointmentConfirmationEmailPayload(
+                    appointment.Id,
+                    patientName,
+                    "Aura Clinic",
+                    slot.Date,
+                    slot.StartTime,
+                    slot.EndTime,
+                    appointment.VisitReason,
+                    checkInCode,
+                    qrPayload),
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send rebook confirmation email for appointment {AppointmentId}", appointment.Id);
         }
     }
 }
