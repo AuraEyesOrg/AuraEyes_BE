@@ -39,6 +39,7 @@ public class AppointmentSlotsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<PagedResult<AppointmentSlotListDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAppointmentSlots(
         [FromQuery] Guid? scheduleTemplateId = null,
+        [FromQuery] Guid? ophthalId = null,
         [FromQuery] ScheduleStatus? status = null,
         [FromQuery] DateOnly? fromDate = null,
         [FromQuery] DateOnly? toDate = null,
@@ -49,6 +50,7 @@ public class AppointmentSlotsController : BaseApiController
         var query = new GetAppointmentSlotsQuery
         {
             ScheduleTemplateId = scheduleTemplateId,
+            OphthalId = ophthalId,
             Status = status,
             FromDate = fromDate,
             ToDate = toDate,

@@ -90,6 +90,7 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
 
     public async Task<(IReadOnlyList<AppointmentSlot> Items, int TotalCount)> GetPagedAsync(
         Guid? scheduleTemplateId,
+        Guid? ophthalId = null,
         ScheduleStatus? status = null,
         DateOnly? fromDate = null,
         DateOnly? toDate = null,
@@ -101,10 +102,15 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
         var query = _dbSet
             .AsNoTracking()
             .Include(s => s.ScheduleTemplate)
+            .Include(s => s.Appointments)
+                .ThenInclude(a => a.Patient)
             .AsQueryable();
 
         if (scheduleTemplateId.HasValue)
             query = query.Where(s => s.ScheduleTemplateId == scheduleTemplateId.Value);
+
+        if (ophthalId.HasValue)
+            query = query.Where(s => s.OphthalId == ophthalId.Value);
 
         if (status.HasValue)
             query = query.Where(s => s.Status == status.Value);
