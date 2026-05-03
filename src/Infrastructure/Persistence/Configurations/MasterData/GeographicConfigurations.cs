@@ -35,8 +35,8 @@ public class DistrictConfiguration : IEntityTypeConfiguration<District>
         builder.Property(d => d.Code).IsRequired();
         builder.HasIndex(d => d.Code).IsUnique();
         
-        builder.HasOne<Province>()
-            .WithMany()
+        builder.HasOne(d => d.Province)
+            .WithMany(p => p.Districts)
             .HasForeignKey(d => d.ProvinceId)
             .OnDelete(DeleteBehavior.Cascade);
     }
@@ -51,8 +51,8 @@ public class WardConfiguration : IEntityTypeConfiguration<Ward>
         builder.Property(w => w.Code).IsRequired();
         builder.HasIndex(w => w.Code).IsUnique();
         
-        builder.HasOne<District>()
-            .WithMany()
+        builder.HasOne(w => w.District)
+            .WithMany(d => d.Wards)
             .HasForeignKey(w => w.DistrictId)
             .OnDelete(DeleteBehavior.Cascade);
     }

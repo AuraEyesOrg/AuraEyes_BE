@@ -26,15 +26,21 @@ public record GetMedicalRecordsQuery : IQuery<PagedResult<MedicalRecordDto>>
 public class GetMedicalRecordsQueryHandler : IQueryHandler<GetMedicalRecordsQuery, PagedResult<MedicalRecordDto>>
 {
     private readonly IMedicalRecordRepository _medicalRecordRepository;
+    private readonly IRepository<Patient> _patientRepository;
+    private readonly ICurrentUserService _currentUserService;
     private readonly IIdentityService _identityService;
     private readonly IMapper _mapper;
 
     public GetMedicalRecordsQueryHandler(
         IMedicalRecordRepository medicalRecordRepository, 
+        IRepository<Patient> patientRepository,
+        ICurrentUserService currentUserService,
         IIdentityService identityService,
         IMapper mapper)
     {
         _medicalRecordRepository = medicalRecordRepository;
+        _patientRepository = patientRepository;
+        _currentUserService = currentUserService;
         _identityService = identityService;
         _mapper = mapper;
     }
@@ -44,6 +50,27 @@ public class GetMedicalRecordsQueryHandler : IQueryHandler<GetMedicalRecordsQuer
         var query = _medicalRecordRepository.Query()
             .Include(x => x.Patient)
             .AsNoTracking();
+
+        // Security Filter: If user is a Patient, they only see their own records
+        if (_currentUserService.UserId.HasValue && 
+            !_currentUserService.IsInRole("SystemAdmin") && 
+            !_currentUserService.IsInRole("Ophthalmologist") && 
+            !_currentUserService.IsInRole("ClinicStaff"))
+        {
+            var patients = await _patientRepository.FindAsync(p => p.UserId == _currentUserService.UserId.Value, cancellationToken);
+            var patient = patients.FirstOrDefault();
+            
+            if (patient != null)
+            {
+                query = query.Where(x => x.PatientId == patient.Id);
+            }
+            else
+            {
+                // Patient profile not found for this user, return empty result
+                return Result<PagedResult<MedicalRecordDto>>.Success(
+                    new PagedResult<MedicalRecordDto>(new List<MedicalRecordDto>(), 0, request.PageNumber, request.PageSize));
+            }
+        }
 
         if (request.Status.HasValue)
         {

@@ -133,7 +133,6 @@ public class MedicalRecordsController : BaseApiController
     /// Download finalized EMR as PDF.
     /// </summary>
     [HttpGet("{id:guid}/pdf")]
-    [AuthorizePermission(Permissions.MedicalRecordsRead)]
     [Produces("application/pdf")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -152,7 +151,6 @@ public class MedicalRecordsController : BaseApiController
     /// Retrieve medical record details.
     /// </summary>
     [HttpGet("{id:guid}")]
-    [AuthorizePermission(Permissions.MedicalRecordsRead)]
     [ProducesResponseType(typeof(ApiResponse<MedicalRecordDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetById(Guid id)
     {

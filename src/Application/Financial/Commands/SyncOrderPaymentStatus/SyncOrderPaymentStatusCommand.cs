@@ -18,6 +18,7 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
     private readonly IPayOSService _payOSService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClinicVisitService _clinicVisitService;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<SyncOrderPaymentStatusCommandHandler> _logger;
 
     public SyncOrderPaymentStatusCommandHandler(
@@ -26,6 +27,7 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
         IPayOSService payOSService,
         IUnitOfWork unitOfWork,
         IClinicVisitService clinicVisitService,
+        INotificationService notificationService,
         ILogger<SyncOrderPaymentStatusCommandHandler> logger)
     {
         _orderRepository = orderRepository;
@@ -33,6 +35,7 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
         _payOSService = payOSService;
         _unitOfWork = unitOfWork;
         _clinicVisitService = clinicVisitService;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -66,11 +69,27 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
                     if (order.DepositAmount.HasValue && Math.Abs(payment.Amount - order.DepositAmount.Value) < 0.01m && order.Status == OrderStatus.Pending)
                     {
                         order.Confirm();
+                        
+                        await _notificationService.SendAsync(
+                            order.UserId,
+                            "Nạp tiền cọc thành công",
+                            $"Bạn đã thanh toán đặt cọc thành công. Số tiền: {payment.Amount:N0} VNĐ",
+                            NotificationType.WalletDepositSuccess,
+                            new { OrderId = order.Id, Amount = payment.Amount },
+                            cancellationToken);
                     }
                     else
                     {
                         order.Complete();
                         
+                        await _notificationService.SendAsync(
+                            order.UserId,
+                            "Thanh toán thành công",
+                            $"Thanh toán hoàn tất. Số tiền: {payment.Amount:N0} VNĐ",
+                            NotificationType.WalletPaymentProcessed,
+                            new { OrderId = order.Id, Amount = payment.Amount },
+                            cancellationToken);
+
                         // Notify clinic visit service to complete the visit and appointment
                         await _clinicVisitService.ProcessPaymentCompletionAsync(order, "PayOS Polling/Verify", cancellationToken);
                     }
