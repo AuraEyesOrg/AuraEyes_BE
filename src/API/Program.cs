@@ -166,7 +166,7 @@ static void RegisterRecurringJobs(WebApplication app)
 
     var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
     var slotCron = Environment.GetEnvironmentVariable("HANGFIRE_SLOT_MAINTENANCE_CRON") ?? "*/5 * * * *";
-    var genCron = Environment.GetEnvironmentVariable("HANGFIRE_FULLTIME_SLOT_GENERATION_CRON") ?? "0 1 * * 1";
+    var genCron = Environment.GetEnvironmentVariable("HANGFIRE_FULLTIME_SLOT_GENERATION_CRON") ?? "0 0 * * *";
 
     recurringJobManager.AddOrUpdate<SlotMaintenanceJob>("slot-maintenance-expire-unused", j => j.ExpireUnusedSlotsAsync(CancellationToken.None), slotCron, new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
     recurringJobManager.AddOrUpdate<FullTimeSlotGenerationJob>("fulltime-slot-rolling-window", j => j.ExecuteAsync(CancellationToken.None), genCron, new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });

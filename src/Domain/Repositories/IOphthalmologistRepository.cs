@@ -41,9 +41,17 @@ public interface IOphthalmologistRepository : IRepository<Ophthalmologist>
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get doctor basic details (name, avatar) keyed by ophthalmologist ID.
+    /// Get doctor enhanced details (name, avatar, bio, ratings, certificates) keyed by ophthalmologist ID.
     /// </summary>
-    Task<IReadOnlyDictionary<Guid, (string FullName, string? AvatarUrl)>> GetDoctorDetailsByIdsAsync(
+    Task<IReadOnlyDictionary<Guid, EnhancedDoctorDetail>> GetEnhancedDoctorDetailsByIdsAsync(
         IReadOnlyCollection<Guid> ophthalmologistIds,
         CancellationToken cancellationToken = default);
 }
+
+public record EnhancedDoctorDetail(
+    string FullName,
+    string? AvatarUrl,
+    string? Bio,
+    decimal RatingAverage,
+    int RatingCount,
+    List<Certificate> Certificates);

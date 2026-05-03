@@ -113,4 +113,14 @@ public class Ophthalmologist : BaseEntity, IAggregateRoot
         AvailableLeaveDays -= days;
         UpdatedAt = DateTime.UtcNow;
     }
+
+    public void RemoveCertificate(Guid certificateId)
+    {
+        var certificate = _certificates.FirstOrDefault(c => c.Id == certificateId);
+        if (certificate != null)
+        {
+            _certificates.Remove(certificate);
+            UpdatedAt = DateTime.UtcNow;
+        }
+    }
 }
