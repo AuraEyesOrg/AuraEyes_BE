@@ -24,5 +24,8 @@ public enum AppointmentStatus
     Cancelled = 6,
 
     /// <summary>Patient did not show up for the appointment.</summary>
-    NoShow = 7
+    NoShow = 7,
+
+    /// <summary>Patient requested cancellation, waiting for refund processing.</summary>
+    CancellationRequested = 8
 }

@@ -7,5 +7,6 @@ public enum OrderStatus
     Processing = 3,
     Completed = 4,
     Cancelled = 5,
-    Refunded = 6
+    Refunded = 6,
+    CancellationRequested = 7
 }

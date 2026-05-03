@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Infrastructure.Identity.Authorization;
 using Application.Scheduling.Appointments.Common;
+using Application.Scheduling.Appointments.Commands.RequestAppointmentCancellation;
 
 namespace API.Controllers;
 
@@ -66,4 +67,29 @@ public class PatientsController : BaseApiController
         var result = await _mediator.Send(new Application.Patients.Queries.GetMedicalRecords.GetPatientMedicalRecordsQuery { Mrn = mrn });
         return HandleResult(result);
     }
+
+    [HttpPost("{patientId:guid}/appointments/{appointmentId:guid}/request-cancellation")]
+    [AuthorizePermission(Permissions.AppointmentsRead)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> RequestAppointmentCancellation(
+        Guid patientId,
+        Guid appointmentId,
+        [FromBody] RequestCancellationRequest request)
+    {
+        var command = new RequestAppointmentCancellationCommand(
+            appointmentId,
+            request.BankNumber,
+            request.AccountName,
+            request.BankName,
+            request.Reason);
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result);
+    }
 }
+
+public record RequestCancellationRequest(
+    string? BankNumber,
+    string? AccountName,
+    string? BankName,
+    string? Reason);
