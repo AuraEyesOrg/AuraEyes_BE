@@ -43,6 +43,10 @@ public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQu
             UserEmail = user?.Email,
             UserPhoneNumber = userDetails?.PhoneNumber,
             UserAddress = userDetails?.Address,
+            UserAvatarUrl = user?.AvatarUrl,
+            UserCitizenId = userDetails?.CitizenId,
+            UserGender = (int)userDetails?.Gender,
+            UserDateOfBirth = userDetails?.DateOfBirth,
             Bio = ophthalmologist.Bio,
             EmploymentType = ophthalmologist.EmploymentType.ToString(),
             CreatedAt = ophthalmologist.CreatedAt,
@@ -51,8 +55,6 @@ public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQu
             RatingCount = ophthalmologist.RatingCount,
             AvailableLeaveDays = ophthalmologist.AvailableLeaveDays,
             ConsultationFee = ophthalmologist.ConsultationFee,
-            MinPrice = null,
-            MaxPrice = null,
             Degrees = ophthalmologist.Certificates
                 .Where(c => c.Type == CertificateType.Degree)
                 .OrderByDescending(c => c.IssuedDate)
