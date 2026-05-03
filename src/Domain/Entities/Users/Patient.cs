@@ -43,6 +43,11 @@ public class Patient : BaseEntity, IAggregateRoot
     /// <summary>UTC expiry of the discount. Must be within 30 days of grant.</summary>
     public DateTime? DiscountExpiryDate { get; private set; }
 
+    // ── Bank information for refunds ──
+    public string? BankNumber { get; private set; }
+    public string? AccountName { get; private set; }
+    public string? BankName { get; private set; }
+
     // Navigation properties
     private readonly List<RetinalImage> _retinalImages = new();
     public IReadOnlyCollection<RetinalImage> RetinalImages => _retinalImages.AsReadOnly();
@@ -177,6 +182,17 @@ public class Patient : BaseEntity, IAggregateRoot
         DiscountExpiryDate = null;
         UpdatedAt = DateTime.UtcNow;
         return rate;
+    }
+
+    /// <summary>
+    /// Update bank info for refunds.
+    /// </summary>
+    public void UpdateBankInfo(string? bankNumber, string? accountName, string? bankName)
+    {
+        BankNumber = bankNumber?.Trim();
+        AccountName = accountName?.Trim();
+        BankName = bankName?.Trim();
+        UpdatedAt = DateTime.UtcNow;
     }
 
 }
