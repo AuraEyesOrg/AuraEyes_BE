@@ -79,6 +79,22 @@ public record DoctorSlotDetailDto
     public string? DoctorAvatar { get; init; }
     public bool IsBooked { get; init; }
     public decimal Price { get; init; }
+    public string? Bio { get; init; }
+    public decimal RatingAverage { get; init; }
+    public int RatingCount { get; init; }
+    public List<CertificateDto> Certificates { get; init; } = new();
+}
+
+public record CertificateDto
+{
+    public Guid Id { get; init; }
+    public string Type { get; init; } = string.Empty;
+    public string? DegreeLevel { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string? IssuingAuthority { get; init; }
+    public DateTime IssuedDate { get; init; }
+    public DateTime? ExpiryDate { get; init; }
+    public string? CertificateUrl { get; init; }
 }
 
 public record AvailableSlotDto

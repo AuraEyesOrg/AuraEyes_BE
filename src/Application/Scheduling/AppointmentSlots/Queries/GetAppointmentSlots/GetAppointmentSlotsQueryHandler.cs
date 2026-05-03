@@ -53,7 +53,7 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
 
             // Fetch ophthalmologist metadata for display names
             var ophthalIds = items.Where(i => i.OphthalId.HasValue).Select(i => i.OphthalId!.Value).Distinct().ToList();
-            var ophthalMap = await _ophthalmologistRepository.GetDoctorDetailsByIdsAsync(ophthalIds, cancellationToken);
+            var ophthalMap = await _ophthalmologistRepository.GetEnhancedDoctorDetailsByIdsAsync(ophthalIds, cancellationToken);
 
             var dtoList = items.Select(slot =>
             {

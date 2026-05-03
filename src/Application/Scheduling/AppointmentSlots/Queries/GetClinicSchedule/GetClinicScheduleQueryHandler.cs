@@ -31,7 +31,7 @@ public class GetClinicScheduleQueryHandler : IQueryHandler<GetClinicScheduleQuer
             cancellationToken);
 
         var ophthalIds = slots.Where(s => s.OphthalId.HasValue).Select(s => s.OphthalId!.Value).Distinct().ToList();
-        var ophthalMap = await _ophthalmologistRepository.GetDoctorDetailsByIdsAsync(ophthalIds, cancellationToken);
+        var ophthalMap = await _ophthalmologistRepository.GetEnhancedDoctorDetailsByIdsAsync(ophthalIds, cancellationToken);
 
         var aggregated = slots
             .Where(s => s.Status != ScheduleStatus.Expired && s.Status != ScheduleStatus.Blocked)
@@ -51,10 +51,24 @@ public class GetClinicScheduleQueryHandler : IQueryHandler<GetClinicScheduleQuer
                     {
                         SlotId = s.Id,
                         DoctorId = s.OphthalId ?? Guid.Empty,
-                        DoctorName = ophthalMeta.FullName ?? "Aura Doctor",
-                        DoctorAvatar = ophthalMeta.AvatarUrl,
+                        DoctorName = ophthalMeta?.FullName ?? "Aura Doctor",
+                        DoctorAvatar = ophthalMeta?.AvatarUrl,
                         IsBooked = s.BookedCount >= s.MaxCapacity,
-                        Price = s.Cost ?? 0
+                        Price = s.Cost ?? 0,
+                        Bio = ophthalMeta?.Bio,
+                        RatingAverage = ophthalMeta?.RatingAverage ?? 0,
+                        RatingCount = ophthalMeta?.RatingCount ?? 0,
+                        Certificates = ophthalMeta?.Certificates?.Select(c => new CertificateDto
+                        {
+                            Id = c.Id,
+                            Type = c.Type.ToString(),
+                            DegreeLevel = c.DegreeLevel?.ToString(),
+                            Name = c.Name,
+                            IssuingAuthority = c.IssuingAuthority,
+                            IssuedDate = c.IssuedDate,
+                            ExpiryDate = c.ExpiryDate,
+                            CertificateUrl = c.CertificateUrl
+                        }).ToList() ?? new List<CertificateDto>()
                     };
                 }).ToList()
             })
