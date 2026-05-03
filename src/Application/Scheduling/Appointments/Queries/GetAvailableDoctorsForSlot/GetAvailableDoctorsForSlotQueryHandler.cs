@@ -71,7 +71,7 @@ public class GetAvailableDoctorsForSlotQueryHandler
             return Result<IReadOnlyList<AvailableDoctorDto>>.Success(new List<AvailableDoctorDto>());
 
         // 6. Fetch doctor details
-        var doctorDetails = await _ophthalmologistRepository.GetDoctorDetailsByIdsAsync(
+        var doctorDetails = await _ophthalmologistRepository.GetEnhancedDoctorDetailsByIdsAsync(
             availableDoctorIds, cancellationToken);
 
         var availableDoctors = availableDoctorIds

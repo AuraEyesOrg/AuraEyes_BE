@@ -1,6 +1,7 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Scheduling.Appointments.Common;
+using Application.Common.Helpers;
 using Domain.Common;
 using Domain.Entities.Financial;
 using Domain.Entities.Scheduling;
@@ -215,6 +216,15 @@ public class CreateClinicAppointmentCommandHandler
 
         var hasExisting = await _appointmentRepository.HasExistingAppointmentAsync(patientProfileId, slotId, cancellationToken);
         if (hasExisting) return Result<AppointmentSlot>.Conflict("Patient already has an appointment for this slot.");
+
+        // Validate advance booking time (minimum 30 minutes notice)
+        var utcNow = DateTime.UtcNow;
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(utcNow, VietnamTimeZoneResolver.TimeZone);
+        var slotLocalDateTime = slot.Date.ToDateTime(slot.StartTime);
+        if (slotLocalDateTime < localNow.AddMinutes(30))
+        {
+            return Result<AppointmentSlot>.Failure("Appointments must be booked at least 30 minutes in advance. Please select a later time slot.");
+        }
 
         return Result<AppointmentSlot>.Success(slot);
     }

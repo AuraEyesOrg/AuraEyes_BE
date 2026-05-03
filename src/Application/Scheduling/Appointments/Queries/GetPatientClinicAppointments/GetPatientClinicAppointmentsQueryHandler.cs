@@ -93,7 +93,7 @@ public class GetPatientClinicAppointmentsQueryHandler
             .Distinct()
             .ToList();
 
-        var doctorMap = await _ophthalmologistRepository.GetDoctorDetailsByIdsAsync(doctorIds, cancellationToken);
+        var doctorMap = await _ophthalmologistRepository.GetEnhancedDoctorDetailsByIdsAsync(doctorIds, cancellationToken);
 
         // Fetch associated orders to populate OrderId/Billing info
         var orders = await _orderRepository.GetByAppointmentIdsAsync(appointmentIds, cancellationToken);

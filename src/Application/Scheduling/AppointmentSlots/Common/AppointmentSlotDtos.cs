@@ -1,5 +1,13 @@
 namespace Application.Scheduling.AppointmentSlots.Common;
 
+public record SlotBookingDto
+{
+    public Guid AppointmentId { get; init; }
+    public Guid PatientId { get; init; }
+    public string PatientName { get; init; } = string.Empty;
+    public string Status { get; init; } = string.Empty;
+}
+
 public record AppointmentSlotListDto
 {
     public Guid Id { get; init; }
@@ -16,6 +24,7 @@ public record AppointmentSlotListDto
     public string? OphthalAvatarUrl { get; init; }
     public decimal? Cost { get; init; }
     public DateTime CreatedAt { get; init; }
+    public List<SlotBookingDto> Bookings { get; init; } = new();
 }
 
 public record AppointmentSlotDto
@@ -79,6 +88,22 @@ public record DoctorSlotDetailDto
     public string? DoctorAvatar { get; init; }
     public bool IsBooked { get; init; }
     public decimal Price { get; init; }
+    public string? Bio { get; init; }
+    public decimal RatingAverage { get; init; }
+    public int RatingCount { get; init; }
+    public List<CertificateDto> Certificates { get; init; } = new();
+}
+
+public record CertificateDto
+{
+    public Guid Id { get; init; }
+    public string Type { get; init; } = string.Empty;
+    public string? DegreeLevel { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string? IssuingAuthority { get; init; }
+    public DateTime IssuedDate { get; init; }
+    public DateTime? ExpiryDate { get; init; }
+    public string? CertificateUrl { get; init; }
 }
 
 public record AvailableSlotDto
