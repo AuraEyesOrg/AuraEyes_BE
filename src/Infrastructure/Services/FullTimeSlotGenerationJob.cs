@@ -1,4 +1,3 @@
-using Application.SystemSettings.Interfaces;
 using Domain.Entities.Scheduling;
 using Domain.Entities.Users;
 using Domain.Enums;
@@ -14,26 +13,22 @@ namespace Infrastructure.Services;
 /// </summary>
 public class FullTimeSlotGenerationJob
 {
-    private const string FullTimeSlotWindowDaysSettingKey = "FULLTIME_SLOT_WINDOW_DAYS";
-    private const int DefaultRollingWindowDays = 14;
+    private const int RollingWindowDays = 14;
 
     private readonly ApplicationDbContext _context;
-    private readonly ISystemSettingService _settingService;
     private readonly ILogger<FullTimeSlotGenerationJob> _logger;
 
     public FullTimeSlotGenerationJob(
         ApplicationDbContext context,
-        ISystemSettingService settingService,
         ILogger<FullTimeSlotGenerationJob> logger)
     {
         _context = context;
-        _settingService = settingService;
         _logger = logger;
     }
 
     public async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        var windowDays = await GetWindowDaysAsync(cancellationToken);
+        var windowDays = RollingWindowDays;
         var fromDate = DateOnly.FromDateTime(DateTime.UtcNow);
         var toDate = fromDate.AddDays(windowDays - 1);
 
@@ -224,14 +219,4 @@ public class FullTimeSlotGenerationJob
     [Obsolete("Use ExecuteAsync(CancellationToken) instead.")]
     public Task Execute() => ExecuteAsync(CancellationToken.None);
 
-    private async Task<int> GetWindowDaysAsync(CancellationToken cancellationToken)
-    {
-        var configured = await _settingService.GetSettingAsync(FullTimeSlotWindowDaysSettingKey, cancellationToken);
-        if (int.TryParse(configured, out var configuredDays) && configuredDays > 0)
-        {
-            return configuredDays;
-        }
-
-        return DefaultRollingWindowDays;
-    }
 }
