@@ -12,7 +12,7 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
 
         builder.Property(e => e.Status)
             .HasConversion<string>()
-            .HasMaxLength(20);
+            .HasMaxLength(50);
 
         builder.Property(e => e.VisitReason)
             .HasMaxLength(500);
