@@ -86,50 +86,50 @@ public class CreateClinicAppointmentCommandHandler
                 "Unable to resolve user identity for payment operation.");
         }
 
+        // ── 0. Pre-transaction checks & Role resolution ──────────────────
+        var isStaffBooking = await _identityService.IsInRoleAsync(_currentUser.UserId.Value, Roles.ClinicStaff) ||
+                             await _identityService.IsInRoleAsync(_currentUser.UserId.Value, Roles.SystemAdmin);
+
+        if (request.PatientId.HasValue && !isStaffBooking)
+        {
+            return Result<CreateClinicAppointmentResult>.Forbidden("Only clinic staff can book for another patient.");
+        }
+
+        Guid targetPatientProfileId;
+        Guid orderUserId;
+        Guid? notificationUserId;
+        bool isStaffCreatedWalkIn = false;
+
+        if (request.PatientId.HasValue)
+        {
+            // Staff booking for another patient
+            var targetPatient = await _patientRepository.GetByIdAsync(request.PatientId.Value, cancellationToken);
+            if (targetPatient == null)
+            {
+                return Result<CreateClinicAppointmentResult>.NotFound($"Patient profile '{request.PatientId}' not found.");
+            }
+            targetPatientProfileId = targetPatient.Id;
+            orderUserId = targetPatient.UserId ?? _currentUser.UserId.Value;
+            notificationUserId = targetPatient.UserId;
+            isStaffCreatedWalkIn = true;
+        }
+        else
+        {
+            // Self-booking
+            if (_currentUser.ProfileId is null)
+            {
+                return Result<CreateClinicAppointmentResult>.Unauthorized("Patient profile is required for self-booking.");
+            }
+            targetPatientProfileId = _currentUser.ProfileId.Value;
+            orderUserId = _currentUser.UserId.Value;
+            notificationUserId = _currentUser.UserId.Value;
+        }
+
+        // ── 1. Start Transaction ──────────────────────────────────────────
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
         try
         {
-            // ── 1. Resolve Patient ──────────────────────────────────────────
-            Guid targetPatientProfileId;
-            Guid orderUserId;
-            Guid? notificationUserId;
-            bool isStaffCreatedWalkIn = false;
-
-            if (request.PatientId.HasValue)
-            {
-                var isStaffBooking = await _identityService.IsInRoleAsync(_currentUser.UserId.Value, Roles.ClinicStaff) ||
-                                     await _identityService.IsInRoleAsync(_currentUser.UserId.Value, Roles.SystemAdmin);
-                if (!isStaffBooking)
-                {
-                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                    return Result<CreateClinicAppointmentResult>.Forbidden("Only clinic staff can book for another patient.");
-                }
-
-                // Staff booking for another patient
-                var targetPatient = await _patientRepository.GetByIdAsync(request.PatientId.Value, cancellationToken);
-                if (targetPatient == null)
-                {
-                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                    return Result<CreateClinicAppointmentResult>.NotFound($"Patient profile '{request.PatientId}' not found.");
-                }
-                targetPatientProfileId = targetPatient.Id;
-                orderUserId = targetPatient.UserId ?? _currentUser.UserId.Value;
-                notificationUserId = targetPatient.UserId;
-                isStaffCreatedWalkIn = true;
-            }
-            else
-            {
-                // Self-booking
-                if (_currentUser.ProfileId is null)
-                {
-                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                    return Result<CreateClinicAppointmentResult>.Unauthorized("Patient profile is required for self-booking.");
-                }
-                targetPatientProfileId = _currentUser.ProfileId.Value;
-                orderUserId = _currentUser.UserId.Value;
-                notificationUserId = _currentUser.UserId.Value;
-            }
 
             // ── 2. Validate slot ──────────────────────────────────────────────
             var slot = await _appointmentSlotRepository.GetByIdWithLockAsync(request.SlotId, cancellationToken);
@@ -262,39 +262,17 @@ public class CreateClinicAppointmentCommandHandler
 
             await _orderRepository.AddAsync(order, cancellationToken);
 
-            string? paymentUrl = null;
+            Payment? payment = null;
             if (!isStaffCreatedWalkIn)
             {
-                // Create PayOS payment link for online deposit
-                var payment = new Payment(order.Id, depositAmount!.Value, PaymentMethod.PayOS, orderDescription);
+                // Create skeleton payment, will call PayOS AFTER commit
+                payment = new Payment(order.Id, depositAmount!.Value, PaymentMethod.PayOS, orderDescription);
                 await _paymentRepository.AddAsync(payment, cancellationToken);
-
-                var returnUrl = _configuration["PayOS:DefaultReturnUrl"] ?? "";
-                var cancelUrl = _configuration["PayOS:DefaultCancelUrl"] ?? "";
-
-                // Append IDs to returnUrl so the callback page knows which order/appointment to process
-                var separator = returnUrl.Contains("?") ? "&" : "?";
-                var queryParams = $"orderId={order.Id}&appointmentId={appointment.Id}&type=clinic-booking";
-                returnUrl = $"{returnUrl}{separator}{queryParams}";
-
-                var cancelSeparator = cancelUrl.Contains("?") ? "&" : "?";
-                cancelUrl = $"{cancelUrl}{cancelSeparator}{queryParams}&cancel=true";
-
-                var (pUrl, orderCode) = await _payOSService.CreatePaymentLinkAsync(
-                    payment.Id,
-                    depositAmount.Value,
-                    orderDescription,
-                    returnUrl,
-                    cancelUrl);
-
-                payment.SetPaymentLink(pUrl, orderCode);
-                paymentUrl = pUrl;
             }
             else
             {
-                // For walk-ins, we can create a "Pending" Cash payment or just leave it for staff to collect
-                // Let's create a pending Cash payment for the full amount
-                var payment = new Payment(order.Id, price, PaymentMethod.Cash, orderDescription);
+                // For walk-ins, create a "Pending" Cash payment
+                payment = new Payment(order.Id, price, PaymentMethod.Cash, orderDescription);
                 await _paymentRepository.AddAsync(payment, cancellationToken);
             }
 
@@ -307,6 +285,40 @@ public class CreateClinicAppointmentCommandHandler
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+            // ── 8. External API calls (AFTER commit to avoid holding locks) ──
+            string? paymentUrl = null;
+            if (!isStaffCreatedWalkIn && payment != null)
+            {
+                try 
+                {
+                    var returnUrl = _configuration["PayOS:DefaultReturnUrl"] ?? "";
+                    var cancelUrl = _configuration["PayOS:DefaultCancelUrl"] ?? "";
+                    var separator = returnUrl.Contains("?") ? "&" : "?";
+                    var queryParams = $"orderId={order.Id}&appointmentId={appointment.Id}&type=clinic-booking";
+                    returnUrl = $"{returnUrl}{separator}{queryParams}";
+                    var cancelSeparator = cancelUrl.Contains("?") ? "&" : "?";
+                    cancelUrl = $"{cancelUrl}{cancelSeparator}{queryParams}&cancel=true";
+
+                    var (pUrl, orderCode) = await _payOSService.CreatePaymentLinkAsync(
+                        payment.Id,
+                        depositAmount!.Value,
+                        orderDescription,
+                        returnUrl,
+                        cancelUrl);
+
+                    // Update payment with the link in a separate small transaction or just save
+                    payment.SetPaymentLink(pUrl, orderCode);
+                    await _paymentRepository.UpdateAsync(payment, cancellationToken);
+                    await _unitOfWork.SaveChangesAsync(cancellationToken);
+                    paymentUrl = pUrl;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to create PayOS payment link for order {OrderId}. User will need to retry from history.", order.Id);
+                    // We don't fail the whole booking because the slot is already booked.
+                }
+            }
 
             _logger.LogInformation(
                 "Created {Type} clinic appointment {AppointmentId} for patient {PatientId} at slot {SlotId}. " +

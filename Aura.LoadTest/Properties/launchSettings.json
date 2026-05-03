@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Aura.LoadTest": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}

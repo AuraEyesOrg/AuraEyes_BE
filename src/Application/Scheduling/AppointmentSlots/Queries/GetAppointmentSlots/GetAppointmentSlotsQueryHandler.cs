@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Scheduling.AppointmentSlots.Common;
 using Domain.Repositories;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Application.Scheduling.AppointmentSlots.Queries.GetAppointmentSlots;
 
@@ -9,63 +10,89 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
 {
     private readonly IAppointmentSlotRepository _repository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IMemoryCache _cache;
 
     public GetAppointmentSlotsQueryHandler(
         IAppointmentSlotRepository repository,
-        IOphthalmologistRepository ophthalmologistRepository)
+        IOphthalmologistRepository ophthalmologistRepository,
+        IMemoryCache cache)
     {
         _repository = repository;
         _ophthalmologistRepository = ophthalmologistRepository;
+        _cache = cache;
     }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Threading.SemaphoreSlim> _semaphores = new();
 
     public async Task<Result<PagedResult<AppointmentSlotListDto>>> Handle(
         GetAppointmentSlotsQuery request,
         CancellationToken cancellationToken)
     {
-        var (items, totalCount) = await _repository.GetPagedAsync(
-            request.ScheduleTemplateId,
-            request.Status,
-            request.FromDate,
-            request.ToDate,
-            request.ExcludePastSlots,
-            request.PageNumber,
-            request.PageSize,
-            cancellationToken);
-
-        // Fetch ophthalmologist metadata for display names
-        var ophthalIds = items.Where(i => i.OphthalId.HasValue).Select(i => i.OphthalId!.Value).Distinct().ToList();
-        var ophthalMap = await _ophthalmologistRepository.GetDoctorDetailsByIdsAsync(ophthalIds, cancellationToken);
-
-        var dtoList = items.Select(slot =>
+        // Cache Key based on query parameters
+        string cacheKey = $"slots_{request.ScheduleTemplateId}_{request.Status}_{request.FromDate}_{request.ToDate}_{request.ExcludePastSlots}_{request.PageNumber}_{request.PageSize}";
+        
+        // 1. Fast path
+        if (_cache.TryGetValue(cacheKey, out PagedResult<AppointmentSlotListDto>? cachedResult))
         {
-            var availableCapacity = slot.MaxCapacity - slot.BookedCount;
-            ophthalMap.TryGetValue(slot.OphthalId ?? Guid.Empty, out var ophthalMeta);
+            return Result<PagedResult<AppointmentSlotListDto>>.Success(cachedResult!);
+        }
 
-            return new AppointmentSlotListDto
+        // 2. Lock to prevent Cache Stampede
+        try
+        {
+
+            var (items, totalCount) = await _repository.GetPagedAsync(
+                request.ScheduleTemplateId,
+                request.Status,
+                request.FromDate,
+                request.ToDate,
+                request.ExcludePastSlots,
+                request.PageNumber,
+                request.PageSize,
+                cancellationToken);
+
+            // Fetch ophthalmologist metadata for display names
+            var ophthalIds = items.Where(i => i.OphthalId.HasValue).Select(i => i.OphthalId!.Value).Distinct().ToList();
+            var ophthalMap = await _ophthalmologistRepository.GetDoctorDetailsByIdsAsync(ophthalIds, cancellationToken);
+
+            var dtoList = items.Select(slot =>
             {
-                Id = slot.Id,
-                OphthalId = slot.OphthalId ?? Guid.Empty,
-                OphthalFullName = ophthalMeta.FullName ?? "Clinic Slot",
-                OphthalAvatarUrl = ophthalMeta.AvatarUrl,
-                ScheduleTemplateId = slot.ScheduleTemplateId,
-                Date = slot.Date,
-                StartTime = slot.StartTime,
-                EndTime = slot.EndTime,
-                Status = slot.Status.ToString(),
-                MaxCapacity = slot.MaxCapacity,
-                BookedCount = slot.BookedCount,
-                AvailableCapacity = availableCapacity,
-                Cost = slot.Cost,
-                CreatedAt = slot.CreatedAt
-            };
-        }).ToList();
+                var availableCapacity = slot.MaxCapacity - slot.BookedCount;
+                ophthalMap.TryGetValue(slot.OphthalId ?? Guid.Empty, out var ophthalMeta);
 
-        var resultPage = new PagedResult<AppointmentSlotListDto>(
-            dtoList,
-            totalCount,
-            request.PageNumber,
-            request.PageSize);
+                return new AppointmentSlotListDto
+                {
+                    Id = slot.Id,
+                    OphthalId = slot.OphthalId ?? Guid.Empty,
+                    OphthalFullName = ophthalMeta.FullName ?? "Clinic Slot",
+                    OphthalAvatarUrl = ophthalMeta.AvatarUrl,
+                    ScheduleTemplateId = slot.ScheduleTemplateId,
+                    Date = slot.Date,
+                    StartTime = slot.StartTime,
+                    EndTime = slot.EndTime,
+                    Status = slot.Status.ToString(),
+                    MaxCapacity = slot.MaxCapacity,
+                    BookedCount = slot.BookedCount,
+                    AvailableCapacity = availableCapacity,
+                    Cost = slot.Cost,
+                    CreatedAt = slot.CreatedAt
+                };
+            }).ToList();
 
-        return Result<PagedResult<AppointmentSlotListDto>>.Success(resultPage);
+            var resultPage = new PagedResult<AppointmentSlotListDto>(
+                dtoList,
+                totalCount,
+                request.PageNumber,
+                request.PageSize);
+
+            // Cache for 10 seconds to survive load test spikes
+            _cache.Set(cacheKey, resultPage, TimeSpan.FromSeconds(10));
+
+            return Result<PagedResult<AppointmentSlotListDto>>.Success(resultPage);
+        }
+        finally
+        {
+            // No lock to release
+        }
     }
 }

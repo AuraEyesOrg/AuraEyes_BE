@@ -99,6 +99,7 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
         CancellationToken cancellationToken = default)
     {
         var query = _dbSet
+            .AsNoTracking()
             .Include(s => s.ScheduleTemplate)
             .AsQueryable();
 
