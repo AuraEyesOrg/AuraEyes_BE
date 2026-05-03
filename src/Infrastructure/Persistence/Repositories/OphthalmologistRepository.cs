@@ -149,4 +149,45 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
                 x.RatingCount,
                 x.Certificates));
     }
+    public async Task<List<ConsiliumDoctorDetail>> GetAvailableDoctorsForConsiliumAsync(
+        DateTime windowStart,
+        DateTime windowEnd,
+        CancellationToken cancellationToken = default)
+    {
+        var startDay = DateOnly.FromDateTime(windowStart);
+        var startTime = TimeOnly.FromDateTime(windowStart);
+        var endDay = DateOnly.FromDateTime(windowEnd);
+        var endTime = TimeOnly.FromDateTime(windowEnd);
+
+        // Perform single-query optimization projecting directly to DTO
+        var query = from ophthal in _dbSet
+                    join user in _context.Users on ophthal.UserId equals user.Id
+                    where user.IsActive && !user.IsDeleted
+                    // Check Approved Leave Requests
+                    && !_context.OphthalmologistLeaveRequests.Any(lr =>
+                        lr.OphthalmologistId == ophthal.Id &&
+                        lr.Status == Domain.Enums.OphthalmologistLeaveRequestStatus.Approved &&
+                        lr.StartDate <= startDay && lr.EndDate >= startDay)
+                    // Check Overlapping Busy Appointment Slots
+                    && !_context.AppointmentSlots.Any(slot =>
+                        slot.OphthalId == ophthal.Id &&
+                        slot.Date == startDay &&
+                        slot.StartTime < endTime &&
+                        slot.EndTime > startTime &&
+                        (slot.Status == Domain.Enums.ScheduleStatus.Blocked || slot.BookedCount > 0))
+                    select new ConsiliumDoctorDetail(
+                        ophthal.Id,
+                        user.FullName ?? "Doctor",
+                        user.AvatarUrl,
+                        ophthal.Certificates
+                            .Where(c => c.DegreeLevel != null)
+                            .OrderByDescending(c => c.DegreeLevel)
+                            .Select(c => c.DegreeLevel.ToString())
+                            .FirstOrDefault()
+                    );
+
+        return await query
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+    }
 }
