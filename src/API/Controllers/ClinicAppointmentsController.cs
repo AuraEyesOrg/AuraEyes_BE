@@ -73,8 +73,12 @@ public class ClinicAppointmentsController : BaseApiController
         return HandleResult(result);
     }
 
+    /// <summary>
+    /// Legacy/adjunct endpoint — prefer coordinator <c>POST /api/clinic-queue/{visitId}/send-to-doctor</c>
+    /// after AI screening. Restricted to visit managers (not receptionists).
+    /// </summary>
     [HttpPut("{appointmentId:guid}/start")]
-    [AuthorizePermission(Permissions.AppointmentsManage)]
+    [AuthorizePermission(Permissions.VisitsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> StartClinicAppointment(Guid appointmentId)
     {
@@ -82,8 +86,12 @@ public class ClinicAppointmentsController : BaseApiController
         return HandleResult(result);
     }
 
+    /// <summary>
+    /// Legacy/adjunct endpoint — prefer doctor EMR <c>FinalizeMedicalRecord</c> which moves visit to waiting for payment.
+    /// Restricted to visit managers (not receptionists).
+    /// </summary>
     [HttpPut("{appointmentId:guid}/complete")]
-    [AuthorizePermission(Permissions.AppointmentsManage)]
+    [AuthorizePermission(Permissions.VisitsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> CompleteClinicAppointment(
         Guid appointmentId,
