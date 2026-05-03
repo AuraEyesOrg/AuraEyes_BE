@@ -1,6 +1,10 @@
+using Application.ClinicQueue.Common;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Scheduling.Appointments.Common;
+using Domain.Common;
+using Domain.Entities.Consultation;
+using Domain.Entities.Screening;
 using Domain.Enums;
 using Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +17,8 @@ public class GetClinicAppointmentsByDateQueryHandler
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IOrderRepository _orderRepository;
     private readonly IPatientVisitRepository _patientVisitRepository;
+    private readonly IRepository<AiScreening> _screeningRepository;
+    private readonly IConsultationSessionRepository _consultationSessionRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IIdentityService _identityService;
 
@@ -20,12 +26,16 @@ public class GetClinicAppointmentsByDateQueryHandler
         IAppointmentRepository appointmentRepository,
         IOrderRepository orderRepository,
         IPatientVisitRepository patientVisitRepository,
+        IRepository<AiScreening> screeningRepository,
+        IConsultationSessionRepository consultationSessionRepository,
         IOphthalmologistRepository ophthalmologistRepository,
         IIdentityService identityService)
     {
         _appointmentRepository = appointmentRepository;
         _orderRepository = orderRepository;
         _patientVisitRepository = patientVisitRepository;
+        _screeningRepository = screeningRepository;
+        _consultationSessionRepository = consultationSessionRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _identityService = identityService;
     }
@@ -44,10 +54,47 @@ public class GetClinicAppointmentsByDateQueryHandler
         var appointmentIds = appointments.Select(a => a.Id).ToList();
         var orders = await _orderRepository.GetByAppointmentIdsAsync(appointmentIds, cancellationToken);
         var orderLookup = orders.ToLookup(o => o.AppointmentId!.Value);
-        var visits = await _patientVisitRepository.Query()
+        var visits = await _patientVisitRepository.Query().AsNoTracking()
             .Where(v => v.AppointmentId.HasValue && appointmentIds.Contains(v.AppointmentId.Value))
             .ToListAsync(cancellationToken);
         var visitMap = visits.ToDictionary(v => v.AppointmentId!.Value);
+
+        var cutoffDate = DateTime.UtcNow.AddDays(-1);
+        var visitPatientIds = visits.Select(v => v.PatientId).Distinct().ToList();
+
+        var screenings = visitPatientIds.Count == 0
+            ? new List<AiScreening>()
+            : await _screeningRepository
+                .Query().AsNoTracking()
+                .Include(s => s.ScreeningResults)
+                .Where(s =>
+                    visitPatientIds.Contains(s.PatientId)
+                    && s.CreatedAt >= cutoffDate
+                    && !s.IsDeleted)
+                .ToListAsync(cancellationToken);
+
+        var consultations = visitPatientIds.Count == 0
+            ? new List<ConsultationSession>()
+            : await _consultationSessionRepository
+                .Query().AsNoTracking()
+                .Where(cs =>
+                    visitPatientIds.Contains(cs.PatientId)
+                    && cs.CreatedAt >= cutoffDate
+                    && cs.Status != SessionStatus.Cancelled
+                    && !cs.IsDeleted)
+                .ToListAsync(cancellationToken);
+
+        var latestScreeningByPatientId = screenings
+            .GroupBy(s => s.PatientId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(s => s.CreatedAt).First());
+
+        var latestConsultationByPatientId = consultations
+            .GroupBy(c => c.PatientId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(c => c.CreatedAt).First());
 
         // Fetch registered user names for patient profiles
         var registeredUserIds = appointments
@@ -70,74 +117,87 @@ public class GetClinicAppointmentsByDateQueryHandler
 
         var doctorMap = await _ophthalmologistRepository.GetDoctorDetailsByIdsAsync(doctorIds, cancellationToken);
 
-        var items = appointments
-            .Where(a => a.AppointmentSlot is not null)
-            .Select(a => {
-                var appointmentOrders = orderLookup[a.Id].ToList();
-                var primaryOrder = appointmentOrders.OrderByDescending(o => o.CreatedAt).FirstOrDefault();
-                
-                decimal totalAmount = appointmentOrders.Sum(o => o.TotalAmount);
-                decimal paidAmount = appointmentOrders.SelectMany(o => o.Payments)
-                    .Where(p => p.Status == PaymentStatus.Completed)
-                    .Sum(p => p.Amount);
-                decimal remaining = totalAmount - paidAmount;
-                
-                bool isPaidDeposit = appointmentOrders.Any(o => o.Status == OrderStatus.Confirmed || o.Status == OrderStatus.Completed);
+        var items = new List<ClinicAppointmentDto>();
 
-                visitMap.TryGetValue(a.Id, out var visit);
-                
-                var finalDocId = visit?.AssignedDoctorId ?? a.RequestedDoctorId ?? a.AppointmentSlot?.OphthalId;
-                doctorMap.TryGetValue(finalDocId ?? Guid.Empty, out var doc);
+        foreach (var a in appointments.Where(x => x.AppointmentSlot is not null && x.Status != AppointmentStatus.Cancelled))
+        {
+            var appointmentOrders = orderLookup[a.Id].ToList();
+            var primaryOrder = appointmentOrders.OrderByDescending(o => o.CreatedAt).FirstOrDefault();
 
-                // Resolve patient display name
-                string patientName = "Patient";
-                if (a.Patient != null)
+            decimal totalAmount = appointmentOrders.Sum(o => o.TotalAmount);
+            decimal paidAmount = appointmentOrders.SelectMany(o => o.Payments)
+                .Where(p => p.Status == PaymentStatus.Completed)
+                .Sum(p => p.Amount);
+            decimal remaining = totalAmount - paidAmount;
+
+            bool isPaidDeposit = appointmentOrders.Count == 0
+                || appointmentOrders.All(o => o.IsClinicDepositSatisfiedForCheckIn());
+
+            visitMap.TryGetValue(a.Id, out var visit);
+
+            string? flowState = null;
+            string? visitStatus = null;
+            if (visit != null)
+            {
+                visitStatus = visit.Status.ToString();
+                latestScreeningByPatientId.TryGetValue(visit.PatientId, out var screening);
+                latestConsultationByPatientId.TryGetValue(visit.PatientId, out var consultation);
+                flowState = ClinicFlowStateResolver.Resolve(visit, screening, consultation);
+            }
+
+            var finalDocId = visit?.AssignedDoctorId ?? a.RequestedDoctorId ?? a.AppointmentSlot?.OphthalId;
+            doctorMap.TryGetValue(finalDocId ?? Guid.Empty, out var doc);
+
+            string patientName = "Patient";
+            if (a.Patient != null)
+            {
+                if (a.Patient.IsWalkIn)
                 {
-                    if (a.Patient.IsWalkIn)
-                    {
-                        patientName = a.Patient.FullName ?? "Patient";
-                    }
-                    else if (a.Patient.UserId.HasValue && userMap.TryGetValue(a.Patient.UserId.Value, out var user))
-                    {
-                        patientName = !string.IsNullOrWhiteSpace(user.FullName) ? user.FullName : (user.Email ?? "Patient");
-                    }
+                    patientName = a.Patient.FullName ?? "Patient";
                 }
-                
-                return new ClinicAppointmentDto
+                else if (a.Patient.UserId.HasValue && userMap.TryGetValue(a.Patient.UserId.Value, out var user))
                 {
-                    Id = a.Id,
-                    PatientId = a.PatientId,
-                    PatientName = patientName,
-                    PatientAvatarUrl = null,
-                    SlotId = a.AppointmentSlotId,
-                    Date = a.AppointmentSlot!.Date,
-                    StartTime = a.AppointmentSlot.StartTime,
-                    EndTime = a.AppointmentSlot.EndTime,
-                    VisitReason = a.VisitReason,
-                    Status = visit?.Status.ToString() ?? a.Status.ToString(),
-                    CreatedAt = a.CreatedAt,
-                    HasFeedback = false,
-                    
-                    // Doctor info
-                    OphthalId = a.AppointmentSlot.OphthalId,
-                    OphthalFullName = doc.FullName ?? "Clinic Doctor",
-                    OphthalAvatarUrl = doc.AvatarUrl,
+                    patientName = !string.IsNullOrWhiteSpace(user.FullName) ? user.FullName : (user.Email ?? "Patient");
+                }
+            }
 
-                    // Billing
-                    OrderId = primaryOrder?.Id,
-                    TotalAmount = totalAmount > 0 ? totalAmount : null,
-                    DepositAmount = primaryOrder?.DepositAmount,
-                    IsPaidDeposit = isPaidDeposit,
-                    PaidAmount = paidAmount,
-                    RemainingAmount = totalAmount > 0 ? (remaining > 0 ? remaining : 0) : null,
-                    OrderStatus = primaryOrder?.Status switch
-                    {
-                        Domain.Enums.OrderStatus.Confirmed => "PartiallyPaid",
-                        Domain.Enums.OrderStatus.Completed => "FullyPaid",
-                        _ => primaryOrder?.Status.ToString()
-                    }
-                };
-            })
+            items.Add(new ClinicAppointmentDto
+            {
+                Id = a.Id,
+                PatientId = a.PatientId,
+                PatientName = patientName,
+                PatientAvatarUrl = null,
+                SlotId = a.AppointmentSlotId,
+                Date = a.AppointmentSlot!.Date,
+                StartTime = a.AppointmentSlot.StartTime,
+                EndTime = a.AppointmentSlot.EndTime,
+                VisitReason = a.VisitReason,
+                Status = a.Status.ToString(),
+                VisitStatus = visitStatus,
+                FlowState = flowState,
+                CreatedAt = a.CreatedAt,
+                HasFeedback = false,
+
+                OphthalId = a.AppointmentSlot.OphthalId,
+                OphthalFullName = doc.FullName ?? "Clinic Doctor",
+                OphthalAvatarUrl = doc.AvatarUrl,
+
+                OrderId = primaryOrder?.Id,
+                TotalAmount = totalAmount > 0 ? totalAmount : null,
+                DepositAmount = primaryOrder?.DepositAmount,
+                IsPaidDeposit = isPaidDeposit,
+                PaidAmount = paidAmount,
+                RemainingAmount = totalAmount > 0 ? (remaining > 0 ? remaining : 0) : null,
+                OrderStatus = primaryOrder?.Status switch
+                {
+                    OrderStatus.Confirmed => "PartiallyPaid",
+                    OrderStatus.Completed => "FullyPaid",
+                    _ => primaryOrder?.Status.ToString()
+                }
+            });
+        }
+
+        items = items
             .OrderBy(x => x.Date)
             .ThenBy(x => x.StartTime)
             .ToList();
@@ -145,3 +205,4 @@ public class GetClinicAppointmentsByDateQueryHandler
         return Result<IReadOnlyList<ClinicAppointmentDto>>.Success(items);
     }
 }
+

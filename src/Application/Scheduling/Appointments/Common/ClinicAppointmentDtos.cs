@@ -13,7 +13,15 @@ public class ClinicAppointmentDto
     public TimeOnly StartTime { get; init; }
     public TimeOnly EndTime { get; init; }
     public string? VisitReason { get; init; }
+    /// <summary>Booking lifecycle status (AppointmentStatus).</summary>
     public string Status { get; init; } = string.Empty;
+
+    /// <summary>Physical visit status when a visit exists (PatientVisitStatus).</summary>
+    public string? VisitStatus { get; init; }
+
+    /// <summary>Unified clinic pipeline step (matches queue flowState).</summary>
+    public string? FlowState { get; init; }
+
     public DateTime CreatedAt { get; init; }
     public Guid? OrganisationId { get; init; }
     public string? OrganisationName { get; init; }

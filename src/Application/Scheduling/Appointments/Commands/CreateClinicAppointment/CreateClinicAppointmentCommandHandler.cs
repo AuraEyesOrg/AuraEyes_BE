@@ -166,68 +166,16 @@ public class CreateClinicAppointmentCommandHandler
             }
 
             // ── 4. Resolve pricing ────────────────────────────────────────────
-            decimal price = BASE_CLINIC_PRICE;
-            Guid? finalDoctorId = request.RequestedDoctorId;
-            var finalPricingType = request.PricingType;
-
-            // Auto-detect doctor if the slot is owned by one (Doctor-centric model)
-            if (slot.OphthalId.HasValue && finalDoctorId == null)
+            var pricingResult = await ResolvePricingAsync(request, slot, targetPatientProfileId, cancellationToken);
+            if (!pricingResult.IsSuccess)
             {
-                finalDoctorId = slot.OphthalId;
-                finalPricingType = PricingType.DoctorSelected;
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                return Result<CreateClinicAppointmentResult>.Failure(pricingResult.ErrorMessage);
             }
 
-            if (finalPricingType == PricingType.DoctorSelected)
-            {
-                if (finalDoctorId == null)
-                {
-                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                    return Result<CreateClinicAppointmentResult>.Failure("Doctor must be selected for DoctorSelected pricing type.");
-                }
-
-                var doctor = await _ophthalmologistRepository.GetByIdAsync(finalDoctorId.Value, cancellationToken);
-                if (doctor == null)
-                {
-                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                    return Result<CreateClinicAppointmentResult>.NotFound($"Doctor '{finalDoctorId}' not found.");
-                }
-
-                // If the slot has a specific OphthalId, verify it matches
-                if (slot.OphthalId.HasValue && slot.OphthalId != finalDoctorId)
-                {
-                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                    return Result<CreateClinicAppointmentResult>.Failure("The selected doctor does not match the doctor assigned to this slot.");
-                }
-
-                // If slot doesn't have OphthalId but we have assignments (shared slot model), verify assignment
-                if (!slot.OphthalId.HasValue)
-                {
-                    var isAssigned = await _slotAssignmentRepository.HasAssignmentAsync(
-                        request.SlotId,
-                        finalDoctorId.Value,
-                        SlotAssignmentRole.Doctor,
-                        cancellationToken);
-
-                    if (!isAssigned)
-                    {
-                        await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                        return Result<CreateClinicAppointmentResult>.Failure("The selected doctor is not available for this appointment slot.");
-                    }
-                }
-
-                price = doctor.ConsultationFee;
-            }
-
-            // ── Apply discount if patient has one ──────────────────────────────
-            var discountPatient = await _patientRepository.GetByIdAsync(targetPatientProfileId, cancellationToken);
-            if (discountPatient != null)
-            {
-                var discount = discountPatient.ConsumeDiscount();
-                if (discount.HasValue)
-                {
-                    price = Math.Round(price * (1 - discount.Value), 0);
-                }
-            }
+            var price = pricingResult.Data.Price;
+            var finalDoctorId = pricingResult.Data.FinalDoctorId;
+            var finalPricingType = pricingResult.Data.FinalPricingType;
 
             // ── 5. Calculate deposit ──────────────────────────────────────────
             // If it's a walk-in (staff booking), there is NO deposit (they pay 100% full amount).
@@ -433,5 +381,69 @@ public class CreateClinicAppointmentCommandHandler
                 "Failed to send walk-in queue notification for visit {VisitId}",
                 visit.Id);
         }
+    }
+
+    private async Task<Result<(decimal Price, Guid? FinalDoctorId, PricingType FinalPricingType)>> ResolvePricingAsync(
+        CreateClinicAppointmentCommand request,
+        AppointmentSlot slot,
+        Guid targetPatientProfileId,
+        CancellationToken cancellationToken)
+    {
+        decimal price = BASE_CLINIC_PRICE;
+        Guid? finalDoctorId = request.RequestedDoctorId;
+        var finalPricingType = request.PricingType;
+
+        if (slot.OphthalId.HasValue && finalDoctorId == null)
+        {
+            finalDoctorId = slot.OphthalId;
+            finalPricingType = PricingType.DoctorSelected;
+        }
+
+        if (finalPricingType == PricingType.DoctorSelected)
+        {
+            if (finalDoctorId == null)
+            {
+                return Result<(decimal, Guid?, PricingType)>.Failure("Doctor must be selected for DoctorSelected pricing type.");
+            }
+
+            var doctor = await _ophthalmologistRepository.GetByIdAsync(finalDoctorId.Value, cancellationToken);
+            if (doctor == null)
+            {
+                return Result<(decimal, Guid?, PricingType)>.NotFound($"Doctor '{finalDoctorId}' not found.");
+            }
+
+            if (slot.OphthalId.HasValue && slot.OphthalId != finalDoctorId)
+            {
+                return Result<(decimal, Guid?, PricingType)>.Failure("The selected doctor does not match the doctor assigned to this slot.");
+            }
+
+            if (!slot.OphthalId.HasValue)
+            {
+                var isAssigned = await _slotAssignmentRepository.HasAssignmentAsync(
+                    request.SlotId,
+                    finalDoctorId.Value,
+                    SlotAssignmentRole.Doctor,
+                    cancellationToken);
+
+                if (!isAssigned)
+                {
+                    return Result<(decimal, Guid?, PricingType)>.Failure("The selected doctor is not available for this appointment slot.");
+                }
+            }
+
+            price = doctor.ConsultationFee;
+        }
+
+        var discountPatient = await _patientRepository.GetByIdAsync(targetPatientProfileId, cancellationToken);
+        if (discountPatient != null)
+        {
+            var discount = discountPatient.ConsumeDiscount();
+            if (discount.HasValue)
+            {
+                price = Math.Round(price * (1 - discount.Value), 0);
+            }
+        }
+
+        return Result<(decimal, Guid?, PricingType)>.Success((price, finalDoctorId, finalPricingType));
     }
 }

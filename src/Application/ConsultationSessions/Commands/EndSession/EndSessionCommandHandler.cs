@@ -35,11 +35,9 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
         if (session is null)
             return Result.NotFound($"Session '{request.SessionId}' not found.");
 
-        if (session.Status == SessionStatus.Completed)
-            return Result.Failure("Session is already completed.");
-
-        if (session.OphthalmologistId.HasValue && session.OphthalmologistId.Value != request.DoctorId)
-            return Result.Forbidden("Only the assigned ophthalmologist can end this session.");
+        var validationResult = ValidateEndSession(session, request.DoctorId);
+        if (!validationResult.IsSuccess)
+            return validationResult;
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
@@ -59,5 +57,16 @@ public class EndSessionCommandHandler : ICommandHandler<EndSessionCommand>
             _logger.LogError(ex, "Error ending session {SessionId}", request.SessionId);
             throw;
         }
+    }
+
+    private static Result ValidateEndSession(Domain.Entities.Consultation.ConsultationSession session, Guid doctorId)
+    {
+        if (session.Status == SessionStatus.Completed)
+            return Result.Failure("Session is already completed.");
+
+        if (session.OphthalmologistId.HasValue && session.OphthalmologistId.Value != doctorId)
+            return Result.Forbidden("Only the assigned ophthalmologist can end this session.");
+
+        return Result.Success();
     }
 }

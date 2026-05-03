@@ -69,7 +69,24 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
             };
         }
 
-        var items = posts.Select(p => new PostFeedDto
+        var items = posts.Select(p => MapToDto(
+            p, authors, userReactions, savedPostIds, request.CurrentUserId, request.IsSystemAdmin)).ToList();
+
+        var pagedResult = new PagedResult<PostFeedDto>(
+            items, totalCount, request.PageNumber, request.PageSize);
+
+        return Result<PagedResult<PostFeedDto>>.Success(pagedResult);
+    }
+
+    private static PostFeedDto MapToDto(
+        Domain.Entities.Network.ProfessionalPost p,
+        Dictionary<Guid, AuthorDto> authors,
+        Dictionary<Guid, Domain.Enums.Network.ReactionType> userReactions,
+        HashSet<Guid> savedPostIds,
+        Guid currentUserId,
+        bool isSystemAdmin)
+    {
+        return new PostFeedDto
         {
             Id = p.Id,
             Author = authors.GetValueOrDefault(p.AuthorId) ?? new AuthorDto { Id = p.AuthorId, FullName = "Unknown" },
@@ -84,11 +101,11 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
                     Id = p.OriginalPost.Id,
                     Author = authors.GetValueOrDefault(p.OriginalPost.AuthorId)
                              ?? new AuthorDto { Id = p.OriginalPost.AuthorId, FullName = "Unknown" },
-                    Content = p.OriginalPost.IsHidden && p.OriginalPost.AuthorId != request.CurrentUserId && !request.IsSystemAdmin
+                    Content = p.OriginalPost.IsHidden && p.OriginalPost.AuthorId != currentUserId && !isSystemAdmin
                         ? "This original post is hidden by moderators."
                         : p.OriginalPost.Content,
                     Category = p.OriginalPost.Category,
-                    Attachments = p.OriginalPost.IsHidden && p.OriginalPost.AuthorId != request.CurrentUserId && !request.IsSystemAdmin
+                    Attachments = p.OriginalPost.IsHidden && p.OriginalPost.AuthorId != currentUserId && !isSystemAdmin
                         ? new List<AttachmentDto>()
                         : p.OriginalPost.Attachments.Select(a => new AttachmentDto
                         {
@@ -112,7 +129,7 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
             AllowComments = p.AllowComments,
             IsInternalCase = p.IsInternalCase,
             ConsultationSessionId = p.ConsultationSessionId,
-            AiScreeningId = p.AuthorId == request.CurrentUserId || request.IsSystemAdmin
+            AiScreeningId = p.AuthorId == currentUserId || isSystemAdmin
                 ? p.AiScreeningId
                 : null,
             PatientAge = p.PatientAge,
@@ -132,11 +149,6 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
             IsHidden = p.IsHidden,
             HideReason = p.IsHidden ? p.HideReason : null,
             CreatedAt = p.CreatedAt
-        }).ToList();
-
-        var pagedResult = new PagedResult<PostFeedDto>(
-            items, totalCount, request.PageNumber, request.PageSize);
-
-        return Result<PagedResult<PostFeedDto>>.Success(pagedResult);
+        };
     }
 }

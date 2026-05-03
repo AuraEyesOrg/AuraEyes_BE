@@ -112,7 +112,7 @@ public class GetConsultationSessionQueryHandler
         if (!screeningId.HasValue || (!canViewRetinalImages && !canViewAiResults)) return null;
 
         var screening = await _aiScreeningRepository
-            .Query()
+            .Query().AsNoTracking()
             .Include(x => x.RetinalImages)
             .Include(x => x.ScreeningResults)
             .FirstOrDefaultAsync(x => x.Id == screeningId.Value, cancellationToken);
@@ -138,53 +138,9 @@ public class GetConsultationSessionQueryHandler
         }
 
         string? annotatedImageUrl = null;
-        if (canViewAiResults && !string.IsNullOrWhiteSpace(screening.RawJsonOutput))
+        if (canViewAiResults)
         {
-            try
-            {
-                using var doc = JsonDocument.Parse(screening.RawJsonOutput);
-                var root = doc.RootElement;
-
-                if (root.TryGetProperty("annotatedImageUrl", out var annotated))
-                {
-                    annotatedImageUrl = annotated.GetString();
-                }
-                else if (root.TryGetProperty("image_url", out var imageUrl))
-                {
-                    annotatedImageUrl = imageUrl.GetString();
-                }
-
-                if (root.TryGetProperty("detections", out var detections) &&
-                    detections.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var det in detections.EnumerateArray())
-                    {
-                        if (det.TryGetProperty("class_name", out var className))
-                        {
-                            var value = className.GetString();
-                            if (!string.IsNullOrWhiteSpace(value)) symptoms.Add(value);
-                        }
-                    }
-                }
-
-                if (root.TryGetProperty("prediction", out var prediction) &&
-                    prediction.TryGetProperty("top_k", out var topK) &&
-                    topK.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var item in topK.EnumerateArray())
-                    {
-                        if (item.TryGetProperty("class_name", out var classNameEl))
-                        {
-                            var value = classNameEl.GetString();
-                            if (!string.IsNullOrWhiteSpace(value)) symptoms.Add(value);
-                        }
-                    }
-                }
-            }
-            catch
-            {
-                // Keep snapshot resilient even if raw output format changes.
-            }
+            ParseAiFindings(screening.RawJsonOutput, symptoms, out annotatedImageUrl);
         }
 
         return new ConsultationCaseSnapshotDto
@@ -206,4 +162,53 @@ public class GetConsultationSessionQueryHandler
             Symptoms = canViewAiResults ? symptoms.ToList() : []
         };
     }
+
+    private static void ParseAiFindings(
+        string? rawJsonOutput,
+        HashSet<string> symptoms,
+        out string? annotatedImageUrl)
+    {
+        annotatedImageUrl = null;
+        if (string.IsNullOrWhiteSpace(rawJsonOutput)) return;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(rawJsonOutput);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("annotatedImageUrl", out var annotated))
+                annotatedImageUrl = annotated.GetString();
+            else if (root.TryGetProperty("image_url", out var imageUrl))
+                annotatedImageUrl = imageUrl.GetString();
+
+            if (root.TryGetProperty("detections", out var detections) &&
+                detections.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var det in detections.EnumerateArray())
+                {
+                    if (det.TryGetProperty("class_name", out var className))
+                    {
+                        var value = className.GetString();
+                        if (!string.IsNullOrWhiteSpace(value)) symptoms.Add(value);
+                    }
+                }
+            }
+
+            if (root.TryGetProperty("prediction", out var prediction) &&
+                prediction.TryGetProperty("top_k", out var topK) &&
+                topK.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in topK.EnumerateArray())
+                {
+                    if (item.TryGetProperty("class_name", out var classNameEl))
+                    {
+                        var value = classNameEl.GetString();
+                        if (!string.IsNullOrWhiteSpace(value)) symptoms.Add(value);
+                    }
+                }
+            }
+        }
+        catch { }
+    }
 }
+

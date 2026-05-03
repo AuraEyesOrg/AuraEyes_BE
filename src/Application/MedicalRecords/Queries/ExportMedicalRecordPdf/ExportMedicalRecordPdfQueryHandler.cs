@@ -34,14 +34,14 @@ public sealed class ExportMedicalRecordPdfQueryHandler
         ExportMedicalRecordPdfQuery request,
         CancellationToken cancellationToken)
     {
-        var record = await _medicalRecordRepository.GetByIdAsync(request.MedicalRecordId, cancellationToken);
+        var record = await _medicalRecordRepository.GetByIdAsNoTrackingAsync(request.MedicalRecordId, cancellationToken);
         if (record is null)
             return Result<MedicalRecordPdfFileDto>.NotFound("Medical record not found.");
 
         // Security Check: If user is a Patient, they can only see their own record
         if (_currentUserService.UserId.HasValue)
         {
-            var patients = await _patientRepository.FindAsync(p => p.UserId == _currentUserService.UserId.Value, cancellationToken);
+            var patients = await _patientRepository.FindAsNoTrackingAsync(p => p.UserId == _currentUserService.UserId.Value, cancellationToken);
             var currentPatient = patients.FirstOrDefault();
             
             if (currentPatient != null && record.PatientId != currentPatient.Id && !_currentUserService.IsInRole("SystemAdmin") && !_currentUserService.IsInRole("Ophthalmologist") && !_currentUserService.IsInRole("ClinicStaff"))
@@ -53,7 +53,7 @@ public sealed class ExportMedicalRecordPdfQueryHandler
         if ((int)record.Status < (int)MedicalRecordStatus.Finalized)
             return Result<MedicalRecordPdfFileDto>.Failure("EMR must be finalized before downloading PDF.");
 
-        var patient = await _patientRepository.GetByIdAsync(record.PatientId, cancellationToken);
+        var patient = await _patientRepository.GetByIdAsNoTrackingAsync(record.PatientId, cancellationToken);
         if (patient is null)
             return Result<MedicalRecordPdfFileDto>.NotFound("Patient profile not found.");
 
@@ -109,3 +109,4 @@ public sealed class ExportMedicalRecordPdfQueryHandler
         });
     }
 }
+

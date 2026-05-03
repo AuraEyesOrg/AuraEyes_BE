@@ -85,4 +85,21 @@ public class Order : BaseEntity, IAggregateRoot
         _payments.Add(payment);
         UpdatedAt = DateTime.UtcNow;
     }
+
+    /// <summary>
+    /// Whether reception can check in the linked clinic appointment (tiền cọc satisfied when required).
+    /// </summary>
+    public bool IsClinicDepositSatisfiedForCheckIn()
+    {
+        if (!DepositAmount.HasValue || DepositAmount.Value <= 0m)
+            return true;
+
+        if (PaidAmount >= DepositAmount.Value)
+            return true;
+
+        if (Status != OrderStatus.Pending)
+            return true;
+
+        return false;
+    }
 }

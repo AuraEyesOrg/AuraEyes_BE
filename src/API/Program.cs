@@ -571,53 +571,7 @@ if (enableHangfireServer)
     try
     {
         var monitoringApi = JobStorage.Current.GetMonitoringApi();
-        const int pageSize = 100;
-        var from = 0;
-        var deletedCount = 0;
-
-        while (true)
-        {
-            var failedJobs = monitoringApi.FailedJobs(from, pageSize);
-            if (failedJobs.Count == 0)
-            {
-                break;
-            }
-
-            foreach (var failed in failedJobs)
-            {
-                var jobId = failed.Key;
-                var details = failed.Value;
-
-                var errorText = string.Join(
-                    " | ",
-                    new[]
-                    {
-                        details.ExceptionType,
-                        details.ExceptionMessage,
-                        details.ExceptionDetails
-                    }.Where(text => !string.IsNullOrWhiteSpace(text)));
-
-                var isIncompatibleLegacyJob =
-                    errorText.Contains("Could not load type 'Infrastructure.Services.FullTimeSlotGenerationJob'", StringComparison.OrdinalIgnoreCase)
-                    || errorText.Contains("target method was not found", StringComparison.OrdinalIgnoreCase)
-                    || errorText.Contains("Hangfire.Common.JobLoadException", StringComparison.OrdinalIgnoreCase)
-                    || errorText.Contains("System.TypeLoadException", StringComparison.OrdinalIgnoreCase);
-
-                if (isIncompatibleLegacyJob && BackgroundJob.Delete(jobId))
-                {
-                    deletedCount++;
-                }
-            }
-
-            from += pageSize;
-        }
-
-        if (deletedCount > 0)
-        {
-            Log.Warning(
-                "Deleted {DeletedCount} incompatible legacy Hangfire failed jobs during startup cleanup.",
-                deletedCount);
-        }
+        CleanupLegacyHangfireJobs(monitoringApi);
     }
     catch (Exception ex)
     {
@@ -632,3 +586,54 @@ else
 app.MapPrometheusScrapingEndpoint();
 
 app.Run();
+
+static void CleanupLegacyHangfireJobs(Hangfire.Storage.IMonitoringApi monitoringApi)
+{
+    const int pageSize = 100;
+    var from = 0;
+    var deletedCount = 0;
+
+    while (true)
+    {
+        var failedJobs = monitoringApi.FailedJobs(from, pageSize);
+        if (failedJobs.Count == 0)
+        {
+            break;
+        }
+
+        foreach (var failed in failedJobs)
+        {
+            var jobId = failed.Key;
+            var details = failed.Value;
+
+            var errorText = string.Join(
+                " | ",
+                new[]
+                {
+                    details.ExceptionType,
+                    details.ExceptionMessage,
+                    details.ExceptionDetails
+                }.Where(text => !string.IsNullOrWhiteSpace(text)));
+
+            var isIncompatibleLegacyJob =
+                errorText.Contains("Could not load type 'Infrastructure.Services.FullTimeSlotGenerationJob'", StringComparison.OrdinalIgnoreCase)
+                || errorText.Contains("target method was not found", StringComparison.OrdinalIgnoreCase)
+                || errorText.Contains("Hangfire.Common.JobLoadException", StringComparison.OrdinalIgnoreCase)
+                || errorText.Contains("System.TypeLoadException", StringComparison.OrdinalIgnoreCase);
+
+            if (isIncompatibleLegacyJob && BackgroundJob.Delete(jobId))
+            {
+                deletedCount++;
+            }
+        }
+
+        from += pageSize;
+    }
+
+    if (deletedCount > 0)
+    {
+        Log.Warning(
+            "Deleted {DeletedCount} incompatible legacy Hangfire failed jobs during startup cleanup.",
+            deletedCount);
+    }
+}
