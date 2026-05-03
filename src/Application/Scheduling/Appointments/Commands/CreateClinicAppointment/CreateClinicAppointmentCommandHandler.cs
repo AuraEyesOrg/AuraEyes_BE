@@ -91,7 +91,44 @@ public class CreateClinicAppointmentCommandHandler
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            var result = await ProcessBookingTransactionAsync(request, patientData, cancellationToken);
+            var slotValidation = await ValidateSlotAndBookingAsync(request.SlotId, targetPatientProfileId, cancellationToken);
+            if (!slotValidation.IsSuccess)
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                return Result<CreateClinicAppointmentResult>.Failure(slotValidation.ErrorMessage);
+            }
+            var slot = slotValidation.Data;
+
+            var pricingResult = await ResolvePricingAsync(request, slot, targetPatientProfileId, cancellationToken);
+            if (!pricingResult.IsSuccess)
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                return Result<CreateClinicAppointmentResult>.Failure(pricingResult.ErrorMessage);
+            }
+
+            var (price, finalDoctorId, finalPricingType) = pricingResult.Data;
+            decimal? depositAmount = isStaffCreatedWalkIn ? null : Math.Max(1, Math.Round(price * DepositRatio, 0));
+
+            // ── 2. Create Appointment ─────────────────────────────────────────
+            slot.BookWithCapacity();
+            var appointment = new Appointment(targetPatientProfileId, request.SlotId, price, finalPricingType, finalDoctorId, request.VisitReason);
+            await _appointmentRepository.AddAsync(appointment, cancellationToken);
+            await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
+
+            var typeLabel = isStaffCreatedWalkIn ? "Thanh toán đủ" : "Đặt cọc";
+            var orderDescription = $"{typeLabel} khám {slot.Date:dd/MM} {slot.StartTime:HH:mm}";
+            var order = new Order(orderUserId, price, depositAmount, orderDescription, appointment.Id);
+            await _orderRepository.AddAsync(order, cancellationToken);
+
+            Payment payment = isStaffCreatedWalkIn 
+                ? new Payment(order.Id, price, PaymentMethod.Cash, orderDescription)
+                : new Payment(order.Id, depositAmount!.Value, PaymentMethod.PayOS, orderDescription);
+            await _paymentRepository.AddAsync(payment, cancellationToken);
+
+            PatientVisit? visit = isStaffCreatedWalkIn ? PatientVisit.CreateFromAppointment(appointment) : null;
+            if (visit != null) await _patientVisitRepository.AddAsync(visit, cancellationToken);
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
             return Result<CreateClinicAppointmentResult>.Success(result);
         }

@@ -37,7 +37,7 @@ public class HandleLatePatientArrivalQueryHandler
                 "Appointment is not linked to a slot.");
 
         var slot = appointment.AppointmentSlot;
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         var slotStart = slot.Date.ToDateTime(slot.StartTime);
         var slotEnd = slot.Date.ToDateTime(slot.EndTime);
         var duration = slotEnd - slotStart;
