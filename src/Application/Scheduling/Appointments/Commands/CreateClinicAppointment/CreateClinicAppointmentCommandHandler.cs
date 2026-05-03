@@ -219,6 +219,8 @@ public class CreateClinicAppointmentCommandHandler
             }
 
             // ── Apply discount if patient has one ──────────────────────────────
+            // Discount is applied to the consultation fee (total price), not just the deposit.
+            // Deposit (30% of the total) is calculated after the discount is applied.
             var discountPatient = await _patientRepository.GetByIdAsync(targetPatientProfileId, cancellationToken);
             if (discountPatient != null)
             {
@@ -231,7 +233,7 @@ public class CreateClinicAppointmentCommandHandler
 
             // ── 5. Calculate deposit ──────────────────────────────────────────
             // If it's a walk-in (staff booking), there is NO deposit (they pay 100% full amount).
-            // For online bookings, we take 30% deposit.
+            // For online bookings, we take 30% deposit (calculated from the discounted total).
             decimal? depositAmount = isStaffCreatedWalkIn ? null : Math.Round(price * DepositRatio, 0);
             if (depositAmount.HasValue && depositAmount.Value < 1) depositAmount = 1;
 

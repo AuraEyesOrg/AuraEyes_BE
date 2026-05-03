@@ -14,7 +14,7 @@ public class CancelLateAndGrantDiscountCommandHandler
     private readonly IRepository<Patient> _patientRepository;
     private readonly IUnitOfWork _unitOfWork;
 
-    private const decimal LateArrivalDiscountRate = 0.20m; // 20%
+    private const decimal LateArrivalDiscountRate = 0.10m; // 10%
     private const int DiscountExpiryDays = 30;
 
     public CancelLateAndGrantDiscountCommandHandler(
