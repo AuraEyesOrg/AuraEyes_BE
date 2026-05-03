@@ -34,6 +34,7 @@ public class ClinicStaffController : BaseApiController
     /// Returns all active clinic staff members, optionally filtered by sub-role.
     /// </summary>
     /// <param name="subRole">Optional: filter by Receptionist, Coordinator, or Cashier.</param>
+    /// <param name="cancellationToken">Propagates notification that operations should be cancelled.</param>
     [HttpGet]
     [AuthorizePermission(Permissions.ClinicStaffRead)]
     [ProducesResponseType(StatusCodes.Status200OK)]

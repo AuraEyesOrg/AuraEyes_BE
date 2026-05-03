@@ -25,14 +25,14 @@ public class GetClinicFeedbackQueryHandler : IQueryHandler<GetClinicFeedbackQuer
 
     public async Task<Result<ClinicFeedbackDto>> Handle(GetClinicFeedbackQuery request, CancellationToken cancellationToken)
     {
-        var feedback = await _clinicFeedbackRepository.GetByIdAsync(
+        var feedback = await _clinicFeedbackRepository.GetByIdAsNoTrackingAsync(
             request.FeedbackId,
             cancellationToken);
 
         if (feedback is null)
             return Result<ClinicFeedbackDto>.NotFound($"Clinic feedback '{request.FeedbackId}' not found.");
 
-        var patientEntity = await _patientRepository.GetByIdAsync(feedback.PatientId, cancellationToken);
+        var patientEntity = await _patientRepository.GetByIdAsNoTrackingAsync(feedback.PatientId, cancellationToken);
         string? patientFullName = null;
         if (patientEntity is not null && patientEntity.IsWalkIn)
         {
@@ -60,3 +60,4 @@ public class GetClinicFeedbackQueryHandler : IQueryHandler<GetClinicFeedbackQuer
         return Result<ClinicFeedbackDto>.Success(dto);
     }
 }
+

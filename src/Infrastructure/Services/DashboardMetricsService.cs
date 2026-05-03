@@ -44,48 +44,12 @@ public class DashboardMetricsService : IDashboardMetricsService
     {
         var now = DateTime.UtcNow;
 
-        var currentMonthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        var nextMonthStart = currentMonthStart.AddMonths(1);
-        var previousMonthStart = currentMonthStart.AddMonths(-1);
-
-        var doctorTotalCount = await _context.Ophthalmologists.AsNoTracking()
-            .CountAsync(cancellationToken);
-        var doctorCurrentMonthCount = await _context.Ophthalmologists.AsNoTracking()
-            .CountAsync(item => item.CreatedAt >= currentMonthStart && item.CreatedAt < nextMonthStart, cancellationToken);
-        var doctorPreviousMonthCount = await _context.Ophthalmologists.AsNoTracking()
-            .CountAsync(item => item.CreatedAt >= previousMonthStart && item.CreatedAt < currentMonthStart, cancellationToken);
-
-        var doctorStats = new
-        {
-            Total = doctorTotalCount,
-            CurrentMonth = doctorCurrentMonthCount,
-            PreviousMonth = doctorPreviousMonthCount
-        };
-
-        var patientTotalCount = await _context.Patients.AsNoTracking()
-            .CountAsync(cancellationToken);
-        var patientCurrentMonthCount = await _context.Patients.AsNoTracking()
-            .CountAsync(item => item.CreatedAt >= currentMonthStart && item.CreatedAt < nextMonthStart, cancellationToken);
-        var patientPreviousMonthCount = await _context.Patients.AsNoTracking()
-            .CountAsync(item => item.CreatedAt >= previousMonthStart && item.CreatedAt < currentMonthStart, cancellationToken);
-
-        var patientStats = new
-        {
-            Total = patientTotalCount,
-            CurrentMonth = patientCurrentMonthCount,
-            PreviousMonth = patientPreviousMonthCount
-        };
-        var doctorTotal = doctorStats?.Total ?? 0;
-        var doctorCurrentMonth = doctorStats?.CurrentMonth ?? 0;
-        var doctorPreviousMonth = doctorStats?.PreviousMonth ?? 0;
-
-        var patientTotal = patientStats?.Total ?? 0;
-        var patientCurrentMonth = patientStats?.CurrentMonth ?? 0;
-        var patientPreviousMonth = patientStats?.PreviousMonth ?? 0;
+        var (doctorMetrics, patientMetrics) = await GetUserStatisticsAsync(now, cancellationToken);
 
         var yearStart = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var nextYearStart = yearStart.AddYears(1);
         var sevenDaysStart = now.Date.AddDays(-6);
+
 
         var paymentMethodBreakdown = new List<PaymentMethodRevenueDto>();
         var monthlyRevenue = Enumerable.Range(1, 12)
@@ -125,21 +89,7 @@ public class DashboardMetricsService : IDashboardMetricsService
         var totalDepositRevenueYear = 0m;
         var totalPlatformCommissionYear = 0m;
 
-        var newDoctorsByMonth = await _context.Ophthalmologists.AsNoTracking()
-            .Where(o => o.CreatedAt >= yearStart && o.CreatedAt < nextYearStart)
-            .GroupBy(o => o.CreatedAt.Month)
-            .Select(g => new { Month = g.Key, Count = g.Count() })
-            .ToListAsync(cancellationToken);
-        var newPatientsByMonth = await _context.Patients.AsNoTracking()
-            .Where(p => p.CreatedAt >= yearStart && p.CreatedAt < nextYearStart)
-            .GroupBy(p => p.CreatedAt.Month)
-            .Select(g => new { Month = g.Key, Count = g.Count() })
-            .ToListAsync(cancellationToken);
-
-        var doctorMonthMap = newDoctorsByMonth.ToDictionary(x => x.Month, x => x.Count);
-        var patientMonthMap = newPatientsByMonth.ToDictionary(x => x.Month, x => x.Count);
-        var monthlyNewDoctorCounts = Enumerable.Range(1, 12).Select(m => doctorMonthMap.GetValueOrDefault(m, 0)).ToList();
-        var monthlyNewPatientCounts = Enumerable.Range(1, 12).Select(m => patientMonthMap.GetValueOrDefault(m, 0)).ToList();
+        var (monthlyNewDoctorCounts, monthlyNewPatientCounts) = await GetMonthlyGrowthCountsAsync(yearStart, nextYearStart, cancellationToken);
 
         var pendingDoctorVerifications = 0;
 
@@ -158,13 +108,7 @@ public class DashboardMetricsService : IDashboardMetricsService
 
         return new DashboardMetricsDto
         {
-            Doctors = new UserGrowthMetricDto
-            {
-                Total = doctorTotal,
-                CurrentMonth = doctorCurrentMonth,
-                PreviousMonth = doctorPreviousMonth,
-                GrowthPercentage = CalculateGrowthPercentage(doctorCurrentMonth, doctorPreviousMonth)
-            },
+            Doctors = doctorMetrics,
             Organisations = new UserGrowthMetricDto
             {
                 Total = 0,
@@ -172,13 +116,7 @@ public class DashboardMetricsService : IDashboardMetricsService
                 PreviousMonth = 0,
                 GrowthPercentage = 0
             },
-            Patients = new UserGrowthMetricDto
-            {
-                Total = patientTotal,
-                CurrentMonth = patientCurrentMonth,
-                PreviousMonth = patientPreviousMonth,
-                GrowthPercentage = CalculateGrowthPercentage(patientCurrentMonth, patientPreviousMonth)
-            },
+            Patients = patientMetrics,
             PaymentMethodBreakdown = paymentMethodBreakdown,
             MonthlyRevenue = monthlyRevenue,
             DailyRevenue = dailyRevenue,
@@ -217,6 +155,69 @@ public class DashboardMetricsService : IDashboardMetricsService
             TopDoctorsByConsultationRevenue = topDoctorRows,
             TopOrganisationsByRating = new List<TopPerformerOrganisationDto>()
         };
+    }
+
+    private async Task<(UserGrowthMetricDto Doctors, UserGrowthMetricDto Patients)> GetUserStatisticsAsync(
+        DateTime now, CancellationToken cancellationToken)
+    {
+        var currentMonthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var nextMonthStart = currentMonthStart.AddMonths(1);
+        var previousMonthStart = currentMonthStart.AddMonths(-1);
+
+        // Doctors
+        var doctorTotalCount = await _context.Ophthalmologists.AsNoTracking().CountAsync(cancellationToken);
+        var doctorCurrentMonthCount = await _context.Ophthalmologists.AsNoTracking()
+            .CountAsync(item => item.CreatedAt >= currentMonthStart && item.CreatedAt < nextMonthStart, cancellationToken);
+        var doctorPreviousMonthCount = await _context.Ophthalmologists.AsNoTracking()
+            .CountAsync(item => item.CreatedAt >= previousMonthStart && item.CreatedAt < currentMonthStart, cancellationToken);
+
+        // Patients
+        var patientTotalCount = await _context.Patients.AsNoTracking().CountAsync(cancellationToken);
+        var patientCurrentMonthCount = await _context.Patients.AsNoTracking()
+            .CountAsync(item => item.CreatedAt >= currentMonthStart && item.CreatedAt < nextMonthStart, cancellationToken);
+        var patientPreviousMonthCount = await _context.Patients.AsNoTracking()
+            .CountAsync(item => item.CreatedAt >= previousMonthStart && item.CreatedAt < currentMonthStart, cancellationToken);
+
+        return (
+            new UserGrowthMetricDto
+            {
+                Total = doctorTotalCount,
+                CurrentMonth = doctorCurrentMonthCount,
+                PreviousMonth = doctorPreviousMonthCount,
+                GrowthPercentage = CalculateGrowthPercentage(doctorCurrentMonthCount, doctorPreviousMonthCount)
+            },
+            new UserGrowthMetricDto
+            {
+                Total = patientTotalCount,
+                CurrentMonth = patientCurrentMonthCount,
+                PreviousMonth = patientPreviousMonthCount,
+                GrowthPercentage = CalculateGrowthPercentage(patientCurrentMonthCount, patientPreviousMonthCount)
+            }
+        );
+    }
+
+    private async Task<(List<int> Doctors, List<int> Patients)> GetMonthlyGrowthCountsAsync(
+        DateTime yearStart, DateTime nextYearStart, CancellationToken cancellationToken)
+    {
+        var newDoctorsByMonth = await _context.Ophthalmologists.AsNoTracking()
+            .Where(o => o.CreatedAt >= yearStart && o.CreatedAt < nextYearStart)
+            .GroupBy(o => o.CreatedAt.Month)
+            .Select(g => new { Month = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var newPatientsByMonth = await _context.Patients.AsNoTracking()
+            .Where(p => p.CreatedAt >= yearStart && p.CreatedAt < nextYearStart)
+            .GroupBy(p => p.CreatedAt.Month)
+            .Select(g => new { Month = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var doctorMonthMap = newDoctorsByMonth.ToDictionary(x => x.Month, x => x.Count);
+        var patientMonthMap = newPatientsByMonth.ToDictionary(x => x.Month, x => x.Count);
+
+        return (
+            Enumerable.Range(1, 12).Select(m => doctorMonthMap.GetValueOrDefault(m, 0)).ToList(),
+            Enumerable.Range(1, 12).Select(m => patientMonthMap.GetValueOrDefault(m, 0)).ToList()
+        );
     }
 
     private static decimal CalculateGrowthPercentage(int currentMonthCount, int previousMonthCount)
@@ -272,7 +273,14 @@ public class DashboardMetricsService : IDashboardMetricsService
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        var items = pageRows.Select(item => new RecentScreeningDto
+        var items = pageRows.Select(MapToRecentScreeningDto).ToList();
+
+        return new PagedResult<RecentScreeningDto>(items, totalCount, pageNumber, pageSize);
+    }
+
+    private static RecentScreeningDto MapToRecentScreeningDto(dynamic item)
+    {
+        return new RecentScreeningDto
         {
             Id = item.Id,
             ScreeningCode = $"SCR-{item.CreatedAt:yyyyMMdd}-{item.Id.ToString().Substring(0, 6).ToUpperInvariant()}",
@@ -285,9 +293,7 @@ public class DashboardMetricsService : IDashboardMetricsService
             IsCritical = item.RiskLevel == RiskLevel.High || item.RiskLevel == RiskLevel.Critical,
             CreatedAt = item.CreatedAt,
             CompletedAt = item.ProcessedAt
-        }).ToList();
-
-        return new PagedResult<RecentScreeningDto>(items, totalCount, pageNumber, pageSize);
+        };
     }
 
     public async Task<ScreeningVolumeTrendsDto> GetScreeningVolumeTrendsAsync(string timeRange, int periods, CancellationToken cancellationToken = default)
@@ -495,91 +501,61 @@ public class DashboardMetricsService : IDashboardMetricsService
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
-            var normalizedSearchTerm = $"%{searchTerm.Trim()}%";
-            doctorsQuery = doctorsQuery.Where(x =>
-                EF.Functions.ILike(x.Name, normalizedSearchTerm)
-                || (x.Email != null && EF.Functions.ILike(x.Email, normalizedSearchTerm)));
+            var normalizedSearch = $"%{searchTerm.Trim()}%";
+            doctorsQuery = doctorsQuery.Where(x => EF.Functions.ILike(x.Name, normalizedSearch) || (x.Email != null && EF.Functions.ILike(x.Email, normalizedSearch)));
         }
 
-        if (employmentType.HasValue)
-        {
-            doctorsQuery = doctorsQuery.Where(x => x.EmploymentType == employmentType.Value);
-        }
+        if (employmentType.HasValue) doctorsQuery = doctorsQuery.Where(x => x.EmploymentType == employmentType.Value);
 
         var doctors = await doctorsQuery.ToListAsync(cancellationToken);
-        if (doctors.Count == 0)
-        {
-            return new PagedResult<DoctorWorkloadListItemDto>(
-                new List<DoctorWorkloadListItemDto>(),
-                0,
-                pageNumber,
-                pageSize);
-        }
+        if (doctors.Count == 0) return new PagedResult<DoctorWorkloadListItemDto>(new List<DoctorWorkloadListItemDto>(), 0, pageNumber, pageSize);
 
-        var intervals = await QueryCompletedSessionIntervalsAsync(
-            doctors.Select(x => x.Id).ToList(),
-            periodBounds.StartUtc,
-            periodBounds.EndUtcExclusive,
-            cancellationToken);
-
-        var intervalsByDoctor = intervals
-            .GroupBy(x => x.DoctorId)
-            .ToDictionary(g => g.Key, g => g.ToList());
-
-        var requiredHoursByEmploymentType = await GetRequiredHoursByEmploymentTypeAsync(periodType, cancellationToken);
+        var intervals = await QueryCompletedSessionIntervalsAsync(doctors.Select(x => x.Id).ToList(), periodBounds.StartUtc, periodBounds.EndUtcExclusive, cancellationToken);
+        var intervalsByDoctor = intervals.GroupBy(x => x.DoctorId).ToDictionary(g => g.Key, g => g.ToList());
+        var requiredHoursByType = await GetRequiredHoursByEmploymentTypeAsync(periodType, cancellationToken);
 
         var computed = new List<DoctorWorkloadListItemDto>(doctors.Count);
         foreach (var doctor in doctors)
         {
-            var doctorIntervals = intervalsByDoctor.TryGetValue(doctor.Id, out var value)
-                ? value
-                : new List<SessionIntervalProjection>();
+            var item = ComputeDoctorWorkloadItem(doctor, intervalsByDoctor.GetValueOrDefault(doctor.Id), requiredHoursByType.GetValueOrDefault(doctor.EmploymentType, 0m), periodType, periodBounds);
+            if (item == null) continue;
+            if (normalizedStatus != null && !string.Equals(item.Status, normalizedStatus, StringComparison.Ordinal)) continue;
+            if (warningOnly && !item.WarningFlag) continue;
 
-            var actualHours = CalculateMergedHours(doctorIntervals, periodBounds.StartUtc, periodBounds.EndUtcExclusive);
-            var requiredHours = requiredHoursByEmploymentType.TryGetValue(doctor.EmploymentType, out var required)
-                ? required
-                : 0m;
-
-            var completionRate = CalculateCompletionRate(actualHours, requiredHours);
-            var workloadStatus = actualHours >= requiredHours ? "OK" : "UNDER";
-            var warningFlag = completionRate < 0.8m;
-
-            if (normalizedStatus is not null && !string.Equals(workloadStatus, normalizedStatus, StringComparison.Ordinal))
-                continue;
-
-            if (warningOnly && !warningFlag)
-                continue;
-
-            computed.Add(new DoctorWorkloadListItemDto
-            {
-                DoctorId = doctor.Id,
-                DoctorName = doctor.Name,
-                Email = doctor.Email,
-                EmploymentType = ToApiEmploymentType(doctor.EmploymentType),
-                PeriodType = ToApiPeriodType(periodType),
-                PeriodStart = periodBounds.StartUtc,
-                PeriodEnd = periodBounds.EndUtcInclusive,
-                RequiredHours = requiredHours,
-                ActualHours = actualHours,
-                CompletionRate = completionRate,
-                Status = workloadStatus,
-                WarningFlag = warningFlag
-            });
+            computed.Add(item);
         }
 
-        var ordered = computed
-            .OrderByDescending(item => item.WarningFlag)
-            .ThenBy(item => item.CompletionRate)
-            .ThenBy(item => item.DoctorName)
-            .ToList();
+        var ordered = computed.OrderByDescending(item => item.WarningFlag).ThenBy(item => item.CompletionRate).ThenBy(item => item.DoctorName).ToList();
+        return new PagedResult<DoctorWorkloadListItemDto>(ordered.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList(), ordered.Count, pageNumber, pageSize);
+    }
 
-        var totalCount = ordered.Count;
-        var pageItems = ordered
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .ToList();
+    private DoctorWorkloadListItemDto ComputeDoctorWorkloadItem(
+        DoctorProjection doctor,
+        List<SessionIntervalProjection>? doctorIntervals,
+        decimal requiredHours,
+        WorkloadPeriodType periodType,
+        (DateTime StartUtc, DateTime EndUtcInclusive, DateTime EndUtcExclusive) periodBounds)
+    {
+        var actualHours = CalculateMergedHours(doctorIntervals ?? new List<SessionIntervalProjection>(), periodBounds.StartUtc, periodBounds.EndUtcExclusive);
+        var completionRate = CalculateCompletionRate(actualHours, requiredHours);
+        var workloadStatus = actualHours >= requiredHours ? "OK" : "UNDER";
+        var warningFlag = completionRate < 0.8m;
 
-        return new PagedResult<DoctorWorkloadListItemDto>(pageItems, totalCount, pageNumber, pageSize);
+        return new DoctorWorkloadListItemDto
+        {
+            DoctorId = doctor.Id,
+            DoctorName = doctor.Name,
+            Email = doctor.Email,
+            EmploymentType = ToApiEmploymentType(doctor.EmploymentType),
+            PeriodType = ToApiPeriodType(periodType),
+            PeriodStart = periodBounds.StartUtc,
+            PeriodEnd = periodBounds.EndUtcInclusive,
+            RequiredHours = requiredHours,
+            ActualHours = actualHours,
+            CompletionRate = completionRate,
+            Status = workloadStatus,
+            WarningFlag = warningFlag
+        };
     }
 
     public async Task<OphthalmologistDashboardMetricsDto> GetOphthalmologistMetricsAsync(Guid userId, CancellationToken cancellationToken = default)

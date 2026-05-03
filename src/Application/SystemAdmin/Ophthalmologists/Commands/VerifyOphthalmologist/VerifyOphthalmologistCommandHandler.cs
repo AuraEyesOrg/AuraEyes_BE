@@ -51,67 +51,65 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
             request.OphthalmologistId, request.Approve);
 
 
-        // Best-effort: Send notification email to the ophthalmologist
-        try
-        {
-            var userDto = await _identityService.GetUserByIdAsync(ophthalmologist.UserId, cancellationToken);
-            if (userDto != null)
-            {
-                await _notificationService.SendAsync(
-                    ophthalmologist.UserId,
-                    request.Approve ? "Hồ sơ xác minh đã được duyệt" : "Hồ sơ xác minh bị từ chối",
-                    request.Approve
-                        ? "System Admin đã duyệt hồ sơ xác minh của bạn."
-                        : "System Admin đã từ chối hồ sơ xác minh của bạn. Vui lòng xem lý do và cập nhật lại.",
-                    NotificationType.SystemAlert,
-                    payload: new
-                    {
-                        action = "verification_review_completed",
-                        approved = request.Approve,
-                        ophthalmologistId = request.OphthalmologistId
-                    },
-                    cancellationToken: cancellationToken,
-                    referenceId: request.OphthalmologistId);
-
-                if (request.Approve)
-                {
-                    await _emailService.SendAsync(
-                        userDto.Email,
-                        "[AURA] Hồ sơ chứng chỉ đã được duyệt",
-                        $"""
-                        <h2>Chúc mừng, {userDto.FullName}!</h2>
-                        <p>Hồ sơ chứng chỉ hành nghề của bạn đã được xác minh và phê duyệt thành công.</p>
-                        <p>Bây giờ bạn có thể bắt đầu sử dụng các tính năng dành cho bác sĩ trên hệ thống AURA.</p>
-                        <p>— Hệ thống AURA</p>
-                        """,
-                        isHtml: true,
-                        cancellationToken);
-                }
-                else
-                {
-                    await _emailService.SendAsync(
-                        userDto.Email,
-                        "[AURA] Credential Verification Update",
-                        $"""
-                        <h2>Xin chào, {userDto.FullName}</h2>
-                        <p>Hồ sơ chứng chỉ hành nghề của bạn chưa đạt yêu cầu xác minh.</p>
-                        <p>Vui lòng liên hệ đội ngũ hỗ trợ nếu bạn cần thêm thông tin.</p>
-                        <p>— Hệ thống AURA</p>
-                        """,
-                        isHtml: true,
-                        cancellationToken);
-                }
-            }
-        }
-        catch (Exception emailEx)
-        {
-            _logger.LogWarning(emailEx,
-                "Failed to send verification status email to ophthalmologist {Id}", request.OphthalmologistId);
-        }
+        await NotifyOphthalmologistAsync(ophthalmologist.UserId, request.Approve, request.OphthalmologistId, cancellationToken);
 
         return Result<string>.Success(request.Approve
             ? "Ophthalmologist approved successfully"
             : "Ophthalmologist rejected successfully");
     }
 
+    private async Task NotifyOphthalmologistAsync(
+        Guid userId,
+        bool isApproved,
+        Guid ophthalmologistId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var userDto = await _identityService.GetUserByIdAsync(userId, cancellationToken);
+            if (userDto == null) return;
+
+            await _notificationService.SendAsync(
+                userId,
+                isApproved ? "Hồ sơ xác minh đã được duyệt" : "Hồ sơ xác minh bị từ chối",
+                isApproved
+                    ? "System Admin đã duyệt hồ sơ xác minh của bạn."
+                    : "System Admin đã từ chối hồ sơ xác minh của bạn. Vui lòng xem lý do và cập nhật lại.",
+                NotificationType.SystemAlert,
+                payload: new
+                {
+                    action = "verification_review_completed",
+                    approved = isApproved,
+                    ophthalmologistId = ophthalmologistId
+                },
+                cancellationToken: cancellationToken,
+                referenceId: ophthalmologistId);
+
+            var emailSubject = isApproved ? "[AURA] Hồ sơ chứng chỉ đã được duyệt" : "[AURA] Credential Verification Update";
+            var emailBody = isApproved
+                ? $"""
+                  <h2>Chúc mừng, {userDto.FullName}!</h2>
+                  <p>Hồ sơ chứng chỉ hành nghề của bạn đã được xác minh và phê duyệt thành công.</p>
+                  <p>Bây giờ bạn có thể bắt đầu sử dụng các tính năng dành cho bác sĩ trên hệ thống AURA.</p>
+                  <p>— Hệ thống AURA</p>
+                  """
+                : $"""
+                  <h2>Xin chào, {userDto.FullName}</h2>
+                  <p>Hồ sơ chứng chỉ hành nghề của bạn chưa đạt yêu cầu xác minh.</p>
+                  <p>Vui lòng liên hệ đội ngũ hỗ trợ nếu bạn cần thêm thông tin.</p>
+                  <p>— Hệ thống AURA</p>
+                  """;
+
+            await _emailService.SendAsync(
+                userDto.Email,
+                emailSubject,
+                emailBody,
+                isHtml: true,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send verification status email to ophthalmologist {Id}", ophthalmologistId);
+        }
+    }
 }

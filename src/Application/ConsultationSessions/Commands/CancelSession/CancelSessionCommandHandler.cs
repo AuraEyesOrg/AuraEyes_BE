@@ -46,6 +46,34 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
         if (session is null)
             return Result.NotFound($"Session '{request.SessionId}' not found.");
 
+        var validationResult = await ValidateCancellationPolicyAsync(session, cancellationToken);
+        if (!validationResult.IsSuccess)
+            return validationResult;
+
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            // ── 4. Cancel the session ──
+            session.Cancel();
+
+            await _sessionRepository.UpdateAsync(session, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+            _logger.LogError(ex, "Error cancelling session {SessionId}", request.SessionId);
+            throw;
+        }
+    }
+
+    private async Task<Result> ValidateCancellationPolicyAsync(
+        Domain.Entities.Consultation.ConsultationSession session,
+        CancellationToken cancellationToken)
+    {
         if (session.Status == SessionStatus.Completed)
             return Result.Failure("Cannot cancel a completed session.");
 
@@ -93,23 +121,6 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
             }
         }
 
-        await _unitOfWork.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            // ── 4. Cancel the session ──
-            session.Cancel();
-
-            await _sessionRepository.UpdateAsync(session, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            await _unitOfWork.CommitTransactionAsync(cancellationToken);
-
-            return Result.Success();
-        }
-        catch (Exception ex)
-        {
-            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-            _logger.LogError(ex, "Error cancelling session {SessionId}", request.SessionId);
-            throw;
-        }
+        return Result.Success();
     }
 }

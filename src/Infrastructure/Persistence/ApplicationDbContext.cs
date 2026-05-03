@@ -110,21 +110,21 @@ public class ApplicationDbContext : IdentityDbContext<
 
     #endregion
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(ModelBuilder builder)
     {
-        base.OnModelCreating(modelBuilder);
+        base.OnModelCreating(builder);
 
         // Apply all configurations from assembly
-        modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+        builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
 
         // Apply global query filter for soft delete
-        ApplySoftDeleteFilter(modelBuilder);
+        ApplySoftDeleteFilter(builder);
     }
 
-    private static void ApplySoftDeleteFilter(ModelBuilder modelBuilder)
+    private static void ApplySoftDeleteFilter(ModelBuilder builder)
     {
         // Apply global query filter for soft delete to all entities inheriting from BaseEntity
-        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        foreach (var entityType in builder.Model.GetEntityTypes())
         {
             if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
             {
@@ -134,7 +134,7 @@ public class ApplicationDbContext : IdentityDbContext<
                 var comparison = System.Linq.Expressions.Expression.Equal(property, falseConstant);
                 var lambda = System.Linq.Expressions.Expression.Lambda(comparison, parameter);
 
-                modelBuilder.Entity(entityType.ClrType).HasQueryFilter(lambda);
+                builder.Entity(entityType.ClrType).HasQueryFilter(lambda);
             }
         }
     }

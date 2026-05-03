@@ -27,7 +27,7 @@ public class GetPatientProfileByIdQueryHandler : IQueryHandler<GetPatientProfile
         GetPatientProfileByIdQuery request,
         CancellationToken cancellationToken)
     {
-        var patient = await _patientRepository.GetByIdAsync(request.PatientId, cancellationToken);
+        var patient = await _patientRepository.GetByIdAsNoTrackingAsync(request.PatientId, cancellationToken);
         if (patient is null)
             return Result<PatientProfileDto>.NotFound("Patient not found");
 
@@ -71,3 +71,4 @@ public class GetPatientProfileByIdQueryHandler : IQueryHandler<GetPatientProfile
         return Result<PatientProfileDto>.Success(dto);
     }
 }
+

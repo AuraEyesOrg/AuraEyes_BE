@@ -49,7 +49,7 @@ public class GetClinicScreeningHistoryQueryHandler
         var take = Math.Clamp(request.Take, 1, 200);
 
         var sessions = await _screeningRepository
-            .Query()
+            .Query().AsNoTracking()
             .Where(s => !s.IsDeleted)
             .OrderByDescending(s => s.CreatedAt)
             .Take(take)
@@ -69,7 +69,7 @@ public class GetClinicScreeningHistoryQueryHandler
 
         var patientIds = sessions.Select(s => s.PatientId).Distinct().ToList();
         var patients = await _patientRepository
-            .Query()
+            .Query().AsNoTracking()
             .Where(p => patientIds.Contains(p.Id))
             .ToListAsync(cancellationToken);
 
@@ -124,3 +124,4 @@ public class GetClinicScreeningHistoryQueryHandler
         return Result<IReadOnlyList<ClinicScreeningHistoryDto>>.Success(results);
     }
 }
+

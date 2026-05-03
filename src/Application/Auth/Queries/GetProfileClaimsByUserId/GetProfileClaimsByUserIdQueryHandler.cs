@@ -26,7 +26,7 @@ public class GetProfileClaimsByUserIdQueryHandler
     {
         if (request.Roles.Contains(Roles.Patient))
         {
-            var patients = await _patientRepository.FindAsync(
+            var patients = await _patientRepository.FindAsNoTrackingAsync(
                 p => p.UserId == request.UserId,
                 cancellationToken);
 
@@ -42,7 +42,7 @@ public class GetProfileClaimsByUserIdQueryHandler
 
         if (request.Roles.Contains(Roles.Ophthalmologist))
         {
-            var doctors = await _ophthalmologistRepository.FindAsync(
+            var doctors = await _ophthalmologistRepository.FindAsNoTrackingAsync(
                 o => o.UserId == request.UserId,
                 cancellationToken);
 
@@ -59,3 +59,4 @@ public class GetProfileClaimsByUserIdQueryHandler
         return Result<ProfileClaimsDto>.Success(new ProfileClaimsDto());
     }
 }
+

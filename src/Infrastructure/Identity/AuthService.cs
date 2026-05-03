@@ -177,56 +177,10 @@ public class AuthService : IAuthService
         {
             var normalizedCredentials = NormalizeCredentials(request);
 
-            if (normalizedCredentials.Count == 0)
+            var validationError = ValidateCredentials(normalizedCredentials);
+            if (validationError != null)
             {
-                return Result<RegisterResponse>.Failure("At least one credential is required");
-            }
-
-            if (!normalizedCredentials.Any(c => c.Type == CertificateType.Degree))
-            {
-                return Result<RegisterResponse>.Failure("At least one degree is required");
-            }
-
-            if (!normalizedCredentials.Any(c => c.Type == CertificateType.License))
-            {
-                return Result<RegisterResponse>.Failure("At least one license/certificate is required");
-            }
-
-            foreach (var certificate in normalizedCredentials)
-            {
-                if (certificate.File is null || certificate.File.Length == 0)
-                {
-                    return Result<RegisterResponse>.Failure("Credential file is required");
-                }
-
-                var issuedDateUtc = EnsureUtc(certificate.IssuedDate);
-                var expiryDateUtc = EnsureUtc(certificate.ExpiryDate);
-
-                if (certificate.Type == CertificateType.Degree)
-                {
-                    if (!certificate.DegreeLevel.HasValue)
-                    {
-                        return Result<RegisterResponse>.Failure("Degree level is required for degree credentials");
-                    }
-
-                    if (expiryDateUtc.HasValue)
-                    {
-                        return Result<RegisterResponse>.Failure("Expiry date must be empty for degree credentials");
-                    }
-                }
-
-                if (certificate.Type == CertificateType.License)
-                {
-                    if (!expiryDateUtc.HasValue)
-                    {
-                        return Result<RegisterResponse>.Failure("Expiry date is required for license credentials");
-                    }
-
-                    if (expiryDateUtc.Value <= issuedDateUtc)
-                    {
-                        return Result<RegisterResponse>.Failure("Certificate expiry date must be later than issued date");
-                    }
-                }
+                return Result<RegisterResponse>.Failure(validationError);
             }
 
             var existingUser = await _identityService.GetUserByEmailAsync(request.Email, cancellationToken);
@@ -255,58 +209,15 @@ public class AuthService : IAuthService
             await _identityService.AddToRoleAsync(user.Id, Roles.Ophthalmologist);
 
             // Upload credential files to Supabase S3 and map to Certificate entities
-            string? licenseUrl = null;
-            string? degreeUrl = null;
-
             var ophthalmologist = new Ophthalmologist(
                 user.Id,
                 request.Bio,
                 request.Phone,
-                licenseUrl,
-                degreeUrl,
+                null,
+                null,
                 request.EmploymentType);
 
-            foreach (var certificate in normalizedCredentials)
-            {
-                var file = certificate.File;
-                if (file is null || file.Length == 0)
-                {
-                    return Result<RegisterResponse>.Failure("Credential file is required");
-                }
-
-                await using var stream = file.OpenReadStream();
-                var uploadedUrl = await _fileStorageService.SaveFileAsync(
-                    stream,
-                    file.FileName,
-                    $"ophthalmologists/credentials/{user.Id}",
-                    cancellationToken);
-
-                uploadedFileUrls.Add(uploadedUrl);
-
-                if (certificate.Type == CertificateType.Degree)
-                {
-                    degreeUrl ??= uploadedUrl;
-                }
-                else if (certificate.Type == CertificateType.License)
-                {
-                    licenseUrl ??= uploadedUrl;
-                }
-
-                var certificateIssuedDateUtc = EnsureUtc(certificate.IssuedDate);
-                var certificateExpiryDateUtc = EnsureUtc(certificate.ExpiryDate);
-
-                ophthalmologist.AddCertificate(new Certificate(
-                    ophthalmologist.Id,
-                    certificate.Type,
-                    certificate.Name,
-                    certificate.DegreeLevel,
-                    certificate.IssuingAuthority,
-                    certificateIssuedDateUtc,
-                    certificateExpiryDateUtc,
-                    uploadedUrl));
-            }
-
-            ophthalmologist.UpdateCredentialFiles(licenseUrl, degreeUrl);
+            await ProcessCredentialsAsync(ophthalmologist, normalizedCredentials, uploadedFileUrls, cancellationToken);
 
             await _ophthalmologistRepository.AddAsync(ophthalmologist, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -452,6 +363,96 @@ public class AuthService : IAuthService
             .ToList();
     }
 
+    private static string? ValidateCredentials(List<CredentialItemDto> credentials)
+    {
+        if (credentials.Count == 0)
+            return "At least one credential is required";
+
+        if (!credentials.Any(c => c.Type == CertificateType.Degree))
+            return "At least one degree is required";
+
+        if (!credentials.Any(c => c.Type == CertificateType.License))
+            return "At least one license/certificate is required";
+
+        foreach (var certificate in credentials)
+        {
+            if (certificate.File is null || certificate.File.Length == 0)
+                return "Credential file is required";
+
+            var issuedDateUtc = EnsureUtc(certificate.IssuedDate);
+            var expiryDateUtc = EnsureUtc(certificate.ExpiryDate);
+
+            if (certificate.Type == CertificateType.Degree)
+            {
+                if (!certificate.DegreeLevel.HasValue)
+                    return "Degree level is required for degree credentials";
+
+                if (expiryDateUtc.HasValue)
+                    return "Expiry date must be empty for degree credentials";
+            }
+
+            if (certificate.Type == CertificateType.License)
+            {
+                if (!expiryDateUtc.HasValue)
+                    return "Expiry date is required for license credentials";
+
+                if (expiryDateUtc.Value <= issuedDateUtc)
+                    return "Certificate expiry date must be later than issued date";
+            }
+        }
+
+        return null;
+    }
+
+    private async Task ProcessCredentialsAsync(
+        Ophthalmologist ophthalmologist,
+        List<CredentialItemDto> credentials,
+        List<string> uploadedFileUrls,
+        CancellationToken cancellationToken)
+    {
+        string? licenseUrl = null;
+        string? degreeUrl = null;
+
+        foreach (var certificate in credentials)
+        {
+            var file = certificate.File;
+            if (file is null || file.Length == 0) continue;
+
+            await using var stream = file.OpenReadStream();
+            var uploadedUrl = await _fileStorageService.SaveFileAsync(
+                stream,
+                file.FileName,
+                $"ophthalmologists/credentials/{ophthalmologist.UserId}",
+                cancellationToken);
+
+            uploadedFileUrls.Add(uploadedUrl);
+
+            if (certificate.Type == CertificateType.Degree)
+            {
+                degreeUrl ??= uploadedUrl;
+            }
+            else if (certificate.Type == CertificateType.License)
+            {
+                licenseUrl ??= uploadedUrl;
+            }
+
+            var certificateIssuedDateUtc = EnsureUtc(certificate.IssuedDate);
+            var certificateExpiryDateUtc = EnsureUtc(certificate.ExpiryDate);
+
+            ophthalmologist.AddCertificate(new Certificate(
+                ophthalmologist.Id,
+                certificate.Type,
+                certificate.Name,
+                certificate.DegreeLevel,
+                certificate.IssuingAuthority,
+                certificateIssuedDateUtc,
+                certificateExpiryDateUtc,
+                uploadedUrl));
+        }
+
+        ophthalmologist.UpdateCredentialFiles(licenseUrl, degreeUrl);
+    }
+
     private static DateTime EnsureUtc(DateTime value)
     {
         return value.Kind switch
@@ -476,26 +477,9 @@ public class AuthService : IAuthService
     {
         try
         {
-            // Validate Google ID token
-            var settings = new GoogleJsonWebSignature.ValidationSettings
-            {
-                Audience = new[] { _googleAuthSettings.ClientId }
-            };
-
-            GoogleJsonWebSignature.Payload payload;
-            try
-            {
-                payload = await GoogleJsonWebSignature.ValidateAsync(request.Credential, settings);
-            }
-            catch (InvalidJwtException)
-            {
-                return Result<LoginResponse>.Unauthorized("Invalid Google token");
-            }
-
-            if (string.IsNullOrEmpty(payload.Email))
-            {
-                return Result<LoginResponse>.Failure("Google account does not have an email address");
-            }
+            var payload = await ValidateGoogleTokenAsync(request.Credential);
+            if (payload == null) return Result<LoginResponse>.Unauthorized("Invalid Google token");
+            if (string.IsNullOrEmpty(payload.Email)) return Result<LoginResponse>.Failure("Google account does not have an email address");
 
             var normalizedEmail = payload.Email.Trim();
             var user = await _userManager.FindByEmailAsync(normalizedEmail)
@@ -503,114 +487,109 @@ public class AuthService : IAuthService
 
             if (user != null)
             {
-                // Existing user
-                if (user.IsDeleted)
-                {
-                    return Result<LoginResponse>.Unauthorized("Account has been deleted");
-                }
-
-                if (!user.IsActive)
-                {
-                    return Result<LoginResponse>.Unauthorized("Account is deactivated. Please contact support.");
-                }
-
-                // Auto-confirm email for Google users if not yet confirmed
-                if (!user.EmailConfirmed)
-                {
-                    user.EmailConfirmed = true;
-                    await _userManager.UpdateAsync(user);
-                }
-
-                var linkResult = await LinkGoogleLoginAsync(user, payload.Subject);
-                if (!linkResult.IsSuccess)
-                {
-                    return Result<LoginResponse>.Failure(
-                        string.IsNullOrWhiteSpace(linkResult.ErrorMessage)
-                            ? "Unable to link Google account"
-                            : linkResult.ErrorMessage);
-                }
-
-                var providerAvatarResult = await UpsertProviderAvatarClaimAsync(user, payload.Picture);
-                if (!providerAvatarResult.IsSuccess)
-                {
-                    _logger.LogWarning(
-                        "Failed to update provider avatar claim for user {UserId}: {Error}",
-                        user.Id,
-                        providerAvatarResult.ErrorMessage);
-                }
-
-                // Check if 2FA is enabled
-                if (await _userManager.GetTwoFactorEnabledAsync(user))
-                {
-                    _logger.LogInformation("2FA required for Google user: {Email}", payload.Email);
-                    return Result<LoginResponse>.Success(LoginResponse.TwoFactorRequired(user.Id));
-                }
-
-                var authResponse = await CompleteLoginAsync(user, request.DeviceInfo, ipAddress, cancellationToken);
-                return Result<LoginResponse>.Success(LoginResponse.Success(authResponse));
+                return await HandleExistingGoogleUserAsync(user, payload, request.DeviceInfo, ipAddress, cancellationToken);
             }
 
-            // New user — create Patient account
-            await _unitOfWork.BeginTransactionAsync(cancellationToken);
-
-            var newUser = new ApplicationUser
-            {
-                UserName = normalizedEmail,
-                Email = normalizedEmail,
-                FullName = payload.Name ?? normalizedEmail,
-                AvatarUrl = null,
-                EmailConfirmed = true // Google already verified the email
-            };
-
-            var createResult = await _userManager.CreateAsync(newUser);
-            if (!createResult.Succeeded)
-            {
-                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                return Result<LoginResponse>.Failure(createResult.Errors.Select(e => e.Description));
-            }
-
-            // Add Google login provider info
-            var addLoginResult = await LinkGoogleLoginAsync(newUser, payload.Subject);
-            if (!addLoginResult.IsSuccess)
-            {
-                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                return Result<LoginResponse>.Failure(
-                    string.IsNullOrWhiteSpace(addLoginResult.ErrorMessage)
-                        ? "Unable to link Google account"
-                        : addLoginResult.ErrorMessage);
-            }
-
-            var newProviderAvatarResult = await UpsertProviderAvatarClaimAsync(newUser, payload.Picture);
-            if (!newProviderAvatarResult.IsSuccess)
-            {
-                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                return Result<LoginResponse>.Failure(
-                    string.IsNullOrWhiteSpace(newProviderAvatarResult.ErrorMessage)
-                        ? "Unable to persist provider avatar"
-                        : newProviderAvatarResult.ErrorMessage);
-            }
-
-            await _identityService.AddToRoleAsync(newUser.Id, Roles.Patient);
-
-            var patient = Patient.CreateRegistered(newUser.Id);
-            await _patientRepository.AddAsync(patient, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            await _unitOfWork.CommitTransactionAsync(cancellationToken);
-
-            _logger.LogInformation("New patient registered via Google: {Email}", payload.Email);
-
-            var newAuthResponse = await CompleteLoginAsync(newUser, request.DeviceInfo, ipAddress, cancellationToken);
-            return Result<LoginResponse>.Success(LoginResponse.Success(newAuthResponse));
+            return await HandleNewGoogleUserAsync(normalizedEmail, payload, request.DeviceInfo, ipAddress, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during Google login");
-
-            try { await _unitOfWork.RollbackTransactionAsync(cancellationToken); }
-            catch { /* transaction may not have started */ }
-
+            try { await _unitOfWork.RollbackTransactionAsync(cancellationToken); } catch { }
             return Result<LoginResponse>.Failure("An error occurred during Google login");
         }
+    }
+
+    private async Task<GoogleJsonWebSignature.Payload?> ValidateGoogleTokenAsync(string credential)
+    {
+        try
+        {
+            var settings = new GoogleJsonWebSignature.ValidationSettings { Audience = new[] { _googleAuthSettings.ClientId } };
+            return await GoogleJsonWebSignature.ValidateAsync(credential, settings);
+        }
+        catch (InvalidJwtException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<Result<LoginResponse>> HandleExistingGoogleUserAsync(
+        ApplicationUser user,
+        GoogleJsonWebSignature.Payload payload,
+        string? deviceInfo,
+        string? ipAddress,
+        CancellationToken cancellationToken)
+    {
+        if (user.IsDeleted) return Result<LoginResponse>.Unauthorized("Account has been deleted");
+        if (!user.IsActive) return Result<LoginResponse>.Unauthorized("Account is deactivated. Please contact support.");
+
+        if (!user.EmailConfirmed)
+        {
+            user.EmailConfirmed = true;
+            await _userManager.UpdateAsync(user);
+        }
+
+        var linkResult = await LinkGoogleLoginAsync(user, payload.Subject);
+        if (!linkResult.IsSuccess) return Result<LoginResponse>.Failure(linkResult.ErrorMessage ?? "Unable to link Google account");
+
+        await UpsertProviderAvatarClaimAsync(user, payload.Picture);
+
+        if (await _userManager.GetTwoFactorEnabledAsync(user))
+        {
+            _logger.LogInformation("2FA required for Google user: {Email}", payload.Email);
+            return Result<LoginResponse>.Success(LoginResponse.TwoFactorRequired(user.Id));
+        }
+
+        var authResponse = await CompleteLoginAsync(user, deviceInfo, ipAddress, cancellationToken);
+        return Result<LoginResponse>.Success(LoginResponse.Success(authResponse));
+    }
+
+    private async Task<Result<LoginResponse>> HandleNewGoogleUserAsync(
+        string normalizedEmail,
+        GoogleJsonWebSignature.Payload payload,
+        string? deviceInfo,
+        string? ipAddress,
+        CancellationToken cancellationToken)
+    {
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+
+        var newUser = new ApplicationUser
+        {
+            UserName = normalizedEmail,
+            Email = normalizedEmail,
+            FullName = payload.Name ?? normalizedEmail,
+            EmailConfirmed = true
+        };
+
+        var createResult = await _userManager.CreateAsync(newUser);
+        if (!createResult.Succeeded)
+        {
+            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+            return Result<LoginResponse>.Failure(createResult.Errors.Select(e => e.Description));
+        }
+
+        var addLoginResult = await LinkGoogleLoginAsync(newUser, payload.Subject);
+        if (!addLoginResult.IsSuccess)
+        {
+            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+            return Result<LoginResponse>.Failure(addLoginResult.ErrorMessage ?? "Unable to link Google account");
+        }
+
+        var avatarResult = await UpsertProviderAvatarClaimAsync(newUser, payload.Picture);
+        if (!avatarResult.IsSuccess)
+        {
+            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+            return Result<LoginResponse>.Failure(avatarResult.ErrorMessage ?? "Unable to persist provider avatar");
+        }
+
+        await _identityService.AddToRoleAsync(newUser.Id, Roles.Patient);
+        await _patientRepository.AddAsync(Patient.CreateRegistered(newUser.Id), cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+        _logger.LogInformation("New patient registered via Google: {Email}", payload.Email);
+        var authResponse = await CompleteLoginAsync(newUser, deviceInfo, ipAddress, cancellationToken);
+        return Result<LoginResponse>.Success(LoginResponse.Success(authResponse));
     }
 
     /// <inheritdoc />
@@ -813,36 +792,7 @@ public class AuthService : IAuthService
         _logger.LogInformation("User logged in: {Email}", user.Email);
 
         // Resolve role-specific profile entity
-        Guid? roleId = null;
-        string? employmentType = null;
-        string? staffSubRoles = null;
-
-        if (roles.Contains(Roles.Patient))
-        {
-            var patients = await _patientRepository.FindAsync(
-                p => p.UserId == user.Id, cancellationToken);
-            if (patients.Count > 0)
-                roleId = patients[0].Id;
-        }
-        else if (roles.Contains(Roles.Ophthalmologist))
-        {
-            var doctors = await _ophthalmologistRepository.FindAsync(
-                o => o.UserId == user.Id, cancellationToken);
-            if (doctors.Count > 0)
-            {
-                roleId = doctors[0].Id;
-                employmentType = doctors[0].EmploymentType.ToString();
-            }
-        }
-        else if (roles.Contains(Roles.ClinicStaff))
-        {
-            var staff = await _clinicStaffRepository.GetByUserIdAsync(user.Id, cancellationToken);
-            if (staff is not null)
-            {
-                roleId = staff.Id;
-                staffSubRoles = staff.SubRoles;
-            }
-        }
+        var (roleId, employmentType, staffSubRoles) = await GetRoleSpecificInfoAsync(user.Id, roles, cancellationToken);
 
 
         var providerAvatarUrl = await GetProviderAvatarUrlAsync(user);
@@ -866,6 +816,7 @@ public class AuthService : IAuthService
                 EmailConfirmed = user.EmailConfirmed,
                 RoleId = roleId,
                 TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
+                MustUpdateProfile = user.MustUpdateProfile,
                 EmploymentType = employmentType,
                 StaffSubRoles = staffSubRoles,
                 Permissions = permissions.ToArray()
@@ -942,36 +893,7 @@ public class AuthService : IAuthService
             _logger.LogInformation("Token refreshed for user: {UserId}", user.Id);
 
             // Resolve role-specific profile entity
-            Guid? roleId = null;
-            string? employmentType = null;
-            string? staffSubRoles = null;
-
-            if (roles.Contains(Roles.Patient))
-            {
-                var patients = await _patientRepository.FindAsync(
-                    p => p.UserId == user.Id, cancellationToken);
-                if (patients.Count > 0)
-                    roleId = patients[0].Id;
-            }
-            else if (roles.Contains(Roles.Ophthalmologist))
-            {
-                var doctors = await _ophthalmologistRepository.FindAsync(
-                    o => o.UserId == user.Id, cancellationToken);
-                if (doctors.Count > 0)
-                {
-                    roleId = doctors[0].Id;
-                    employmentType = doctors[0].EmploymentType.ToString();
-                }
-            }
-            else if (roles.Contains(Roles.ClinicStaff))
-            {
-                var staff = await _clinicStaffRepository.GetByUserIdAsync(user.Id, cancellationToken);
-                if (staff is not null)
-                {
-                    roleId = staff.Id;
-                    staffSubRoles = staff.SubRoles;
-                }
-            }
+            var (roleId, employmentType, staffSubRoles) = await GetRoleSpecificInfoAsync(user.Id, roles, cancellationToken);
 
 
             var providerAvatarUrl = await GetProviderAvatarUrlAsync(user);
@@ -1413,5 +1335,41 @@ public class AuthService : IAuthService
         return string.IsNullOrWhiteSpace(providerAvatarClaim?.Value)
             ? null
             : providerAvatarClaim.Value;
+    }
+    private async Task<(Guid? RoleId, string? EmploymentType, string? StaffSubRoles)> GetRoleSpecificInfoAsync(
+        Guid userId, IList<string> roles, CancellationToken cancellationToken)
+    {
+        Guid? roleId = null;
+        string? employmentType = null;
+        string? staffSubRoles = null;
+
+        if (roles.Contains(Roles.Patient))
+        {
+            var patients = await _patientRepository.FindAsync(
+                p => p.UserId == userId, cancellationToken);
+            if (patients.Count > 0)
+                roleId = patients[0].Id;
+        }
+        else if (roles.Contains(Roles.Ophthalmologist))
+        {
+            var doctors = await _ophthalmologistRepository.FindAsync(
+                o => o.UserId == userId, cancellationToken);
+            if (doctors.Count > 0)
+            {
+                roleId = doctors[0].Id;
+                employmentType = doctors[0].EmploymentType.ToString();
+            }
+        }
+        else if (roles.Contains(Roles.ClinicStaff))
+        {
+            var staff = await _clinicStaffRepository.GetByUserIdAsync(userId, cancellationToken);
+            if (staff is not null)
+            {
+                roleId = staff.Id;
+                staffSubRoles = staff.SubRoles;
+            }
+        }
+
+        return (roleId, employmentType, staffSubRoles);
     }
 }

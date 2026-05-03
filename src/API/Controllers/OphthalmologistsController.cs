@@ -223,10 +223,22 @@ public class OphthalmologistsController : BaseApiController
             Phone = request.Phone,
             Address = request.Address,
             Bio = request.Bio,
+            CitizenId = request.CitizenId,
+            Gender = request.Gender,
+            DateOfBirth = request.DateOfBirth,
         };
 
         var result = await _mediator.Send(command, cancellationToken);
-        return HandleResult(result, "Profile updated successfully");
+        
+        if (!result.IsSuccess)
+            return HandleResult(result);
+
+        // Fetch the updated profile to return to the frontend
+        var updatedProfileResult = await _mediator.Send(
+            new GetOphthalmologistQuery(profileId.Value),
+            cancellationToken);
+
+        return HandleResult(updatedProfileResult, "Profile updated successfully");
     }
 
     /// <summary>
@@ -289,64 +301,87 @@ public class OphthalmologistsController : BaseApiController
             return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
 
         var form = await Request.ReadFormAsync(cancellationToken);
-        var certificates = new List<UploadCredentialItemDto>();
-
-        // Parse certificates from form data
-        // Expected format: certificates[0][type], certificates[0][name], certificates[0][file], etc.
-        var certificateCount = form.Keys
-            .Where(k => k.StartsWith("certificates["))
-            .Select(k => int.Parse(k.Split('[', ']')[1]))
-            .Distinct()
-            .Count();
-
-        for (int i = 0; i < certificateCount; i++)
-        {
-            var typeStr = form[$"certificates[{i}][type]"].FirstOrDefault();
-            var name = form[$"certificates[{i}][name]"].FirstOrDefault();
-            var issuingAuthority = form[$"certificates[{i}][issuingAuthority]"].FirstOrDefault();
-            var issuedDateStr = form[$"certificates[{i}][issuedDate]"].FirstOrDefault();
-            var expiryDateStr = form[$"certificates[{i}][expiryDate]"].FirstOrDefault();
-            var file = form.Files.FirstOrDefault(f => f.Name == $"certificates[{i}][file]");
-
-            if (file?.Length > 0 &&
-                !string.IsNullOrEmpty(typeStr) &&
-                !string.IsNullOrEmpty(name) &&
-                !string.IsNullOrEmpty(issuingAuthority) &&
-                DateTime.TryParse(issuedDateStr, out var issuedDate))
-            {
-                var certificate = new UploadCredentialItemDto
-                {
-                    Type = Enum.Parse<CertificateType>(typeStr ?? "License"),
-                    Name = name,
-                    IssuingAuthority = issuingAuthority,
-                    IssuedDate = issuedDate,
-                    ExpiryDate = DateTime.TryParse(expiryDateStr, out var expiryDate) ? expiryDate : null,
-                    File = file
-                };
-
-                // Set DegreeLevel for degrees
-                if (certificate.Type == CertificateType.Degree)
-                {
-                    var degreeLevelStr = form[$"certificates[{i}][degreeLevel]"].FirstOrDefault();
-                    if (Enum.TryParse<DegreeLevel>(degreeLevelStr ?? "Bachelor", out var degreeLevel))
-                        certificate.DegreeLevel = degreeLevel;
-                }
-
-                certificates.Add(certificate);
-            }
-        }
+        var certificates = ParseCertificatesFromForm(form);
 
         if (certificates.Count == 0)
             return BadRequest(ApiResponseFactory.Error("No valid certificates provided"));
 
-        var command = new UploadCredentialsCommand
+        var result = await _mediator.Send(new UploadCredentialsCommand
         {
             OphthalmologistId = profileId.Value,
             Certificates = certificates
-        };
+        }, cancellationToken);
 
-        var result = await _mediator.Send(command, cancellationToken);
         return HandleResult(result, "Certificates uploaded successfully. Awaiting verification.");
+    }
+
+    private List<UploadCredentialItemDto> ParseCertificatesFromForm(IFormCollection form)
+    {
+        var certificates = new List<UploadCredentialItemDto>();
+        var certificateCount = GetCertificateCountFromForm(form);
+
+        for (int i = 0; i < certificateCount; i++)
+        {
+            var item = ParseCertificateItem(form, i);
+            if (item != null)
+            {
+                certificates.Add(item);
+            }
+        }
+
+        return certificates;
+    }
+
+    private int GetCertificateCountFromForm(IFormCollection form)
+    {
+        return form.Keys
+            .Where(k => k.StartsWith("certificates["))
+            .Select(k =>
+            {
+                var parts = k.Split('[', ']');
+                return parts.Length > 1 && int.TryParse(parts[1], out var index) ? index : -1;
+            })
+            .Where(index => index >= 0)
+            .DefaultIfEmpty(-1)
+            .Max() + 1;
+    }
+
+    private UploadCredentialItemDto? ParseCertificateItem(IFormCollection form, int index)
+    {
+        var typeStr = form[$"certificates[{index}][type]"].FirstOrDefault();
+        var name = form[$"certificates[{index}][name]"].FirstOrDefault();
+        var issuingAuthority = form[$"certificates[{index}][issuingAuthority]"].FirstOrDefault();
+        var issuedDateStr = form[$"certificates[{index}][issuedDate]"].FirstOrDefault();
+        var expiryDateStr = form[$"certificates[{index}][expiryDate]"].FirstOrDefault();
+        var file = form.Files.FirstOrDefault(f => f.Name == $"certificates[{index}][file]");
+
+        if (file?.Length > 0 &&
+            !string.IsNullOrEmpty(typeStr) &&
+            !string.IsNullOrEmpty(name) &&
+            !string.IsNullOrEmpty(issuingAuthority) &&
+            DateTime.TryParse(issuedDateStr, out var issuedDate))
+        {
+            var item = new UploadCredentialItemDto
+            {
+                Type = Enum.Parse<CertificateType>(typeStr ?? "License"),
+                Name = name,
+                IssuingAuthority = issuingAuthority,
+                IssuedDate = issuedDate,
+                ExpiryDate = DateTime.TryParse(expiryDateStr, out var expiryDate) ? expiryDate : null,
+                File = file
+            };
+
+            if (item.Type == CertificateType.Degree)
+            {
+                var degreeLevelStr = form[$"certificates[{index}][degreeLevel]"].FirstOrDefault();
+                if (Enum.TryParse<DegreeLevel>(degreeLevelStr ?? "Bachelor", out var degreeLevel))
+                    item.DegreeLevel = degreeLevel;
+            }
+
+            return item;
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -563,6 +598,9 @@ public record UpdateOphthalmologistProfileRequest
     public string? Phone { get; init; }
     public string? Address { get; init; }
     public string? Bio { get; init; }
+    public string? CitizenId { get; init; }
+    public int? Gender { get; init; }
+    public DateTime? DateOfBirth { get; init; }
 }
 
 public record CreateLeaveRequestApiRequest

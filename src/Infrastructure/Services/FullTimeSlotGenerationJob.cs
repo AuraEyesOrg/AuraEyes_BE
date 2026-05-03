@@ -30,7 +30,7 @@ public class FullTimeSlotGenerationJob
         _logger = logger;
     }
 
-    public async Task ExecuteAsync(CancellationToken cancellationToken = default)
+    public async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var windowDays = await GetWindowDaysAsync(cancellationToken);
         var fromDate = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -173,11 +173,6 @@ public class FullTimeSlotGenerationJob
             templates.Count, createdSlots, skippedInvalidTemplates);
     }
 
-    /// <summary>
-    /// Backward-compatible overload for legacy Hangfire payloads.
-    /// </summary>
-    [Obsolete("Use ExecuteAsync(CancellationToken) instead.")]
-    public Task ExecuteAsync() => ExecuteAsync(CancellationToken.None);
 
     /// <summary>
     /// Backward-compatible entry point for legacy Hangfire payloads.

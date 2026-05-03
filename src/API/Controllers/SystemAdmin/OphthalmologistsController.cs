@@ -14,7 +14,7 @@ using Infrastructure.Identity.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Infrastructure.Identity.Authorization;
+
 using Application.Ophthalmologists.Common;
 using Application.Ophthalmologists.Queries.GetOphthalmologist;
 using Application.Ophthalmologists.Commands.CreateOphthalmologist;
@@ -37,13 +37,11 @@ public class OphthalmologistsController : BaseApiController
 {
     private readonly IMediator _mediator;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IFileStorageService _fileStorageService;
 
-    public OphthalmologistsController(IMediator mediator, ICurrentUserService currentUserService, IFileStorageService fileStorageService)
+    public OphthalmologistsController(IMediator mediator, ICurrentUserService currentUserService)
     {
         _mediator = mediator;
         _currentUserService = currentUserService;
-        _fileStorageService = fileStorageService;
     }
 
     /// <summary>
