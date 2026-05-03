@@ -14,6 +14,19 @@ public class CreateClinicalGroupCommand : ICommand<Guid>
     public Guid? ConsultationSessionId { get; set; }
     public List<Guid> InvitedDoctorIds { get; set; } = new();
     public string? Reason { get; set; }
+
+    /// <summary>
+    /// Marks this consilium as a high-priority emergency case.
+    /// Affects the SignalR notification title and the system first-message prefix.
+    /// </summary>
+    public bool IsEmergency { get; set; } = false;
+
+    /// <summary>
+    /// ID of the Medical Record associated with this consilium.
+    /// Injected as a deep-link in the first system message so invited doctors
+    /// can navigate directly to the patient's record without extra clicks.
+    /// </summary>
+    public Guid? MedicalRecordId { get; set; }
 }
 
 public class CreateClinicalGroupCommandHandler : ICommandHandler<CreateClinicalGroupCommand, Guid>
@@ -69,17 +82,30 @@ public class CreateClinicalGroupCommandHandler : ICommandHandler<CreateClinicalG
             }
         }
 
-        // Add initial system message if reason is provided
-        if (!string.IsNullOrWhiteSpace(request.Reason))
-        {
-            var systemMessage = new InternalGroupMessage(
-                group.Id,
-                currentUserId,
-                AuthorType.Ophthalmologist,
-                $"[HỘI CHẨN LÂM SÀNG]\nLý do: {request.Reason}\nXem chi tiết tại Hồ sơ bệnh án của phiên khám."
-            );
-            group.AddMessage(systemMessage);
-        }
+        // Always inject a first system message with:
+        //   - Emergency tag prefix when IsEmergency = true
+        //   - Consilium reason (if provided)
+        //   - Deep-link to the Medical Record (enables one-click navigation for invited doctors)
+        var emergencyPrefix = request.IsEmergency ? "🚨 [CA KHẨN CẤP] " : "";
+
+        var reasonSection = !string.IsNullOrWhiteSpace(request.Reason)
+            ? $"\nLý do: {request.Reason}"
+            : string.Empty;
+
+        var medicalRecordSection = request.MedicalRecordId.HasValue
+            ? $"\n🔗 Xem Bệnh án: /medical-records/{request.MedicalRecordId}"
+            : string.Empty;
+
+        var systemMessageContent =
+            $"{emergencyPrefix}[HỘI CHẨN LÂM SÀNG]{reasonSection}{medicalRecordSection}\nPhiên hội chẩn này sẽ tự động kết thúc sau 20 phút.";
+
+        var systemMessage = new InternalGroupMessage(
+            group.Id,
+            currentUserId,
+            AuthorType.Ophthalmologist,
+            systemMessageContent
+        );
+        group.AddMessage(systemMessage);
 
         await _groupChatRepository.AddAsync(group, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -89,16 +115,22 @@ public class CreateClinicalGroupCommandHandler : ICommandHandler<CreateClinicalG
         {
             if (doctorId == currentUserId) continue;
 
+            var notificationTitle = request.IsEmergency
+                ? "🚨 Mời hội chẩn KHẨN CẤP"
+                : "Mời hội chẩn lâm sàng";
+
             await _notificationService.SendAsync(
                 doctorId,
-                "Mời hội chẩn lâm sàng khẩn cấp",
+                notificationTitle,
                 $"Bác sĩ {_currentUserService.UserName} mời bạn hội chẩn ca bệnh: {groupName}",
                 NotificationType.ConsiliumInvitation,
-                new { 
-                    GroupId = group.Id, 
+                new {
+                    GroupId = group.Id,
                     SessionId = request.ConsultationSessionId,
                     InviterName = _currentUserService.UserName,
-                    GroupName = groupName
+                    GroupName = groupName,
+                    IsEmergency = request.IsEmergency,
+                    MedicalRecordId = request.MedicalRecordId
                 },
                 cancellationToken,
                 group.Id);
