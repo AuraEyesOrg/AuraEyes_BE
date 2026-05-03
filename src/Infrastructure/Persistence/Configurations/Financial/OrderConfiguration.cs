@@ -10,7 +10,7 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
     {
         builder.Property(e => e.Status)
             .HasConversion<string>()
-            .HasMaxLength(20);
+            .HasMaxLength(50);
 
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);
