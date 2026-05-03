@@ -58,12 +58,18 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
                 // If it was paid, mark as Refunded, else Cancelled
                 if (order.PaidAmount > 0)
                 {
-                    // Need a way to mark as Refunded if it's not completed yet
-                    // Looking at Order.cs, Refund() requires status Completed.
-                    // Let's use Cancel() for now or just update status directly if possible.
-                    // Or I'll add a ForceRefund method or something.
-                    // For now I'll use Cancel() as it's the safest.
-                    order.Cancel();
+                    var refundAmount = order.PaidAmount;
+                    var refundDesc = string.IsNullOrWhiteSpace(request.AdminNote) 
+                        ? "Refund for appointment cancellation" 
+                        : $"Refund: {request.AdminNote}";
+                    
+                    var refundPayment = new Domain.Entities.Financial.Payment(order.Id, refundAmount, PaymentMethod.BankTransfer, refundDesc);
+                    // To get to Refunded state via domain logic, we often need it completed first
+                    refundPayment.Complete(request.RefundTransactionId);
+                    refundPayment.Refund();
+                    order.AddPayment(refundPayment);
+
+                    order.Refund();
                 }
                 else
                 {

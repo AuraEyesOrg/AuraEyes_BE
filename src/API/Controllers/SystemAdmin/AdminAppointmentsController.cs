@@ -28,11 +28,13 @@ public class AdminAppointmentsController : BaseApiController
         return HandleResult(result);
     }
 
+    public record ConfirmRefundPayload(string? RefundTransactionId, string? AdminNote);
+
     [HttpPost("{appointmentId:guid}/confirm-refund")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> ConfirmRefund(Guid appointmentId)
+    public async Task<IActionResult> ConfirmRefund(Guid appointmentId, [FromBody] ConfirmRefundPayload payload)
     {
-        var result = await _mediator.Send(new ConfirmAppointmentCancellationCommand(appointmentId));
+        var result = await _mediator.Send(new ConfirmAppointmentCancellationCommand(appointmentId, payload.RefundTransactionId, payload.AdminNote));
         return HandleResult(result);
     }
 }
