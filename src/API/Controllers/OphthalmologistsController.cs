@@ -223,10 +223,22 @@ public class OphthalmologistsController : BaseApiController
             Phone = request.Phone,
             Address = request.Address,
             Bio = request.Bio,
+            CitizenId = request.CitizenId,
+            Gender = request.Gender,
+            DateOfBirth = request.DateOfBirth,
         };
 
         var result = await _mediator.Send(command, cancellationToken);
-        return HandleResult(result, "Profile updated successfully");
+        
+        if (!result.IsSuccess)
+            return HandleResult(result);
+
+        // Fetch the updated profile to return to the frontend
+        var updatedProfileResult = await _mediator.Send(
+            new GetOphthalmologistQuery(profileId.Value),
+            cancellationToken);
+
+        return HandleResult(updatedProfileResult, "Profile updated successfully");
     }
 
     /// <summary>
@@ -586,6 +598,9 @@ public record UpdateOphthalmologistProfileRequest
     public string? Phone { get; init; }
     public string? Address { get; init; }
     public string? Bio { get; init; }
+    public string? CitizenId { get; init; }
+    public int? Gender { get; init; }
+    public DateTime? DateOfBirth { get; init; }
 }
 
 public record CreateLeaveRequestApiRequest

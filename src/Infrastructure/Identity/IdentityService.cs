@@ -198,7 +198,8 @@ public class IdentityService : IIdentityService
                 u.IsDeleted,
                 u.TwoFactorEnabled,
                 u.AvatarUrl, // Direct from user table, ignores provider claims for performance
-                u.PhoneNumber))
+                u.PhoneNumber,
+                u.MustUpdateProfile))
             .ToListAsync(cancellationToken);
 
         return users.AsReadOnly();
@@ -408,7 +409,8 @@ public class IdentityService : IIdentityService
             user.IsDeleted,
             user.TwoFactorEnabled,
             avatarUrl,
-            user.PhoneNumber
+            user.PhoneNumber,
+            user.MustUpdateProfile
         );
     }
 

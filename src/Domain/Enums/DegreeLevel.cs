@@ -2,9 +2,12 @@ namespace Domain.Enums;
 
 public enum DegreeLevel
 {
-    Bachelor = 0,
-    Master = 1,
-    Doctor = 2,
-    AssociateProfessor = 3,
-    Professor = 4
+    BSCKI = 1,
+    BSCKII = 2,
+    Bachelor = 3,
+    Master = 4,
+    Doctor = 5,
+    AssociateProfessor = 6,
+    Professor = 7,
+    ResidentDoctor = 8
 }

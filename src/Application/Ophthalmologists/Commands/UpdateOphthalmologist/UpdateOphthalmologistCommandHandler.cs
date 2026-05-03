@@ -72,13 +72,18 @@ public class UpdateOphthalmologistCommandHandler : ICommandHandler<UpdateOphthal
 
             if (request.UserId.HasValue)
             {
+                var dateOfBirthUtc = request.DateOfBirth.HasValue 
+                    ? DateTime.SpecifyKind(request.DateOfBirth.Value, DateTimeKind.Utc) 
+                    : (DateTime?)null;
+
                 var (succeeded, errors) = await _identityService.UpdateUserProfileAsync(
                     request.UserId.Value,
                     request.FullName ?? string.Empty,
                     request.Phone,
-                    null, null,
+                    dateOfBirthUtc,
+                    request.Gender,
                     request.Address,
-                    null, // CitizenId not updated from ophthalmologist profile
+                    request.CitizenId,
                     cancellationToken);
 
                 if (!succeeded)

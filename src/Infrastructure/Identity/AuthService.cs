@@ -838,6 +838,7 @@ public class AuthService : IAuthService
                 EmailConfirmed = user.EmailConfirmed,
                 RoleId = roleId,
                 TwoFactorEnabled = await _userManager.GetTwoFactorEnabledAsync(user),
+                MustUpdateProfile = user.MustUpdateProfile,
                 EmploymentType = employmentType,
                 StaffSubRoles = staffSubRoles,
                 Permissions = permissions.ToArray()

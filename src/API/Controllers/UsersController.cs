@@ -1,5 +1,7 @@
 using Application.Common.Models;
-using Application.Users.Commands.ForceUpdateProfile;
+using Application.Users.Commands.ChangePassword;
+using Application.Ophthalmologists.Commands.OnboardOphthalmologist;
+using Application.ClinicStaffs.Commands.OnboardClinicStaff;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,16 +23,47 @@ public class UsersController : BaseApiController
     }
 
     /// <summary>
-    /// Force update profile for new users (First Login flow).
-    /// Updates basic info, role-specific info, and changes temporary password.
+    /// Change password for the current user.
     /// </summary>
-    [HttpPut("force-update-profile")]
+    [HttpPost("change-password")]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> ForceUpdateProfile([FromBody] ForceUpdateProfileCommand command)
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordCommand command)
     {
         var result = await _mediator.Send(command);
-        return HandleResult(result, "Profile updated and password changed successfully.");
+        return HandleResult(result, "Password changed successfully.");
+    }
+
+    /// <summary>
+    /// Onboard ophthalmologist (First Login flow).
+    /// Updates identity, medical credentials, and changes temporary password.
+    /// </summary>
+    [HttpPost("onboard-ophthalmologist")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> OnboardOphthalmologist([FromForm] OnboardOphthalmologistCommand command)
+    {
+        Console.WriteLine($"[DEBUG] OnboardOphthalmologist: FullName={command.FullName}, DegreesCount={command.Degrees?.Count}");
+        
+        if (!ModelState.IsValid)
+        {
+            var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
+            Console.WriteLine($"[DEBUG] ModelState Invalid: {string.Join(", ", errors)}");
+            return BadRequest(new { Message = "Model state invalid", Errors = errors });
+        }
+
+        var result = await _mediator.Send(command);
+        return HandleResult(result, "Ophthalmologist profile onboarded successfully.");
+    }
+
+    /// <summary>
+    /// Onboard clinic staff (First Login flow).
+    /// Updates identity and staff details.
+    /// </summary>
+    [HttpPost("onboard-clinic-staff")]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> OnboardClinicStaff([FromBody] OnboardClinicStaffCommand command)
+    {
+        var result = await _mediator.Send(command);
+        return HandleResult(result, "Clinic staff profile onboarded successfully.");
     }
 }
