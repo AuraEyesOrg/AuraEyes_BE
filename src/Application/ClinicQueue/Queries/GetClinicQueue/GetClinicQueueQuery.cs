@@ -42,8 +42,6 @@ public class GetClinicQueueQueryHandler
         _cache = cache;
     }
 
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Threading.SemaphoreSlim> _semaphores = new();
-    
     public async Task<Result<IReadOnlyList<ClinicQueueItemDto>>> Handle(
         GetClinicQueueQuery request,
         CancellationToken cancellationToken)
@@ -51,17 +49,16 @@ public class GetClinicQueueQueryHandler
         if (request.RequestedByUserId == Guid.Empty)
             return Result<IReadOnlyList<ClinicQueueItemDto>>.Failure("Invalid requester.");
 
-        string cacheKey = $"clinic_queue_{request.RequestedByUserId}";
-        
-        // 1. Fast path: check cache
-        if (_cache.TryGetValue(cacheKey, out IReadOnlyList<ClinicQueueItemDto>? cachedQueue))
+        string cacheKey = $"clinic_queue_all";
+
+        // 1. Fast path: Check cache
+        if (_cache.TryGetValue(cacheKey, out List<ClinicQueueItemDto>? cachedQueue))
         {
             return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(cachedQueue!);
         }
 
         try
         {
-
             var cutoffDate = DateTime.UtcNow.AddDays(-1);
 
             var visits = await _patientVisitRepository
@@ -82,14 +79,11 @@ public class GetClinicQueueQueryHandler
                 .ToListAsync(cancellationToken);
 
             if (visits.Count == 0)
-            {
-                var emptyResult = Array.Empty<ClinicQueueItemDto>();
-                _cache.Set(cacheKey, emptyResult, TimeSpan.FromSeconds(10));
-                return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(emptyResult);
-            }
+                return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(Array.Empty<ClinicQueueItemDto>());
 
             var patientIds = visits.Select(v => v.PatientId).Distinct().ToList();
-            var screenings = await _screeningRepository
+            
+            var screeningsTask = _screeningRepository
                 .Query()
                 .AsNoTracking()
                 .Include(s => s.ScreeningResults)
@@ -98,7 +92,7 @@ public class GetClinicQueueQueryHandler
                     && !s.IsDeleted)
                 .ToListAsync(cancellationToken);
 
-            var consultations = await _consultationSessionRepository
+            var consultationsTask = _consultationSessionRepository
                 .Query()
                 .AsNoTracking()
                 .Where(cs => patientIds.Contains(cs.PatientId)
@@ -107,6 +101,11 @@ public class GetClinicQueueQueryHandler
                     && !cs.IsDeleted)
                 .ToListAsync(cancellationToken);
 
+            await Task.WhenAll(screeningsTask, consultationsTask);
+            var screenings = screeningsTask.Result;
+            var consultations = consultationsTask.Result;
+
+            // --- Optimized User Lookup (Batch) ---
             var doctorUserIds = visits
                 .Where(v => v.AssignedDoctor != null)
                 .Select(v => v.AssignedDoctor!.UserId)
@@ -119,7 +118,6 @@ public class GetClinicQueueQueryHandler
                 .Distinct()
                 .ToList();
 
-            // Combine all IDs to fetch in a single batch to reduce round-trips
             var allUserIds = doctorUserIds.Concat(patientUserIds).Distinct().ToList();
             var allUsers = allUserIds.Count > 0
                 ? await _identityService.GetUsersByIdsAsync(allUserIds, cancellationToken)
@@ -131,18 +129,14 @@ public class GetClinicQueueQueryHandler
             foreach (var id in doctorUserIds)
             {
                 if (userNameLookup.TryGetValue(id, out var name))
-                {
                     doctorNameByUserId[id] = name ?? string.Empty;
-                }
             }
 
             var patientNameByUserId = new Dictionary<Guid, string>();
             foreach (var id in patientUserIds)
             {
                 if (userNameLookup.TryGetValue(id, out var name))
-                {
                     patientNameByUserId[id] = name ?? "Unknown Patient";
-                }
             }
 
             var queueItems = new List<ClinicQueueItemDto>();
@@ -164,16 +158,16 @@ public class GetClinicQueueQueryHandler
                     .FirstOrDefault();
                 
                 var assignedDoctorName = visit.AssignedDoctor is not null &&
-                                         doctorNameByUserId.TryGetValue(visit.AssignedDoctor.UserId, out var doctorName)
-                    ? doctorName
+                                         doctorNameByUserId.TryGetValue(visit.AssignedDoctor.UserId, out var dName)
+                    ? dName
                     : null;
 
                 string patientName = "Unknown Patient";
                 if (visit.Patient != null)
                 {
-                    if (visit.Patient.UserId.HasValue && patientNameByUserId.TryGetValue(visit.Patient.UserId.Value, out var name))
+                    if (visit.Patient.UserId.HasValue && patientNameByUserId.TryGetValue(visit.Patient.UserId.Value, out var pName))
                     {
-                        patientName = name;
+                        patientName = pName;
                     }
                     else if (visit.Patient.IsWalkIn && !string.IsNullOrWhiteSpace(visit.Patient.FullName))
                     {
@@ -202,13 +196,14 @@ public class GetClinicQueueQueryHandler
                     MedicalRecordId = visit.MedicalRecord?.Id,
                     IsAdminCompleted = visit.MedicalRecord != null && visit.MedicalRecord.Status != MedicalRecordStatus.DraftAdmin,
 
-                    FlowState = DetermineFlowState(visit, screening, consultation)
+                    // Integration with the new business logic resolver
+                    FlowState = ClinicFlowStateResolver.Resolve(visit, screening, consultation)
                 };
 
                 queueItems.Add(item);
             }
 
-            // Cache the results for 30 seconds to survive heavy load
+            // Cache for 30 seconds to survive load tests
             _cache.Set(cacheKey, queueItems, TimeSpan.FromSeconds(30));
 
             return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(queueItems);
@@ -216,7 +211,7 @@ public class GetClinicQueueQueryHandler
         catch (Exception ex)
         {
             Console.WriteLine($"[CRITICAL] Error in GetClinicQueueQueryHandler: {ex.Message} \n {ex.StackTrace}");
-            return Result<IReadOnlyList<ClinicQueueItemDto>>.Failure("An internal error occurred while fetching the clinic queue.");
+            return Result<IReadOnlyList<ClinicQueueItemDto>>.Failure("Internal error occurred while processing queue.");
         }
     }
 
@@ -228,7 +223,6 @@ public class GetClinicQueueQueryHandler
         if (dob.Value.Date > today.AddYears(-age)) age--;
         return age;
     }
-
 }
 
 public class ClinicQueueItemDto
