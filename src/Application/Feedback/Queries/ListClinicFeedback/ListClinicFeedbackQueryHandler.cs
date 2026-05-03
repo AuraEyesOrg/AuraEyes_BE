@@ -37,7 +37,7 @@ public class ListClinicFeedbackQueryHandler
 
         foreach (var x in items)
         {
-            var patientEntity = await _patientRepository.GetByIdAsync(x.PatientId, cancellationToken);
+            var patientEntity = await _patientRepository.GetByIdAsNoTrackingAsync(x.PatientId, cancellationToken);
             string? patientFullName = null;
             if (patientEntity is not null && patientEntity.IsWalkIn)
             {
@@ -72,3 +72,4 @@ public class ListClinicFeedbackQueryHandler
         return Result<PagedResult<ClinicFeedbackDto>>.Success(pagedResult);
     }
 }
+

@@ -57,7 +57,7 @@ public class GetMedicalRecordsQueryHandler : IQueryHandler<GetMedicalRecordsQuer
             !_currentUserService.IsInRole("Ophthalmologist") && 
             !_currentUserService.IsInRole("ClinicStaff"))
         {
-            var patients = await _patientRepository.FindAsync(p => p.UserId == _currentUserService.UserId.Value, cancellationToken);
+            var patients = await _patientRepository.FindAsNoTrackingAsync(p => p.UserId == _currentUserService.UserId.Value, cancellationToken);
             var patient = patients.FirstOrDefault();
             
             if (patient != null)
@@ -132,3 +132,4 @@ public class GetMedicalRecordsQueryHandler : IQueryHandler<GetMedicalRecordsQuer
             new PagedResult<MedicalRecordDto>(dtos, totalCount, request.PageNumber, request.PageSize));
     }
 }
+

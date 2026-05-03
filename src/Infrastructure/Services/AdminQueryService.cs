@@ -97,42 +97,7 @@ public class AdminQueryService : IAdminQueryService
                 g => g.ToList());
 
         var items = pageRows
-            .Select(row =>
-            {
-                var credentials = credentialsByOphthalmologist.TryGetValue(row.OphthalmologistId, out var mapped)
-                    ? mapped
-                    : new List<OphthalmologistCredentialProjection>();
-
-                var licenses = credentials
-                    .Where(c => c.Type == CertificateType.License)
-                    .Select(c => c.Credential)
-                    .ToList();
-
-                var degrees = credentials
-                    .Where(c => c.Type == CertificateType.Degree)
-                    .Select(c => c.Credential)
-                    .ToList();
-
-                return new OphthalmologistListDto
-                {
-                    Id = row.OphthalmologistId,
-                    UserId = row.UserId,
-                    FullName = row.FullName,
-                    Email = row.Email,
-                    Phone = row.Phone,
-                    Bio = row.Bio,
-                    EmploymentType = row.EmploymentType,
-                    LicenseUrl = row.LicenseUrl,
-                    DegreeUrl = row.DegreeUrl,
-                    Licenses = licenses,
-                    Degrees = degrees,
-                    OrganisationName = null,
-                    IsActive = row.IsActive,
-                    AvailableLeaveDays = row.AvailableLeaveDays,
-                    ConsultationFee = row.ConsultationFee,
-                    CreatedAt = row.CreatedAt
-                };
-            })
+            .Select(row => MapToOphthalmologistListDto(row, credentialsByOphthalmologist))
             .ToList();
 
         return new PagedResult<OphthalmologistListDto>(
@@ -323,6 +288,45 @@ public class AdminQueryService : IAdminQueryService
             .ToListAsync(cancellationToken);
 
         return new PagedResult<AuditLogDto>(items, totalCount, pageNumber, pageSize);
+    }
+
+    private static OphthalmologistListDto MapToOphthalmologistListDto(
+        dynamic row,
+        Dictionary<Guid, List<OphthalmologistCredentialProjection>> credentialsByOphthalmologist)
+    {
+        var credentials = credentialsByOphthalmologist.TryGetValue((Guid)row.OphthalmologistId, out List<OphthalmologistCredentialProjection>? mapped)
+            ? mapped
+            : new List<OphthalmologistCredentialProjection>();
+
+        var licenses = credentials
+            .Where(c => c.Type == CertificateType.License)
+            .Select(c => c.Credential)
+            .ToList();
+
+        var degrees = credentials
+            .Where(c => c.Type == CertificateType.Degree)
+            .Select(c => c.Credential)
+            .ToList();
+
+        return new OphthalmologistListDto
+        {
+            Id = row.OphthalmologistId,
+            UserId = row.UserId,
+            FullName = row.FullName,
+            Email = row.Email,
+            Phone = row.Phone,
+            Bio = row.Bio,
+            EmploymentType = row.EmploymentType,
+            LicenseUrl = row.LicenseUrl,
+            DegreeUrl = row.DegreeUrl,
+            Licenses = licenses,
+            Degrees = degrees,
+            OrganisationName = null,
+            IsActive = row.IsActive,
+            AvailableLeaveDays = row.AvailableLeaveDays,
+            ConsultationFee = row.ConsultationFee,
+            CreatedAt = row.CreatedAt
+        };
     }
 
     private sealed class OphthalmologistCredentialProjection

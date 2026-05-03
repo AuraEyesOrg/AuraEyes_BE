@@ -39,7 +39,7 @@ public class GetClinicScreeningHistoryQueryHandler
 
         // Fetch screenings with related data
         var screenings = await _screeningRepository
-            .Query()
+            .Query().AsNoTracking()
             .Where(s => !s.IsDeleted)
             .OrderByDescending(s => s.CreatedAt)
             .Take(take)
@@ -65,7 +65,7 @@ public class GetClinicScreeningHistoryQueryHandler
 
         // Fetch patient profiles
         var patients = await _patientRepository
-            .Query()
+            .Query().AsNoTracking()
             .Where(p => patientIds.Contains(p.Id))
             .Select(p => new { p.Id, p.UserId, p.FullName })
             .ToListAsync(cancellationToken);
@@ -122,3 +122,4 @@ public class GetClinicScreeningHistoryQueryHandler
         return Result<IReadOnlyList<ClinicScreeningHistoryDto>>.Success(result);
     }
 }
+

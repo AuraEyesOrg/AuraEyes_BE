@@ -110,15 +110,15 @@ public class ApplicationDbContext : IdentityDbContext<
 
     #endregion
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(ModelBuilder builder)
     {
-        base.OnModelCreating(modelBuilder);
+        base.OnModelCreating(builder);
 
         // Apply all configurations from assembly
-        modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+        builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
 
         // Apply global query filter for soft delete
-        ApplySoftDeleteFilter(modelBuilder);
+        ApplySoftDeleteFilter(builder);
     }
 
     private static void ApplySoftDeleteFilter(ModelBuilder modelBuilder)

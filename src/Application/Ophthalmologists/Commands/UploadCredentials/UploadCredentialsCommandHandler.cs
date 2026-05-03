@@ -36,36 +36,44 @@ public class UploadCredentialsCommandHandler : ICommandHandler<UploadCredentials
 
         foreach (var cert in request.Certificates)
         {
-            if (cert.File is null || cert.File.Length == 0) continue;
-
-            await using var stream = cert.File.OpenReadStream();
-            var uploadedUrl = await _fileStorageService.SaveFileAsync(
-                stream,
-                cert.File.FileName,
-                $"ophthalmologists/credentials/{ophthalmologist.UserId}",
-                cancellationToken);
-
-            var newCert = new Certificate(
-                ophthalmologist.Id,
-                cert.Type,
-                cert.Name,
-                cert.Type == CertificateType.Degree ? cert.DegreeLevel : null,
-                cert.IssuingAuthority,
-                DateTime.SpecifyKind(cert.IssuedDate, DateTimeKind.Utc),
-                cert.ExpiryDate.HasValue ? DateTime.SpecifyKind(cert.ExpiryDate.Value, DateTimeKind.Utc) : null,
-                uploadedUrl
-            );
-            ophthalmologist.AddCertificate(newCert);
-
-            ophthalmologist.UpdateCredentialFiles(
-                cert.Type == CertificateType.License ? uploadedUrl : null,
-                cert.Type == CertificateType.Degree ? uploadedUrl : null
-            );
+            await ProcessCertificateAsync(cert, ophthalmologist, cancellationToken);
         }
 
         await _repository.UpdateAsync(ophthalmologist, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
+    }
+
+    private async Task ProcessCertificateAsync(
+        UploadCredentialItemDto cert,
+        Domain.Entities.Users.Ophthalmologist ophthalmologist,
+        CancellationToken cancellationToken)
+    {
+        if (cert.File is null || cert.File.Length == 0) return;
+
+        await using var stream = cert.File.OpenReadStream();
+        var uploadedUrl = await _fileStorageService.SaveFileAsync(
+            stream,
+            cert.File.FileName,
+            $"ophthalmologists/credentials/{ophthalmologist.UserId}",
+            cancellationToken);
+
+        var newCert = new Certificate(
+            ophthalmologist.Id,
+            cert.Type,
+            cert.Name,
+            cert.Type == CertificateType.Degree ? cert.DegreeLevel : null,
+            cert.IssuingAuthority,
+            DateTime.SpecifyKind(cert.IssuedDate, DateTimeKind.Utc),
+            cert.ExpiryDate.HasValue ? DateTime.SpecifyKind(cert.ExpiryDate.Value, DateTimeKind.Utc) : null,
+            uploadedUrl
+        );
+        ophthalmologist.AddCertificate(newCert);
+
+        ophthalmologist.UpdateCredentialFiles(
+            cert.Type == CertificateType.License ? uploadedUrl : null,
+            cert.Type == CertificateType.Degree ? uploadedUrl : null
+        );
     }
 }

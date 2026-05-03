@@ -30,7 +30,7 @@ public class GetClinicDashboardMetricsQueryHandler : IQueryHandler<GetClinicDash
         var today = DateOnly.FromDateTime(vnTime);
 
         // Get today's appointments
-        var todayAppointments = await _appointmentRepository.Query()
+        var todayAppointments = await _appointmentRepository.Query().AsNoTracking()
             .Include(a => a.AppointmentSlot)
             .Include(a => a.Patient)
             .Where(a => a.AppointmentSlot.Date == today && !a.IsDeleted)
@@ -101,3 +101,4 @@ public class GetClinicDashboardMetricsQueryHandler : IQueryHandler<GetClinicDash
         _ => "pending"
     };
 }
+

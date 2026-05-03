@@ -31,7 +31,7 @@ public class GetOverviewMetricsQueryHandler : IQueryHandler<GetOverviewMetricsQu
 
         var screeningCount = await _aiScreeningRepository.CountAsync(cancellationToken: cancellationToken);
 
-        var clinicFeedbackMetrics = await _clinicFeedbackRepository.Query()
+        var clinicFeedbackMetrics = await _clinicFeedbackRepository.Query().AsNoTracking()
             .GroupBy(_ => 1)
             .Select(g => new
             {
@@ -64,3 +64,4 @@ public class GuestOverviewMetricsDto
     public int ScreeningCount { get; init; }
     public double? AverageRating { get; init; }
 }
+

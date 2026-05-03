@@ -80,7 +80,7 @@ public class GetConsultationSessionsQueryHandler
 
         var sessionIds = sessions.Select(s => s.Id).ToList();
 
-        var latestMessages = await _sessionRepository.Query()
+        var latestMessages = await _sessionRepository.Query().AsNoTracking()
             .Where(s => sessionIds.Contains(s.Id))
             .Select(s => new
             {
@@ -122,14 +122,7 @@ public class GetConsultationSessionsQueryHandler
         var currentProfile = currentProfileId.GetValueOrDefault();
         // Only load screenings for sessions the caller is authorized to view.
         var screeningIds = sessions
-            .Where(s =>
-                s.AiScreeningId.HasValue &&
-                (canAlwaysViewAi ||
-                 (hasCurrentProfile && s.PatientId == currentProfile) ||
-                 (hasCurrentProfile &&
-                  s.OphthalmologistId == currentProfile &&
-                  (s.Type == Domain.Enums.ConsultationSessionType.Verification ||
-                   s.Type == Domain.Enums.ConsultationSessionType.ClinicBooking))))
+            .Where(s => s.AiScreeningId.HasValue && CanViewAiResults(s, isAdmin, currentProfileId))
             .Select(s => s.AiScreeningId!.Value)
             .Distinct()
             .ToList();
@@ -138,7 +131,7 @@ public class GetConsultationSessionsQueryHandler
 
         // Load screenings + latest results for snapshot. Do NOT include images/raw json for list.
         var screenings = await _aiScreeningRepository
-            .Query()
+            .Query().AsNoTracking()
             .Where(x => screeningIds.Contains(x.Id))
             .Include(x => x.ScreeningResults)
             .ToListAsync(cancellationToken);
@@ -152,15 +145,7 @@ public class GetConsultationSessionsQueryHandler
 
             if (!session.AiScreeningId.HasValue) continue;
 
-            var isPatient = hasCurrentProfile && session.PatientId == currentProfile;
-            var isAssignedDoctorOnInternalSession =
-                hasCurrentProfile &&
-                session.OphthalmologistId == currentProfile &&
-                (session.Type == Domain.Enums.ConsultationSessionType.Verification ||
-                 session.Type == Domain.Enums.ConsultationSessionType.ClinicBooking);
-
-            var canViewAi = canAlwaysViewAi || isPatient || isAssignedDoctorOnInternalSession;
-            if (!canViewAi) continue;
+            if (!CanViewAiResults(session, isAdmin, currentProfileId)) continue;
 
             if (!screeningMap.TryGetValue(session.AiScreeningId.Value, out var screening)) continue;
             var latestResult = screening.ScreeningResults
@@ -188,4 +173,26 @@ public class GetConsultationSessionsQueryHandler
 
         return dtos;
     }
+
+    private static bool CanViewAiResults(
+        Domain.Entities.Consultation.ConsultationSession session,
+        bool isAdmin,
+        Guid? currentProfileId)
+    {
+        if (isAdmin) return true;
+        if (!currentProfileId.HasValue) return false;
+
+        var profileId = currentProfileId.Value;
+        if (session.PatientId == profileId) return true;
+
+        if (session.OphthalmologistId == profileId &&
+            (session.Type == Domain.Enums.ConsultationSessionType.Verification ||
+             session.Type == Domain.Enums.ConsultationSessionType.ClinicBooking))
+        {
+            return true;
+        }
+
+        return false;
+    }
 }
+

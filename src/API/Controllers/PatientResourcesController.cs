@@ -124,41 +124,7 @@ public class PatientResourcesController : BaseApiController
                     continue;
                 }
 
-                foreach (var result in organicResults.EnumerateArray())
-                {
-                    if (candidates.Count >= maxItems) break;
-
-                    var title = result.TryGetProperty("title", out var titleProp)
-                        ? titleProp.GetString()
-                        : null;
-                    var link = result.TryGetProperty("link", out var linkProp)
-                        ? linkProp.GetString()
-                        : null;
-
-                    if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(link))
-                        continue;
-                    if (!seenLinks.Add(link))
-                        continue;
-                    if (!IsAllowedDomain(link, trustedDomains))
-                        continue;
-
-                    var snippet = result.TryGetProperty("snippet", out var snippetProp)
-                        ? snippetProp.GetString()
-                        : string.Empty;
-
-                    string? image = null;
-                    if (result.TryGetProperty("thumbnail", out var thumbnailProp))
-                        image = thumbnailProp.GetString();
-                    else if (result.TryGetProperty("favicon", out var faviconProp))
-                        image = faviconProp.GetString();
-
-                    candidates.Add(new PatientEducationalResourceDto(
-                        Guid.NewGuid().ToString("N"),
-                        title,
-                        snippet ?? string.Empty,
-                        link,
-                        image));
-                }
+                ParseOrganicResults(organicResults, candidates, seenLinks, trustedDomains, maxItems);
             }
             catch (Exception ex)
             {
@@ -167,6 +133,50 @@ public class PatientResourcesController : BaseApiController
         }
 
         return candidates;
+    }
+
+    private static void ParseOrganicResults(
+        JsonElement organicResults,
+        List<PatientEducationalResourceDto> candidates,
+        HashSet<string> seenLinks,
+        IReadOnlyCollection<string> trustedDomains,
+        int maxItems)
+    {
+        foreach (var result in organicResults.EnumerateArray())
+        {
+            if (candidates.Count >= maxItems) break;
+
+            var title = result.TryGetProperty("title", out var titleProp)
+                ? titleProp.GetString()
+                : null;
+            var link = result.TryGetProperty("link", out var linkProp)
+                ? linkProp.GetString()
+                : null;
+
+            if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(link))
+                continue;
+            if (!seenLinks.Add(link))
+                continue;
+            if (!IsAllowedDomain(link, trustedDomains))
+                continue;
+
+            var snippet = result.TryGetProperty("snippet", out var snippetProp)
+                ? snippetProp.GetString()
+                : string.Empty;
+
+            string? image = null;
+            if (result.TryGetProperty("thumbnail", out var thumbnailProp))
+                image = thumbnailProp.GetString();
+            else if (result.TryGetProperty("favicon", out var faviconProp))
+                image = faviconProp.GetString();
+
+            candidates.Add(new PatientEducationalResourceDto(
+                Guid.NewGuid().ToString("N"),
+                title,
+                snippet ?? string.Empty,
+                link,
+                image));
+        }
     }
 
     private static bool IsAllowedDomain(string link, IReadOnlyCollection<string> trustedDomains)
