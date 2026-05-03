@@ -2,6 +2,7 @@ using Domain.Enums;
 using System.Text;
 using System.Text.Encodings.Web;
 using Application.Common.Interfaces;
+using Application.Common.Constants;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Infrastructure.Persistence;
@@ -609,31 +610,7 @@ public class IdentityService : IIdentityService
     {
         var query = _userManager.Users.Where(u => !u.IsDeleted);
 
-        // Apply search filter
-        if (!string.IsNullOrWhiteSpace(searchTerm))
-        {
-            query = query.Where(u =>
-                u.Email!.Contains(searchTerm) ||
-                u.FullName.Contains(searchTerm) ||
-                u.UserName!.Contains(searchTerm));
-        }
-
-        // Apply status filter
-        if (!string.IsNullOrWhiteSpace(statusFilter))
-        {
-            switch (statusFilter.ToLowerInvariant())
-            {
-                case "active":
-                    query = query.Where(u => u.IsActive);
-                    break;
-                case "pending":
-                    query = query.Where(u => !u.EmailConfirmed);
-                    break;
-                case "suspended":
-                    query = query.Where(u => !u.IsActive);
-                    break;
-            }
-        }
+        query = ApplyUserFilters(query, searchTerm, statusFilter);
 
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -643,12 +620,41 @@ public class IdentityService : IIdentityService
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
+        var items = await MapToUserAdminDtosAsync(users, roleFilter);
+
+        return (items, totalCount);
+    }
+
+    private static IQueryable<ApplicationUser> ApplyUserFilters(IQueryable<ApplicationUser> query, string? searchTerm, string? statusFilter)
+    {
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            query = query.Where(u =>
+                u.Email!.Contains(searchTerm) ||
+                u.FullName.Contains(searchTerm) ||
+                u.UserName!.Contains(searchTerm));
+        }
+
+        if (!string.IsNullOrWhiteSpace(statusFilter))
+        {
+            query = statusFilter.ToLowerInvariant() switch
+            {
+                "active" => query.Where(u => u.IsActive),
+                "pending" => query.Where(u => !u.EmailConfirmed),
+                "suspended" => query.Where(u => !u.IsActive),
+                _ => query
+            };
+        }
+        return query;
+    }
+
+    private async Task<List<UserAdminDto>> MapToUserAdminDtosAsync(List<ApplicationUser> users, string? roleFilter)
+    {
         var items = new List<UserAdminDto>();
         foreach (var user in users)
         {
             var roles = await _userManager.GetRolesAsync(user);
 
-            // Filter by role if specified
             if (!string.IsNullOrWhiteSpace(roleFilter) &&
                 !roles.Contains(roleFilter, StringComparer.OrdinalIgnoreCase))
             {
@@ -668,8 +674,7 @@ public class IdentityService : IIdentityService
                 user.LastLoginAt
             ));
         }
-
-        return (items, totalCount);
+        return items;
     }
 
     public async Task<UserMetricsDto> GetUserMetricsAsync(CancellationToken cancellationToken = default)
@@ -943,124 +948,102 @@ public class IdentityService : IIdentityService
 
     public async Task SynchronizeRolesWithDefaultsAsync(CancellationToken cancellationToken = default)
     {
-        // 1. Get current defined permissions from code
         var allPermissionDefinitions = Application.Common.Constants.Permissions.All;
-        var allowedNames = allPermissionDefinitions.Select(p => p.Name).ToList();
 
-        // 2. Cleanup: Find permissions in DB that are NOT in the code constants
+        await CleanupInvalidPermissionsAsync(allPermissionDefinitions, cancellationToken);
+        await EnsurePermissionDefinitionsExistAsync(allPermissionDefinitions, cancellationToken);
+        await SynchronizeDefaultRolePermissionsAsync(cancellationToken);
+    }
+
+    private async Task CleanupInvalidPermissionsAsync(IEnumerable<PermissionDefinition> definitions, CancellationToken cancellationToken)
+    {
+        var allowedNames = definitions.Select(p => p.Name).ToList();
         var invalidPermissions = await _context.Permissions
             .Where(p => !allowedNames.Contains(p.Name))
             .ToListAsync(cancellationToken);
 
-        if (invalidPermissions.Any())
-        {
-            var invalidIds = invalidPermissions.Select(p => p.Id).ToList();
+        if (!invalidPermissions.Any()) return;
 
-            // First remove assignments (preventing FK constraint errors since it's Restrict)
-            var roleAssignmentsToRemove = await _context.RolePermissions
-                .Where(rp => invalidIds.Contains(rp.PermissionId))
-                .ToListAsync(cancellationToken);
-            if (roleAssignmentsToRemove.Any()) _context.RolePermissions.RemoveRange(roleAssignmentsToRemove);
+        var invalidIds = invalidPermissions.Select(p => p.Id).ToList();
 
-            var userAssignmentsToRemove = await _context.UserPermissions
-                .Where(up => invalidIds.Contains(up.PermissionId))
-                .ToListAsync(cancellationToken);
-            if (userAssignmentsToRemove.Any()) _context.UserPermissions.RemoveRange(userAssignmentsToRemove);
+        var roleAssignments = await _context.RolePermissions.Where(rp => invalidIds.Contains(rp.PermissionId)).ToListAsync(cancellationToken);
+        if (roleAssignments.Any()) _context.RolePermissions.RemoveRange(roleAssignments);
 
-            // Now remove the permissions themselves
-            _context.Permissions.RemoveRange(invalidPermissions);
-            
-            await _context.SaveChangesAsync(cancellationToken);
-        }
+        var userAssignments = await _context.UserPermissions.Where(up => invalidIds.Contains(up.PermissionId)).ToListAsync(cancellationToken);
+        if (userAssignments.Any()) _context.UserPermissions.RemoveRange(userAssignments);
 
-        // 3. Ensure all permissions from the code constants exist / update metadata
-        var existingPermissions = await _context.Permissions
-            .IgnoreQueryFilters()
-            .ToListAsync(cancellationToken);
+        _context.Permissions.RemoveRange(invalidPermissions);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 
-        foreach (var def in allPermissionDefinitions)
+    private async Task EnsurePermissionDefinitionsExistAsync(IEnumerable<PermissionDefinition> definitions, CancellationToken cancellationToken)
+    {
+        var existingPermissions = await _context.Permissions.IgnoreQueryFilters().ToListAsync(cancellationToken);
+
+        foreach (var def in definitions)
         {
             var existing = existingPermissions.FirstOrDefault(p => p.Name == def.Name);
             if (existing == null)
             {
-                _context.Permissions.Add(new Domain.Entities.Authorization.Permission(
-                    def.Name,
-                    def.DisplayName,
-                    def.Description,
-                    def.Category));
+                _context.Permissions.Add(new Domain.Entities.Authorization.Permission(def.Name, def.DisplayName, def.Description, def.Category));
             }
             else
             {
-                // Update metadata and RESTORE if it was soft-deleted
                 existing.Update(def.DisplayName, def.Description, def.Category);
-                
                 if (existing.IsDeleted)
                 {
                     existing.GetType().GetProperty("IsDeleted")?.SetValue(existing, false);
                 }
             }
         }
-
         await _context.SaveChangesAsync(cancellationToken);
+    }
 
-        // Refresh list after insertion (including restored ones)
-        var permissions = await _context.Permissions
-            .IgnoreQueryFilters()
-            .ToListAsync(cancellationToken);
+    private async Task SynchronizeDefaultRolePermissionsAsync(CancellationToken cancellationToken)
+    {
+        var permissions = await _context.Permissions.IgnoreQueryFilters().ToListAsync(cancellationToken);
 
-        // 4. Synchronize Role Permissions (Reset each role to match code)
         foreach (var entry in Application.Common.Constants.Permissions.DefaultRolePermissions)
         {
-            var roleName = entry.Key;
-            var expectedPermissionNames = entry.Value;
+            await SyncRolePermissionsAsync(entry.Key, entry.Value, permissions, cancellationToken);
+        }
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 
-            var role = await _roleManager.FindByNameAsync(roleName);
-            if (role == null) continue;
+    private async Task SyncRolePermissionsAsync(string roleName, IEnumerable<string> expectedPermissionNames, List<Domain.Entities.Authorization.Permission> allPermissions, CancellationToken cancellationToken)
+    {
+        var role = await _roleManager.FindByNameAsync(roleName);
+        if (role == null) return;
 
-            // Get ALL current assignments for this role (including deleted ones)
-            var currentRolePermData = await _context.RolePermissions
-                .IgnoreQueryFilters()
-                .Where(rp => rp.RoleId == role.Id)
-                .Join(_context.Permissions.IgnoreQueryFilters(), 
-                    rp => rp.PermissionId, 
-                    p => p.Id, 
-                    (rp, p) => new { RolePermission = rp, PermissionName = p.Name })
-                .ToListAsync(cancellationToken);
+        var currentRolePermData = await _context.RolePermissions
+            .IgnoreQueryFilters()
+            .Where(rp => rp.RoleId == role.Id)
+            .Join(_context.Permissions.IgnoreQueryFilters(),
+                rp => rp.PermissionId,
+                p => p.Id,
+                (rp, p) => new { RolePermission = rp, PermissionName = p.Name })
+            .ToListAsync(cancellationToken);
 
-            // Remove assignments from DB that aren't in code
-            var expectedSet = new HashSet<string>(expectedPermissionNames, StringComparer.OrdinalIgnoreCase);
-            var toRemove = currentRolePermData
-                .Where(x => !x.RolePermission.IsDeleted && !expectedSet.Contains(x.PermissionName))
-                .Select(x => x.RolePermission)
-                .ToList();
+        var expectedSet = new HashSet<string>(expectedPermissionNames, StringComparer.OrdinalIgnoreCase);
 
-            if (toRemove.Any())
+        // Remove
+        var toRemove = currentRolePermData.Where(x => !x.RolePermission.IsDeleted && !expectedSet.Contains(x.PermissionName)).Select(x => x.RolePermission).ToList();
+        if (toRemove.Any()) _context.RolePermissions.RemoveRange(toRemove);
+
+        // Restore or Add
+        foreach (var permName in expectedPermissionNames)
+        {
+            var existingMapping = currentRolePermData.FirstOrDefault(x => x.PermissionName == permName);
+            if (existingMapping == null)
             {
-                _context.RolePermissions.RemoveRange(toRemove);
+                var permission = allPermissions.FirstOrDefault(p => p.Name == permName);
+                if (permission != null) _context.RolePermissions.Add(new Domain.Entities.Authorization.RolePermission(role.Id, permission.Id));
             }
-
-            // Restore or Add expected assignments
-            foreach (var permName in expectedPermissionNames)
+            else if (existingMapping.RolePermission.IsDeleted)
             {
-                var existingMapping = currentRolePermData.FirstOrDefault(x => x.PermissionName == permName);
-                
-                if (existingMapping == null)
-                {
-                    var permission = permissions.FirstOrDefault(p => p.Name == permName);
-                    if (permission != null)
-                    {
-                        _context.RolePermissions.Add(new Domain.Entities.Authorization.RolePermission(role.Id, permission.Id));
-                    }
-                }
-                else if (existingMapping.RolePermission.IsDeleted)
-                {
-                    // Restore soft-deleted mapping
-                    existingMapping.RolePermission.GetType().GetProperty("IsDeleted")?.SetValue(existingMapping.RolePermission, false);
-                }
+                existingMapping.RolePermission.GetType().GetProperty("IsDeleted")?.SetValue(existingMapping.RolePermission, false);
             }
         }
-
-        await _context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task SynchronizeUserSubRolePermissionsAsync(
@@ -1069,22 +1052,8 @@ public class IdentityService : IIdentityService
         CancellationToken cancellationToken = default)
     {
         var roleList = subRoles.ToList();
-        var expectedPermissionNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var expectedPermissionNames = BuildExpectedPermissionNames(roleList);
 
-        foreach (var role in roleList)
-        {
-            var extras = role switch
-            {
-                ClinicStaffRole.Receptionist => Application.Common.Constants.Permissions.ReceptionistExtras,
-                ClinicStaffRole.Coordinator => Application.Common.Constants.Permissions.CoordinatorExtras,
-                ClinicStaffRole.Cashier => Application.Common.Constants.Permissions.CashierExtras,
-                _ => Array.Empty<string>()
-            };
-
-            foreach (var perm in extras) expectedPermissionNames.Add(perm);
-        }
-
-        // Get all possible sub-role permissions to distinguish from other manual overrides
         var allSubRolePermissions = Application.Common.Constants.Permissions.ReceptionistExtras
             .Concat(Application.Common.Constants.Permissions.CoordinatorExtras)
             .Concat(Application.Common.Constants.Permissions.CashierExtras)
@@ -1099,30 +1068,47 @@ public class IdentityService : IIdentityService
             .Where(up => up.UserId == userId)
             .ToListAsync(cancellationToken);
 
-        // 1. Remove assignments that are in the "SubRole Pool" but NOT in the new expected set
-        var subRolePermIds = allPermissionsInDb.Select(p => p.Id).ToList();
+        await UpdateUserSubRolePermissionsAsync(userId, expectedPermissionNames, allPermissionsInDb, currentAssignments, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static HashSet<string> BuildExpectedPermissionNames(List<ClinicStaffRole> roles)
+    {
+        var expected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var role in roles)
+        {
+            var extras = role switch
+            {
+                ClinicStaffRole.Receptionist => Application.Common.Constants.Permissions.ReceptionistExtras,
+                ClinicStaffRole.Coordinator => Application.Common.Constants.Permissions.CoordinatorExtras,
+                ClinicStaffRole.Cashier => Application.Common.Constants.Permissions.CashierExtras,
+                _ => Array.Empty<string>()
+            };
+            foreach (var perm in extras) expected.Add(perm);
+        }
+        return expected;
+    }
+
+    private async Task UpdateUserSubRolePermissionsAsync(Guid userId, HashSet<string> expectedNames, List<Domain.Entities.Authorization.Permission> allPermissionsInDb, List<Domain.Entities.Authorization.UserPermission> currentAssignments, CancellationToken cancellationToken)
+    {
+        var poolPermissionIds = allPermissionsInDb.Select(p => p.Id).ToList();
+        
+        // Remove
         var toRemove = currentAssignments
-            .Where(up => subRolePermIds.Contains(up.PermissionId))
-            .Where(up => !expectedPermissionNames.Contains(allPermissionsInDb.First(p => p.Id == up.PermissionId).Name))
+            .Where(up => poolPermissionIds.Contains(up.PermissionId))
+            .Where(up => !expectedNames.Contains(allPermissionsInDb.First(p => p.Id == up.PermissionId).Name))
             .ToList();
 
-        if (toRemove.Any())
-        {
-            _context.UserPermissions.RemoveRange(toRemove);
-        }
+        if (toRemove.Any()) _context.UserPermissions.RemoveRange(toRemove);
 
-        // 2. Add missing assignments
-        foreach (var permName in expectedPermissionNames)
+        // Add
+        foreach (var permName in expectedNames)
         {
             var permission = allPermissionsInDb.FirstOrDefault(p => p.Name == permName);
-            if (permission == null) continue;
-
-            if (!currentAssignments.Any(up => up.PermissionId == permission.Id))
+            if (permission != null && !currentAssignments.Any(up => up.PermissionId == permission.Id))
             {
                 await _context.UserPermissions.AddAsync(new Domain.Entities.Authorization.UserPermission(userId, permission.Id, true));
             }
         }
-
-        await _context.SaveChangesAsync(cancellationToken);
     }
 }

@@ -76,32 +76,19 @@ public class CreateClinicAppointmentCommandHandler
         _configuration = configuration;
     }
 
-    public async Task<Result<CreateClinicAppointmentResult>> Handle(
-        CreateClinicAppointmentCommand request,
-        CancellationToken cancellationToken)
+    public async Task<Result<CreateClinicAppointmentResult>> Handle(CreateClinicAppointmentCommand request, CancellationToken cancellationToken)
     {
-        if (!_currentUser.UserId.HasValue)
-        {
-            return Result<CreateClinicAppointmentResult>.Forbidden("Unable to resolve user identity for payment operation.");
-        }
+        if (!_currentUser.UserId.HasValue) return Result<CreateClinicAppointmentResult>.Forbidden("Unable to resolve user identity for payment operation.");
 
-        // ── 0. Pre-transaction checks & Role resolution ──────────────────
-        var isStaffBooking = await _identityService.IsInRoleAsync(_currentUser.UserId.Value, Roles.ClinicStaff) ||
-                             await _identityService.IsInRoleAsync(_currentUser.UserId.Value, Roles.SystemAdmin);
-
-        if (request.PatientId.HasValue && !isStaffBooking)
-        {
-            return Result<CreateClinicAppointmentResult>.Forbidden("Only clinic staff can book for another patient.");
-        }
+        var roleResolution = await ResolveBookingRoleAsync(request);
+        if (!roleResolution.IsSuccess) return Result<CreateClinicAppointmentResult>.Failure(roleResolution.ErrorMessage);
 
         var patientResolution = await ResolveTargetPatientAsync(request, cancellationToken);
         if (!patientResolution.IsSuccess) return Result<CreateClinicAppointmentResult>.Failure(patientResolution.ErrorMessage);
 
-        var (targetPatientProfileId, orderUserId, notificationUserId, isStaffCreatedWalkIn) = patientResolution.Data;
+        var patientData = patientResolution.Data;
 
-        // ── 1. Start Transaction ──────────────────────────────────────────
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
-
         try
         {
             var slotValidation = await ValidateSlotAndBookingAsync(request.SlotId, targetPatientProfileId, cancellationToken);
@@ -143,28 +130,7 @@ public class CreateClinicAppointmentCommandHandler
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
-
-            string? paymentUrl = null;
-            if (!isStaffCreatedWalkIn)
-            {
-                paymentUrl = await TryCreatePaymentLinkAsync(payment, order, appointment, depositAmount!.Value, orderDescription, cancellationToken);
-            }
-
-            _logger.LogInformation("Created {Type} clinic appointment {AppointmentId} for patient {PatientId} at slot {SlotId}. Order {OrderId}",
-                isStaffCreatedWalkIn ? "Walk-in" : "Online", appointment.Id, targetPatientProfileId, request.SlotId, order.Id);
-
-            await SendBookingNotificationAsync(appointment, notificationUserId, slot, request.VisitReason, isStaffCreatedWalkIn, cancellationToken);
-            if (visit != null) await SendQueueNotificationAsync(appointment, visit, cancellationToken);
-
-            return Result<CreateClinicAppointmentResult>.Success(new CreateClinicAppointmentResult
-            {
-                AppointmentId = appointment.Id,
-                VisitId = visit?.Id,
-                Status = visit?.Status.ToString() ?? appointment.Status.ToString(),
-                PaymentUrl = paymentUrl,
-                OrderId = order.Id,
-                DepositAmount = depositAmount,
-            });
+            return Result<CreateClinicAppointmentResult>.Success(result);
         }
         catch (Domain.Common.ConcurrencyException)
         {
@@ -177,6 +143,90 @@ public class CreateClinicAppointmentCommandHandler
             if (ex is InvalidOperationException) return Result<CreateClinicAppointmentResult>.Failure(ex.Message);
             throw;
         }
+    }
+
+    private async Task<Result> ResolveBookingRoleAsync(CreateClinicAppointmentCommand request)
+    {
+        var isStaffBooking = await _identityService.IsInRoleAsync(_currentUser.UserId!.Value, Roles.ClinicStaff) ||
+                             await _identityService.IsInRoleAsync(_currentUser.UserId.Value, Roles.SystemAdmin);
+
+        if (request.PatientId.HasValue && !isStaffBooking)
+            return Result.Failure("Only clinic staff can book for another patient.");
+
+        return Result.Success();
+    }
+
+    private async Task<CreateClinicAppointmentResult> ProcessBookingTransactionAsync(
+        CreateClinicAppointmentCommand request,
+        (Guid ProfileId, Guid OrderUserId, Guid? NotifyUserId, bool IsWalkIn) patientData,
+        CancellationToken cancellationToken)
+    {
+        var slotValidation = await ValidateSlotAndBookingAsync(request.SlotId, patientData.ProfileId, cancellationToken);
+        if (!slotValidation.IsSuccess) throw new InvalidOperationException(slotValidation.ErrorMessage);
+        var slot = slotValidation.Data;
+
+        var pricingResult = await ResolvePricingAsync(request, slot, patientData.ProfileId, cancellationToken);
+        if (!pricingResult.IsSuccess) throw new InvalidOperationException(pricingResult.ErrorMessage);
+        var (price, finalDoctorId, finalPricingType) = pricingResult.Data;
+
+        decimal? depositAmount = patientData.IsWalkIn ? null : Math.Max(1, Math.Round(price * DepositRatio, 0));
+
+        slot.BookWithCapacity();
+        var appointment = new Appointment(patientData.ProfileId, request.SlotId, price, finalPricingType, finalDoctorId, request.VisitReason);
+        await _appointmentRepository.AddAsync(appointment, cancellationToken);
+        await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
+
+        var order = await CreateOrderAndPaymentAsync(appointment, patientData, price, depositAmount, slot, cancellationToken);
+        var visit = await CreateVisitIfWalkInAsync(appointment, patientData.IsWalkIn, cancellationToken);
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        string? paymentUrl = null;
+        if (!patientData.IsWalkIn)
+        {
+            var payments = await _paymentRepository.GetByOrderIdAsync(order.Id, cancellationToken);
+            var payment = payments.FirstOrDefault();
+            paymentUrl = await TryCreatePaymentLinkAsync(payment!, order, appointment, depositAmount!.Value, order.Description, cancellationToken);
+        }
+
+        _logger.LogInformation("Created {Type} clinic appointment {AppointmentId} for patient {PatientId}. Order {OrderId}",
+            patientData.IsWalkIn ? "Walk-in" : "Online", appointment.Id, patientData.ProfileId, order.Id);
+
+        await SendBookingNotificationAsync(appointment, patientData.NotifyUserId, slot, request.VisitReason, patientData.IsWalkIn, cancellationToken);
+        if (visit != null) await SendQueueNotificationAsync(appointment, visit, cancellationToken);
+
+        return new CreateClinicAppointmentResult
+        {
+            AppointmentId = appointment.Id,
+            VisitId = visit?.Id,
+            Status = visit?.Status.ToString() ?? appointment.Status.ToString(),
+            PaymentUrl = paymentUrl,
+            OrderId = order.Id,
+            DepositAmount = depositAmount,
+        };
+    }
+
+    private async Task<Order> CreateOrderAndPaymentAsync(Appointment appointment, (Guid ProfileId, Guid OrderUserId, Guid? NotifyUserId, bool IsWalkIn) patientData, decimal price, decimal? depositAmount, AppointmentSlot slot, CancellationToken cancellationToken)
+    {
+        var typeLabel = patientData.IsWalkIn ? "Thanh toán đủ" : "Đặt cọc";
+        var orderDescription = $"{typeLabel} khám {slot.Date:dd/MM} {slot.StartTime:HH:mm}";
+        var order = new Order(patientData.OrderUserId, price, depositAmount, orderDescription, appointment.Id);
+        await _orderRepository.AddAsync(order, cancellationToken);
+
+        Payment payment = patientData.IsWalkIn 
+            ? new Payment(order.Id, price, PaymentMethod.Cash, orderDescription)
+            : new Payment(order.Id, depositAmount!.Value, PaymentMethod.PayOS, orderDescription);
+        await _paymentRepository.AddAsync(payment, cancellationToken);
+        
+        return order;
+    }
+
+    private async Task<PatientVisit?> CreateVisitIfWalkInAsync(Appointment appointment, bool isWalkIn, CancellationToken cancellationToken)
+    {
+        if (!isWalkIn) return null;
+        var visit = PatientVisit.CreateFromAppointment(appointment);
+        await _patientVisitRepository.AddAsync(visit, cancellationToken);
+        return visit;
     }
 
     private async Task<Result<(Guid ProfileId, Guid OrderUserId, Guid? NotifyUserId, bool IsWalkIn)>> ResolveTargetPatientAsync(

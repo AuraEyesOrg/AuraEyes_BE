@@ -66,13 +66,16 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
             .Distinct()
             .ToList();
 
+        var users = await _identityService.GetUsersByIdsAsync(authorIds, cancellationToken);
+        var userDict = users.ToDictionary(u => u.Id);
+
         var authors = new Dictionary<Guid, AuthorDto>();
         foreach (var authorId in authorIds)
         {
-            var user = await _identityService.GetUserByIdAsync(authorId, cancellationToken);
+            var user = userDict.GetValueOrDefault(authorId);
             var matchingPost = posts.FirstOrDefault(p => p.AuthorId == authorId)
                                ?? posts.FirstOrDefault(p => p.OriginalPost?.AuthorId == authorId);
-            
+
             authors[authorId] = new AuthorDto
             {
                 Id = authorId,
@@ -103,33 +106,7 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
             IsRepost = p.IsRepost,
             RepostComment = p.RepostComment,
             OriginalPostId = p.OriginalPostId,
-            OriginalPost = p.IsRepost && p.OriginalPost is not null
-                ? new OriginalPostDto
-                {
-                    Id = p.OriginalPost.Id,
-                    Author = authors.GetValueOrDefault(p.OriginalPost.AuthorId)
-                             ?? new AuthorDto { Id = p.OriginalPost.AuthorId, FullName = "Unknown" },
-                    Content = p.OriginalPost.IsHidden && p.OriginalPost.AuthorId != currentUserId && !isSystemAdmin
-                        ? "This original post is hidden by moderators."
-                        : p.OriginalPost.Content,
-                    Category = p.OriginalPost.Category,
-                    Attachments = p.OriginalPost.IsHidden && p.OriginalPost.AuthorId != currentUserId && !isSystemAdmin
-                        ? new List<AttachmentDto>()
-                        : p.OriginalPost.Attachments.Select(a => new AttachmentDto
-                        {
-                            Id = a.Id,
-                            Type = a.Type,
-                            FileName = a.FileName,
-                            FileUrl = a.FileUrl,
-                            MimeType = a.MimeType,
-                            FileSize = a.FileSize,
-                            DisplayOrder = a.DisplayOrder
-                        }).OrderBy(a => a.DisplayOrder).ToList(),
-                    IsHidden = p.OriginalPost.IsHidden,
-                    HideReason = p.OriginalPost.IsHidden ? p.OriginalPost.HideReason : null,
-                    CreatedAt = p.OriginalPost.CreatedAt
-                }
-                : null,
+            OriginalPost = MapOriginalPost(p.OriginalPost, authors, currentUserId, isSystemAdmin),
             ReactionCount = p.ReactionCount,
             CommentCount = p.CommentCount,
             RepostCount = p.RepostCount,
@@ -137,26 +114,48 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
             AllowComments = p.AllowComments,
             IsInternalCase = p.IsInternalCase,
             ConsultationSessionId = p.ConsultationSessionId,
-            AiScreeningId = p.AuthorId == currentUserId || isSystemAdmin
-                ? p.AiScreeningId
-                : null,
+            AiScreeningId = (p.AuthorId == currentUserId || isSystemAdmin) ? p.AiScreeningId : null,
             PatientAge = p.PatientAge,
             PatientGender = p.PatientGender,
-            Attachments = p.Attachments.Select(a => new AttachmentDto
-            {
-                Id = a.Id,
-                Type = a.Type,
-                FileName = a.FileName,
-                FileUrl = a.FileUrl,
-                MimeType = a.MimeType,
-                FileSize = a.FileSize,
-                DisplayOrder = a.DisplayOrder
-            }).OrderBy(a => a.DisplayOrder).ToList(),
+            Attachments = MapAttachments(p.Attachments),
             CurrentUserReaction = userReactions.GetValueOrDefault(p.Id),
             IsBookmarked = savedPostIds.Contains(p.Id),
             IsHidden = p.IsHidden,
             HideReason = p.IsHidden ? p.HideReason : null,
             CreatedAt = p.CreatedAt
         };
+    }
+
+    private static OriginalPostDto? MapOriginalPost(Domain.Entities.Network.ProfessionalPost? op, Dictionary<Guid, AuthorDto> authors, Guid currentUserId, bool isSystemAdmin)
+    {
+        if (op == null) return null;
+
+        var isRestricted = op.IsHidden && op.AuthorId != currentUserId && !isSystemAdmin;
+
+        return new OriginalPostDto
+        {
+            Id = op.Id,
+            Author = authors.GetValueOrDefault(op.AuthorId) ?? new AuthorDto { Id = op.AuthorId, FullName = "Unknown" },
+            Content = isRestricted ? "This original post is hidden by moderators." : op.Content,
+            Category = op.Category,
+            Attachments = isRestricted ? new List<AttachmentDto>() : MapAttachments(op.Attachments),
+            IsHidden = op.IsHidden,
+            HideReason = op.IsHidden ? op.HideReason : null,
+            CreatedAt = op.CreatedAt
+        };
+    }
+
+    private static List<AttachmentDto> MapAttachments(IEnumerable<Domain.Entities.Network.PostAttachment> attachments)
+    {
+        return attachments.Select(a => new AttachmentDto
+        {
+            Id = a.Id,
+            Type = a.Type,
+            FileName = a.FileName,
+            FileUrl = a.FileUrl,
+            MimeType = a.MimeType,
+            FileSize = a.FileSize,
+            DisplayOrder = a.DisplayOrder
+        }).OrderBy(a => a.DisplayOrder).ToList();
     }
 }
