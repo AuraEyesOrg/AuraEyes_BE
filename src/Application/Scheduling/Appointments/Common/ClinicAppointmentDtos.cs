@@ -85,3 +85,10 @@ public class CreateClinicAppointmentResult
     /// </summary>
     public decimal? DepositAmount { get; init; }
 }
+
+public record AvailableDoctorDto(
+    Guid Id,
+    string Name,
+    string? Avatar,
+    string? DegreeLevel
+);
