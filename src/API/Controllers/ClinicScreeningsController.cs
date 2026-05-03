@@ -1,8 +1,9 @@
 using Application.ClinicScreenings.Queries.GetClinicScreeningHistory;
-using Application.Common.Models;
+
 using Application.Common.Constants;
 using Application.Common.Interfaces;
 using Application.Common.Models;
+
 using Application.Screenings.Queries.GetClinicScreeningHistory;
 using Application.Screenings.Queries.GetScreeningSessionDetail;
 using Application.Screenings.Commands.CreateAiScreeningSession;
@@ -27,18 +28,10 @@ namespace API.Controllers;
 public class ClinicScreeningsController : BaseApiController
 {
     private readonly IMediator _mediator;
-    private readonly IRepository<AiScreening> _screeningRepository;
-    private readonly IRepository<Domain.Entities.Users.Patient> _patientRepository;
-    private readonly IIdentityService _identityService;
-    private readonly ICurrentUserService _currentUserService;
 
-    public ClinicScreeningsController(IMediator mediator, IRepository<AiScreening> screeningRepository, IRepository<Domain.Entities.Users.Patient> patientRepository, IIdentityService identityService, ICurrentUserService currentUserService)
+    public ClinicScreeningsController(IMediator mediator)
     {
         _mediator = mediator;
-        _screeningRepository = screeningRepository;
-        _patientRepository = patientRepository;
-        _identityService = identityService;
-        _currentUserService = currentUserService;
     }
 
     /// <summary>

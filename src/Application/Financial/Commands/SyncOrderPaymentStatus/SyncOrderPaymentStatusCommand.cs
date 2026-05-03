@@ -14,7 +14,6 @@ public record SyncOrderPaymentStatusCommand(Guid OrderId) : IRequest<bool>;
 public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPaymentStatusCommand, bool>
 {
     private readonly IOrderRepository _orderRepository;
-    private readonly IPaymentRepository _paymentRepository;
     private readonly IPayOSService _payOSService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClinicVisitService _clinicVisitService;
@@ -23,7 +22,6 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
 
     public SyncOrderPaymentStatusCommandHandler(
         IOrderRepository orderRepository,
-        IPaymentRepository paymentRepository,
         IPayOSService payOSService,
         IUnitOfWork unitOfWork,
         IClinicVisitService clinicVisitService,
@@ -31,7 +29,6 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
         ILogger<SyncOrderPaymentStatusCommandHandler> logger)
     {
         _orderRepository = orderRepository;
-        _paymentRepository = paymentRepository;
         _payOSService = payOSService;
         _unitOfWork = unitOfWork;
         _clinicVisitService = clinicVisitService;
@@ -51,58 +48,11 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
         if (!pendingPayments.Any()) return true;
 
         bool updated = false;
-
         foreach (var payment in pendingPayments)
         {
-            try
+            if (await SyncPaymentStatusAsync(order, payment, cancellationToken))
             {
-                var (status, amount, txnRef) = await _payOSService.GetPaymentStatusAsync(payment.PaymentOrderCode!);
-                
-                if (status == "PAID")
-                {
-                    payment.Complete(txnRef, "Synced via Verify command");
-                    updated = true;
-                    
-                    _logger.LogInformation("Payment {PaymentId} for Order {OrderId} synced to PAID.", payment.Id, order.Id);
-
-                    // Logic to update order status
-                    if (order.DepositAmount.HasValue && Math.Abs(payment.Amount - order.DepositAmount.Value) < 0.01m && order.Status == OrderStatus.Pending)
-                    {
-                        order.Confirm();
-                        
-                        await _notificationService.SendAsync(
-                            order.UserId,
-                            "Nạp tiền cọc thành công",
-                            $"Bạn đã thanh toán đặt cọc thành công. Số tiền: {payment.Amount:N0} VNĐ",
-                            NotificationType.WalletDepositSuccess,
-                            new { OrderId = order.Id, Amount = payment.Amount },
-                            cancellationToken);
-                    }
-                    else
-                    {
-                        order.Complete();
-                        
-                        await _notificationService.SendAsync(
-                            order.UserId,
-                            "Thanh toán thành công",
-                            $"Thanh toán hoàn tất. Số tiền: {payment.Amount:N0} VNĐ",
-                            NotificationType.WalletPaymentProcessed,
-                            new { OrderId = order.Id, Amount = payment.Amount },
-                            cancellationToken);
-
-                        // Notify clinic visit service to complete the visit and appointment
-                        await _clinicVisitService.ProcessPaymentCompletionAsync(order, "PayOS Polling/Verify", cancellationToken);
-                    }
-                }
-                else if (status == "CANCELLED" || status == "EXPIRED")
-                {
-                    payment.Fail(status);
-                    updated = true;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to sync payment {PaymentId} status from PayOS.", payment.Id);
+                updated = true;
             }
         }
 
@@ -113,5 +63,67 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
         }
 
         return true;
+    }
+
+    private async Task<bool> SyncPaymentStatusAsync(Order order, Payment payment, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var (status, _, txnRef) = await _payOSService.GetPaymentStatusAsync(payment.PaymentOrderCode!);
+
+            if (status == "PAID")
+            {
+                await HandlePaidPaymentAsync(order, payment, txnRef, cancellationToken);
+                return true;
+            }
+
+            if (status is "CANCELLED" or "EXPIRED")
+            {
+                payment.Fail(status);
+                return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to sync payment {PaymentId} status from PayOS.", payment.Id);
+        }
+
+        return false;
+    }
+
+    private async Task HandlePaidPaymentAsync(Order order, Payment payment, string? txnRef, CancellationToken cancellationToken)
+    {
+        payment.Complete(txnRef, "Synced via Verify command");
+        _logger.LogInformation("Payment {PaymentId} for Order {OrderId} synced to PAID.", payment.Id, order.Id);
+
+        if (IsDepositPayment(order, payment))
+        {
+            order.Confirm();
+            await SendNotificationAsync(order.UserId, "Nạp tiền cọc thành công", $"Bạn đã thanh toán đặt cọc thành công. Số tiền: {payment.Amount:N0} VNĐ", NotificationType.WalletDepositSuccess, order.Id, payment.Amount, cancellationToken);
+        }
+        else
+        {
+            order.Complete();
+            await SendNotificationAsync(order.UserId, "Thanh toán thành công", $"Thanh toán hoàn tất. Số tiền: {payment.Amount:N0} VNĐ", NotificationType.WalletPaymentProcessed, order.Id, payment.Amount, cancellationToken);
+            await _clinicVisitService.ProcessPaymentCompletionAsync(order, "PayOS Polling/Verify", cancellationToken);
+        }
+    }
+
+    private static bool IsDepositPayment(Order order, Payment payment)
+    {
+        return order.DepositAmount.HasValue &&
+               Math.Abs(payment.Amount - order.DepositAmount.Value) < 0.01m &&
+               order.Status == OrderStatus.Pending;
+    }
+
+    private async Task SendNotificationAsync(Guid userId, string title, string message, NotificationType type, Guid orderId, decimal amount, CancellationToken cancellationToken)
+    {
+        await _notificationService.SendAsync(
+            userId,
+            title,
+            message,
+            type,
+            new { OrderId = orderId, Amount = amount },
+            cancellationToken);
     }
 }

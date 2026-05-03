@@ -66,6 +66,7 @@ public class AuthController : BaseApiController
         [FromBody] RegisterPatientRequest request,
         CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Registering new patient with email: {Email}", request.Email);
         var confirmationUrlBase = $"{_frontendUrl}/confirm-email";
         var result = await _authService.RegisterPatientAsync(request, confirmationUrlBase!, cancellationToken);
 
@@ -147,16 +148,19 @@ public class AuthController : BaseApiController
         [FromBody] LoginRequest request,
         CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Login attempt for email: {Email}", request.Email);
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         var result = await _authService.LoginAsync(request, ipAddress, cancellationToken);
 
         if (result.IsUnauthorized)
         {
+            _logger.LogWarning("Unauthorized login attempt for email: {Email}", request.Email);
             return Unauthorized(ApiResponseFactory.Unauthorized(result.ErrorMessage));
         }
 
         if (!result.IsSuccess)
         {
+            _logger.LogWarning("Login failed for email: {Email}. Errors: {Errors}", request.Email, string.Join(", ", result.Errors));
             return BadRequest(ApiResponseFactory.Error("Login failed", result.Errors));
         }
 
@@ -165,6 +169,7 @@ public class AuthController : BaseApiController
         // Handle 2FA required
         if (loginResponse.RequiresTwoFactor)
         {
+            _logger.LogInformation("Two-factor authentication required for user: {Email}", request.Email);
             var twoFactorResponse = new TwoFactorRequiredResponse
             {
                 RequiresTwoFactor = true,
@@ -174,6 +179,7 @@ public class AuthController : BaseApiController
             return OkResponse(twoFactorResponse, "Two-factor authentication required");
         }
 
+        _logger.LogInformation("User {Email} logged in successfully", request.Email);
         return OkResponse(loginResponse.AuthResponse, "Login successful");
     }
 

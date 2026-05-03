@@ -43,35 +43,57 @@ public class CreatePostCommandHandler : ICommandHandler<CreatePostCommand, Guid>
         _fileStorageService = fileStorageService;
     }
 
-    public async Task<Result<Guid>> Handle(
-        CreatePostCommand request,
-        CancellationToken cancellationToken)
+    public async Task<Result<Guid>> Handle(CreatePostCommand request, CancellationToken cancellationToken)
     {
-        // Validate anonymization confirmation when attachments are provided
+        var validationResult = ValidateRequest(request);
+        if (!validationResult.IsSuccess) return Result<Guid>.Failure(validationResult.ErrorMessage);
+
+        var resolutionResult = await ResolvePostDataAsync(request, cancellationToken);
+        if (!resolutionResult.IsSuccess) return MapSourceFailure<Guid>(resolutionResult);
+
+        var resolvedData = resolutionResult.Data!;
+        var post = CreatePostEntity(request, resolvedData);
+
+        if (request.Attachments is { Count: > 0 })
+        {
+            await ProcessAttachmentsAsync(post, request.Attachments, cancellationToken);
+        }
+        else if (resolvedData.AttachmentAiScreeningId.HasValue)
+        {
+            await AddRetinalAttachmentsFromAiScreeningAsync(post, resolvedData.AttachmentAiScreeningId.Value, cancellationToken);
+        }
+
+        await _postRepository.AddAsync(post, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result<Guid>.Success(post.Id);
+    }
+
+    private static Result ValidateRequest(CreatePostCommand request)
+    {
         if (request.Attachments is { Count: > 0 } && !request.IsAnonymizationConfirmed)
         {
-            return Result<Guid>.Failure("Bạn phải xác nhận đã ẩn danh dữ liệu bệnh nhân trước khi đính kèm tệp.");
+            return Result.Failure("Bạn phải xác nhận đã ẩn danh dữ liệu bệnh nhân trước khi đính kèm tệp.");
         }
 
-        var hasConsultationSource = request.ConsultationSessionId.HasValue;
-        var hasAiScreeningSource = request.AiScreeningId.HasValue;
+        var hasConsultation = request.ConsultationSessionId.HasValue;
+        var hasAiScreening = request.AiScreeningId.HasValue;
 
-        if (hasConsultationSource && hasAiScreeningSource)
+        if (hasConsultation && hasAiScreening) return Result.Failure("Only one source reference is allowed: consultationSessionId or aiScreeningId.");
+        if (!hasConsultation && !hasAiScreening && string.IsNullOrWhiteSpace(request.Content)) return Result.Failure("Post content is required when no source reference is provided.");
+        if (request.IsInternalCase && !hasConsultation) return Result.Failure("consultationSessionId is required for internal case posts.");
+
+        return Result.Success();
+    }
+
+    private async Task<Result<ResolvedSourceData>> ResolvePostDataAsync(CreatePostCommand request, CancellationToken cancellationToken)
+    {
+        if (request.ConsultationSessionId.HasValue)
         {
-            return Result<Guid>.Failure("Only one source reference is allowed: consultationSessionId or aiScreeningId.");
+            return await ResolveFromConsultationSourceAsync(request, cancellationToken);
         }
 
-        if (!hasConsultationSource && !hasAiScreeningSource && string.IsNullOrWhiteSpace(request.Content))
-        {
-            return Result<Guid>.Failure("Post content is required when no source reference is provided.");
-        }
-
-        if (request.IsInternalCase && !hasConsultationSource)
-        {
-            return Result<Guid>.Failure("consultationSessionId is required for internal case posts.");
-        }
-
-        var resolvedData = new ResolvedSourceData(
+        return Result<ResolvedSourceData>.Success(new ResolvedSourceData(
             request.Content.Trim(),
             null,
             request.IsInternalCase,
@@ -79,19 +101,11 @@ public class CreatePostCommandHandler : ICommandHandler<CreatePostCommand, Guid>
             request.AiScreeningId,
             request.PatientAge,
             request.PatientGender,
-            request.AiScreeningId);
+            request.AiScreeningId));
+    }
 
-        if (hasConsultationSource)
-        {
-            var sourceResult = await ResolveFromConsultationSourceAsync(request, cancellationToken);
-            if (!sourceResult.IsSuccess || sourceResult.Data is null)
-            {
-                return MapSourceFailure<Guid>(sourceResult);
-            }
-
-            resolvedData = sourceResult.Data;
-        }
-
+    private static ProfessionalPost CreatePostEntity(CreatePostCommand request, ResolvedSourceData resolvedData)
+    {
         var post = new ProfessionalPost(
             request.AuthorId,
             request.AuthorType,
@@ -99,14 +113,7 @@ public class CreatePostCommandHandler : ICommandHandler<CreatePostCommand, Guid>
             request.Category,
             request.AllowComments);
 
-        var hasClinicalMetadata =
-            resolvedData.IsInternalCase
-            || resolvedData.ConsultationSessionId.HasValue
-            || resolvedData.AiScreeningId.HasValue
-            || resolvedData.PatientAge.HasValue
-            || !string.IsNullOrWhiteSpace(resolvedData.PatientGender);
-
-        if (hasClinicalMetadata)
+        if (HasClinicalMetadata(resolvedData))
         {
             post.SetClinicalCaseMetadata(
                 resolvedData.IsInternalCase,
@@ -115,46 +122,34 @@ public class CreatePostCommandHandler : ICommandHandler<CreatePostCommand, Guid>
                 resolvedData.PatientAge,
                 resolvedData.PatientGender);
         }
+        return post;
+    }
 
-        // Handle file uploads
-        if (request.Attachments is { Count: > 0 })
+    private static bool HasClinicalMetadata(ResolvedSourceData data)
+    {
+        return data.IsInternalCase || data.ConsultationSessionId.HasValue || data.AiScreeningId.HasValue || data.PatientAge.HasValue || !string.IsNullOrWhiteSpace(data.PatientGender);
+    }
+
+    private async Task ProcessAttachmentsAsync(ProfessionalPost post, IReadOnlyList<Microsoft.AspNetCore.Http.IFormFile> files, CancellationToken cancellationToken)
+    {
+        var order = 0;
+        foreach (var file in files)
         {
-            var order = 0;
-            foreach (var file in request.Attachments)
-            {
-                var subFolder = $"network/posts/{post.Id}";
-                await using var stream = file.OpenReadStream();
-                var fileUrl = await _fileStorageService.SaveFileAsync(
-                    stream, file.FileName, subFolder, cancellationToken);
+            var subFolder = $"network/posts/{post.Id}";
+            await using var stream = file.OpenReadStream();
+            var fileUrl = await _fileStorageService.SaveFileAsync(stream, file.FileName, subFolder, cancellationToken);
 
-                var attachmentType = GetAttachmentType(file.ContentType);
+            var attachment = new PostAttachment(
+                post.Id,
+                GetAttachmentType(file.ContentType),
+                file.FileName,
+                fileUrl,
+                file.ContentType,
+                file.Length,
+                order++);
 
-                var attachment = new PostAttachment(
-                    post.Id,
-                    attachmentType,
-                    file.FileName,
-                    fileUrl,
-                    file.ContentType,
-                    file.Length,
-                    order++);
-
-                post.AddAttachment(attachment);
-            }
+            post.AddAttachment(attachment);
         }
-
-        if ((request.Attachments == null || request.Attachments.Count == 0) &&
-            resolvedData.AttachmentAiScreeningId.HasValue)
-        {
-            await AddRetinalAttachmentsFromAiScreeningAsync(
-                post,
-                resolvedData.AttachmentAiScreeningId.Value,
-                cancellationToken);
-        }
-
-        await _postRepository.AddAsync(post, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        return Result<Guid>.Success(post.Id);
     }
 
     private static AttachmentType GetAttachmentType(string? contentType)

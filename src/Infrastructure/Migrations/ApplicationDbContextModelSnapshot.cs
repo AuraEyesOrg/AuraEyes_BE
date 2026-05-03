@@ -534,8 +534,8 @@ namespace Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<decimal>("TotalAmount")
                         .HasColumnType("numeric");
@@ -1605,13 +1605,22 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("RefundAccountName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RefundBankName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RefundBankNumber")
+                        .HasColumnType("text");
+
                     b.Property<Guid?>("RequestedDoctorId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2244,6 +2253,12 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("IssuingInstitution")
+                        .HasColumnType("text");
+
+                    b.Property<string>("LicenseNumber")
+                        .HasColumnType("text");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -2251,6 +2266,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<Guid>("OphthalmologistId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ScopeOfPractice")
+                        .HasColumnType("text");
 
                     b.Property<int>("Type")
                         .HasColumnType("integer");
@@ -2410,6 +2428,9 @@ namespace Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AccountName")
+                        .HasColumnType("text");
+
                     b.Property<string>("Address")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -2417,6 +2438,12 @@ namespace Infrastructure.Migrations
                     b.Property<decimal?>("BMI")
                         .HasPrecision(5, 2)
                         .HasColumnType("numeric(5,2)");
+
+                    b.Property<string>("BankName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("BankNumber")
+                        .HasColumnType("text");
 
                     b.Property<string>("CitizenId")
                         .HasMaxLength(20)

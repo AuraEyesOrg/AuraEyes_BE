@@ -17,10 +17,7 @@ using Application.SystemAdmin.Permissions.Commands.SynchronizeRolePermissions;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
 using Infrastructure.Identity.Authorization;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers.SystemAdmin;
 

@@ -2,9 +2,9 @@ name: SonarQube Quality Gate & Jira Automation
 
 on:
   push:
-    branches: [main, coverage]
+    branches: [main, develop]
   pull_request:
-    branches: [main, coverage]
+    branches: [main, develop]
 
 permissions:
   contents: read

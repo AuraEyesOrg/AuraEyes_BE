@@ -31,7 +31,7 @@ public class GetRecentScreeningSessionsQueryHandler
         if (_currentUserService.UserId is null)
             return Result<IReadOnlyList<ScreeningSessionSummaryDto>>.Unauthorized("User not authenticated");
 
-        var patients = await _patientRepository.FindAsync(
+        var patients = await _patientRepository.FindAsNoTrackingAsync(
             p => p.UserId == _currentUserService.UserId.Value,
             cancellationToken);
 
@@ -42,7 +42,7 @@ public class GetRecentScreeningSessionsQueryHandler
         var cappedLimit = Math.Clamp(request.Limit, 1, 50);
 
         var sessions = await _screeningRepository
-            .Query()
+            .Query().AsNoTracking()
             .Where(s => s.PatientId == patient.Id && !s.IsDeleted)
             .OrderByDescending(s => s.CreatedAt)
             .Take(cappedLimit)
@@ -68,3 +68,5 @@ public class GetRecentScreeningSessionsQueryHandler
         return Result<IReadOnlyList<ScreeningSessionSummaryDto>>.Success(sessions);
     }
 }
+
+

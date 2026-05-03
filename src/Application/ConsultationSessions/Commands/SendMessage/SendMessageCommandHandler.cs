@@ -52,30 +52,9 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         if (session is null)
             return Result.NotFound($"Session '{request.SessionId}' not found.");
 
-        bool isPatient = senderProfileId == session.PatientId;
-        bool isDoctor = session.OphthalmologistId.HasValue
-                && senderProfileId == session.OphthalmologistId.Value;
-
-        if (!isPatient && !isDoctor)
-            return Result.Forbidden("You are not a participant of this session.");
-
-        if (session.ChatStatus == ChatStatus.Locked)
-            return Result.Failure("Chat is locked for this session.");
-
-        if (session.ChatStatus == ChatStatus.Archived)
-            return Result.Failure("Session has been archived. No new messages allowed.");
-
-        // Enforce 14-day chat lock after completion/closure
-        if (session.EndTime.HasValue && DateTime.UtcNow > session.EndTime.Value.AddDays(14))
-        {
-            return Result.Failure("Chat is locked as the 14-day grace period after consultation has expired.");
-        }
-
-        if (session.ChatStatus == ChatStatus.MemoOnly
-            && isDoctor)
-        {
-            return Result.Failure("In MemoOnly mode, only the patient can send notes.");
-        }
+        var validationResult = ValidateSendMessage(session, senderProfileId, out bool isPatient, out bool isDoctor);
+        if (!validationResult.IsSuccess)
+            return validationResult;
 
         var conversation = session.Conversations.FirstOrDefault();
         if (conversation is null)
@@ -98,6 +77,46 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         if (session.ChatStatus == ChatStatus.MemoOnly)
             return Result.Success();
 
+        await BroadcastAndNotifyAsync(session, chatMessage, senderProfileId, isPatient, isDoctor, cancellationToken);
+
+        return Result.Success();
+    }
+
+    private static Result ValidateSendMessage(
+        Domain.Entities.Consultation.ConsultationSession session,
+        Guid senderProfileId,
+        out bool isPatient,
+        out bool isDoctor)
+    {
+        isPatient = senderProfileId == session.PatientId;
+        isDoctor = session.OphthalmologistId.HasValue && senderProfileId == session.OphthalmologistId.Value;
+
+        if (!isPatient && !isDoctor)
+            return Result.Forbidden("You are not a participant of this session.");
+
+        if (session.ChatStatus == ChatStatus.Locked)
+            return Result.Failure("Chat is locked for this session.");
+
+        if (session.ChatStatus == ChatStatus.Archived)
+            return Result.Failure("Session has been archived. No new messages allowed.");
+
+        if (session.EndTime.HasValue && DateTime.UtcNow > session.EndTime.Value.AddDays(14))
+            return Result.Failure("Chat is locked as the 14-day grace period after consultation has expired.");
+
+        if (session.ChatStatus == ChatStatus.MemoOnly && isDoctor)
+            return Result.Failure("In MemoOnly mode, only the patient can send notes.");
+
+        return Result.Success();
+    }
+
+    private async Task BroadcastAndNotifyAsync(
+        Domain.Entities.Consultation.ConsultationSession session,
+        ChatMessage chatMessage,
+        Guid senderProfileId,
+        bool isPatient,
+        bool isDoctor,
+        CancellationToken cancellationToken)
+    {
         Guid? recipientUserId = null;
 
         if (isPatient && session.OphthalmologistId.HasValue)
@@ -115,14 +134,12 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
             recipientUserId = patient?.UserId;
         }
 
-        // Broadcast to both parties for realtime sync [FR-47]
         var participants = new List<Guid>();
         if (_currentUser.UserId.HasValue) participants.Add(_currentUser.UserId.Value);
         if (recipientUserId.HasValue) participants.Add(recipientUserId.Value);
 
         var distinctParticipants = participants.Distinct().ToList();
-        
-        // Log for diagnostic
+
         Console.WriteLine($"[SignalR_Debug] Broadcasting message {chatMessage.Id} to {distinctParticipants.Count} participants. RecipientUserId: {recipientUserId}");
 
         foreach (var userId in distinctParticipants)
@@ -140,7 +157,6 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
                 cancellationToken);
         }
 
-        // Send real-time notification to the other party [FR-47]
         if (isPatient && session.OphthalmologistId.HasValue)
         {
             var ophthalmologist = await _ophthalmologistRepository.GetByIdAsync(
@@ -149,9 +165,9 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
 
             if (ophthalmologist is not null)
             {
-                var messagePreview = request.Message.Length > 50
-                    ? request.Message[..50] + "..."
-                    : request.Message;
+                var messagePreview = chatMessage.Message.Length > 50
+                    ? chatMessage.Message[..50] + "..."
+                    : chatMessage.Message;
 
                 await _notificationService.SendAsync(
                     ophthalmologist.UserId,
@@ -162,7 +178,5 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
                     cancellationToken);
             }
         }
-
-        return Result.Success();
     }
 }

@@ -200,44 +200,44 @@ public static class DatabaseSeeder
     {
         logger?.LogInformation("Seeding domain entities (Ophthalmologist, ClinicStaff, Patient, Schedules)...");
 
-        // Step 1: Seed Ophthalmologist entity
-        var ophthalmologistUser = await userManager.FindByEmailAsync("doctor@auraeyes.vn");
-        Guid ophthalmologistId = Guid.Empty;
+        var ophthalmologistId = await SeedOphthalmologistAsync(context, userManager, logger);
+        await SeedStaffProfilesAsync(context, userManager, logger);
+        await SeedPatientProfileAsync(context, userManager, logger);
 
+        logger?.LogInformation("Domain entity seeding completed.");
+    }
+
+    private static async Task<Guid> SeedOphthalmologistAsync(ApplicationDbContext context, UserManager<ApplicationUser> userManager, ILogger? logger)
+    {
+        var ophthalmologistUser = await userManager.FindByEmailAsync("doctor@auraeyes.vn");
         if (ophthalmologistUser == null)
         {
             logger?.LogWarning("Ophthalmologist user not found. Skipping ophthalmologist entity seeding.");
+            return Guid.Empty;
         }
-        else
+
+        var existingOphth = await context.Ophthalmologists.FirstOrDefaultAsync(o => o.UserId == ophthalmologistUser.Id);
+        if (existingOphth == null)
         {
-            var existingOphth = await context.Ophthalmologists
-                .FirstOrDefaultAsync(o => o.UserId == ophthalmologistUser.Id);
+            var ophthalmologist = new Ophthalmologist(
+                userId: ophthalmologistUser.Id,
+                bio: "Bác sĩ chuyên khoa mắt với kinh nghiệm trong lĩnh vực sàng lọc bệnh võng mạc.",
+                phone: "+84123456789",
+                licenseUrl: null,
+                degreeUrl: null);
 
-            if (existingOphth == null)
-            {
-                var ophthalmologist = new Ophthalmologist(
-                    userId: ophthalmologistUser.Id,
-                    bio: "Bác sĩ chuyên khoa mắt với kinh nghiệm trong lĩnh vực sàng lọc bệnh võng mạc.",
-                    phone: "+84123456789",
-                    licenseUrl: null,
-                    degreeUrl: null
-                );
-
-                await context.Ophthalmologists.AddAsync(ophthalmologist);
-                await context.SaveChangesAsync();
-                ophthalmologistId = ophthalmologist.Id;
-
-                logger?.LogInformation("âœ“ Created ophthalmologist profile for {Email} â†’ Ophthalmologists table",
-                    ophthalmologistUser.Email);
-            }
-            else
-            {
-                ophthalmologistId = existingOphth.Id;
-                logger?.LogInformation("Ophthalmologist profile already exists. Skipping.");
-            }
+            await context.Ophthalmologists.AddAsync(ophthalmologist);
+            await context.SaveChangesAsync();
+            logger?.LogInformation("✓ Created ophthalmologist profile for {Email}", ophthalmologistUser.Email);
+            return ophthalmologist.Id;
         }
 
-        // Step 2: Seed ClinicStaff profiles
+        logger?.LogInformation("Ophthalmologist profile already exists. Skipping.");
+        return existingOphth.Id;
+    }
+
+    private static async Task SeedStaffProfilesAsync(ApplicationDbContext context, UserManager<ApplicationUser> userManager, ILogger? logger)
+    {
         var staffAccounts = new[]
         {
             ("receptionist@auraeyes.vn", new[] { ClinicStaffRole.Receptionist }),
@@ -248,69 +248,43 @@ public static class DatabaseSeeder
         foreach (var (email, subRoles) in staffAccounts)
         {
             var staffUser = await userManager.FindByEmailAsync(email);
-            if (staffUser == null)
-            {
-                logger?.LogWarning("ClinicStaff user {Email} not found. Skipping.", email);
-                continue;
-            }
+            if (staffUser == null) continue;
 
-            var existingStaff = await context.ClinicStaffs
-                .FirstOrDefaultAsync(s => s.UserId == staffUser.Id);
-
+            var existingStaff = await context.ClinicStaffs.FirstOrDefaultAsync(s => s.UserId == staffUser.Id);
             if (existingStaff == null)
             {
                 var clinicStaff = new ClinicStaff(staffUser.Id, subRoles, department: "Clinic Operations");
                 await context.ClinicStaffs.AddAsync(clinicStaff);
-                logger?.LogInformation("âœ“ Created ClinicStaff profile for {Email} [{SubRoles}] â†’ ClinicStaffs table",
-                    email, string.Join(",", subRoles.Select(r => r.ToString())));
-            }
-            else
-            {
-                logger?.LogInformation("ClinicStaff profile for {Email} already exists. Skipping.", email);
+                logger?.LogInformation("✓ Created ClinicStaff profile for {Email} [{SubRoles}]", email, string.Join(",", subRoles));
             }
         }
-
         await context.SaveChangesAsync();
+    }
 
-        // Step 3: Seed Patient entity
+    private static async Task SeedPatientProfileAsync(ApplicationDbContext context, UserManager<ApplicationUser> userManager, ILogger? logger)
+    {
         var patientUser = await userManager.FindByEmailAsync("patient@auraeyes.vn");
-        if (patientUser != null)
-        {
-            var p = await context.Patients.FirstOrDefaultAsync(pat => pat.UserId == patientUser.Id);
-            if (p != null)
-            {
-                var existingVisits = await context.PatientVisits.Where(v => v.PatientId == p.Id).ToListAsync();
-                context.PatientVisits.RemoveRange(existingVisits);
-                await context.SaveChangesAsync();
-                logger?.LogInformation("Cleared existing visits for patient@auraeyes.vn to ensure fresh test data.");
-            }
-        }
-
         if (patientUser == null)
         {
             logger?.LogWarning("Patient user not found. Skipping patient entity seeding.");
+            return;
+        }
+
+        var p = await context.Patients.FirstOrDefaultAsync(pat => pat.UserId == patientUser.Id);
+        if (p != null)
+        {
+            var existingVisits = await context.PatientVisits.Where(v => v.PatientId == p.Id).ToListAsync();
+            context.PatientVisits.RemoveRange(existingVisits);
+            await context.SaveChangesAsync();
+            logger?.LogInformation("Cleared existing visits for patient@auraeyes.vn to ensure fresh test data.");
         }
         else
         {
-            var existingPatient = await context.Patients
-                .FirstOrDefaultAsync(p => p.UserId == patientUser.Id);
-
-            if (existingPatient == null)
-            {
-                var patient = Patient.CreateRegistered(userId: patientUser.Id);
-                await context.Patients.AddAsync(patient);
-                await context.SaveChangesAsync();
-
-                logger?.LogInformation("âœ“ Created patient profile for {Email} â†’ Patients table",
-                    patientUser.Email);
-            }
-            else
-            {
-                logger?.LogInformation("Patient profile already exists. Skipping.");
-            }
+            var patient = Patient.CreateRegistered(userId: patientUser.Id);
+            await context.Patients.AddAsync(patient);
+            await context.SaveChangesAsync();
+            logger?.LogInformation("✓ Created patient profile for {Email}", patientUser.Email);
         }
-
-        logger?.LogInformation("Domain entity seeding completed.");
     }
 
 

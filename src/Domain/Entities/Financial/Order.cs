@@ -71,10 +71,19 @@ public class Order : BaseEntity, IAggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void RequestRefund()
+    {
+        if (Status == OrderStatus.Refunded || Status == OrderStatus.Cancelled)
+            throw new InvalidOperationException("Order is already in a final state");
+
+        Status = OrderStatus.CancellationRequested;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void Refund()
     {
-        if (Status != OrderStatus.Completed)
-            throw new InvalidOperationException("Only completed orders can be refunded");
+        if (Status == OrderStatus.Refunded || Status == OrderStatus.Cancelled)
+            throw new InvalidOperationException("Cannot refund already refunded or cancelled orders");
 
         Status = OrderStatus.Refunded;
         UpdatedAt = DateTime.UtcNow;

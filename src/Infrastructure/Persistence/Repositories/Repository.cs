@@ -78,4 +78,19 @@ public class Repository<T> : IRepository<T> where T : BaseEntity, IAggregateRoot
     {
         return await _dbSet.AnyAsync(predicate, cancellationToken);
     }
+
+    public virtual async Task<T?> GetByIdAsNoTrackingAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _dbSet.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+    }
+
+    public virtual async Task<IReadOnlyList<T>> FindAsNoTrackingAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+    {
+        return await _dbSet.AsNoTracking().Where(predicate).ToListAsync(cancellationToken);
+    }
+
+    public virtual async Task<IReadOnlyList<T>> GetAllAsNoTrackingAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbSet.AsNoTracking().ToListAsync(cancellationToken);
+    }
 }

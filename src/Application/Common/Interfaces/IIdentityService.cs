@@ -224,7 +224,8 @@ public record UserDto(
     bool IsDeleted,
     bool TwoFactorEnabled = false,
     string? AvatarUrl = null,
-    string? PhoneNumber = null
+    string? PhoneNumber = null,
+    bool MustUpdateProfile = false
 );
 
 /// <summary>

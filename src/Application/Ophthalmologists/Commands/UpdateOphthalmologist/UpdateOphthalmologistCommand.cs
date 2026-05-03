@@ -33,6 +33,9 @@ public record UpdateOphthalmologistCommand : ICommand
     /// Optional address update for self-profile flow.
     /// </summary>
     public string? Address { get; init; }
+    public DateTime? DateOfBirth { get; init; }
+    public int? Gender { get; init; }
+    public string? CitizenId { get; init; }
 
     /// <summary>
     /// Updated bio/description.

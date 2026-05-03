@@ -16,6 +16,9 @@ public class Certificate : BaseEntity
     public DateTime IssuedDate { get; private set; }
     public DateTime? ExpiryDate { get; private set; }
     public string? CertificateUrl { get; private set; }
+    public string? LicenseNumber { get; private set; }
+    public string? ScopeOfPractice { get; private set; }
+    public string? IssuingInstitution { get; private set; }
 
     private Certificate() { } // EF Core
 
@@ -27,7 +30,10 @@ public class Certificate : BaseEntity
         string? issuingAuthority,
         DateTime issuedDate,
         DateTime? expiryDate = null,
-        string? certificateUrl = null)
+        string? certificateUrl = null,
+        string? licenseNumber = null,
+        string? scopeOfPractice = null,
+        string? issuingInstitution = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Certificate name cannot be empty", nameof(name));
@@ -46,6 +52,9 @@ public class Certificate : BaseEntity
         IssuedDate = issuedDate;
         ExpiryDate = expiryDate;
         CertificateUrl = certificateUrl;
+        LicenseNumber = licenseNumber;
+        ScopeOfPractice = scopeOfPractice;
+        IssuingInstitution = issuingInstitution;
     }
 
     public bool IsExpired => ExpiryDate.HasValue && ExpiryDate.Value < DateTime.UtcNow;
@@ -57,7 +66,10 @@ public class Certificate : BaseEntity
         string? issuingAuthority,
         DateTime issuedDate,
         DateTime? expiryDate,
-        string? certificateUrl)
+        string? certificateUrl,
+        string? licenseNumber,
+        string? scopeOfPractice,
+        string? issuingInstitution)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Certificate name cannot be empty", nameof(name));
@@ -75,6 +87,9 @@ public class Certificate : BaseEntity
         IssuedDate = issuedDate;
         ExpiryDate = expiryDate;
         CertificateUrl = certificateUrl;
+        LicenseNumber = licenseNumber;
+        ScopeOfPractice = scopeOfPractice;
+        IssuingInstitution = issuingInstitution;
         UpdatedAt = DateTime.UtcNow;
     }
 }

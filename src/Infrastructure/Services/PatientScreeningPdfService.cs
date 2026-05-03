@@ -586,22 +586,7 @@ public sealed class PatientScreeningPdfService : IPatientScreeningPdfService
             {
                 foreach (var box in boxes)
                 {
-                    var isPercentLocation = box.X <= 100m && box.Y <= 100m && box.Width <= 100m && box.Height <= 100m;
-                    var rawX = isPercentLocation ? (box.X / 100m) * image.Width : box.X;
-                    var rawY = isPercentLocation ? (box.Y / 100m) * image.Height : box.Y;
-                    var rawWidth = isPercentLocation ? (box.Width / 100m) * image.Width : box.Width;
-                    var rawHeight = isPercentLocation ? (box.Height / 100m) * image.Height : box.Height;
-
-                    var x = Math.Clamp((int)Math.Round(rawX), 0, image.Width - 1);
-                    var y = Math.Clamp((int)Math.Round(rawY), 0, image.Height - 1);
-                    var maxWidth = image.Width - x;
-                    var maxHeight = image.Height - y;
-                    var width = Math.Clamp((int)Math.Round(rawWidth), 1, maxWidth);
-                    var height = Math.Clamp((int)Math.Round(rawHeight), 1, maxHeight);
-
-                    var rectangle = new RectangleF(x, y, width, height);
-                    ctx.Fill(fillColor, rectangle);
-                    ctx.Draw(strokeColor, lineThickness, rectangle);
+                    DrawBox(ctx, box, image.Width, image.Height, fillColor, strokeColor, lineThickness);
                 }
             });
 
@@ -613,5 +598,22 @@ public sealed class PatientScreeningPdfService : IPatientScreeningPdfService
         {
             return null;
         }
+    }
+    private static void DrawBox(IImageProcessingContext ctx, PatientAiLocalizationBox box, int imgWidth, int imgHeight, ImgSharpColor fillColor, ImgSharpColor strokeColor, float lineThickness)
+    {
+        var isPercentLocation = box.X <= 100m && box.Y <= 100m && box.Width <= 100m && box.Height <= 100m;
+        var rawX = isPercentLocation ? (box.X / 100m) * imgWidth : box.X;
+        var rawY = isPercentLocation ? (box.Y / 100m) * imgHeight : box.Y;
+        var rawWidth = isPercentLocation ? (box.Width / 100m) * imgWidth : box.Width;
+        var rawHeight = isPercentLocation ? (box.Height / 100m) * imgHeight : box.Height;
+
+        var x = Math.Clamp((int)Math.Round(rawX), 0, imgWidth - 1);
+        var y = Math.Clamp((int)Math.Round(rawY), 0, imgHeight - 1);
+        var width = Math.Clamp((int)Math.Round(rawWidth), 1, imgWidth - x);
+        var height = Math.Clamp((int)Math.Round(rawHeight), 1, imgHeight - y);
+
+        var rectangle = new RectangleF(x, y, width, height);
+        ctx.Fill(fillColor, rectangle);
+        ctx.Draw(strokeColor, lineThickness, rectangle);
     }
 }

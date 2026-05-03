@@ -70,11 +70,18 @@ public class ForceUpdateProfileCommandHandler : ICommandHandler<ForceUpdateProfi
                     Phone = request.Phone,
                     Address = request.Address,
                     Bio = request.Bio,
-                    ConsultationFee = request.ConsultationFee
+                    ConsultationFee = request.ConsultationFee,
+                    DateOfBirth = request.DateOfBirth,
+                    Gender = (int?)request.Gender,
+                    CitizenId = request.CitizenId
                 };
                 
-                // Note: UpdateOphthalmologistCommand is ICommand (no return value in record def but usually handled by MediatR)
-                await _mediator.Send(updateCmd, cancellationToken);
+                var ophthalmologistResult = await _mediator.Send(updateCmd, cancellationToken);
+                if (!ophthalmologistResult.IsSuccess)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<bool>.Failure(ophthalmologistResult.Errors);
+                }
             }
             else if (roles.Contains(Roles.ClinicStaff))
             {
@@ -87,10 +94,16 @@ public class ForceUpdateProfileCommandHandler : ICommandHandler<ForceUpdateProfi
                     DateOfBirth = request.DateOfBirth?.ToString("yyyy-MM-dd"),
                     Gender = request.Gender?.ToString(),
                     CitizenId = request.CitizenId,
-                    Department = request.Department
+                    Department = request.Department,
+                    EmployeeCode = request.EmployeeCode
                 };
                 
-                await _mediator.Send(updateCmd, cancellationToken);
+                var staffResult = await _mediator.Send(updateCmd, cancellationToken);
+                if (!staffResult.IsSuccess)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<bool>.Failure(staffResult.Errors);
+                }
             }
 
             // 2. Update Avatar if provided
@@ -99,14 +112,16 @@ public class ForceUpdateProfileCommandHandler : ICommandHandler<ForceUpdateProfi
                 await _identityService.UpdateAvatarUrlAsync(userId.Value, request.AvatarUrl, cancellationToken);
             }
 
-            // 3. Reset Password
-            var token = await _identityService.GeneratePasswordResetTokenAsync(userId.Value);
-            var passwordResult = await _identityService.ResetPasswordAsync(userId.Value, token, request.NewPassword);
-            
-            if (!passwordResult.Succeeded)
+            // 3. Change Password (if provided)
+            if (!string.IsNullOrEmpty(request.NewPassword) && !string.IsNullOrEmpty(request.CurrentPassword))
             {
-                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                return Result<bool>.Failure(passwordResult.Errors);
+                var passwordResult = await _identityService.ChangePasswordAsync(userId.Value, request.CurrentPassword, request.NewPassword, cancellationToken);
+                
+                if (!passwordResult.Succeeded)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    return Result<bool>.Failure(passwordResult.Errors);
+                }
             }
 
             // 4. Clear MustUpdateProfile flag

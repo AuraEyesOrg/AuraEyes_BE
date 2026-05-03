@@ -139,7 +139,13 @@ public class GetPatientClinicAppointmentsQueryHandler
                     },
                     TotalAmount = ord?.TotalAmount,
                     DepositAmount = ord?.DepositAmount,
-                    IsPaidDeposit = ord?.Status == OrderStatus.Confirmed || ord?.Status == OrderStatus.Completed
+                    IsPaidDeposit = ord?.Status == OrderStatus.Confirmed || ord?.Status == OrderStatus.Completed,
+                    
+                    // Refund info
+                    RefundBankNumber = a.RefundBankNumber,
+                    RefundAccountName = a.RefundAccountName,
+                    RefundBankName = a.RefundBankName,
+                    CancellationReason = a.CancellationReason
                 };
             })
             .ToList();
@@ -165,7 +171,8 @@ public class GetPatientClinicAppointmentsQueryHandler
             PatientAppointmentTab.Cancelled => new[]
             {
                 AppointmentStatus.Cancelled,
-                AppointmentStatus.NoShow
+                AppointmentStatus.NoShow,
+                AppointmentStatus.CancellationRequested
             },
             _ => null
         };

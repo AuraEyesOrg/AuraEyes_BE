@@ -25,7 +25,7 @@ public class GetClinicStaffByIdQueryHandler : IQueryHandler<GetClinicStaffByIdQu
         GetClinicStaffByIdQuery request,
         CancellationToken cancellationToken)
     {
-        var staff = await _clinicStaffRepository.GetByIdAsync(request.StaffId, cancellationToken);
+        var staff = await _clinicStaffRepository.GetByIdAsNoTrackingAsync(request.StaffId, cancellationToken);
         if (staff is null)
             return Result<ClinicStaffResponse>.NotFound($"ClinicStaff '{request.StaffId}' was not found.");
 
@@ -48,3 +48,4 @@ public class GetClinicStaffByIdQueryHandler : IQueryHandler<GetClinicStaffByIdQu
         return Result<ClinicStaffResponse>.Success(response);
     }
 }
+

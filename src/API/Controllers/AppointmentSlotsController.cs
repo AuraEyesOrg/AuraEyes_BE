@@ -25,12 +25,10 @@ namespace API.Controllers;
 public class AppointmentSlotsController : BaseApiController
 {
     private readonly IMediator _mediator;
-    private readonly ICurrentUserService _currentUser;
 
-    public AppointmentSlotsController(IMediator mediator, ICurrentUserService currentUser)
+    public AppointmentSlotsController(IMediator mediator)
     {
         _mediator = mediator;
-        _currentUser = currentUser;
     }
 
     /// <summary>
