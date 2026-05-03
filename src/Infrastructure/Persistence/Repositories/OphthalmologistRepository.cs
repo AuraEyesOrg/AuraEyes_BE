@@ -114,4 +114,39 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
                 x => x.Id,
                 x => (FullName: x.FullName ?? "Unknown", AvatarUrl: (string?)x.AvatarUrl));
     }
+    public async Task<IReadOnlyDictionary<Guid, EnhancedDoctorDetail>> GetEnhancedDoctorDetailsByIdsAsync(
+        IReadOnlyCollection<Guid> ophthalmologistIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (ophthalmologistIds.Count == 0)
+            return new Dictionary<Guid, EnhancedDoctorDetail>();
+
+        var uniqueIds = ophthalmologistIds.Distinct().ToArray();
+
+        var query = from ophthalmologist in _dbSet.Include(o => o.Certificates)
+                    join user in _context.Users on ophthalmologist.UserId equals user.Id
+                    where uniqueIds.Contains(ophthalmologist.Id) && !user.IsDeleted
+                    select new
+                    {
+                        ophthalmologist.Id,
+                        user.FullName,
+                        user.AvatarUrl,
+                        ophthalmologist.Bio,
+                        ophthalmologist.RatingAverage,
+                        ophthalmologist.RatingCount,
+                        Certificates = ophthalmologist.Certificates.ToList()
+                    };
+
+        var rows = await query.ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(
+            x => x.Id,
+            x => new EnhancedDoctorDetail(
+                x.FullName ?? "Unknown",
+                x.AvatarUrl,
+                x.Bio,
+                x.RatingAverage,
+                x.RatingCount,
+                x.Certificates));
+    }
 }

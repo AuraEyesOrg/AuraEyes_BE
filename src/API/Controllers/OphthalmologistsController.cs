@@ -315,6 +315,64 @@ public class OphthalmologistsController : BaseApiController
         return HandleResult(result, "Certificates uploaded successfully. Awaiting verification.");
     }
 
+    /// <summary>
+    /// Delete a specific certificate for the authenticated ophthalmologist.
+    /// </summary>
+    [HttpDelete("~/api/ophthalmologist/profile/certificates/{certificateId:guid}")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteCertificate(
+        Guid certificateId,
+        CancellationToken cancellationToken)
+    {
+        var profileId = await ResolveCurrentOphthalmologistProfileIdAsync(cancellationToken);
+        if (!profileId.HasValue)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
+
+        var result = await _mediator.Send(new Application.Ophthalmologists.Commands.DeleteCertificate.DeleteCertificateCommand(
+            profileId.Value,
+            certificateId), cancellationToken);
+
+        return HandleResult(result, "Certificate deleted successfully.");
+    }
+
+    /// <summary>
+    /// Update a specific certificate for the authenticated ophthalmologist.
+    /// </summary>
+    [HttpPut("~/api/ophthalmologist/profile/certificates/{certificateId:guid}")]
+    [Authorize(Policy = Policies.OphthalmologistOnly)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateCertificate(
+        Guid certificateId,
+        [FromForm] string name,
+        [FromForm] string? degreeLevel,
+        [FromForm] string? issuingAuthority,
+        [FromForm] DateTime issuedDate,
+        [FromForm] DateTime? expiryDate,
+        IFormFile? file,
+        CancellationToken cancellationToken)
+    {
+        var profileId = await ResolveCurrentOphthalmologistProfileIdAsync(cancellationToken);
+        if (!profileId.HasValue)
+            return Unauthorized(ApiResponseFactory.Unauthorized("Ophthalmologist profile not found for current user"));
+
+        var result = await _mediator.Send(new Application.Ophthalmologists.Commands.UpdateCertificate.UpdateCertificateCommand
+        {
+            OphthalmologistId = profileId.Value,
+            CertificateId = certificateId,
+            Name = name,
+            DegreeLevel = degreeLevel,
+            IssuingAuthority = issuingAuthority,
+            IssuedDate = issuedDate,
+            ExpiryDate = expiryDate,
+            File = file
+        }, cancellationToken);
+
+        return HandleResult(result, "Certificate updated successfully.");
+    }
+
     private List<UploadCredentialItemDto> ParseCertificatesFromForm(IFormCollection form)
     {
         var certificates = new List<UploadCredentialItemDto>();

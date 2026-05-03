@@ -115,7 +115,7 @@ public class GetClinicAppointmentsByDateQueryHandler
             .Distinct()
             .ToList();
 
-        var doctorMap = await _ophthalmologistRepository.GetDoctorDetailsByIdsAsync(doctorIds, cancellationToken);
+        var doctorMap = await _ophthalmologistRepository.GetEnhancedDoctorDetailsByIdsAsync(doctorIds, cancellationToken);
 
         var items = new List<ClinicAppointmentDto>();
 
