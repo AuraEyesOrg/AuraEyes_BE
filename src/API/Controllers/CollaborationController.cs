@@ -1,6 +1,8 @@
 using Application.Common.Constants;
 using Application.Common.Models;
 using Application.Network.InternalChat.Commands.Consilium;
+using Application.Scheduling.Appointments.Common;
+using Application.Scheduling.Appointments.Queries.GetAvailableDoctorsForConsilium;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,7 +24,22 @@ public class CollaborationController : BaseApiController
     }
 
     /// <summary>
+    /// Get list of ophthalmologists currently available for a Hot Consilium session.
+    /// Availability is derived dynamically from appointment slots and approved leave requests
+    /// within the next 25-minute window. Zero schema changes required.
+    /// </summary>
+    [HttpGet("available-doctors")]
+    [Authorize(Roles = Roles.Ophthalmologist)]
+    [ProducesResponseType(typeof(ApiResponse<List<AvailableDoctorDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAvailableDoctors()
+    {
+        var result = await _mediator.Send(new GetAvailableDoctorsForConsiliumQuery());
+        return HandleResult(result);
+    }
+
+    /// <summary>
     /// Create a new clinical consilium group chat.
+    /// Automatically injects a system message containing a deep-link to the Medical Record.
     /// </summary>
     [HttpPost("clinical-group")]
     [Authorize(Roles = Roles.Ophthalmologist)]

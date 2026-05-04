@@ -18,17 +18,20 @@ public class CreateGroupMeetingCommandHandler : ICommandHandler<CreateGroupMeeti
     private readonly IGoogleMeetService _googleMeetService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IIdentityService _identityService;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CreateGroupMeetingCommandHandler(
         IRepository<InternalGroupChat> groupChatRepository,
         IGoogleMeetService googleMeetService,
         ICurrentUserService currentUserService,
-        IIdentityService identityService)
+        IIdentityService identityService,
+        IUnitOfWork unitOfWork)
     {
         _groupChatRepository = groupChatRepository;
         _googleMeetService = googleMeetService;
         _currentUserService = currentUserService;
         _identityService = identityService;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<MeetingInfo>> Handle(CreateGroupMeetingCommand request, CancellationToken cancellationToken)
@@ -72,6 +75,11 @@ public class CreateGroupMeetingCommandHandler : ICommandHandler<CreateGroupMeeti
             attendeeEmails,
             60,
             cancellationToken);
+
+        // Persist meeting info to the group
+        group.SetMeetingInfo(meetingInfo.MeetingLink, meetingInfo.CalendarEventId);
+        await _groupChatRepository.UpdateAsync(group, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result<MeetingInfo>.Success(meetingInfo);
     }

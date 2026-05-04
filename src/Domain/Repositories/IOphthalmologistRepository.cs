@@ -41,10 +41,25 @@ public interface IOphthalmologistRepository : IRepository<Ophthalmologist>
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Get doctor enhanced details (name, avatar, bio, ratings, certificates) keyed by ophthalmologist ID.
+    /// Get enhanced doctor details (name, avatar, bio, ratings, certificates) keyed by ophthalmologist ID.
     /// </summary>
     Task<IReadOnlyDictionary<Guid, EnhancedDoctorDetail>> GetEnhancedDoctorDetailsByIdsAsync(
         IReadOnlyCollection<Guid> ophthalmologistIds,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get doctor basic details (FullName, AvatarUrl) keyed by ophthalmologist ID.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, (string FullName, string? AvatarUrl)>> GetDoctorDetailsByIdsAsync(
+        IReadOnlyCollection<Guid> ophthalmologistIds,
+        CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Get doctors available for real-time consilium based on time window.
+    /// Derived from overlapping appointment slots and leave requests.
+    /// </summary>
+    Task<List<ConsiliumDoctorDetail>> GetAvailableDoctorsForConsiliumAsync(
+        DateTime windowStart,
+        DateTime windowEnd,
         CancellationToken cancellationToken = default);
 }
 
@@ -55,3 +70,9 @@ public record EnhancedDoctorDetail(
     decimal RatingAverage,
     int RatingCount,
     List<Certificate> Certificates);
+
+public record ConsiliumDoctorDetail(
+    Guid Id,
+    string Name,
+    string? Avatar,
+    string? DegreeLevel);

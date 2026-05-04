@@ -85,6 +85,8 @@ public class SendToDoctorCommandHandler
         if (screening.PatientId != visit.PatientId)
             return Result<SendToDoctorResponse>.Failure("Screening does not belong to this patient.");
 
+        if (screening.PatientVisitId.HasValue && screening.PatientVisitId.Value != visit.Id)
+            return Result<SendToDoctorResponse>.Failure("Screening is linked to a different visit.");
 
         if (!screening.ScreeningResults.Any())
             return Result<SendToDoctorResponse>.Failure("Screening has no AI results. Please run AI analysis first.");

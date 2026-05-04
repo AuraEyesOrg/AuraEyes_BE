@@ -1,5 +1,5 @@
+using Domain.Entities.Scheduling;
 using Domain.Entities.Screening;
-using Domain.Entities.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -39,5 +39,11 @@ public class AiScreeningConfiguration : IEntityTypeConfiguration<AiScreening>
 
         builder.HasIndex(e => e.PatientId);
 
+        builder.HasIndex(e => e.PatientVisitId);
+
+        builder.HasOne<PatientVisit>()
+            .WithMany()
+            .HasForeignKey(e => e.PatientVisitId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
