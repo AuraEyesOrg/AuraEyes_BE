@@ -77,21 +77,28 @@ public class HandlePaymentWebhookCommandHandler : IRequestHandler<HandlePaymentW
             return true;
         }
 
-        if (status is "PAID" or "00" && payment.Status == PaymentStatus.Pending)
-        {
-            await ProcessSuccessfulPaymentAsync(payment, txnRef, request.Payload, cancellationToken);
-        }
-        else if (status is "CANCELLED" && payment.Status == PaymentStatus.Pending)
-        {
-            await ProcessCancelledPaymentAsync(payment, cancellationToken);
-        }
-        else
-        {
-            _logger.LogInformation("PayOS webhook: payment {PaymentId} already in status {Status}, no update needed.", payment.Id, payment.Status);
-        }
+        await ProcessStatusUpdateAsync(payment, status, txnRef, request.Payload, cancellationToken);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    private async Task ProcessStatusUpdateAsync(Payment payment, string? status, string? txnRef, string payload, CancellationToken cancellationToken)
+    {
+        if (payment.Status != PaymentStatus.Pending)
+        {
+            _logger.LogInformation("PayOS webhook: payment {PaymentId} already in status {Status}, no update needed.", payment.Id, payment.Status);
+            return;
+        }
+
+        if (status is "PAID" or "00")
+        {
+            await ProcessSuccessfulPaymentAsync(payment, txnRef, payload, cancellationToken);
+        }
+        else if (status is "CANCELLED")
+        {
+            await ProcessCancelledPaymentAsync(payment, cancellationToken);
+        }
     }
 
     private (string? OrderCode, string? Status, string? TxnRef) ParseWebhookPayload(string payload)

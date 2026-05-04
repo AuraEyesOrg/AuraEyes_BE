@@ -14,20 +14,17 @@ public class UpdateOphthalmologistCommandHandler : ICommandHandler<UpdateOphthal
 {
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IIdentityService _identityService;
-    private readonly ISender _sender;
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public UpdateOphthalmologistCommandHandler(
         IOphthalmologistRepository ophthalmologistRepository,
         IIdentityService identityService,
-        ISender sender,
         IAppointmentSlotRepository appointmentSlotRepository,
         IUnitOfWork unitOfWork)
     {
         _ophthalmologistRepository = ophthalmologistRepository;
         _identityService = identityService;
-        _sender = sender;
         _appointmentSlotRepository = appointmentSlotRepository;
         _unitOfWork = unitOfWork;
     }

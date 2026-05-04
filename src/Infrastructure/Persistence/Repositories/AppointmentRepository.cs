@@ -86,6 +86,7 @@ public class AppointmentRepository : Repository<Appointment>, IAppointmentReposi
         CancellationToken cancellationToken = default)
     {
         var query = _dbSet
+            .AsNoTracking()
             .Include(a => a.Patient)
             .Include(a => a.AppointmentSlot)
             .AsQueryable();
@@ -123,6 +124,7 @@ public class AppointmentRepository : Repository<Appointment>, IAppointmentReposi
         CancellationToken cancellationToken = default)
     {
         var query = _dbSet
+            .AsNoTracking()
             .Include(a => a.AppointmentSlot)
                 .ThenInclude(s => s!.ScheduleTemplate)
             .Where(a => a.PatientId == patientId && a.AppointmentSlot != null);

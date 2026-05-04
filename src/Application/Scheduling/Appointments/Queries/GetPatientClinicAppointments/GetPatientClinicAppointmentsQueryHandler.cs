@@ -17,8 +17,6 @@ public class GetPatientClinicAppointmentsQueryHandler
     private readonly IClinicFeedbackRepository _clinicFeedbackRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IOrderRepository _orderRepository;
-    private readonly IClinicStaffRepository _staffRepository;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
 
     public GetPatientClinicAppointmentsQueryHandler(
@@ -26,16 +24,12 @@ public class GetPatientClinicAppointmentsQueryHandler
         IClinicFeedbackRepository clinicFeedbackRepository,
         IOphthalmologistRepository ophthalmologistRepository,
         IOrderRepository orderRepository,
-        IClinicStaffRepository staffRepository,
-        IUnitOfWork unitOfWork,
         ICurrentUserService currentUser)
     {
         _appointmentRepository = appointmentRepository;
         _clinicFeedbackRepository = clinicFeedbackRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _orderRepository = orderRepository;
-        _staffRepository = staffRepository;
-        _unitOfWork = unitOfWork;
         _currentUser = currentUser;
     }
 
@@ -78,25 +72,30 @@ public class GetPatientClinicAppointmentsQueryHandler
             .Select(a => a.Id)
             .ToArray();
 
-        // Batch feedback presence check in a single query (avoids N+1 round-trips).
-        IReadOnlySet<Guid> feedbackAppointmentIds = appointmentIds.Length == 0
-            ? new HashSet<Guid>()
-            : await _clinicFeedbackRepository.GetAppointmentIdsWithFeedbackAsync(
+        // Parallelize batch loading tasks
+        var feedbackTask = appointmentIds.Length == 0
+            ? Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>())
+            : _clinicFeedbackRepository.GetAppointmentIdsWithFeedbackAsync(
                 request.PatientId,
                 appointmentIds,
                 cancellationToken);
 
-        // Fetch doctor names/avatars in batch
         var doctorIds = appointments
             .Where(a => a.AppointmentSlot?.OphthalId != null)
             .Select(a => a.AppointmentSlot!.OphthalId!.Value)
             .Distinct()
             .ToList();
 
-        var doctorMap = await _ophthalmologistRepository.GetEnhancedDoctorDetailsByIdsAsync(doctorIds, cancellationToken);
+        var doctorMapTask = _ophthalmologistRepository.GetEnhancedDoctorDetailsByIdsAsync(doctorIds, cancellationToken);
 
-        // Fetch associated orders to populate OrderId/Billing info
-        var orders = await _orderRepository.GetByAppointmentIdsAsync(appointmentIds, cancellationToken);
+        var ordersTask = _orderRepository.GetByAppointmentIdsAsync(appointmentIds, cancellationToken);
+
+        await Task.WhenAll(feedbackTask, doctorMapTask, ordersTask);
+
+        var feedbackAppointmentIds = await feedbackTask;
+        var doctorMap = await doctorMapTask;
+        var orders = await ordersTask;
+
         var orderMap = orders.GroupBy(o => o.AppointmentId)
             .ToDictionary(g => g.Key!.Value, g => g.OrderByDescending(o => o.CreatedAt).First());
 

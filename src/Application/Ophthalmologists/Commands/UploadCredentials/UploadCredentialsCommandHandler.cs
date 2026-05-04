@@ -11,21 +11,15 @@ public class UploadCredentialsCommandHandler : ICommandHandler<UploadCredentials
 {
     private readonly IOphthalmologistRepository _repository;
     private readonly IFileStorageService _fileStorageService;
-    private readonly INotificationService _notificationService;
-    private readonly IIdentityService _identityService;
     private readonly IUnitOfWork _unitOfWork;
 
     public UploadCredentialsCommandHandler(
         IOphthalmologistRepository repository,
         IFileStorageService fileStorageService,
-        INotificationService notificationService,
-        IIdentityService identityService,
         IUnitOfWork unitOfWork)
     {
         _repository = repository;
         _fileStorageService = fileStorageService;
-        _notificationService = notificationService;
-        _identityService = identityService;
         _unitOfWork = unitOfWork;
     }
 
