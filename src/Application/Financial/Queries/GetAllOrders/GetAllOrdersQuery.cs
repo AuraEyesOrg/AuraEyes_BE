@@ -12,7 +12,9 @@ public record AllOrdersResult(
     IEnumerable<OrderDto> Items,
     int TotalCount,
     int PageNumber,
-    int PageSize)
+    int PageSize,
+    decimal TotalRevenue = 0,
+    decimal TotalPending = 0)
 {
     public int TotalPages => (int)Math.Ceiling(TotalCount / (double)PageSize);
     public bool HasPrevious => PageNumber > 1;
@@ -81,6 +83,8 @@ public class GetAllOrdersQueryHandler : IRequestHandler<GetAllOrdersQuery, AllOr
                     p.PaymentOrderCode)).ToList());
         }).ToList();
 
-        return new AllOrdersResult(dtos, totalCount, request.PageNumber, request.PageSize);
+        var (totalRevenue, totalPending) = await _orderRepository.GetFinancialSummaryAsync(cancellationToken);
+
+        return new AllOrdersResult(dtos, totalCount, request.PageNumber, request.PageSize, totalRevenue, totalPending);
     }
 }

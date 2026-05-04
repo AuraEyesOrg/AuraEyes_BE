@@ -149,19 +149,30 @@ public class GetClinicAppointmentsByDateQueryHandler
                 
                 var nextVisitTime = nextVisitOfSamePatient?.CheckedInAt;
 
-                var screening = screenings
-                    .Where(s => s.PatientId == visit.PatientId && 
-                                s.CreatedAt >= visitCheckedInAt && 
-                                (nextVisitTime == null || s.CreatedAt < nextVisitTime))
-                    .OrderByDescending(s => s.CreatedAt)
-                    .FirstOrDefault();
+                var screening = screenings.FirstOrDefault(s => s.PatientVisitId == visit.Id);
+                if (screening is null)
+                {
+                    screening = screenings
+                        .Where(s => s.PatientId == visit.PatientId &&
+                                    s.PatientVisitId == null &&
+                                    s.CreatedAt >= visitCheckedInAt &&
+                                    (nextVisitTime == null || s.CreatedAt < nextVisitTime))
+                        .OrderByDescending(s => s.CreatedAt)
+                        .FirstOrDefault();
+                }
 
-                var consultation = consultations
-                    .Where(c => c.PatientId == visit.PatientId && 
-                                c.CreatedAt >= visitCheckedInAt && 
-                                (nextVisitTime == null || c.CreatedAt < nextVisitTime))
-                    .OrderByDescending(c => c.CreatedAt)
-                    .FirstOrDefault();
+                ConsultationSession? consultation = null;
+                if (visit.MedicalRecord?.ConsultationSessionId is { } linkedCsId)
+                {
+                    consultation = consultations.FirstOrDefault(c => c.Id == linkedCsId);
+                }
+
+                if (consultation is null &&
+                    screening is not null &&
+                    screening.PatientVisitId == visit.Id)
+                {
+                    consultation = consultations.FirstOrDefault(c => c.AiScreeningId == screening.Id);
+                }
 
                 flowState = ClinicFlowStateResolver.Resolve(visit, screening, consultation, visit.MedicalRecord);
             }

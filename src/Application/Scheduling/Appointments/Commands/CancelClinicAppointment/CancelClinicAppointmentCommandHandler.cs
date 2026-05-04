@@ -10,17 +10,20 @@ public class CancelClinicAppointmentCommandHandler : ICommandHandler<CancelClini
 {
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
+    private readonly IOrderRepository _orderRepository;
     private readonly ICurrentUserService _currentUser;
     private readonly IUnitOfWork _unitOfWork;
 
     public CancelClinicAppointmentCommandHandler(
         IAppointmentRepository appointmentRepository,
         IAppointmentSlotRepository appointmentSlotRepository,
+        IOrderRepository orderRepository,
         ICurrentUserService currentUser,
         IUnitOfWork unitOfWork)
     {
         _appointmentRepository = appointmentRepository;
         _appointmentSlotRepository = appointmentSlotRepository;
+        _orderRepository = orderRepository;
         _currentUser = currentUser;
         _unitOfWork = unitOfWork;
     }
@@ -55,6 +58,18 @@ public class CancelClinicAppointmentCommandHandler : ICommandHandler<CancelClini
             }
 
             await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
+
+            // Also cancel linked pending order if exists
+            var orders = await _orderRepository.GetByAppointmentIdsAsync(new[] { appointment.Id }, cancellationToken);
+            foreach (var order in orders)
+            {
+                if (order.Status == OrderStatus.Pending)
+                {
+                    order.Cancel();
+                    await _orderRepository.UpdateAsync(order, cancellationToken);
+                }
+            }
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result.Success();
