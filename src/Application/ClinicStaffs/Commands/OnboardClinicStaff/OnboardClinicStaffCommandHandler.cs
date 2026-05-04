@@ -59,22 +59,6 @@ public class OnboardClinicStaffCommandHandler : ICommandHandler<OnboardClinicSta
                 return Result<bool>.Failure(userErrors);
             }
 
-            // 2. Change Password if provided
-            if (!string.IsNullOrWhiteSpace(request.NewPassword) && !string.IsNullOrWhiteSpace(request.CurrentPassword))
-            {
-                var (pwdSucceeded, pwdErrors) = await _identityService.ChangePasswordAsync(
-                    userId.Value,
-                    request.CurrentPassword,
-                    request.NewPassword,
-                    cancellationToken);
-
-                if (!pwdSucceeded)
-                {
-                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                    return Result<bool>.Failure(pwdErrors);
-                }
-            }
-
             // 3. Update Avatar if provided
             if (!string.IsNullOrWhiteSpace(request.AvatarUrl))
             {
