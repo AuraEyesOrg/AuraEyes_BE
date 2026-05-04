@@ -173,20 +173,17 @@ public class GetClinicQueueQueryHandler
                 }
 
                 ConsultationSession? consultation = null;
-                var linkedConsultationId = visit.MedicalRecord?.ConsultationSessionId;
-                if (linkedConsultationId.HasValue)
+                if (visit.MedicalRecord?.ConsultationSessionId is { } linkedCsId)
                 {
-                    consultation = consultations.FirstOrDefault(c => c.Id == linkedConsultationId.Value);
+                    consultation = consultations.FirstOrDefault(c => c.Id == linkedCsId);
                 }
 
-                if (consultation is null)
+                // Never infer consultation by patient + time — sibling visits share PatientId and
+                // would incorrectly show "Sent to Doctor" for a visit that has no screening yet.
+                if (consultation is null && screening is not null)
                 {
-                    consultation = consultations
-                        .Where(c => c.PatientId == visit.PatientId &&
-                                    c.CreatedAt >= visitCheckedInAt &&
-                                    (nextVisitTime == null || c.CreatedAt < nextVisitTime))
-                        .OrderByDescending(c => c.CreatedAt)
-                        .FirstOrDefault();
+                    consultation = consultations.FirstOrDefault(c =>
+                        c.AiScreeningId == screening.Id);
                 }
                     
                 var latestResult = screening?.ScreeningResults
