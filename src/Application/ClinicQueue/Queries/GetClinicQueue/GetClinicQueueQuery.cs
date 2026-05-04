@@ -159,18 +159,35 @@ public class GetClinicQueueQueryHandler
                 var nextVisitTime = nextVisitOfSamePatient?.CheckedInAt;
 
                 var screening = screenings
-                    .Where(s => s.PatientId == visit.PatientId && 
-                                s.CreatedAt >= visitCheckedInAt && 
-                                (nextVisitTime == null || s.CreatedAt < nextVisitTime))
-                    .OrderByDescending(s => s.CreatedAt)
-                    .FirstOrDefault();
+                    .FirstOrDefault(s => s.PatientVisitId == visit.Id);
 
-                var consultation = consultations
-                    .Where(c => c.PatientId == visit.PatientId && 
-                                c.CreatedAt >= visitCheckedInAt && 
-                                (nextVisitTime == null || c.CreatedAt < nextVisitTime))
-                    .OrderByDescending(c => c.CreatedAt)
-                    .FirstOrDefault();
+                if (screening is null)
+                {
+                    screening = screenings
+                        .Where(s => s.PatientId == visit.PatientId &&
+                                    s.PatientVisitId == null &&
+                                    s.CreatedAt >= visitCheckedInAt &&
+                                    (nextVisitTime == null || s.CreatedAt < nextVisitTime))
+                        .OrderByDescending(s => s.CreatedAt)
+                        .FirstOrDefault();
+                }
+
+                ConsultationSession? consultation = null;
+                var linkedConsultationId = visit.MedicalRecord?.ConsultationSessionId;
+                if (linkedConsultationId.HasValue)
+                {
+                    consultation = consultations.FirstOrDefault(c => c.Id == linkedConsultationId.Value);
+                }
+
+                if (consultation is null)
+                {
+                    consultation = consultations
+                        .Where(c => c.PatientId == visit.PatientId &&
+                                    c.CreatedAt >= visitCheckedInAt &&
+                                    (nextVisitTime == null || c.CreatedAt < nextVisitTime))
+                        .OrderByDescending(c => c.CreatedAt)
+                        .FirstOrDefault();
+                }
                     
                 var latestResult = screening?.ScreeningResults
                     .OrderByDescending(r => r.CreatedAt)
