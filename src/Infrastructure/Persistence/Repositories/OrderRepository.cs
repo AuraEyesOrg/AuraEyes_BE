@@ -66,20 +66,21 @@ public class OrderRepository : Repository<Order>, IOrderRepository
         var paidStatuses = new[] { OrderStatus.Confirmed, OrderStatus.Completed };
         
         // Revenue is what we actually keep (Completed payments - Refunded payments)
-        var completedTotalTask = _dbSet
+        // Sequential awaits are required because EF Core DbContext is not thread-safe
+        var completedTotal = await _dbSet
             .AsNoTracking()
             .Where(o => paidStatuses.Contains(o.Status))
             .SelectMany(o => o.Payments)
             .Where(p => p.Status == PaymentStatus.Completed)
             .SumAsync(p => p.Amount, cancellationToken);
 
-        var refundedTotalTask = _dbSet
+        var refundedTotal = await _dbSet
             .AsNoTracking()
             .SelectMany(o => o.Payments)
             .Where(p => p.Status == PaymentStatus.Refunded)
             .SumAsync(p => p.Amount, cancellationToken);
 
-        var totalPendingTask = _dbSet
+        var totalPending = await _dbSet
             .AsNoTracking()
             .Where(o => o.Status != OrderStatus.Cancelled && 
                         o.Status != OrderStatus.Refunded && 
@@ -88,11 +89,7 @@ public class OrderRepository : Repository<Order>, IOrderRepository
                 .Where(p => p.Status == PaymentStatus.Completed)
                 .Sum(p => p.Amount), cancellationToken);
 
-        await Task.WhenAll(completedTotalTask, refundedTotalTask, totalPendingTask);
-
-        var totalRevenue = (await completedTotalTask) - (await refundedTotalTask);
-        var totalPending = await totalPendingTask;
-
+        var totalRevenue = completedTotal - refundedTotal;
         return (totalRevenue, totalPending);
     }
 }
