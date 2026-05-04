@@ -6,6 +6,7 @@ namespace Application.ClinicScreenings.Commands.CreateClinicScreeningSession;
 public record CreateClinicScreeningSessionCommand : ICommand<CreateClinicScreeningSessionResponse>
 {
     public Guid PatientId { get; init; }
+    public Guid PatientVisitId { get; init; }
     public string ModelVersion { get; init; } = "AURA_v1.0";
     public List<RetinalImageData> RetinalImages { get; init; } = new();
 }
