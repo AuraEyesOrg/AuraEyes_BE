@@ -84,10 +84,6 @@ public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInCli
         var medicalRecord = new Domain.Entities.MedicalRecords.MedicalRecord(visit.PatientId, medicalRecordNumber);
         medicalRecord.LinkToPatientVisit(visit.Id);
         
-        // Pre-fill administrative data if possible (e.g., from patient profile)
-        // For now, initialized with empty JSON as required
-        medicalRecord.UpdateAdministrativeInfo("{}"); 
-        
         await _medicalRecordRepository.AddAsync(medicalRecord, cancellationToken);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);

@@ -230,7 +230,7 @@ public class GetClinicQueueQueryHandler
                     AssignedDoctorId = visit.AssignedDoctorId ?? consultation?.OphthalmologistId,
                     AssignedDoctorName = assignedDoctorName,
                     MedicalRecordId = visit.MedicalRecord?.Id,
-                    IsAdminCompleted = visit.MedicalRecord != null && visit.MedicalRecord.Status != MedicalRecordStatus.DraftAdmin,
+                    IsAdminCompleted = ClinicAdministrativeErmGate.IsSatisfied(visit.MedicalRecord),
 
                     // Integration with the new business logic resolver
                     FlowState = ClinicFlowStateResolver.Resolve(visit, screening, consultation, visit.MedicalRecord)
