@@ -17,7 +17,6 @@ public class ForceUpdateProfileCommandHandler : ICommandHandler<ForceUpdateProfi
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMediator _mediator;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
-    private readonly IClinicStaffRepository _clinicStaffRepository;
     private readonly ILogger<ForceUpdateProfileCommandHandler> _logger;
 
     public ForceUpdateProfileCommandHandler(
@@ -26,7 +25,6 @@ public class ForceUpdateProfileCommandHandler : ICommandHandler<ForceUpdateProfi
         IUnitOfWork unitOfWork,
         IMediator mediator,
         IOphthalmologistRepository ophthalmologistRepository,
-        IClinicStaffRepository clinicStaffRepository,
         ILogger<ForceUpdateProfileCommandHandler> logger)
     {
         _identityService = identityService;
@@ -34,7 +32,6 @@ public class ForceUpdateProfileCommandHandler : ICommandHandler<ForceUpdateProfi
         _unitOfWork = unitOfWork;
         _mediator = mediator;
         _ophthalmologistRepository = ophthalmologistRepository;
-        _clinicStaffRepository = clinicStaffRepository;
         _logger = logger;
     }
 

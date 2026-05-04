@@ -21,20 +21,17 @@ public class CancelSessionCommandHandler : ICommandHandler<CancelSessionCommand>
     private static readonly TimeSpan CancellationCutoff = TimeSpan.FromHours(3);
 
     private readonly IConsultationSessionRepository _sessionRepository;
-    private readonly IRepository<Patient> _patientRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<CancelSessionCommandHandler> _logger;
 
     public CancelSessionCommandHandler(
         IConsultationSessionRepository sessionRepository,
-        IRepository<Patient> patientRepository,
         IUnitOfWork unitOfWork,
         ICurrentUserService currentUserService,
         ILogger<CancelSessionCommandHandler> logger)
     {
         _sessionRepository = sessionRepository;
-        _patientRepository = patientRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
         _logger = logger;

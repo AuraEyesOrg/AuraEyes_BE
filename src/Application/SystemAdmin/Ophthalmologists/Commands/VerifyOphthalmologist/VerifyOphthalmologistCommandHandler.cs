@@ -15,7 +15,6 @@ namespace Application.SystemAdmin.Ophthalmologists.Commands.VerifyOphthalmologis
 public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthalmologistCommand, Result<string>>
 {
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
-    private readonly Domain.Common.IUnitOfWork _unitOfWork;
     private readonly IIdentityService _identityService;
     private readonly IEmailService _emailService;
     private readonly INotificationService _notificationService;
@@ -23,14 +22,12 @@ public class VerifyOphthalmologistCommandHandler : IRequestHandler<VerifyOphthal
 
     public VerifyOphthalmologistCommandHandler(
         IOphthalmologistRepository ophthalmologistRepository,
-        Domain.Common.IUnitOfWork unitOfWork,
         IIdentityService identityService,
         IEmailService emailService,
         INotificationService notificationService,
         ILogger<VerifyOphthalmologistCommandHandler> logger)
     {
         _ophthalmologistRepository = ophthalmologistRepository;
-        _unitOfWork = unitOfWork;
         _identityService = identityService;
         _emailService = emailService;
         _notificationService = notificationService;

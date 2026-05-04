@@ -8,16 +8,13 @@ namespace Application.MedicalRecords.Commands.UpdateMedicalRecordClinical;
 public class UpdateMedicalRecordClinicalCommandHandler : IRequestHandler<UpdateMedicalRecordClinicalCommand, Result>
 {
     private readonly IMedicalRecordRepository _medicalRecordRepository;
-    private readonly IPatientVisitRepository _patientVisitRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public UpdateMedicalRecordClinicalCommandHandler(
         IMedicalRecordRepository medicalRecordRepository,
-        IPatientVisitRepository patientVisitRepository,
         IUnitOfWork unitOfWork)
     {
         _medicalRecordRepository = medicalRecordRepository;
-        _patientVisitRepository = patientVisitRepository;
         _unitOfWork = unitOfWork;
     }
 
