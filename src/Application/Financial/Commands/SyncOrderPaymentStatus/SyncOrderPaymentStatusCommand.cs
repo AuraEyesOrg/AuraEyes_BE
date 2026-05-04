@@ -93,28 +93,7 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
 
             if (status is "CANCELLED" or "EXPIRED")
             {
-                if (status == "CANCELLED")
-                    payment.Cancel();
-                else
-                    payment.Fail(status);
-
-                // If deposit payment fails/cancelled, cancel the order and appointment to release the slot
-                if (IsDepositPayment(order, payment))
-                {
-                    order.Cancel();
-                    _logger.LogInformation("Deposit payment {Status} for Order {OrderId}. Cancelling order.", status, order.Id);
-
-                    if (order.AppointmentId.HasValue)
-                    {
-                        _logger.LogInformation("Cancelling associated Appointment {AppointmentId}.", order.AppointmentId.Value);
-                        var appointment = await _clinicVisitService.GetAppointmentByIdAsync(order.AppointmentId.Value, cancellationToken);
-                        if (appointment != null && appointment.Status == AppointmentStatus.Pending)
-                        {
-                            await _clinicVisitService.CancelAppointmentAsync(appointment.Id, $"Payment {status} via PayOS sync", cancellationToken);
-                        }
-                    }
-                }
-
+                await HandleFailedPaymentAsync(order, payment, status, cancellationToken);
                 return true;
             }
         }
@@ -124,6 +103,34 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
         }
 
         return false;
+    }
+
+    private async Task HandleFailedPaymentAsync(Order order, Payment payment, string status, CancellationToken cancellationToken)
+    {
+        if (status == "CANCELLED")
+            payment.Cancel();
+        else
+            payment.Fail(status);
+
+        if (!IsDepositPayment(order, payment)) return;
+
+        order.Cancel();
+        _logger.LogInformation("Deposit payment {Status} for Order {OrderId}. Cancelling order.", status, order.Id);
+
+        if (order.AppointmentId.HasValue)
+        {
+            await CancelAssociatedAppointmentAsync(order.AppointmentId.Value, status, cancellationToken);
+        }
+    }
+
+    private async Task CancelAssociatedAppointmentAsync(Guid appointmentId, string status, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Cancelling associated Appointment {AppointmentId}.", appointmentId);
+        var appointment = await _clinicVisitService.GetAppointmentByIdAsync(appointmentId, cancellationToken);
+        if (appointment != null && appointment.Status == AppointmentStatus.Pending)
+        {
+            await _clinicVisitService.CancelAppointmentAsync(appointment.Id, $"Payment {status} via PayOS sync", cancellationToken);
+        }
     }
 
     private async Task HandlePaidPaymentAsync(Order order, Payment payment, string? txnRef, CancellationToken cancellationToken)

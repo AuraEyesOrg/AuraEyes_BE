@@ -32,14 +32,6 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
     private readonly IPaymentRepository _paymentRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPayOSService _payOSService;
-    private readonly IPatientVisitRepository _patientVisitRepository;
-    private readonly IRepository<Patient> _patientRepository;
-    private readonly IAppointmentRepository _appointmentRepository;
-    private readonly IConsultationSessionRepository _sessionRepository;
-    private readonly IOphthalmologistRepository _ophthalmologistRepository;
-    private readonly INotificationService _notificationService;
-    private readonly IIdentityService _identityService;
-    private readonly IChatHubService _chatHubService;
     private readonly IClinicVisitService _clinicVisitService;
     private readonly PayOSSettings _payOSSettings;
     private readonly ILogger<CompleteOrderPaymentCommandHandler> _logger;
@@ -49,14 +41,6 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
         IPaymentRepository paymentRepository,
         IUnitOfWork unitOfWork,
         IPayOSService payOSService,
-        IPatientVisitRepository patientVisitRepository,
-        IRepository<Patient> patientRepository,
-        IAppointmentRepository appointmentRepository,
-        IConsultationSessionRepository sessionRepository,
-        IOphthalmologistRepository ophthalmologistRepository,
-        INotificationService notificationService,
-        IIdentityService identityService,
-        IChatHubService chatHubService,
         IClinicVisitService clinicVisitService,
         Microsoft.Extensions.Options.IOptions<PayOSSettings> payOSSettings,
         ILogger<CompleteOrderPaymentCommandHandler> logger)
@@ -65,14 +49,6 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
         _paymentRepository = paymentRepository;
         _unitOfWork = unitOfWork;
         _payOSService = payOSService;
-        _patientVisitRepository = patientVisitRepository;
-        _patientRepository = patientRepository;
-        _appointmentRepository = appointmentRepository;
-        _sessionRepository = sessionRepository;
-        _ophthalmologistRepository = ophthalmologistRepository;
-        _notificationService = notificationService;
-        _identityService = identityService;
-        _chatHubService = chatHubService;
         _clinicVisitService = clinicVisitService;
         _payOSSettings = payOSSettings.Value;
         _logger = logger;
