@@ -36,8 +36,8 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
         if (screeningIds.Count == 0)
             return Array.Empty<OphthalmologistScreeningListReadModel>();
 
-        // Parallelize independent queries
-        var baseRowsTask = (
+        // Sequential awaits are required because EF Core DbContext is not thread-safe
+        var baseRows = await (
             from s in _context.Set<AiScreening>().AsNoTracking()
             join p in _context.Set<Patient>().AsNoTracking() on s.PatientId equals p.Id
             join u in _context.Set<ApplicationUser>().AsNoTracking() on p.UserId equals u.Id into users
@@ -56,14 +56,14 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
             }
         ).ToListAsync(cancellationToken);
 
-        var latestResultByScreeningTask = (
+        var latestResultByScreening = await (
             from r in _context.Set<ScreeningResult>().AsNoTracking()
             where screeningIds.Contains(r.AiScreeningId)
             group r by r.AiScreeningId into grp
             select grp.OrderByDescending(x => x.CreatedAt).First()
         ).ToListAsync(cancellationToken);
 
-        var imgMetadataTask = (
+        var imgMetadata = await (
             from img in _context.Set<RetinalImage>().AsNoTracking()
             where img.AiScreeningId != null && screeningIds.Contains(img.AiScreeningId.Value)
             group img by img.AiScreeningId into grp
@@ -75,17 +75,10 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
             }
         ).ToListAsync(cancellationToken);
 
-        var diagnosesTask = _context.Set<MedicalDiagnosis>()
+        var diagnoses = await _context.Set<MedicalDiagnosis>()
             .AsNoTracking()
             .Where(d => d.DoctorId == ophthalmologistProfileId && screeningIds.Contains(d.AiScreeningId))
             .ToListAsync(cancellationToken);
-
-        await Task.WhenAll(baseRowsTask, latestResultByScreeningTask, imgMetadataTask, diagnosesTask);
-
-        var baseRows = await baseRowsTask;
-        var latestResultByScreening = await latestResultByScreeningTask;
-        var imgMetadata = await imgMetadataTask;
-        var diagnoses = await diagnosesTask;
 
         var resultDict = latestResultByScreening.ToDictionary(r => r.AiScreeningId);
         var imgDict = imgMetadata.ToDictionary(x => x.ScreeningId);
