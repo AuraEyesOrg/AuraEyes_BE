@@ -80,6 +80,18 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
             if (status is "CANCELLED" or "EXPIRED")
             {
                 payment.Fail(status);
+
+                // If deposit payment fails, cancel the appointment to release the slot
+                if (IsDepositPayment(order, payment) && order.AppointmentId.HasValue)
+                {
+                    _logger.LogInformation("Deposit payment failed for Order {OrderId}. Cancelling associated Appointment {AppointmentId}.", order.Id, order.AppointmentId.Value);
+                    var appointment = await _clinicVisitService.GetAppointmentByIdAsync(order.AppointmentId.Value, cancellationToken);
+                    if (appointment != null && appointment.Status == AppointmentStatus.Pending)
+                    {
+                        await _clinicVisitService.CancelAppointmentAsync(appointment.Id, "Payment failed/cancelled via PayOS sync", cancellationToken);
+                    }
+                }
+
                 return true;
             }
         }
