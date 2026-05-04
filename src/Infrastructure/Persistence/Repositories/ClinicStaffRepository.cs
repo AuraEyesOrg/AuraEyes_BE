@@ -19,6 +19,7 @@ public class ClinicStaffRepository : Repository<ClinicStaff>, IClinicStaffReposi
     public async Task<ClinicStaff?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbSet
+            .AsNoTracking()
             .FirstOrDefaultAsync(s => s.UserId == userId, cancellationToken);
     }
 
@@ -26,6 +27,7 @@ public class ClinicStaffRepository : Repository<ClinicStaff>, IClinicStaffReposi
     public async Task<List<ClinicStaff>> GetAllActiveAsync(CancellationToken cancellationToken = default)
     {
         return await _dbSet
+            .AsNoTracking()
             .Where(s => s.IsActive)
             .OrderBy(s => s.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -38,6 +40,7 @@ public class ClinicStaffRepository : Repository<ClinicStaff>, IClinicStaffReposi
     {
         var roleName = subRole.ToString();
         return await _dbSet
+            .AsNoTracking()
             .Where(s => s.IsActive && s.SubRoles.Contains(roleName))
             .ToListAsync(cancellationToken);
     }

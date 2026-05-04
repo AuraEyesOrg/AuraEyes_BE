@@ -38,13 +38,17 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
 
         var postIds = posts.Select(p => p.Id).ToList();
 
-        // Batch load user reactions and bookmark status
-        var userReactions = await _postRepository.GetUserReactionsForPostsAsync(
+        var userReactionsTask = _postRepository.GetUserReactionsForPostsAsync(
             request.CurrentUserId, postIds, cancellationToken);
-        var savedPostIds = await _postRepository.GetUserSavedPostIdsAsync(
+        var savedPostIdsTask = _postRepository.GetUserSavedPostIdsAsync(
             request.CurrentUserId, postIds, cancellationToken);
+        var authorsTask = BatchLoadAuthorsAsync(posts, cancellationToken);
 
-        var authors = await BatchLoadAuthorsAsync(posts, cancellationToken);
+        await Task.WhenAll(userReactionsTask, savedPostIdsTask, authorsTask);
+
+        var userReactions = await userReactionsTask;
+        var savedPostIds = await savedPostIdsTask;
+        var authors = await authorsTask;
 
         var items = posts.Select(p => MapToDto(
             p, authors, userReactions, savedPostIds, request.CurrentUserId, request.IsSystemAdmin)).ToList();

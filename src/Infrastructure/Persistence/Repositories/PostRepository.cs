@@ -60,8 +60,7 @@ public class PostRepository : Repository<ProfessionalPost>, IPostRepository
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
-            var term = searchTerm.ToLower();
-            query = query.Where(p => p.Content.ToLower().Contains(term));
+            query = query.Where(p => EF.Functions.ILike(p.Content, $"%{searchTerm}%"));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);

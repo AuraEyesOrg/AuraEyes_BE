@@ -52,14 +52,29 @@ public class GetClinicAppointmentsByDateQueryHandler
             cancellationToken: cancellationToken);
 
         var appointmentIds = appointments.Select(a => a.Id).ToList();
-        var orders = await _orderRepository.GetByAppointmentIdsAsync(appointmentIds, cancellationToken);
-        var orderLookup = orders.ToLookup(o => o.AppointmentId!.Value);
-        var visits = await _patientVisitRepository.Query().AsNoTracking()
+
+        // Batch 1: Independent queries
+        var ordersTask = _orderRepository.GetByAppointmentIdsAsync(appointmentIds, cancellationToken);
+        var visitsTask = _patientVisitRepository.Query().AsNoTracking()
             .Where(v => v.AppointmentId.HasValue && appointmentIds.Contains(v.AppointmentId.Value))
             .Include(v => v.MedicalRecord)
             .ToListAsync(cancellationToken);
-        var visitMap = visits.ToDictionary(v => v.AppointmentId!.Value);
+        
+        var registeredUserIds = appointments
+            .Where(a => a.Patient?.UserId != null)
+            .Select(a => a.Patient!.UserId!.Value)
+            .Distinct()
+            .ToList();
+        var userMapTask = _identityService.GetUsersByIdsAsync(registeredUserIds, cancellationToken);
 
+        await Task.WhenAll(ordersTask, visitsTask, userMapTask);
+
+        var orders = await ordersTask;
+        var visits = await visitsTask;
+        var userMap = (await userMapTask).ToDictionary(u => u.Id);
+
+        var orderLookup = orders.ToLookup(o => o.AppointmentId!.Value);
+        var visitMap = visits.ToDictionary(v => v.AppointmentId!.Value);
         var visitPatientIds = visits.Select(v => v.PatientId).Distinct().ToList();
 
         // Use the earliest CheckedInAt among active visits as the cutoff to avoid missing
@@ -70,9 +85,10 @@ public class GetClinicAppointmentsByDateQueryHandler
             .DefaultIfEmpty(DateTime.UtcNow.AddDays(-1))
             .Min();
 
-        var screenings = visitPatientIds.Count == 0
-            ? new List<AiScreening>()
-            : await _screeningRepository
+        // Batch 2: Data dependent on visits
+        var screeningsTask = visitPatientIds.Count == 0
+            ? Task.FromResult(new List<AiScreening>())
+            : _screeningRepository
                 .Query().AsNoTracking()
                 .Include(s => s.ScreeningResults)
                 .Where(s =>
@@ -81,9 +97,9 @@ public class GetClinicAppointmentsByDateQueryHandler
                     && !s.IsDeleted)
                 .ToListAsync(cancellationToken);
 
-        var consultations = visitPatientIds.Count == 0
-            ? new List<ConsultationSession>()
-            : await _consultationSessionRepository
+        var consultationsTask = visitPatientIds.Count == 0
+            ? Task.FromResult(new List<ConsultationSession>())
+            : _consultationSessionRepository
                 .Query().AsNoTracking()
                 .Where(cs =>
                     visitPatientIds.Contains(cs.PatientId)
@@ -92,20 +108,6 @@ public class GetClinicAppointmentsByDateQueryHandler
                     && !cs.IsDeleted)
                 .ToListAsync(cancellationToken);
 
-        // NOTE: We do NOT pre-group by patientId anymore, because we need to filter
-        // per-visit using CheckedInAt to avoid old sessions from polluting the current visit.
-
-        // Fetch registered user names for patient profiles
-        var registeredUserIds = appointments
-            .Where(a => a.Patient?.UserId != null)
-            .Select(a => a.Patient!.UserId!.Value)
-            .Distinct()
-            .ToList();
-
-        var userMap = (await _identityService.GetUsersByIdsAsync(registeredUserIds, cancellationToken))
-            .ToDictionary(u => u.Id);
-
-        // Fetch doctor names/avatars in batch
         var doctorIds = appointments
             .Select(a => a.RequestedDoctorId ?? a.AppointmentSlot?.OphthalId)
             .Where(id => id.HasValue)
@@ -114,7 +116,13 @@ public class GetClinicAppointmentsByDateQueryHandler
             .Distinct()
             .ToList();
 
-        var doctorMap = await _ophthalmologistRepository.GetEnhancedDoctorDetailsByIdsAsync(doctorIds, cancellationToken);
+        var doctorMapTask = _ophthalmologistRepository.GetEnhancedDoctorDetailsByIdsAsync(doctorIds, cancellationToken);
+
+        await Task.WhenAll(screeningsTask, consultationsTask, doctorMapTask);
+
+        var screenings = await screeningsTask;
+        var consultations = await consultationsTask;
+        var doctorMap = await doctorMapTask;
 
         var sortedVisits = visits.OrderBy(v => v.CheckedInAt).ThenBy(v => v.Id).ToList();
         var items = new List<ClinicAppointmentDto>();
