@@ -91,7 +91,7 @@ public class FinancialController : BaseApiController
     /// Synchronizes the payment status with PayOS.
     /// </summary>
     [HttpPost("orders/{id}/sync")]
-    [Authorize(Roles = "ClinicStaff,SystemAdmin")]
+    [Authorize(Roles = "ClinicStaff,SystemAdmin,Patient")]
     public async Task<IActionResult> SyncOrderPaymentStatus(Guid id)
     {
         var result = await _mediator.Send(new Application.Financial.Commands.SyncOrderPaymentStatus.SyncOrderPaymentStatusCommand(id));
