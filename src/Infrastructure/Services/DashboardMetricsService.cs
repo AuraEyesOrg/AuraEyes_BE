@@ -282,56 +282,9 @@ public class DashboardMetricsService : IDashboardMetricsService
             ? "weekly"
             : "monthly";
 
-        var dataPoints = new List<VolumeTrendDataPoint>();
-        if (normalizedTimeRange == "weekly")
-        {
-            var start = DateTime.UtcNow.Date.AddDays(-7 * (periods - 1));
-            var screeningDates = await _context.AiScreenings
-                .Where(s => s.CreatedAt >= start)
-                .Select(s => s.CreatedAt)
-                .ToListAsync(cancellationToken);
-
-            dataPoints.AddRange(screeningDates
-                .GroupBy(date =>
-                {
-                    var offset = ((int)date.DayOfWeek + 6) % 7;
-                    return date.Date.AddDays(-offset);
-                })
-                .OrderBy(group => group.Key)
-                .Select(group => new VolumeTrendDataPoint
-                {
-                    Date = group.Key,
-                    Label = group.Key.ToString("dd MMM"),
-                    Count = group.Count()
-                }));
-        }
-        else
-        {
-            var start = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-(periods - 1));
-            var screenings = await _context.AiScreenings
-                .Where(s => s.CreatedAt >= start)
-                .GroupBy(s => new { s.CreatedAt.Year, s.CreatedAt.Month })
-                .Select(group => new
-                {
-                    group.Key.Year,
-                    group.Key.Month,
-                    Count = group.Count()
-                })
-                .OrderBy(item => item.Year)
-                .ThenBy(item => item.Month)
-                .ToListAsync(cancellationToken);
-
-            dataPoints.AddRange(screenings.Select(item =>
-            {
-                var date = new DateTime(item.Year, item.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-                return new VolumeTrendDataPoint
-                {
-                    Date = date,
-                    Label = date.ToString("MMM yyyy"),
-                    Count = item.Count
-                };
-            }));
-        }
+        var dataPoints = normalizedTimeRange == "weekly"
+            ? await GetWeeklyTrendDataPointsAsync(periods, cancellationToken)
+            : await GetMonthlyTrendDataPointsAsync(periods, cancellationToken);
 
         return new ScreeningVolumeTrendsDto
         {
@@ -340,6 +293,58 @@ public class DashboardMetricsService : IDashboardMetricsService
             TotalScreenings = dataPoints.Sum(item => item.Count),
             AveragePerPeriod = dataPoints.Count == 0 ? 0 : Math.Round((decimal)dataPoints.Sum(item => item.Count) / dataPoints.Count, 1)
         };
+    }
+
+    private async Task<List<VolumeTrendDataPoint>> GetWeeklyTrendDataPointsAsync(int periods, CancellationToken cancellationToken)
+    {
+        var start = DateTime.UtcNow.Date.AddDays(-7 * (periods - 1));
+        var screeningDates = await _context.AiScreenings
+            .Where(s => s.CreatedAt >= start)
+            .Select(s => s.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        return screeningDates
+            .GroupBy(date =>
+            {
+                var offset = ((int)date.DayOfWeek + 6) % 7;
+                return date.Date.AddDays(-offset);
+            })
+            .OrderBy(group => group.Key)
+            .Select(group => new VolumeTrendDataPoint
+            {
+                Date = group.Key,
+                Label = group.Key.ToString("dd MMM"),
+                Count = group.Count()
+            })
+            .ToList();
+    }
+
+    private async Task<List<VolumeTrendDataPoint>> GetMonthlyTrendDataPointsAsync(int periods, CancellationToken cancellationToken)
+    {
+        var start = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-(periods - 1));
+        var screenings = await _context.AiScreenings
+            .Where(s => s.CreatedAt >= start)
+            .GroupBy(s => new { s.CreatedAt.Year, s.CreatedAt.Month })
+            .Select(group => new
+            {
+                group.Key.Year,
+                group.Key.Month,
+                Count = group.Count()
+            })
+            .OrderBy(item => item.Year)
+            .ThenBy(item => item.Month)
+            .ToListAsync(cancellationToken);
+
+        return screenings.Select(item =>
+        {
+            var date = new DateTime(item.Year, item.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            return new VolumeTrendDataPoint
+            {
+                Date = date,
+                Label = date.ToString("MMM yyyy"),
+                Count = item.Count
+            };
+        }).ToList();
     }
 
     public async Task<PopulationRiskAnalysisDto> GetPopulationRiskAnalysisAsync(CancellationToken cancellationToken = default)
