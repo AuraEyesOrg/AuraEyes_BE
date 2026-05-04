@@ -17,8 +17,6 @@ public class GetPatientClinicAppointmentsQueryHandler
     private readonly IClinicFeedbackRepository _clinicFeedbackRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IOrderRepository _orderRepository;
-    private readonly IClinicStaffRepository _staffRepository;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
 
     public GetPatientClinicAppointmentsQueryHandler(
@@ -26,16 +24,12 @@ public class GetPatientClinicAppointmentsQueryHandler
         IClinicFeedbackRepository clinicFeedbackRepository,
         IOphthalmologistRepository ophthalmologistRepository,
         IOrderRepository orderRepository,
-        IClinicStaffRepository staffRepository,
-        IUnitOfWork unitOfWork,
         ICurrentUserService currentUser)
     {
         _appointmentRepository = appointmentRepository;
         _clinicFeedbackRepository = clinicFeedbackRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _orderRepository = orderRepository;
-        _staffRepository = staffRepository;
-        _unitOfWork = unitOfWork;
         _currentUser = currentUser;
     }
 

@@ -25,7 +25,6 @@ public class CreateClinicAppointmentCommandHandler
     private readonly IPaymentRepository _paymentRepository;
     private readonly ICurrentUserService _currentUser;
     private readonly IIdentityService _identityService;
-    private readonly IEmailService _emailService;
     private readonly INotificationService _notificationService;
     private readonly ISlotAssignmentRepository _slotAssignmentRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
@@ -50,7 +49,6 @@ public class CreateClinicAppointmentCommandHandler
         IPaymentRepository paymentRepository,
         ICurrentUserService currentUser,
         IIdentityService identityService,
-        IEmailService emailService,
         INotificationService notificationService,
         ISlotAssignmentRepository slotAssignmentRepository,
         IOphthalmologistRepository ophthalmologistRepository,
@@ -67,7 +65,6 @@ public class CreateClinicAppointmentCommandHandler
         _paymentRepository = paymentRepository;
         _currentUser = currentUser;
         _identityService = identityService;
-        _emailService = emailService;
         _notificationService = notificationService;
         _slotAssignmentRepository = slotAssignmentRepository;
         _ophthalmologistRepository = ophthalmologistRepository;

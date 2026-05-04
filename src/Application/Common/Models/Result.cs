@@ -66,6 +66,17 @@ public class Result<T>
         IsPaymentRequired = true,
         Errors = new() { message }
     };
+
+    public Result ToResult()
+    {
+        if (IsSuccess) return Result.Success();
+        if (IsUnauthorized) return Result.Unauthorized(ErrorMessage);
+        if (IsForbidden) return Result.Forbidden(ErrorMessage);
+        if (IsNotFound) return Result.NotFound(ErrorMessage);
+        if (IsConflict) return Result.Conflict(ErrorMessage);
+        if (IsPaymentRequired) return Result.PaymentRequired(ErrorMessage);
+        return Result.Failure(Errors);
+    }
 }
 
 /// <summary>

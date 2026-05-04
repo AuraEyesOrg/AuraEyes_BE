@@ -11,16 +11,13 @@ public class GetPatientProfileByIdQueryHandler : IQueryHandler<GetPatientProfile
 {
     private readonly IIdentityService _identityService;
     private readonly IRepository<Patient> _patientRepository;
-    private readonly ILogger<GetPatientProfileByIdQueryHandler> _logger;
 
     public GetPatientProfileByIdQueryHandler(
         IIdentityService identityService,
-        IRepository<Patient> patientRepository,
-        ILogger<GetPatientProfileByIdQueryHandler> logger)
+        IRepository<Patient> patientRepository)
     {
         _identityService = identityService;
         _patientRepository = patientRepository;
-        _logger = logger;
     }
 
     public async Task<Result<PatientProfileDto>> Handle(

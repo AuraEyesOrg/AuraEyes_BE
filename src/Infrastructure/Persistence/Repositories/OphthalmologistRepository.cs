@@ -42,9 +42,9 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
             var lower = searchTerm.ToLower();
             query = query
                 .Join(_context.Users, o => o.UserId, u => u.Id, (o, u) => new { o, u })
-                .Where(x => x.u.FullName.ToLower().Contains(lower) ||
-                            x.u.Email.ToLower().Contains(lower) ||
-                            x.o.Phone.ToLower().Contains(lower))
+                .Where(x => (x.u.FullName != null && x.u.FullName.ToLower().Contains(lower)) ||
+                            (x.u.Email != null && x.u.Email.ToLower().Contains(lower)) ||
+                            (x.o.Phone != null && x.o.Phone.ToLower().Contains(lower)))
                 .Select(x => x.o);
         }
 
