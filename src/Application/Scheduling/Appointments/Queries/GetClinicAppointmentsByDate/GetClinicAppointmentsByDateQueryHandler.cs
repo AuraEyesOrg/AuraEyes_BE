@@ -167,7 +167,9 @@ public class GetClinicAppointmentsByDateQueryHandler
                     consultation = consultations.FirstOrDefault(c => c.Id == linkedCsId);
                 }
 
-                if (consultation is null && screening is not null)
+                if (consultation is null &&
+                    screening is not null &&
+                    screening.PatientVisitId == visit.Id)
                 {
                     consultation = consultations.FirstOrDefault(c => c.AiScreeningId == screening.Id);
                 }

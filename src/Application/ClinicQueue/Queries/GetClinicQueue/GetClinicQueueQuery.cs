@@ -147,7 +147,8 @@ public class GetClinicQueueQueryHandler
 
             var sortedVisits = visits.OrderBy(v => v.CheckedInAt).ThenBy(v => v.Id).ToList();
 
-            foreach (var visit in visits)
+            // Iterate in stable visit order so legacy screening windows align with "next visit" boundaries.
+            foreach (var visit in sortedVisits)
             {
                 var visitCheckedInAt = visit.CheckedInAt ?? DateTime.UtcNow;
 
@@ -178,9 +179,11 @@ public class GetClinicQueueQueryHandler
                     consultation = consultations.FirstOrDefault(c => c.Id == linkedCsId);
                 }
 
-                // Never infer consultation by patient + time — sibling visits share PatientId and
-                // would incorrectly show "Sent to Doctor" for a visit that has no screening yet.
-                if (consultation is null && screening is not null)
+                // Never infer consultation from a screening that belongs to another visit (or legacy
+                // unscoped screening): that session would leak "Sent to Doctor" / "Finalized" across rows.
+                if (consultation is null &&
+                    screening is not null &&
+                    screening.PatientVisitId == visit.Id)
                 {
                     consultation = consultations.FirstOrDefault(c =>
                         c.AiScreeningId == screening.Id);

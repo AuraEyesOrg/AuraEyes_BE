@@ -5,6 +5,7 @@ using System.Text.Json;
 using Domain.Common;
 using Domain.Entities.Consultation;
 using Domain.Entities.Screening;
+using Domain.Entities.Scheduling;
 using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
@@ -23,6 +24,7 @@ public class SubmitVerificationReportCommandHandler
     private readonly INotificationService _notificationService;
     private readonly IIdentityService _identityService;
     private readonly IPatientVisitRepository _patientVisitRepository;
+    private readonly IMedicalRecordRepository _medicalRecordRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public SubmitVerificationReportCommandHandler(
@@ -33,6 +35,7 @@ public class SubmitVerificationReportCommandHandler
         INotificationService notificationService,
         IIdentityService identityService,
         IPatientVisitRepository patientVisitRepository,
+        IMedicalRecordRepository medicalRecordRepository,
         IUnitOfWork unitOfWork)
     {
         _sessionRepository = sessionRepository;
@@ -42,6 +45,7 @@ public class SubmitVerificationReportCommandHandler
         _notificationService = notificationService;
         _identityService = identityService;
         _patientVisitRepository = patientVisitRepository;
+        _medicalRecordRepository = medicalRecordRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -195,25 +199,63 @@ public class SubmitVerificationReportCommandHandler
             session.OpenChat();
             await _sessionRepository.UpdateAsync(session, cancellationToken);
 
-            // Digital Clinic Flow: Update PatientVisit to WaitingForPayment
-            var visit = await _patientVisitRepository.Query()
-                .FirstOrDefaultAsync(v => 
-                    v.PatientId == session.PatientId && 
-                    (v.Status == PatientVisitStatus.CheckedIn ||
-                     v.Status == PatientVisitStatus.InProgress),
+            // Resolve the visit for this session — never pick "any" active visit for the same patient.
+            PatientVisit? visitToComplete = null;
+            if (screening.PatientVisitId.HasValue)
+            {
+                visitToComplete = await _patientVisitRepository.GetByIdAsync(
+                    screening.PatientVisitId.Value,
                     cancellationToken);
+                if (visitToComplete is not null &&
+                    visitToComplete.PatientId != session.PatientId)
+                {
+                    visitToComplete = null;
+                }
+            }
+
+            if (visitToComplete is null)
+            {
+                var visitIdFromMr = await _medicalRecordRepository
+                    .Query()
+                    .Where(mr => mr.ConsultationSessionId == session.Id && mr.PatientVisitId != null)
+                    .Select(mr => mr.PatientVisitId!.Value)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (visitIdFromMr != Guid.Empty)
+                {
+                    visitToComplete = await _patientVisitRepository.GetByIdAsync(
+                        visitIdFromMr,
+                        cancellationToken);
+                    if (visitToComplete is not null &&
+                        visitToComplete.PatientId != session.PatientId)
+                    {
+                        visitToComplete = null;
+                    }
+                }
+            }
+
+            if (visitToComplete is null && isFinalized)
+            {
+                visitToComplete = await _patientVisitRepository.Query()
+                    .Where(v =>
+                        v.PatientId == session.PatientId &&
+                        (v.Status == PatientVisitStatus.CheckedIn ||
+                         v.Status == PatientVisitStatus.InProgress))
+                    .OrderByDescending(v => v.CheckedInAt ?? v.CreatedAt)
+                    .FirstOrDefaultAsync(cancellationToken);
+            }
 
             var patient = await _patientRepository.GetByIdAsync(session.PatientId, cancellationToken);
 
-            if (visit != null && isFinalized)
+            if (visitToComplete != null && isFinalized)
             {
-                if (visit.Status == PatientVisitStatus.CheckedIn)
+                if (visitToComplete.Status == PatientVisitStatus.CheckedIn)
                 {
-                    visit.Start();
+                    visitToComplete.Start();
                 }
 
-                visit.FinishConsultation(clinicalFindings);
-                await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
+                visitToComplete.FinishConsultation(clinicalFindings);
+                await _patientVisitRepository.UpdateAsync(visitToComplete, cancellationToken);
 
                 // Notify Cashier (ClinicStaff)
                 await _notificationService.SendToRoleAsync(
@@ -224,8 +266,8 @@ public class SubmitVerificationReportCommandHandler
                     payload: new
                     {
                         Action = "cashier_payment_ready",
-                        VisitId = visit.Id,
-                        PatientId = visit.PatientId,
+                        VisitId = visitToComplete.Id,
+                        PatientId = visitToComplete.PatientId,
                         ConsultationSessionId = session.Id,
                         ScreeningId = session.AiScreeningId,
                         DiagnosisId = diagnosis.Id,
