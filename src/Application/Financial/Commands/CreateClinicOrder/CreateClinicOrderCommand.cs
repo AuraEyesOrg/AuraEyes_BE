@@ -93,42 +93,37 @@ public class CreateClinicOrderCommandHandler : ICommandHandler<CreateClinicOrder
         if (totalAmount <= 0)
             return Result<CreateClinicOrderResponse>.Failure("Total amount must be greater than zero.");
 
-        // Get doctor name from diagnosis for metadata
-        string doctorName = "N/A";
-        var consultation = await _consultationSessionRepository.Query()
-            .Where(c => c.PatientId == visit.PatientId && !c.IsDeleted)
-            .OrderByDescending(c => c.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (consultation != null)
+        // Get patient name correctly
+        string patientName = "Patient";
+        var patient = visit.Patient;
+        if (patient != null)
         {
-            var diagnosis = await _diagnosisRepository.Query()
-                .Where(d => d.ConsultationSessionId == consultation.Id && !d.IsDeleted)
-                .OrderByDescending(d => d.CreatedAt)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            if (diagnosis != null)
+            if (patient.IsWalkIn)
             {
-                var ophthalmologist = await _ophthalmologistRepository.GetByIdAsync(diagnosis.DoctorId, cancellationToken);
-                if (ophthalmologist != null)
-                {
-                    var doctorUser = await _identityService.GetUserByIdAsync(ophthalmologist.UserId, cancellationToken);
-                    doctorName = doctorUser?.FullName ?? "N/A";
-                }
+                patientName = patient.FullName ?? "Walk-in Patient";
+            }
+            else if (patient.UserId.HasValue)
+            {
+                var patientUser = await _identityService.GetUserByIdAsync(patient.UserId.Value, cancellationToken);
+                patientName = patientUser?.FullName ?? "Registered Patient";
             }
         }
 
-        // Ensure patient is loaded for name
-        var patient = visit.Patient;
-        if (patient == null)
+        // Get doctor name from assigned doctor
+        string doctorName = "N/A";
+        if (visit.AssignedDoctorId.HasValue)
         {
-            patient = await _patientRepository.GetByIdAsync(visit.PatientId, cancellationToken);
+            var ophthalmologist = await _ophthalmologistRepository.GetByIdAsync(visit.AssignedDoctorId.Value, cancellationToken);
+            if (ophthalmologist != null)
+            {
+                var doctorUser = await _identityService.GetUserByIdAsync(ophthalmologist.UserId, cancellationToken);
+                doctorName = doctorUser?.FullName ?? "N/A";
+            }
         }
 
         var metadata = new { V = visit.Id };
         var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
 
-        string patientName = patient?.FullName ?? "Patient";
         string shortDescription = $"Thanh toán thuốc & dịch vụ - BN: {patientName} - BS: {doctorName}";
         string fullDescription = $"METADATA:{metadataJson} | {shortDescription}";
 
@@ -161,6 +156,10 @@ public class CreateClinicOrderCommandHandler : ICommandHandler<CreateClinicOrder
                 // Cash payment is completed immediately
                 payment.Complete("CASH_MANUAL", "Paid by Cash at Reception");
                 order.Complete();
+                
+                // CRITICAL: Update visit status inside the transaction so it's immediate for the queue
+                visit.Complete("Paid by Cash at Reception");
+                await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
             }
 
             await _paymentRepository.AddAsync(payment, cancellationToken);
