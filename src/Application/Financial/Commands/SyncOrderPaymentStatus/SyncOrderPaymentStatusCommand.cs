@@ -18,6 +18,7 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClinicVisitService _clinicVisitService;
     private readonly INotificationService _notificationService;
+    private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<SyncOrderPaymentStatusCommandHandler> _logger;
 
     public SyncOrderPaymentStatusCommandHandler(
@@ -26,6 +27,7 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
         IUnitOfWork unitOfWork,
         IClinicVisitService clinicVisitService,
         INotificationService notificationService,
+        ICurrentUserService currentUserService,
         ILogger<SyncOrderPaymentStatusCommandHandler> logger)
     {
         _orderRepository = orderRepository;
@@ -33,6 +35,7 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
         _unitOfWork = unitOfWork;
         _clinicVisitService = clinicVisitService;
         _notificationService = notificationService;
+        _currentUserService = currentUserService;
         _logger = logger;
     }
 
@@ -40,6 +43,17 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
     {
         var order = await _orderRepository.GetWithPaymentsAsync(request.OrderId, cancellationToken);
         if (order == null) return false;
+
+        // Authorization check: User must be either Staff/Admin OR the owner of the order
+        var currentUserId = _currentUserService.UserId;
+        bool isStaffOrAdmin = _currentUserService.IsInRole("ClinicStaff") || _currentUserService.IsInRole("SystemAdmin");
+        
+        if (!isStaffOrAdmin && order.UserId != currentUserId)
+        {
+            _logger.LogWarning("User {UserId} attempted to sync Order {OrderId} which belongs to {OwnerId}.", 
+                currentUserId, order.Id, order.UserId);
+            return false; // Resulting in 404/403 behavior via controller logic
+        }
 
         var pendingPayments = order.Payments
             .Where(p => p.Status == PaymentStatus.Pending && !string.IsNullOrEmpty(p.PaymentOrderCode))
@@ -79,16 +93,25 @@ public class SyncOrderPaymentStatusCommandHandler : IRequestHandler<SyncOrderPay
 
             if (status is "CANCELLED" or "EXPIRED")
             {
-                payment.Fail(status);
+                if (status == "CANCELLED")
+                    payment.Cancel();
+                else
+                    payment.Fail(status);
 
-                // If deposit payment fails, cancel the appointment to release the slot
-                if (IsDepositPayment(order, payment) && order.AppointmentId.HasValue)
+                // If deposit payment fails/cancelled, cancel the order and appointment to release the slot
+                if (IsDepositPayment(order, payment))
                 {
-                    _logger.LogInformation("Deposit payment failed for Order {OrderId}. Cancelling associated Appointment {AppointmentId}.", order.Id, order.AppointmentId.Value);
-                    var appointment = await _clinicVisitService.GetAppointmentByIdAsync(order.AppointmentId.Value, cancellationToken);
-                    if (appointment != null && appointment.Status == AppointmentStatus.Pending)
+                    order.Cancel();
+                    _logger.LogInformation("Deposit payment {Status} for Order {OrderId}. Cancelling order.", status, order.Id);
+
+                    if (order.AppointmentId.HasValue)
                     {
-                        await _clinicVisitService.CancelAppointmentAsync(appointment.Id, "Payment failed/cancelled via PayOS sync", cancellationToken);
+                        _logger.LogInformation("Cancelling associated Appointment {AppointmentId}.", order.AppointmentId.Value);
+                        var appointment = await _clinicVisitService.GetAppointmentByIdAsync(order.AppointmentId.Value, cancellationToken);
+                        if (appointment != null && appointment.Status == AppointmentStatus.Pending)
+                        {
+                            await _clinicVisitService.CancelAppointmentAsync(appointment.Id, $"Payment {status} via PayOS sync", cancellationToken);
+                        }
                     }
                 }
 
