@@ -42,10 +42,7 @@ public static class ClinicFlowStateResolver
             return "ScreeningPending";
         }
 
-        bool isErmReady = medicalRecord != null
-            && medicalRecord.Status != MedicalRecordStatus.DraftAdmin;
-
-        if (!isErmReady)
+        if (!ClinicAdministrativeErmGate.IsSatisfied(medicalRecord))
             return "ErmPending";
 
         return "CheckedIn";

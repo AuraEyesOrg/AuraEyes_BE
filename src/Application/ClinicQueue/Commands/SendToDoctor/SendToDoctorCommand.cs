@@ -115,6 +115,21 @@ public class SendToDoctorCommandHandler
 
         if (existingConsultation != null)
         {
+            var sessionBoundToAnotherVisit = await _medicalRecordRepository
+                .Query()
+                .AnyAsync(
+                    mr =>
+                        mr.ConsultationSessionId == existingConsultation.Id &&
+                        mr.PatientVisitId.HasValue &&
+                        mr.PatientVisitId.Value != visit.Id,
+                    cancellationToken);
+
+            if (sessionBoundToAnotherVisit)
+            {
+                return Result<SendToDoctorResponse>.Failure(
+                    "This screening is already linked to another check-in (visit). Create a new screening for this visit, or open the correct queue row.");
+            }
+
             if (request.DoctorId.HasValue &&
                 existingConsultation.OphthalmologistId != request.DoctorId.Value)
             {

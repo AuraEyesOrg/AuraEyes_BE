@@ -1,3 +1,4 @@
+using Application.ClinicQueue.Common;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
@@ -5,6 +6,7 @@ using Domain.Entities.Screening;
 using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
@@ -56,7 +58,10 @@ public class CreateClinicScreeningSessionCommandHandler
         if (patient is null)
             return Result<CreateClinicScreeningSessionResponse>.NotFound("Patient not found");
 
-        var visit = await _patientVisitRepository.GetByIdAsync(request.PatientVisitId, cancellationToken);
+        var visit = await _patientVisitRepository
+            .Query()
+            .Include(v => v.MedicalRecord)
+            .FirstOrDefaultAsync(v => v.Id == request.PatientVisitId, cancellationToken);
         if (visit is null)
             return Result<CreateClinicScreeningSessionResponse>.NotFound("Patient visit not found");
 
@@ -65,6 +70,9 @@ public class CreateClinicScreeningSessionCommandHandler
 
         if (visit.Status == PatientVisitStatus.Completed)
             return Result<CreateClinicScreeningSessionResponse>.Failure("Cannot create screening for a completed visit.");
+
+        if (!ClinicAdministrativeErmGate.IsSatisfied(visit.MedicalRecord))
+            return Result<CreateClinicScreeningSessionResponse>.Failure("Administrative ERM must be saved before creating a screening session.");
 
         var screening = new AiScreening(patient.Id, request.ModelVersion);
         screening.AttachToPatientVisit(visit.Id);
