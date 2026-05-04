@@ -54,7 +54,10 @@ public class ClinicVisitService : IClinicVisitService
         try
         {
             var visit = await ResolveVisitAsync(order, cancellationToken);
-            if (visit == null || visit.Status != PatientVisitStatus.WaitingForPayment) return;
+            if (visit == null) return;
+            
+            // Allow both WaitingForPayment (PayOS flow) and Completed (Cash flow updated in handler)
+            if (visit.Status != PatientVisitStatus.WaitingForPayment && visit.Status != PatientVisitStatus.Completed) return;
 
             _logger.LogInformation("Processing clinic visit completion for Visit {VisitId} after {Method} payment.", visit.Id, paymentMethod);
 
