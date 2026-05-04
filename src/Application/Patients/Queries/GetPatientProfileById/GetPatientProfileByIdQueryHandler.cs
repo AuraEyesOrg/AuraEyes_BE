@@ -45,14 +45,13 @@ public class GetPatientProfileByIdQueryHandler : IQueryHandler<GetPatientProfile
             });
         }
 
-        var user = await _identityService.GetUserByIdAsync(patient.UserId.Value, cancellationToken);
         var userDetails = await _identityService.GetUserDetailsAsync(patient.UserId.Value, cancellationToken);
-
+        
         var dto = new PatientProfileDto
         {
             Id = patient.Id,
-            Email = user?.Email,
-            FullName = user?.FullName ?? patient.FullName,
+            Email = userDetails?.Email,
+            FullName = userDetails?.FullName ?? patient.FullName,
             Phone = userDetails?.PhoneNumber ?? patient.PhoneNumber,
             DateOfBirth = userDetails?.DateOfBirth ?? patient.DateOfBirth,
             Gender = (userDetails?.Gender?.ToString() ?? (patient.GenderId.HasValue ? ((Domain.Enums.Gender)patient.GenderId.Value).ToString() : null))?.ToLower(),
@@ -62,7 +61,7 @@ public class GetPatientProfileByIdQueryHandler : IQueryHandler<GetPatientProfile
             MedicalRecordNumber = patient.MedicalRecordNumber,
             CreatedAt = patient.CreatedAt,
             UpdatedAt = patient.UpdatedAt,
-            IsEmailVerified = user?.EmailConfirmed ?? false,
+            IsEmailVerified = userDetails?.EmailConfirmed ?? false,
         };
 
         return Result<PatientProfileDto>.Success(dto);
