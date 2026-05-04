@@ -22,6 +22,7 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
     private readonly IPayOSService _payOSService;
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly IAppointmentSlotRepository _appointmentSlotRepository;
+    private readonly IClinicVisitService _clinicVisitService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMediator _mediator;
     private readonly ILogger<GetOrderByIdQueryHandler> _logger;
@@ -33,6 +34,7 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
         IPayOSService payOSService,
         IAppointmentRepository appointmentRepository,
         IAppointmentSlotRepository appointmentSlotRepository,
+        IClinicVisitService clinicVisitService,
         IUnitOfWork unitOfWork,
         IMediator mediator,
         ILogger<GetOrderByIdQueryHandler> logger)
@@ -43,6 +45,7 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
         _payOSService = payOSService;
         _appointmentRepository = appointmentRepository;
         _appointmentSlotRepository = appointmentSlotRepository;
+        _clinicVisitService = clinicVisitService;
         _unitOfWork = unitOfWork;
         _mediator = mediator;
         _logger = logger;
@@ -112,6 +115,7 @@ public class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Order
         else
         {
             order.Complete();
+            await _clinicVisitService.ProcessPaymentCompletionAsync(order, "Proactive Sync", cancellationToken);
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);

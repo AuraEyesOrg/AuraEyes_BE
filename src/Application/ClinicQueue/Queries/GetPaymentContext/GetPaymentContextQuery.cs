@@ -19,17 +19,20 @@ public sealed class GetPaymentContextQueryHandler
     private readonly IPatientVisitRepository _patientVisitRepository;
     private readonly IConsultationSessionRepository _consultationSessionRepository;
     private readonly IRepository<MedicalDiagnosis> _diagnosisRepository;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IIdentityService _identityService;
 
     public GetPaymentContextQueryHandler(
         IPatientVisitRepository patientVisitRepository,
         IConsultationSessionRepository consultationSessionRepository,
         IRepository<MedicalDiagnosis> diagnosisRepository,
+        IOphthalmologistRepository ophthalmologistRepository,
         IIdentityService identityService)
     {
         _patientVisitRepository = patientVisitRepository;
         _consultationSessionRepository = consultationSessionRepository;
         _diagnosisRepository = diagnosisRepository;
+        _ophthalmologistRepository = ophthalmologistRepository;
         _identityService = identityService;
     }
 
@@ -71,8 +74,12 @@ public sealed class GetPaymentContextQueryHandler
         var diagnosedByDoctorName = snapshot.DiagnosedBy?.DoctorName;
         if (string.IsNullOrWhiteSpace(diagnosedByDoctorName))
         {
-            var doctorUser = await _identityService.GetUserByIdAsync(diagnosis.DoctorId, cancellationToken);
-            diagnosedByDoctorName = doctorUser?.FullName?.Trim();
+            var ophthalmologist = await _ophthalmologistRepository.GetByIdAsync(diagnosis.DoctorId, cancellationToken);
+            if (ophthalmologist != null)
+            {
+                var doctorUser = await _identityService.GetUserByIdAsync(ophthalmologist.UserId, cancellationToken);
+                diagnosedByDoctorName = doctorUser?.FullName?.Trim();
+            }
         }
 
         var patientName = visit.Patient?.FullName;

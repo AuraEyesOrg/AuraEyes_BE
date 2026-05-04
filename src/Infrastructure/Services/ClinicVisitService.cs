@@ -8,6 +8,7 @@ using Domain.Enums;
 using Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 namespace Infrastructure.Services;
 
@@ -15,30 +16,36 @@ public class ClinicVisitService : IClinicVisitService
 {
     private readonly IPatientVisitRepository _patientVisitRepository;
     private readonly IAppointmentRepository _appointmentRepository;
+    private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly IRepository<Domain.Entities.Users.Patient> _patientRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly INotificationService _notificationService;
     private readonly IChatHubService _chatHubService;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ClinicVisitService> _logger;
 
     public ClinicVisitService(
         IPatientVisitRepository patientVisitRepository,
         IAppointmentRepository appointmentRepository,
+        IAppointmentSlotRepository appointmentSlotRepository,
         IConsultationSessionRepository sessionRepository,
         IRepository<Domain.Entities.Users.Patient> patientRepository,
         IOphthalmologistRepository ophthalmologistRepository,
         INotificationService notificationService,
         IChatHubService chatHubService,
+        IUnitOfWork unitOfWork,
         ILogger<ClinicVisitService> logger)
     {
         _patientVisitRepository = patientVisitRepository;
         _appointmentRepository = appointmentRepository;
+        _appointmentSlotRepository = appointmentSlotRepository;
         _sessionRepository = sessionRepository;
         _patientRepository = patientRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
         _notificationService = notificationService;
         _chatHubService = chatHubService;
+        _unitOfWork = unitOfWork;
         _logger = logger;
     }
 
@@ -47,12 +54,16 @@ public class ClinicVisitService : IClinicVisitService
         try
         {
             var visit = await ResolveVisitAsync(order, cancellationToken);
-            if (visit == null || visit.Status != PatientVisitStatus.WaitingForPayment) return;
+            if (visit == null) return;
+            
+            // Allow both WaitingForPayment (PayOS flow) and Completed (Cash flow updated in handler)
+            if (visit.Status != PatientVisitStatus.WaitingForPayment && visit.Status != PatientVisitStatus.Completed) return;
 
             _logger.LogInformation("Processing clinic visit completion for Visit {VisitId} after {Method} payment.", visit.Id, paymentMethod);
 
             visit.Complete($"Payment received via {paymentMethod}");
             await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             if (visit.AppointmentId.HasValue)
             {
@@ -65,13 +76,67 @@ public class ClinicVisitService : IClinicVisitService
         }
     }
 
-    private async Task<PatientVisit?> ResolveVisitAsync(Order order, CancellationToken cancellationToken)
+    public async Task<Appointment?> GetAppointmentByIdAsync(Guid appointmentId, CancellationToken cancellationToken)
     {
-        if (order.AppointmentId.HasValue)
+        return await _appointmentRepository.GetByIdWithDetailsAsync(appointmentId, cancellationToken);
+    }
+
+    public async Task CancelAppointmentAsync(Guid appointmentId, string? reason, CancellationToken cancellationToken)
+    {
+        var appointment = await _appointmentRepository.GetByIdWithDetailsAsync(appointmentId, cancellationToken);
+        if (appointment == null || appointment.Status == AppointmentStatus.Cancelled) return;
+
+        appointment.Cancel(Guid.Empty, reason); // Guid.Empty for system/sync cancellation
+
+        var slot = appointment.AppointmentSlot;
+        if (slot != null)
         {
-            return await _patientVisitRepository.GetByAppointmentIdAsync(order.AppointmentId.Value, cancellationToken);
+            slot.CancelBooking();
+            await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
         }
 
+        await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Appointment {AppointmentId} cancelled and slot {SlotId} released. Reason: {Reason}", 
+            appointmentId, slot?.Id, reason);
+    }
+
+    private async Task<PatientVisit?> ResolveVisitAsync(Order order, CancellationToken cancellationToken)
+    {
+        // 1. Try resolving by AppointmentId
+        if (order.AppointmentId.HasValue)
+        {
+            var visitByAppt = await _patientVisitRepository.GetByAppointmentIdAsync(order.AppointmentId.Value, cancellationToken);
+            if (visitByAppt != null) return visitByAppt;
+        }
+
+        // 2. Try resolving by METADATA in description (V: VisitId)
+        if (!string.IsNullOrEmpty(order.Description) && order.Description.Trim().StartsWith("METADATA:", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var description = order.Description.Trim();
+                var parts = description.Split('|');
+                if (parts.Length > 0)
+                {
+                    var metadataJson = parts[0].Substring("METADATA:".Length).Trim();
+                    using var doc = JsonDocument.Parse(metadataJson);
+                    if (doc.RootElement.TryGetProperty("V", out var vProp))
+                    {
+                        var visitId = vProp.GetGuid();
+                        var visitByMetadata = await _patientVisitRepository.GetByIdAsync(visitId, cancellationToken);
+                        if (visitByMetadata != null) return visitByMetadata;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse VisitId from order description metadata: {Description}", order.Description);
+            }
+        }
+
+        // 3. Fallback: resolve by patient's latest WaitingForPayment visit
         var patient = await _patientRepository.Query()
             .FirstOrDefaultAsync(p => p.UserId == order.UserId, cancellationToken);
 
