@@ -16,6 +16,7 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
         CancellationToken cancellationToken = default)
     {
         return await _dbSet
+            .AsNoTracking()
             .Include(s => s.Conversations)
             .ThenInclude(c => c.Messages)
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
@@ -26,6 +27,7 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
         CancellationToken cancellationToken = default)
     {
         return await _dbSet
+            .AsNoTracking()
             .Where(s => s.PatientId == patientId)
             .OrderByDescending(s => s.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -36,6 +38,7 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
         CancellationToken cancellationToken = default)
     {
         return await _dbSet
+            .AsNoTracking()
             .Where(s => s.OphthalmologistId == ophthalmologistId)
             .OrderByDescending(s => s.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -53,7 +56,7 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
         int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.AsQueryable();
+        var query = _dbSet.AsNoTracking().AsQueryable();
 
         if (participantProfileId.HasValue)
         {
