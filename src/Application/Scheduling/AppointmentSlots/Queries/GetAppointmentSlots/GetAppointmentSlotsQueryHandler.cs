@@ -101,8 +101,8 @@ public class GetAppointmentSlotsQueryHandler : IQueryHandler<GetAppointmentSlots
                 {
                     Id = slot.Id,
                     OphthalId = slot.OphthalId ?? Guid.Empty,
-                    OphthalFullName = ophthalMeta.FullName ?? "Clinic Slot",
-                    OphthalAvatarUrl = ophthalMeta.AvatarUrl,
+                    OphthalFullName = ophthalMeta?.FullName ?? "Clinic Slot",
+                    OphthalAvatarUrl = ophthalMeta?.AvatarUrl,
                     ScheduleTemplateId = slot.ScheduleTemplateId,
                     Date = slot.Date,
                     StartTime = slot.StartTime,

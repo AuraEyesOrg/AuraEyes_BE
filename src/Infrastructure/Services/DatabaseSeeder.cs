@@ -48,20 +48,20 @@ public static class DatabaseSeeder
         // Step 1: Seed roles first (idempotent)
         await SeedRolesAsync(roleManager, logger);
 
-        // Step 2: Seed default accounts (AspNetUsers + AspNetUserRoles) (idempotent)
-        await SeedDefaultAccountsAsync(userManager, configuration, logger);
+        // // Step 2: Seed default accounts (AspNetUsers + AspNetUserRoles) (idempotent)
+        // await SeedDefaultAccountsAsync(userManager, configuration, logger);
 
-        // Step 3: Seed domain entities (Ophthalmologist, Patient, etc.) (idempotent)
-        await SeedDomainEntitiesAsync(context, userManager, logger);
+        // // Step 3: Seed domain entities (Ophthalmologist, Patient, etc.) (idempotent)
+        // await SeedDomainEntitiesAsync(context, userManager, logger);
 
         // Step 4: Seed permissions + default role assignments
         await SeedPermissionsAsync(context, roleManager, logger);
 
-        // Step 4.5: Seed specific permissions for staff sub-roles (Receptionist, etc.)
-        await SeedStaffSubRolePermissionsAsync(context, userManager, logger);
+        // // Step 4.5: Seed specific permissions for staff sub-roles (Receptionist, etc.)
+        // await SeedStaffSubRolePermissionsAsync(context, userManager, logger);
 
-        // Step 5: Seed test data for clinic queue (Cashier page) (idempotent)
-        await SeedClinicQueueTestDataAsync(context, userManager, logger);
+        // // Step 5: Seed test data for clinic queue (Cashier page) (idempotent)
+        // await SeedClinicQueueTestDataAsync(context, userManager, logger);
 
         logger?.LogInformation("Seeding completed successfully.");
     }
