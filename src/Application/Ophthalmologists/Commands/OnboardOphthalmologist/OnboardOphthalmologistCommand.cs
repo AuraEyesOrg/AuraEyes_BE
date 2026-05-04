@@ -14,8 +14,6 @@ public class OnboardOphthalmologistCommand : ICommand<bool>
     public string? CitizenId { get; set; }
     public string? Bio { get; set; }
     public string? AvatarUrl { get; set; }
-    public string? NewPassword { get; set; }
-    public string? CurrentPassword { get; set; }
 
     public List<OnboardDegreeDto> Degrees { get; set; } = new();
     public List<OnboardLicenseDto> Licenses { get; set; } = new();

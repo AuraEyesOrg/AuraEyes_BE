@@ -13,6 +13,4 @@ public record OnboardClinicStaffCommand : ICommand<bool>
     public string? Department { get; init; }
     public string? EmployeeCode { get; init; }
     public string? AvatarUrl { get; init; }
-    public string? NewPassword { get; init; }
-    public string? CurrentPassword { get; init; }
 }
