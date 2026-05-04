@@ -117,7 +117,8 @@ public class GetClinicQueueQueryHandler
         DateTime screeningCutoff,
         CancellationToken cancellationToken)
     {
-        var screeningsTask = _screeningRepository
+        // Sequential awaits are required because EF Core DbContext is not thread-safe
+        var screenings = await _screeningRepository
             .Query()
             .AsNoTracking()
             .Include(s => s.ScreeningResults)
@@ -126,7 +127,7 @@ public class GetClinicQueueQueryHandler
                 && !s.IsDeleted)
             .ToListAsync(cancellationToken);
 
-        var consultationsTask = _consultationSessionRepository
+        var consultations = await _consultationSessionRepository
             .Query()
             .AsNoTracking()
             .Where(cs => patientIds.Contains(cs.PatientId)
@@ -135,8 +136,7 @@ public class GetClinicQueueQueryHandler
                 && !cs.IsDeleted)
             .ToListAsync(cancellationToken);
 
-        await Task.WhenAll(screeningsTask, consultationsTask);
-        return (screeningsTask.Result, consultationsTask.Result);
+        return (screenings, consultations);
     }
 
     private async Task<(Dictionary<Guid, string> DoctorNames, Dictionary<Guid, string> PatientNames)> GetUserNamesAsync(
