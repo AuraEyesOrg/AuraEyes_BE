@@ -79,15 +79,23 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
             return Result<CompleteOrderPaymentResponse>.Success(new CompleteOrderPaymentResponse(order.Id, Guid.Empty, PaymentStatus.Completed));
         }
 
-        // Create final payment
         var description = order.PaidAmount > 0 
             ? $"Thanh toán nốt khám - Đơn {order.Id.ToString().Substring(0, 8)}"
             : $"Thanh toán đủ khám - Đơn {order.Id.ToString().Substring(0, 8)}";
-        var payment = new Payment(order.Id, remainingAmount, request.Method, description);
-        
-        await _paymentRepository.AddAsync(payment, cancellationToken);
-        // Save to get the ID for PayOS
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Try to find an existing Pending payment for this amount and method
+        var payment = order.Payments.FirstOrDefault(p => 
+            p.Status == PaymentStatus.Pending && 
+            p.Amount == remainingAmount && 
+            p.Method == request.Method);
+
+        if (payment == null)
+        {
+            payment = new Payment(order.Id, remainingAmount, request.Method, description);
+            await _paymentRepository.AddAsync(payment, cancellationToken);
+            // Save to get the ID for PayOS
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
 
         if (request.Method == PaymentMethod.Cash)
         {
@@ -119,22 +127,22 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
                 var cancelSeparator = cancelUrl.Contains("?") ? "&" : "?";
                 cancelUrl = $"{cancelUrl}{cancelSeparator}{queryParams}&cancel=true";
 
-                var (paymentUrl, orderCode) = await _payOSService.CreatePaymentLinkAsync(
+                var payOSResult = await _payOSService.CreatePaymentLinkAsync(
                     payment.Id,
                     remainingAmount,
                     description,
                     returnUrl,
                     cancelUrl);
 
-                payment.SetPaymentLink(paymentUrl, orderCode);
+                payment.SetPaymentLink(payOSResult.PaymentUrl, payOSResult.OrderCode);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
                 return Result<CompleteOrderPaymentResponse>.Success(new CompleteOrderPaymentResponse(
                     order.Id,
                     payment.Id,
                     payment.Status,
-                    paymentUrl,
-                    orderCode));
+                    payOSResult.PaymentUrl,
+                    payOSResult.OrderCode));
             }
             catch (Exception ex)
             {
