@@ -19,4 +19,6 @@ public class UserListDto
     public Guid? OphthalmologistId { get; set; }
     public List<string> SubRoles { get; set; } = new();
     public Guid? ClinicStaffId { get; set; }
+    public string? AvatarUrl { get; set; }
+    public string? ProviderAvatarUrl { get; set; }
 }

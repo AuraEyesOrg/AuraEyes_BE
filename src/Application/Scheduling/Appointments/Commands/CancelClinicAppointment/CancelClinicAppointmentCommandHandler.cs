@@ -14,6 +14,8 @@ public class CancelClinicAppointmentCommandHandler : ICommandHandler<CancelClini
     private readonly IOrderRepository _orderRepository;
     private readonly ICurrentUserService _currentUser;
     private readonly IIdentityService _identityService;
+    private readonly INotificationService _notificationService;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public CancelClinicAppointmentCommandHandler(
@@ -22,6 +24,8 @@ public class CancelClinicAppointmentCommandHandler : ICommandHandler<CancelClini
         IOrderRepository orderRepository,
         ICurrentUserService currentUser,
         IIdentityService identityService,
+        INotificationService notificationService,
+        IOphthalmologistRepository ophthalmologistRepository,
         IUnitOfWork unitOfWork)
     {
         _appointmentRepository = appointmentRepository;
@@ -29,6 +33,8 @@ public class CancelClinicAppointmentCommandHandler : ICommandHandler<CancelClini
         _orderRepository = orderRepository;
         _currentUser = currentUser;
         _identityService = identityService;
+        _notificationService = notificationService;
+        _ophthalmologistRepository = ophthalmologistRepository;
         _unitOfWork = unitOfWork;
     }
 

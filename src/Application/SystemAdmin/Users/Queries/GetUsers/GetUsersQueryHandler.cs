@@ -60,7 +60,9 @@ public class GetUsersQueryHandler : IQueryHandler<GetUsersQuery, PagedResult<Use
                 ConsultationFee = ophthalmologist?.ConsultationFee,
                 OphthalmologistId = ophthalmologist?.Id,
                 SubRoles = clinicStaff?.SubRoles.Select(sr => sr.ToString()).ToList() ?? new List<string>(),
-                ClinicStaffId = clinicStaff?.Id
+                ClinicStaffId = clinicStaff?.Id,
+                AvatarUrl = u.AvatarUrl,
+                ProviderAvatarUrl = u.ProviderAvatarUrl
             };
         }).ToList();
 
