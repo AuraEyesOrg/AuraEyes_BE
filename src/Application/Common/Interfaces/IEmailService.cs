@@ -16,6 +16,11 @@ public interface IEmailService
     /// </summary>
     Task SendStaffOnboardingEmailAsync(string email, string fullName, string temporaryPassword, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Sends credentials to a walk-in patient created at the clinic.
+    /// </summary>
+    Task SendPatientWalkInCredentialsAsync(string email, string fullName, string temporaryPassword, CancellationToken cancellationToken = default);
+
     Task SendClinicAppointmentConfirmationAsync(
         string email,
         ClinicAppointmentConfirmationEmailPayload payload,

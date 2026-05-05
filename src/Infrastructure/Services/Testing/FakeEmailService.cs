@@ -90,4 +90,14 @@ public sealed class FakeEmailService : IEmailService
             fullName);
         return Task.CompletedTask;
     }
+
+    public Task SendPatientWalkInCredentialsAsync(string email, string fullName, string temporaryPassword, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "[FAKE EMAIL] Patient Walk-in credentials email captured for {Email} ({FullName}). Temporary password issued: {Password}",
+            email,
+            fullName,
+            temporaryPassword);
+        return Task.CompletedTask;
+    }
 }
