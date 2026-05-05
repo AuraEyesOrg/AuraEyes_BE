@@ -12,17 +12,20 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
     private readonly IOrderRepository _orderRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
+    private readonly INotificationService _notificationService;
 
     public ConfirmAppointmentCancellationCommandHandler(
         IAppointmentRepository appointmentRepository,
         IOrderRepository orderRepository,
         IUnitOfWork unitOfWork,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        INotificationService notificationService)
     {
         _appointmentRepository = appointmentRepository;
         _orderRepository = orderRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
+        _notificationService = notificationService;
     }
 
     public async Task<Result> Handle(ConfirmAppointmentCancellationCommand request, CancellationToken cancellationToken)
@@ -41,7 +44,11 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
         // Update appointment status to Cancelled
         var adminId = _currentUserService.UserId ?? Guid.Empty;
 
-        appointment.Cancel(adminId, "Refund processed by admin.");
+        var cancellationReason = string.IsNullOrWhiteSpace(request.AdminNote) 
+            ? "Refund processed by admin." 
+            : $"[REFUNDED] {request.AdminNote}";
+
+        appointment.Cancel(adminId, cancellationReason);
 
         // Also release the slot count
         if (appointment.AppointmentSlot != null)
@@ -51,6 +58,7 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
 
         // Update linked orders
         var orders = await _orderRepository.GetByAppointmentIdsAsync(new[] { request.AppointmentId }, cancellationToken);
+        decimal totalRefunded = 0;
         foreach (var order in orders)
         {
             if (order.Status != OrderStatus.Cancelled && order.Status != OrderStatus.Refunded)
@@ -59,6 +67,7 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
                 if (order.PaidAmount > 0)
                 {
                     var refundAmount = order.PaidAmount;
+                    totalRefunded += refundAmount;
                     var refundDesc = string.IsNullOrWhiteSpace(request.AdminNote) 
                         ? "Refund for appointment cancellation" 
                         : $"Refund: {request.AdminNote}";
@@ -80,6 +89,20 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
 
         await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Send notification to patient
+        var targetUserId = appointment.Patient?.UserId;
+        if (targetUserId.HasValue)
+        {
+            await _notificationService.SendAsync(
+                targetUserId.Value,
+                "Hoàn tiền thành công",
+                $"Yêu cầu hoàn tiền cho lịch khám ngày {appointment.AppointmentSlot?.Date:dd/MM/yyyy} đã được duyệt. Số tiền: {totalRefunded:N0} VNĐ.",
+                NotificationType.ScheduleChanged,
+                new { AppointmentId = appointment.Id, Action = "RefundConfirmed" },
+                cancellationToken,
+                appointment.Id);
+        }
 
         return Result.Success();
     }
