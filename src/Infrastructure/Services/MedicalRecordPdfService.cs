@@ -77,7 +77,9 @@ public class MedicalRecordPdfService : IMedicalRecordPdfService
             ComposeDischargeSection(col, adminData);
             ComposeMedicalHistorySection(col, adminData, clinicalData);
             ComposeExaminationSection(col, clinicalData);
-            ComposeSignatures(col, adminData, model);
+            ComposePrescriptionSection(col, clinicalData);
+            ComposeTreatmentPlanSection(col, clinicalData, model);
+            ComposeSignatures(col, adminData, clinicalData, model);
         });
     }
 
@@ -155,18 +157,39 @@ public class MedicalRecordPdfService : IMedicalRecordPdfService
         col.Item().PaddingTop(5).Text("III. CHẨN ĐOÁN").SemiBold().Underline();
         col.Item().PaddingLeft(5).Column(inner =>
         {
-            inner.Item().Text($"20. Nơi chuyển đến: {adminData.GetValueOrDefault("transferDiagnosis") ?? "........................................"}");
-            inner.Item().Text($"21. KKB, Cấp cứu: {adminData.GetValueOrDefault("kkbDiagnosis") ?? "........................................"}");
-            inner.Item().Text($"22. Khi vào khoa điều trị: {adminData.GetValueOrDefault("departmentDiagnosis") ?? "........................................"}");
+            inner.Item().Text(txt => {
+                txt.Span("20. Nơi chuyển đến: ");
+                txt.Span(adminData.GetValueOrDefault("transferDiagnosis")?.ToString()?.ToUpper() ?? "........................................").SemiBold();
+            });
+            inner.Item().Text(txt => {
+                txt.Span("21. KKB, Cấp cứu: ");
+                txt.Span(adminData.GetValueOrDefault("kkbDiagnosis")?.ToString()?.ToUpper() ?? "........................................").SemiBold();
+            });
+            inner.Item().Text(txt => {
+                txt.Span("22. Khi vào khoa điều trị: ");
+                txt.Span(adminData.GetValueOrDefault("departmentDiagnosis")?.ToString()?.ToUpper() ?? "........................................").SemiBold();
+            });
             
             inner.Item().PaddingTop(2).Row(r => {
-                r.RelativeItem().Text($"+ Bệnh chính: {model.FinalDiagnosis ?? "...."}");
-                r.RelativeItem().Text($"+ Bệnh kèm theo: {adminData.GetValueOrDefault("companionDisease") ?? "...................."}");
+                r.RelativeItem().Text(txt => {
+                    txt.Span("+ Bệnh chính: ");
+                    txt.Span(model.FinalDiagnosis?.ToUpper() ?? "....").SemiBold();
+                });
+                r.RelativeItem().Text(txt => {
+                    txt.Span("+ Bệnh kèm theo: ");
+                    txt.Span(adminData.GetValueOrDefault("companionDisease")?.ToString()?.ToUpper() ?? "....................").SemiBold();
+                });
             });
             
             inner.Item().Row(r => {
-                r.RelativeItem().Text($"+ Chẩn đoán trước PT: {adminData.GetValueOrDefault("preOpDiagnosis") ?? "...................."}");
-                r.RelativeItem().Text($"+ Chẩn đoán sau PT: {adminData.GetValueOrDefault("postOpDiagnosis") ?? "...................."}");
+                r.RelativeItem().Text(txt => {
+                    txt.Span("+ Chẩn đoán trước PT: ");
+                    txt.Span(adminData.GetValueOrDefault("preOpDiagnosis")?.ToString()?.ToUpper() ?? "....................").SemiBold();
+                });
+                r.RelativeItem().Text(txt => {
+                    txt.Span("+ Chẩn đoán sau PT: ");
+                    txt.Span(adminData.GetValueOrDefault("postOpDiagnosis")?.ToString()?.ToUpper() ?? "....................").SemiBold();
+                });
             });
         });
     }
@@ -185,14 +208,26 @@ public class MedicalRecordPdfService : IMedicalRecordPdfService
         col.Item().PaddingTop(10).Text("A. BỆNH ÁN").SemiBold().AlignCenter();
         col.Item().PaddingLeft(5).Column(inner =>
         {
-            inner.Item().Text($"I. LÝ DO VÀO VIỆN: {adminData.GetValueOrDefault("admissionReason") ?? "........................................"}");
+            inner.Item().Text(txt => {
+                txt.Span("I. LÝ DO VÀO VIỆN: ");
+                txt.Span(adminData.GetValueOrDefault("admissionReason")?.ToString()?.ToUpper() ?? "........................................").SemiBold();
+            });
             inner.Item().Text("II. HỎI BỆNH:");
             inner.Item().PaddingLeft(10).Column(h => {
-                h.Item().Text($"1. Quá trình bệnh lý: {adminData.GetValueOrDefault("diseaseProcess") ?? "........................................"}");
+                h.Item().Text(txt => {
+                    txt.Span("1. Quá trình bệnh lý: ");
+                    txt.Span(adminData.GetValueOrDefault("diseaseProcess")?.ToString() ?? "........................................").SemiBold();
+                });
                 h.Item().Text("2. Tiền sử:");
                 h.Item().PaddingLeft(10).Column(p => {
-                    p.Item().Text($"- Bản thân: {clinicalData.GetValueOrDefault("medicalHistory") ?? "...."}");
-                    p.Item().Text($"- Gia đình: {clinicalData.GetValueOrDefault("familyHistory") ?? "...."}");
+                    p.Item().Text(txt => {
+                        txt.Span("- Bản thân: ");
+                        txt.Span(clinicalData.GetValueOrDefault("medicalHistory")?.ToString() ?? "....").SemiBold();
+                    });
+                    p.Item().Text(txt => {
+                        txt.Span("- Gia đình: ");
+                        txt.Span(clinicalData.GetValueOrDefault("familyHistory")?.ToString() ?? "....").SemiBold();
+                    });
                 });
             });
         });
@@ -260,13 +295,130 @@ public class MedicalRecordPdfService : IMedicalRecordPdfService
         });
     }
 
-    private void ComposeSignatures(ColumnDescriptor col, Dictionary<string, object> adminData, MedicalRecordPdfModel model)
+    private void ComposePrescriptionSection(ColumnDescriptor col, Dictionary<string, object> clinicalData)
     {
-        col.Item().PaddingVertical(15).AlignRight().Column(inner => {
+        col.Item().PaddingTop(10).Text("IV. ĐƠN THUỐC").SemiBold();
+
+        if (clinicalData.TryGetValue("noMedicationPrescribed", out var noMedObj) && noMedObj is JsonElement noMedEl && noMedEl.ValueKind == JsonValueKind.True)
+        {
+            col.Item().PaddingLeft(10).Text("Không kê thuốc (chỉ tư vấn / lifestyle).").Italic();
+            return;
+        }
+
+        if (!clinicalData.TryGetValue("prescriptionItems", out var rxObj) || !(rxObj is JsonElement rxEl) || rxEl.ValueKind != JsonValueKind.Array || rxEl.GetArrayLength() == 0)
+        {
+            col.Item().PaddingLeft(10).Text("Chưa có đơn thuốc.").Italic();
+            return;
+        }
+
+        col.Item().PaddingTop(5).PaddingLeft(5).Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.ConstantColumn(20); // STT
+                columns.RelativeColumn(3);  // Tên thuốc
+                columns.RelativeColumn(2);  // Liều dùng
+                columns.RelativeColumn(1);  // Đơn vị
+                columns.RelativeColumn(1);  // Tần suất
+                columns.RelativeColumn(1);  // Số ngày
+                columns.RelativeColumn(3);  // Hướng dẫn
+            });
+
+            table.Header(header =>
+            {
+                header.Cell().Border(1).Padding(2).AlignCenter().Text("STT").SemiBold();
+                header.Cell().Border(1).Padding(2).Text(" Tên thuốc").SemiBold();
+                header.Cell().Border(1).Padding(2).AlignCenter().Text("Liều dùng").SemiBold();
+                header.Cell().Border(1).Padding(2).AlignCenter().Text("Đơn vị").SemiBold();
+                header.Cell().Border(1).Padding(2).AlignCenter().Text("Tần suất").SemiBold();
+                header.Cell().Border(1).Padding(2).AlignCenter().Text("Số ngày").SemiBold();
+                header.Cell().Border(1).Padding(2).Text(" Hướng dẫn").SemiBold();
+            });
+
+            int idx = 1;
+            foreach (var item in rxEl.EnumerateArray())
+            {
+                var medicineName = item.TryGetProperty("medicineName", out var mn) ? mn.GetString() : "";
+                var dosage = item.TryGetProperty("dosage", out var ds) ? ds.GetString() : "";
+                var unit = item.TryGetProperty("unit", out var un) ? un.GetString() : "";
+                var frequency = item.TryGetProperty("frequency", out var fq) ? fq.GetString() : "";
+                var duration = item.TryGetProperty("duration", out var dr) ? dr.GetString() : "";
+                var instruction = item.TryGetProperty("instruction", out var inst) ? inst.GetString() : "";
+
+                table.Cell().Border(1).Padding(2).AlignCenter().Text(idx.ToString());
+                table.Cell().Border(1).Padding(2).Text($" {medicineName}").SemiBold();
+                table.Cell().Border(1).Padding(2).AlignCenter().Text(dosage);
+                table.Cell().Border(1).Padding(2).AlignCenter().Text(unit);
+                table.Cell().Border(1).Padding(2).AlignCenter().Text(frequency);
+                table.Cell().Border(1).Padding(2).AlignCenter().Text(duration);
+                table.Cell().Border(1).Padding(2).Text($" {instruction}").Italic();
+                idx++;
+            }
+        });
+
+        if (clinicalData.TryGetValue("prescriptionNote", out var noteObj) && noteObj is JsonElement noteEl && noteEl.ValueKind == JsonValueKind.String)
+        {
+            var note = noteEl.GetString();
+            if (!string.IsNullOrWhiteSpace(note))
+            {
+                col.Item().PaddingTop(5).PaddingLeft(10).Text(txt =>
+                {
+                    txt.Span("Ghi chú: ").SemiBold();
+                    txt.Span(note).Italic();
+                });
+            }
+        }
+    }
+
+    private void ComposeTreatmentPlanSection(ColumnDescriptor col, Dictionary<string, object> clinicalData, MedicalRecordPdfModel model)
+    {
+        var hasPlan = !string.IsNullOrWhiteSpace(model.TreatmentPlan);
+        var followUpDateRaw = clinicalData.GetValueOrDefault("followUpDate")?.ToString();
+        var hasFollowUp = !string.IsNullOrWhiteSpace(followUpDateRaw);
+
+        if (hasPlan || hasFollowUp)
+        {
+            col.Item().PaddingTop(8).Text("V. LỜI DẶN / TÁI KHÁM").SemiBold();
+            
+            if (hasPlan)
+            {
+                col.Item().PaddingLeft(10).Text(txt => {
+                    txt.Span("Lời dặn: ").SemiBold();
+                    txt.Span(model.TreatmentPlan).Italic();
+                });
+            }
+
+            if (hasFollowUp)
+            {
+                if (DateTime.TryParse(followUpDateRaw, out var dt))
+                {
+                    col.Item().PaddingLeft(10).Text(txt => {
+                        txt.Span("Ngày tái khám: ").SemiBold();
+                        txt.Span(dt.ToString("dd/MM/yyyy")).Italic();
+                    });
+                }
+                else
+                {
+                    col.Item().PaddingLeft(10).Text(txt => {
+                        txt.Span("Ngày tái khám: ").SemiBold();
+                        txt.Span(followUpDateRaw).Italic();
+                    });
+                }
+            }
+        }
+    }
+
+    private void ComposeSignatures(ColumnDescriptor col, Dictionary<string, object> adminData, Dictionary<string, object> clinicalData, MedicalRecordPdfModel model)
+    {
+        var doctorName = clinicalData.GetValueOrDefault("doctorName")?.ToString() 
+                         ?? adminData.GetValueOrDefault("doctorName")?.ToString() 
+                         ?? "........................................";
+
+        col.Item().PaddingTop(5).AlignRight().Column(inner => {
             inner.Item().Text($"Ngày {model.CreatedAt:dd} tháng {model.CreatedAt:MM} năm {model.CreatedAt:yyyy}").Italic();
             inner.Item().PaddingTop(5).Text("BÁC SĨ ĐIỀU TRỊ").SemiBold().AlignCenter();
-            inner.Item().PaddingTop(30).Text(adminData.GetValueOrDefault("doctorName")?.ToString() ?? "").AlignCenter();
             inner.Item().Text("(Ký và ghi rõ họ tên)").FontSize(8).Italic().AlignCenter();
+            inner.Item().PaddingTop(20).Text(doctorName).SemiBold().AlignCenter();
         });
     }
 

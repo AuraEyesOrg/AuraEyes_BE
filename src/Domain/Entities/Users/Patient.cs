@@ -34,8 +34,8 @@ public class Patient : BaseEntity, IAggregateRoot
     /// <summary>Free-text history of prior diseases (e.g. "Type-2 Diabetes, Hypertension").</summary>
     public string? DiseaseHistory { get; private set; }
 
-    /// <summary>True when the patient has no Identity user (walk-in).</summary>
-    public bool IsWalkIn => UserId is null;
+    /// <summary>True when the patient was created as a walk-in at the clinic.</summary>
+    public bool IsWalkIn { get; private set; }
 
     /// <summary>Discount rate (e.g. 0.20 for 20%) for the next clinic booking. Null if none.</summary>
     public decimal? DiscountForNextBooking { get; private set; }
@@ -64,7 +64,7 @@ public class Patient : BaseEntity, IAggregateRoot
     /// Create a patient backed by an Identity user (registered flow + walk-in-with-account flow).
     /// Profile data (name, phone, etc.) lives in the ApplicationUser / Identity system.
     /// </summary>
-    public static Patient CreateRegistered(Guid userId, decimal? bmi = null, string? diseaseHistory = null)
+    public static Patient CreateRegistered(Guid userId, bool isWalkIn = false, decimal? bmi = null, string? diseaseHistory = null)
     {
         if (userId == Guid.Empty)
             throw new ArgumentException("UserId cannot be empty.", nameof(userId));
@@ -72,6 +72,7 @@ public class Patient : BaseEntity, IAggregateRoot
         return new Patient
         {
             UserId = userId,
+            IsWalkIn = isWalkIn,
             BMI = bmi,
             DiseaseHistory = diseaseHistory,
             IsDeleted = false
@@ -97,6 +98,7 @@ public class Patient : BaseEntity, IAggregateRoot
         return new Patient
         {
             UserId = null,
+            IsWalkIn = true,
             FullName = fullName.Trim(),
             PhoneNumber = phoneNumber?.Trim(),
             CitizenId = citizenId?.Trim(),

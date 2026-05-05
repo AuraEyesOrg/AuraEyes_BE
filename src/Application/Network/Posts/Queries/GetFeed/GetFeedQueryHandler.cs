@@ -38,12 +38,10 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
 
         var postIds = posts.Select(p => p.Id).ToList();
 
-        // Batch load user reactions and bookmark status
         var userReactions = await _postRepository.GetUserReactionsForPostsAsync(
             request.CurrentUserId, postIds, cancellationToken);
         var savedPostIds = await _postRepository.GetUserSavedPostIdsAsync(
             request.CurrentUserId, postIds, cancellationToken);
-
         var authors = await BatchLoadAuthorsAsync(posts, cancellationToken);
 
         var items = posts.Select(p => MapToDto(
@@ -60,33 +58,30 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
         CancellationToken cancellationToken)
     {
         var authorIds = posts
-            .SelectMany(p => p.OriginalPost is not null
-                ? new[] { p.AuthorId, p.OriginalPost.AuthorId }
-                : new[] { p.AuthorId })
+            .Select(p => p.AuthorId)
+            .Concat(posts.Where(p => p.OriginalPost != null).Select(p => p.OriginalPost!.AuthorId))
             .Distinct()
             .ToList();
 
         var users = await _identityService.GetUsersByIdsAsync(authorIds, cancellationToken);
         var userDict = users.ToDictionary(u => u.Id);
 
-        var authors = new Dictionary<Guid, AuthorDto>();
-        foreach (var authorId in authorIds)
+        // Map author details from posts to avoid repeated FirstOrDefault in the loop
+        var authorTypeMap = posts.ToDictionary(p => p.AuthorId, p => p.AuthorType);
+        foreach (var p in posts.Where(p => p.OriginalPost != null))
         {
-            var user = userDict.GetValueOrDefault(authorId);
-            var matchingPost = posts.FirstOrDefault(p => p.AuthorId == authorId)
-                               ?? posts.FirstOrDefault(p => p.OriginalPost?.AuthorId == authorId);
-
-            authors[authorId] = new AuthorDto
-            {
-                Id = authorId,
-                AuthorType = matchingPost?.AuthorId == authorId
-                    ? matchingPost.AuthorType
-                    : matchingPost!.OriginalPost!.AuthorType,
-                FullName = user?.FullName ?? "Unknown",
-                AvatarUrl = user?.AvatarUrl
-            };
+            authorTypeMap.TryAdd(p.OriginalPost!.AuthorId, p.OriginalPost.AuthorType);
         }
-        return authors;
+
+        return authorIds.ToDictionary(
+            id => id,
+            id => new AuthorDto
+            {
+                Id = id,
+                AuthorType = authorTypeMap.GetValueOrDefault(id, AuthorType.Ophthalmologist),
+                FullName = userDict.GetValueOrDefault(id)?.FullName ?? "Unknown",
+                AvatarUrl = userDict.GetValueOrDefault(id)?.AvatarUrl
+            });
     }
 
     private static PostFeedDto MapToDto(

@@ -32,14 +32,6 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
     private readonly IPaymentRepository _paymentRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPayOSService _payOSService;
-    private readonly IPatientVisitRepository _patientVisitRepository;
-    private readonly IRepository<Patient> _patientRepository;
-    private readonly IAppointmentRepository _appointmentRepository;
-    private readonly IConsultationSessionRepository _sessionRepository;
-    private readonly IOphthalmologistRepository _ophthalmologistRepository;
-    private readonly INotificationService _notificationService;
-    private readonly IIdentityService _identityService;
-    private readonly IChatHubService _chatHubService;
     private readonly IClinicVisitService _clinicVisitService;
     private readonly PayOSSettings _payOSSettings;
     private readonly ILogger<CompleteOrderPaymentCommandHandler> _logger;
@@ -49,14 +41,6 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
         IPaymentRepository paymentRepository,
         IUnitOfWork unitOfWork,
         IPayOSService payOSService,
-        IPatientVisitRepository patientVisitRepository,
-        IRepository<Patient> patientRepository,
-        IAppointmentRepository appointmentRepository,
-        IConsultationSessionRepository sessionRepository,
-        IOphthalmologistRepository ophthalmologistRepository,
-        INotificationService notificationService,
-        IIdentityService identityService,
-        IChatHubService chatHubService,
         IClinicVisitService clinicVisitService,
         Microsoft.Extensions.Options.IOptions<PayOSSettings> payOSSettings,
         ILogger<CompleteOrderPaymentCommandHandler> logger)
@@ -65,14 +49,6 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
         _paymentRepository = paymentRepository;
         _unitOfWork = unitOfWork;
         _payOSService = payOSService;
-        _patientVisitRepository = patientVisitRepository;
-        _patientRepository = patientRepository;
-        _appointmentRepository = appointmentRepository;
-        _sessionRepository = sessionRepository;
-        _ophthalmologistRepository = ophthalmologistRepository;
-        _notificationService = notificationService;
-        _identityService = identityService;
-        _chatHubService = chatHubService;
         _clinicVisitService = clinicVisitService;
         _payOSSettings = payOSSettings.Value;
         _logger = logger;
@@ -103,15 +79,23 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
             return Result<CompleteOrderPaymentResponse>.Success(new CompleteOrderPaymentResponse(order.Id, Guid.Empty, PaymentStatus.Completed));
         }
 
-        // Create final payment
         var description = order.PaidAmount > 0 
             ? $"Thanh toán nốt khám - Đơn {order.Id.ToString().Substring(0, 8)}"
             : $"Thanh toán đủ khám - Đơn {order.Id.ToString().Substring(0, 8)}";
-        var payment = new Payment(order.Id, remainingAmount, request.Method, description);
-        
-        await _paymentRepository.AddAsync(payment, cancellationToken);
-        // Save to get the ID for PayOS
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Try to find an existing Pending payment for this amount and method
+        var payment = order.Payments.FirstOrDefault(p => 
+            p.Status == PaymentStatus.Pending && 
+            p.Amount == remainingAmount && 
+            p.Method == request.Method);
+
+        if (payment == null)
+        {
+            payment = new Payment(order.Id, remainingAmount, request.Method, description);
+            await _paymentRepository.AddAsync(payment, cancellationToken);
+            // Save to get the ID for PayOS
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
 
         if (request.Method == PaymentMethod.Cash)
         {
@@ -143,22 +127,22 @@ public class CompleteOrderPaymentCommandHandler : IRequestHandler<CompleteOrderP
                 var cancelSeparator = cancelUrl.Contains("?") ? "&" : "?";
                 cancelUrl = $"{cancelUrl}{cancelSeparator}{queryParams}&cancel=true";
 
-                var (paymentUrl, orderCode) = await _payOSService.CreatePaymentLinkAsync(
+                var payOSResult = await _payOSService.CreatePaymentLinkAsync(
                     payment.Id,
                     remainingAmount,
                     description,
                     returnUrl,
                     cancelUrl);
 
-                payment.SetPaymentLink(paymentUrl, orderCode);
+                payment.SetPaymentLink(payOSResult.PaymentUrl, payOSResult.OrderCode);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
                 return Result<CompleteOrderPaymentResponse>.Success(new CompleteOrderPaymentResponse(
                     order.Id,
                     payment.Id,
                     payment.Status,
-                    paymentUrl,
-                    orderCode));
+                    payOSResult.PaymentUrl,
+                    payOSResult.OrderCode));
             }
             catch (Exception ex)
             {

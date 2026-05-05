@@ -52,14 +52,25 @@ public class GetClinicAppointmentsByDateQueryHandler
             cancellationToken: cancellationToken);
 
         var appointmentIds = appointments.Select(a => a.Id).ToList();
+
         var orders = await _orderRepository.GetByAppointmentIdsAsync(appointmentIds, cancellationToken);
-        var orderLookup = orders.ToLookup(o => o.AppointmentId!.Value);
+        
         var visits = await _patientVisitRepository.Query().AsNoTracking()
             .Where(v => v.AppointmentId.HasValue && appointmentIds.Contains(v.AppointmentId.Value))
             .Include(v => v.MedicalRecord)
             .ToListAsync(cancellationToken);
-        var visitMap = visits.ToDictionary(v => v.AppointmentId!.Value);
+        
+        var registeredUserIds = appointments
+            .Where(a => a.Patient?.UserId != null)
+            .Select(a => a.Patient!.UserId!.Value)
+            .Distinct()
+            .ToList();
 
+        var userMap = (await _identityService.GetUsersByIdsAsync(registeredUserIds, cancellationToken))
+            .ToDictionary(u => u.Id);
+
+        var orderLookup = orders.ToLookup(o => o.AppointmentId!.Value);
+        var visitMap = visits.ToDictionary(v => v.AppointmentId!.Value);
         var visitPatientIds = visits.Select(v => v.PatientId).Distinct().ToList();
 
         // Use the earliest CheckedInAt among active visits as the cutoff to avoid missing
@@ -92,20 +103,6 @@ public class GetClinicAppointmentsByDateQueryHandler
                     && !cs.IsDeleted)
                 .ToListAsync(cancellationToken);
 
-        // NOTE: We do NOT pre-group by patientId anymore, because we need to filter
-        // per-visit using CheckedInAt to avoid old sessions from polluting the current visit.
-
-        // Fetch registered user names for patient profiles
-        var registeredUserIds = appointments
-            .Where(a => a.Patient?.UserId != null)
-            .Select(a => a.Patient!.UserId!.Value)
-            .Distinct()
-            .ToList();
-
-        var userMap = (await _identityService.GetUsersByIdsAsync(registeredUserIds, cancellationToken))
-            .ToDictionary(u => u.Id);
-
-        // Fetch doctor names/avatars in batch
         var doctorIds = appointments
             .Select(a => a.RequestedDoctorId ?? a.AppointmentSlot?.OphthalId)
             .Where(id => id.HasValue)
@@ -132,6 +129,13 @@ public class GetClinicAppointmentsByDateQueryHandler
 
             bool isPaidDeposit = appointmentOrders.Count == 0
                 || appointmentOrders.All(o => o.IsClinicDepositSatisfiedForCheckIn());
+
+            // Special case: for walk-in appointments, we require 100% payment (FullyPaid) 
+            // before we consider the "deposit" (which is the full price) as satisfied for check-in.
+            if (a.Patient?.IsWalkIn == true && appointmentOrders.Count > 0)
+            {
+                isPaidDeposit = appointmentOrders.All(o => o.Status == OrderStatus.Completed);
+            }
 
             visitMap.TryGetValue(a.Id, out var visit);
 
@@ -183,13 +187,26 @@ public class GetClinicAppointmentsByDateQueryHandler
             string patientName = "Patient";
             if (a.Patient != null)
             {
-                if (a.Patient.IsWalkIn)
+                // Try Identity system first
+                if (a.Patient.UserId.HasValue && userMap.TryGetValue(a.Patient.UserId.Value, out var user))
                 {
-                    patientName = a.Patient.FullName ?? "Patient";
+                    if (!string.IsNullOrWhiteSpace(user.FullName))
+                    {
+                        patientName = user.FullName;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(a.Patient.FullName))
+                    {
+                        patientName = a.Patient.FullName;
+                    }
+                    else
+                    {
+                        patientName = user.Email ?? "Patient";
+                    }
                 }
-                else if (a.Patient.UserId.HasValue && userMap.TryGetValue(a.Patient.UserId.Value, out var user))
+                // Fallback to Patient profile name (especially for legacy walk-ins)
+                else if (!string.IsNullOrWhiteSpace(a.Patient.FullName))
                 {
-                    patientName = !string.IsNullOrWhiteSpace(user.FullName) ? user.FullName : (user.Email ?? "Patient");
+                    patientName = a.Patient.FullName!;
                 }
             }
 
@@ -199,6 +216,7 @@ public class GetClinicAppointmentsByDateQueryHandler
                 PatientId = a.PatientId,
                 PatientName = patientName,
                 PatientAvatarUrl = null,
+                IsWalkIn = a.Patient?.IsWalkIn ?? false,
                 SlotId = a.AppointmentSlotId,
                 Date = a.AppointmentSlot!.Date,
                 StartTime = a.AppointmentSlot.StartTime,

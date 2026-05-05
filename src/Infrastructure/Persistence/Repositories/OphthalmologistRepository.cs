@@ -34,17 +34,18 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
         CancellationToken cancellationToken = default)
     {
         var query = _dbSet
+            .AsNoTracking()
             .Include(o => o.Certificates)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
-            var lower = searchTerm.ToLower();
+            var pattern = $"%{searchTerm}%";
             query = query
                 .Join(_context.Users, o => o.UserId, u => u.Id, (o, u) => new { o, u })
-                .Where(x => x.u.FullName.ToLower().Contains(lower) ||
-                            x.u.Email.ToLower().Contains(lower) ||
-                            x.o.Phone.ToLower().Contains(lower))
+                .Where(x => (x.u.FullName != null && EF.Functions.ILike(x.u.FullName, pattern)) ||
+                            (x.u.Email != null && EF.Functions.ILike(x.u.Email, pattern)) ||
+                            (x.o.Phone != null && EF.Functions.ILike(x.o.Phone, pattern)))
                 .Select(x => x.o);
         }
 
@@ -123,7 +124,7 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
 
         var uniqueIds = ophthalmologistIds.Distinct().ToArray();
 
-        var query = from ophthalmologist in _dbSet.Include(o => o.Certificates)
+        var query = from ophthalmologist in _dbSet.AsNoTracking().Include(o => o.Certificates)
                     join user in _context.Users on ophthalmologist.UserId equals user.Id
                     where uniqueIds.Contains(ophthalmologist.Id) && !user.IsDeleted
                     select new

@@ -4,7 +4,8 @@ namespace Infrastructure.Identity.Authorization;
 
 public class AuthorizePermissionAttribute : AuthorizeAttribute
 {
-    public AuthorizePermissionAttribute(string permission) : base(permission)
+    public AuthorizePermissionAttribute(params string[] permissions) 
+        : base(string.Join(",", permissions))
     {
     }
 }

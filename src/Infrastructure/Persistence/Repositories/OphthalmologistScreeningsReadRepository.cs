@@ -36,7 +36,7 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
         if (screeningIds.Count == 0)
             return Array.Empty<OphthalmologistScreeningListReadModel>();
 
-        // 2. Get screening base data (patient info, model version, etc.)
+        // Sequential awaits are required because EF Core DbContext is not thread-safe
         var baseRows = await (
             from s in _context.Set<AiScreening>().AsNoTracking()
             join p in _context.Set<Patient>().AsNoTracking() on s.PatientId equals p.Id
@@ -56,7 +56,6 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
             }
         ).ToListAsync(cancellationToken);
 
-        // 3. Get latest ScreeningResult per screening (aggregated at DB)
         var latestResultByScreening = await (
             from r in _context.Set<ScreeningResult>().AsNoTracking()
             where screeningIds.Contains(r.AiScreeningId)
@@ -64,9 +63,6 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
             select grp.OrderByDescending(x => x.CreatedAt).First()
         ).ToListAsync(cancellationToken);
 
-        var resultDict = latestResultByScreening.ToDictionary(r => r.AiScreeningId);
-
-        // 4. Get image metadata per screening (count + thumbnail) aggregated at DB
         var imgMetadata = await (
             from img in _context.Set<RetinalImage>().AsNoTracking()
             where img.AiScreeningId != null && screeningIds.Contains(img.AiScreeningId.Value)
@@ -79,14 +75,13 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
             }
         ).ToListAsync(cancellationToken);
 
-        var imgDict = imgMetadata.ToDictionary(x => x.ScreeningId);
-
-        // 5. Get medical diagnoses for this ophthalmologist
         var diagnoses = await _context.Set<MedicalDiagnosis>()
             .AsNoTracking()
             .Where(d => d.DoctorId == ophthalmologistProfileId && screeningIds.Contains(d.AiScreeningId))
             .ToListAsync(cancellationToken);
 
+        var resultDict = latestResultByScreening.ToDictionary(r => r.AiScreeningId);
+        var imgDict = imgMetadata.ToDictionary(x => x.ScreeningId);
         var diagByScreening = diagnoses
             .GroupBy(d => d.AiScreeningId)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.CreatedAt).First());

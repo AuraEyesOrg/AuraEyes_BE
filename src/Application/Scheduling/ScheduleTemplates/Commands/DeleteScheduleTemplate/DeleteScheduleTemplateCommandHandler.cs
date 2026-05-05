@@ -14,18 +14,15 @@ namespace Application.Scheduling.ScheduleTemplates.Commands.DeleteScheduleTempla
 public class DeleteScheduleTemplateCommandHandler : ICommandHandler<DeleteScheduleTemplateCommand>
 {
     private readonly IScheduleTemplateRepository _scheduleTemplateRepository;
-    private readonly IAppointmentSlotRepository _appointmentSlotRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<DeleteScheduleTemplateCommandHandler> _logger;
 
     public DeleteScheduleTemplateCommandHandler(
         IScheduleTemplateRepository scheduleTemplateRepository,
-        IAppointmentSlotRepository appointmentSlotRepository,
         IUnitOfWork unitOfWork,
         ILogger<DeleteScheduleTemplateCommandHandler> logger)
     {
         _scheduleTemplateRepository = scheduleTemplateRepository;
-        _appointmentSlotRepository = appointmentSlotRepository;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }

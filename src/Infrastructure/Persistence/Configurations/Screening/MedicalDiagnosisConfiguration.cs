@@ -16,7 +16,7 @@ public class MedicalDiagnosisConfiguration : IEntityTypeConfiguration<MedicalDia
             .HasMaxLength(50);
 
         builder.Property(e => e.ClinicalFindings)
-            .HasMaxLength(2000);
+            .HasColumnType("text");
 
         builder.Property(e => e.SeverityLevel)
             .HasMaxLength(50);
@@ -25,13 +25,13 @@ public class MedicalDiagnosisConfiguration : IEntityTypeConfiguration<MedicalDia
             .HasPrecision(5, 2);
 
         builder.Property(e => e.TreatmentPlan)
-            .HasMaxLength(2000);
+            .HasColumnType("text");
 
         builder.Property(e => e.Recommendations)
-            .HasMaxLength(2000);
+            .HasColumnType("text");
 
         builder.Property(e => e.LifestyleAdvice)
-            .HasMaxLength(2000);
+            .HasColumnType("text");
 
         builder.Property(e => e.Status)
             .HasMaxLength(50);

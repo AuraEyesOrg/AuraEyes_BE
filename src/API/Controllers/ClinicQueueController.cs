@@ -93,7 +93,7 @@ public class ClinicQueueController : BaseApiController
     /// Generates a PayOS payment link.
     /// </summary>
     [HttpPost("{visitId:guid}/payment")]
-    [AuthorizePermission(Permissions.ScreeningCreate)]
+    [AuthorizePermission(Permissions.ScreeningCreate, Permissions.OrdersManage)]
     [ProducesResponseType(typeof(ApiResponse<Application.Financial.Commands.CreateClinicOrder.CreateClinicOrderResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> CreatePayment(
         [FromRoute] Guid visitId,

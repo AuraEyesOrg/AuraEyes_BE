@@ -365,42 +365,45 @@ public class AuthService : IAuthService
 
     private static string? ValidateCredentials(List<CredentialItemDto> credentials)
     {
-        if (credentials.Count == 0)
-            return "At least one credential is required";
-
-        if (!credentials.Any(c => c.Type == CertificateType.Degree))
-            return "At least one degree is required";
-
-        if (!credentials.Any(c => c.Type == CertificateType.License))
-            return "At least one license/certificate is required";
+        if (credentials.Count == 0) return "At least one credential is required";
+        if (!credentials.Any(c => c.Type == CertificateType.Degree)) return "At least one degree is required";
+        if (!credentials.Any(c => c.Type == CertificateType.License)) return "At least one license/certificate is required";
 
         foreach (var certificate in credentials)
         {
-            if (certificate.File is null || certificate.File.Length == 0)
-                return "Credential file is required";
-
-            var issuedDateUtc = EnsureUtc(certificate.IssuedDate);
-            var expiryDateUtc = EnsureUtc(certificate.ExpiryDate);
-
-            if (certificate.Type == CertificateType.Degree)
-            {
-                if (!certificate.DegreeLevel.HasValue)
-                    return "Degree level is required for degree credentials";
-
-                if (expiryDateUtc.HasValue)
-                    return "Expiry date must be empty for degree credentials";
-            }
-
-            if (certificate.Type == CertificateType.License)
-            {
-                if (!expiryDateUtc.HasValue)
-                    return "Expiry date is required for license credentials";
-
-                if (expiryDateUtc.Value <= issuedDateUtc)
-                    return "Certificate expiry date must be later than issued date";
-            }
+            var error = ValidateIndividualCredential(certificate);
+            if (error != null) return error;
         }
 
+        return null;
+    }
+
+    private static string? ValidateIndividualCredential(CredentialItemDto cert)
+    {
+        if (cert.File is null || cert.File.Length == 0) return "Credential file is required";
+
+        var issuedDateUtc = EnsureUtc(cert.IssuedDate);
+        var expiryDateUtc = EnsureUtc(cert.ExpiryDate);
+
+        return cert.Type switch
+        {
+            CertificateType.Degree => ValidateDegree(cert, expiryDateUtc),
+            CertificateType.License => ValidateLicense(cert, issuedDateUtc, expiryDateUtc),
+            _ => null
+        };
+    }
+
+    private static string? ValidateDegree(CredentialItemDto cert, DateTime? expiryDateUtc)
+    {
+        if (!cert.DegreeLevel.HasValue) return "Degree level is required for degree credentials";
+        if (expiryDateUtc.HasValue) return "Expiry date must be empty for degree credentials";
+        return null;
+    }
+
+    private static string? ValidateLicense(CredentialItemDto cert, DateTime issuedDateUtc, DateTime? expiryDateUtc)
+    {
+        if (!expiryDateUtc.HasValue) return "Expiry date is required for license credentials";
+        if (expiryDateUtc.Value <= issuedDateUtc) return "Certificate expiry date must be later than issued date";
         return null;
     }
 

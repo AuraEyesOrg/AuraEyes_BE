@@ -49,9 +49,8 @@ public class GetClinicQueueQueryHandler
         if (request.RequestedByUserId == Guid.Empty)
             return Result<IReadOnlyList<ClinicQueueItemDto>>.Failure("Invalid requester.");
 
-        string cacheKey = $"clinic_queue_all";
+        const string cacheKey = "clinic_queue_all";
 
-        // 1. Fast path: Check cache
         if (_cache.TryGetValue(cacheKey, out List<ClinicQueueItemDto>? cachedQueue))
         {
             return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(cachedQueue!);
@@ -59,187 +58,18 @@ public class GetClinicQueueQueryHandler
 
         try
         {
-            var cutoffDate = DateTime.UtcNow.AddDays(-1);
-
-            var visits = await _patientVisitRepository
-                .Query()
-                .AsNoTracking()
-                .Include(v => v.Patient)
-                .Include(v => v.Appointment)
-                    .ThenInclude(a => a!.AppointmentSlot)
-                        .ThenInclude(s => s!.ScheduleTemplate)
-                .Include(v => v.AssignedDoctor)
-                .Include(v => v.MedicalRecord)
-                .Where(v =>
-                    v.Appointment != null &&
-                    v.Appointment.AppointmentSlot != null &&
-                    v.CheckedInAt >= cutoffDate &&
-                    v.Status != PatientVisitStatus.Completed)
-                .OrderBy(v => v.CheckedInAt)
-                .ToListAsync(cancellationToken);
-
+            var visits = await FetchActiveVisitsAsync(cancellationToken);
             if (visits.Count == 0)
                 return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(Array.Empty<ClinicQueueItemDto>());
 
             var patientIds = visits.Select(v => v.PatientId).Distinct().ToList();
-            
-            // Use the earliest CheckedInAt among active visits as the cutoff — avoids missing data
-            // for visits that started before the rolling 24h window.
-            var screeningCutoff = visits
-                .Where(v => v.CheckedInAt.HasValue)
-                .Select(v => v.CheckedInAt!.Value)
-                .DefaultIfEmpty(DateTime.UtcNow.AddDays(-1))
-                .Min();
+            var screeningCutoff = GetScreeningCutoff(visits);
 
-            var screenings = await _screeningRepository
-                .Query()
-                .AsNoTracking()
-                .Include(s => s.ScreeningResults)
-                .Where(s => patientIds.Contains(s.PatientId)
-                    && s.CreatedAt >= screeningCutoff
-                    && !s.IsDeleted)
-                .ToListAsync(cancellationToken);
+            var (screenings, consultations) = await FetchRelatedDataAsync(patientIds, screeningCutoff, cancellationToken);
+            var (doctorNames, patientNames) = await GetUserNamesAsync(visits, cancellationToken);
 
-            var consultations = await _consultationSessionRepository
-                .Query()
-                .AsNoTracking()
-                .Where(cs => patientIds.Contains(cs.PatientId)
-                    && cs.CreatedAt >= screeningCutoff
-                    && cs.Status != SessionStatus.Cancelled
-                    && !cs.IsDeleted)
-                .ToListAsync(cancellationToken);
+            var queueItems = MapVisitsToQueueItems(visits, screenings, consultations, doctorNames, patientNames);
 
-            // --- Optimized User Lookup (Batch) ---
-            var doctorUserIds = visits
-                .Where(v => v.AssignedDoctor != null)
-                .Select(v => v.AssignedDoctor!.UserId)
-                .Distinct()
-                .ToList();
-
-            var patientUserIds = visits
-                .Where(v => v.Patient != null && v.Patient.UserId.HasValue)
-                .Select(v => v.Patient!.UserId!.Value)
-                .Distinct()
-                .ToList();
-
-            var allUserIds = doctorUserIds.Concat(patientUserIds).Distinct().ToList();
-            var allUsers = allUserIds.Count > 0
-                ? await _identityService.GetUsersByIdsAsync(allUserIds, cancellationToken)
-                : Array.Empty<UserDto>();
-            
-            var userNameLookup = allUsers.ToDictionary(u => u.Id, u => u.FullName?.Trim());
-
-            var doctorNameByUserId = new Dictionary<Guid, string>();
-            foreach (var id in doctorUserIds)
-            {
-                if (userNameLookup.TryGetValue(id, out var name))
-                    doctorNameByUserId[id] = name ?? string.Empty;
-            }
-
-            var patientNameByUserId = new Dictionary<Guid, string>();
-            foreach (var id in patientUserIds)
-            {
-                if (userNameLookup.TryGetValue(id, out var name))
-                    patientNameByUserId[id] = name ?? "Unknown Patient";
-            }
-
-            var queueItems = new List<ClinicQueueItemDto>();
-
-            var sortedVisits = visits.OrderBy(v => v.CheckedInAt).ThenBy(v => v.Id).ToList();
-
-            // Iterate in stable visit order so legacy screening windows align with "next visit" boundaries.
-            foreach (var visit in sortedVisits)
-            {
-                var visitCheckedInAt = visit.CheckedInAt ?? DateTime.UtcNow;
-
-                // Find the next visit of the same patient in the sorted list to define the time boundary
-                var nextVisitOfSamePatient = sortedVisits
-                    .Skip(sortedVisits.IndexOf(visit) + 1)
-                    .FirstOrDefault(v => v.PatientId == visit.PatientId);
-                
-                var nextVisitTime = nextVisitOfSamePatient?.CheckedInAt;
-
-                var screening = screenings
-                    .FirstOrDefault(s => s.PatientVisitId == visit.Id);
-
-                if (screening is null)
-                {
-                    screening = screenings
-                        .Where(s => s.PatientId == visit.PatientId &&
-                                    s.PatientVisitId == null &&
-                                    s.CreatedAt >= visitCheckedInAt &&
-                                    (nextVisitTime == null || s.CreatedAt < nextVisitTime))
-                        .OrderByDescending(s => s.CreatedAt)
-                        .FirstOrDefault();
-                }
-
-                ConsultationSession? consultation = null;
-                if (visit.MedicalRecord?.ConsultationSessionId is { } linkedCsId)
-                {
-                    consultation = consultations.FirstOrDefault(c => c.Id == linkedCsId);
-                }
-
-                // Never infer consultation from a screening that belongs to another visit (or legacy
-                // unscoped screening): that session would leak "Sent to Doctor" / "Finalized" across rows.
-                if (consultation is null &&
-                    screening is not null &&
-                    screening.PatientVisitId == visit.Id)
-                {
-                    consultation = consultations.FirstOrDefault(c =>
-                        c.AiScreeningId == screening.Id);
-                }
-                    
-                var latestResult = screening?.ScreeningResults
-                    .OrderByDescending(r => r.CreatedAt)
-                    .FirstOrDefault();
-                
-                var assignedDoctorName = visit.AssignedDoctor is not null &&
-                                         doctorNameByUserId.TryGetValue(visit.AssignedDoctor.UserId, out var dName)
-                    ? dName
-                    : null;
-
-                string patientName = "Unknown Patient";
-                if (visit.Patient != null)
-                {
-                    if (visit.Patient.UserId.HasValue && patientNameByUserId.TryGetValue(visit.Patient.UserId.Value, out var pName))
-                    {
-                        patientName = pName;
-                    }
-                    else if (visit.Patient.IsWalkIn && !string.IsNullOrWhiteSpace(visit.Patient.FullName))
-                    {
-                        patientName = visit.Patient.FullName;
-                    }
-                }
-
-                var item = new ClinicQueueItemDto
-                {
-                    VisitId = visit.Id,
-                    PatientId = visit.PatientId,
-                    PatientName = patientName,
-                    PatientAge = visit.Patient != null ? CalculateAge(visit.Patient.DateOfBirth) : null,
-                    PatientGender = visit.Patient != null ? ((Gender?)visit.Patient.GenderId)?.ToString() : null,
-                    CitizenId = visit.Patient?.CitizenId,
-                    AppointmentId = visit.AppointmentId,
-                    VisitStatus = visit.Status.ToString(),
-                    CheckedInAt = visit.CheckedInAt ?? DateTime.UtcNow,
-                    ScreeningId = screening?.Id,
-                    ScreeningStatus = latestResult is not null ? "completed" : screening is not null ? "pending" : null,
-                    ScreeningRiskLevel = latestResult?.RiskLevel.ToString(),
-                    ConsultationSessionId = consultation?.Id,
-                    ConsultationStatus = consultation?.Status.ToString(),
-                    AssignedDoctorId = visit.AssignedDoctorId ?? consultation?.OphthalmologistId,
-                    AssignedDoctorName = assignedDoctorName,
-                    MedicalRecordId = visit.MedicalRecord?.Id,
-                    IsAdminCompleted = ClinicAdministrativeErmGate.IsSatisfied(visit.MedicalRecord),
-
-                    // Integration with the new business logic resolver
-                    FlowState = ClinicFlowStateResolver.Resolve(visit, screening, consultation, visit.MedicalRecord)
-                };
-
-                queueItems.Add(item);
-            }
-
-            // Cache for 30 seconds to survive load tests
             _cache.Set(cacheKey, queueItems, TimeSpan.FromSeconds(30));
 
             return Result<IReadOnlyList<ClinicQueueItemDto>>.Success(queueItems);
@@ -249,6 +79,207 @@ public class GetClinicQueueQueryHandler
             Console.WriteLine($"[CRITICAL] Error in GetClinicQueueQueryHandler: {ex.Message} \n {ex.StackTrace}");
             return Result<IReadOnlyList<ClinicQueueItemDto>>.Failure("Internal error occurred while processing queue.");
         }
+    }
+
+    private async Task<List<PatientVisit>> FetchActiveVisitsAsync(CancellationToken cancellationToken)
+    {
+        var cutoffDate = DateTime.UtcNow.AddDays(-1);
+
+        return await _patientVisitRepository
+            .Query()
+            .AsNoTracking()
+            .Include(v => v.Patient)
+            .Include(v => v.Appointment)
+                .ThenInclude(a => a!.AppointmentSlot)
+                    .ThenInclude(s => s!.ScheduleTemplate)
+            .Include(v => v.AssignedDoctor)
+            .Include(v => v.MedicalRecord)
+            .Where(v =>
+                v.Appointment != null &&
+                v.Appointment.AppointmentSlot != null &&
+                v.CheckedInAt >= cutoffDate &&
+                v.Status != PatientVisitStatus.Completed)
+            .OrderBy(v => v.CheckedInAt)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static DateTime GetScreeningCutoff(IEnumerable<PatientVisit> visits)
+    {
+        return visits
+            .Where(v => v.CheckedInAt.HasValue)
+            .Select(v => v.CheckedInAt!.Value)
+            .DefaultIfEmpty(DateTime.UtcNow.AddDays(-1))
+            .Min();
+    }
+
+    private async Task<(List<AiScreening> Screenings, List<ConsultationSession> Consultations)> FetchRelatedDataAsync(
+        List<Guid> patientIds,
+        DateTime screeningCutoff,
+        CancellationToken cancellationToken)
+    {
+        // Sequential awaits are required because EF Core DbContext is not thread-safe
+        var screenings = await _screeningRepository
+            .Query()
+            .AsNoTracking()
+            .Include(s => s.ScreeningResults)
+            .Where(s => patientIds.Contains(s.PatientId)
+                && s.CreatedAt >= screeningCutoff
+                && !s.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        var consultations = await _consultationSessionRepository
+            .Query()
+            .AsNoTracking()
+            .Where(cs => patientIds.Contains(cs.PatientId)
+                && cs.CreatedAt >= screeningCutoff
+                && cs.Status != SessionStatus.Cancelled
+                && !cs.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        return (screenings, consultations);
+    }
+
+    private async Task<(Dictionary<Guid, string> DoctorNames, Dictionary<Guid, string> PatientNames)> GetUserNamesAsync(
+        List<PatientVisit> visits,
+        CancellationToken cancellationToken)
+    {
+        var doctorUserIds = visits
+            .Where(v => v.AssignedDoctor != null)
+            .Select(v => v.AssignedDoctor!.UserId)
+            .Distinct()
+            .ToList();
+
+        var patientUserIds = visits
+            .Where(v => v.Patient != null && v.Patient.UserId.HasValue)
+            .Select(v => v.Patient!.UserId!.Value)
+            .Distinct()
+            .ToList();
+
+        var allUserIds = doctorUserIds.Concat(patientUserIds).Distinct().ToList();
+        if (allUserIds.Count == 0)
+            return (new Dictionary<Guid, string>(), new Dictionary<Guid, string>());
+
+        var allUsers = await _identityService.GetUsersByIdsAsync(allUserIds, cancellationToken);
+        var userNameLookup = allUsers.ToDictionary(u => u.Id, u => u.FullName?.Trim());
+
+        var doctorNames = doctorUserIds
+            .Where(id => userNameLookup.ContainsKey(id))
+            .ToDictionary(id => id, id => userNameLookup[id] ?? string.Empty);
+
+        var patientNames = patientUserIds
+            .Where(id => userNameLookup.ContainsKey(id))
+            .ToDictionary(id => id, id => userNameLookup[id] ?? "Unknown Patient");
+
+        return (doctorNames, patientNames);
+    }
+
+    private List<ClinicQueueItemDto> MapVisitsToQueueItems(
+        List<PatientVisit> visits,
+        List<AiScreening> screenings,
+        List<ConsultationSession> consultations,
+        Dictionary<Guid, string> doctorNames,
+        Dictionary<Guid, string> patientNames)
+    {
+        var queueItems = new List<ClinicQueueItemDto>();
+        var sortedVisits = visits.OrderBy(v => v.CheckedInAt).ThenBy(v => v.Id).ToList();
+
+        foreach (var visit in sortedVisits)
+        {
+            var visitIdx = sortedVisits.IndexOf(visit);
+            var nextVisitTime = sortedVisits
+                .Skip(visitIdx + 1)
+                .FirstOrDefault(v => v.PatientId == visit.PatientId)?.CheckedInAt;
+
+            var screening = ResolveScreening(visit, screenings, nextVisitTime);
+            var consultation = ResolveConsultation(visit, screening, consultations);
+            
+            queueItems.Add(MapToDto(visit, screening, consultation, doctorNames, patientNames));
+        }
+
+        return queueItems;
+    }
+
+    private static AiScreening? ResolveScreening(PatientVisit visit, List<AiScreening> screenings, DateTime? nextVisitTime)
+    {
+        var screening = screenings.FirstOrDefault(s => s.PatientVisitId == visit.Id);
+        if (screening != null) return screening;
+
+        var visitCheckedInAt = visit.CheckedInAt ?? DateTime.UtcNow;
+        return screenings
+            .Where(s => s.PatientId == visit.PatientId &&
+                        s.PatientVisitId == null &&
+                        s.CreatedAt >= visitCheckedInAt &&
+                        (nextVisitTime == null || s.CreatedAt < nextVisitTime))
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefault();
+    }
+
+    private static ConsultationSession? ResolveConsultation(PatientVisit visit, AiScreening? screening, List<ConsultationSession> consultations)
+    {
+        if (visit.MedicalRecord?.ConsultationSessionId is { } linkedCsId)
+        {
+            return consultations.FirstOrDefault(c => c.Id == linkedCsId);
+        }
+
+        if (screening != null && screening.PatientVisitId == visit.Id)
+        {
+            return consultations.FirstOrDefault(c => c.AiScreeningId == screening.Id);
+        }
+
+        return null;
+    }
+
+    private static ClinicQueueItemDto MapToDto(
+        PatientVisit visit,
+        AiScreening? screening,
+        ConsultationSession? consultation,
+        Dictionary<Guid, string> doctorNames,
+        Dictionary<Guid, string> patientNames)
+    {
+        var latestResult = screening?.ScreeningResults
+            .OrderByDescending(r => r.CreatedAt)
+            .FirstOrDefault();
+
+        var assignedDoctorName = visit.AssignedDoctor != null &&
+                                 doctorNames.TryGetValue(visit.AssignedDoctor.UserId, out var dName)
+            ? dName : null;
+
+        string patientName = ResolvePatientName(visit, patientNames);
+
+        return new ClinicQueueItemDto
+        {
+            VisitId = visit.Id,
+            PatientId = visit.PatientId,
+            PatientName = patientName,
+            PatientAge = visit.Patient != null ? CalculateAge(visit.Patient.DateOfBirth) : null,
+            PatientGender = visit.Patient != null ? ((Gender?)visit.Patient.GenderId)?.ToString() : null,
+            CitizenId = visit.Patient?.CitizenId,
+            AppointmentId = visit.AppointmentId,
+            VisitStatus = visit.Status.ToString(),
+            CheckedInAt = visit.CheckedInAt ?? DateTime.UtcNow,
+            ScreeningId = screening?.Id,
+            ScreeningStatus = latestResult != null ? "completed" : screening != null ? "pending" : null,
+            ScreeningRiskLevel = latestResult?.RiskLevel.ToString(),
+            ConsultationSessionId = consultation?.Id,
+            ConsultationStatus = consultation?.Status.ToString(),
+            AssignedDoctorId = visit.AssignedDoctorId ?? consultation?.OphthalmologistId,
+            AssignedDoctorName = assignedDoctorName,
+            MedicalRecordId = visit.MedicalRecord?.Id,
+            IsAdminCompleted = ClinicAdministrativeErmGate.IsSatisfied(visit.MedicalRecord),
+            FlowState = ClinicFlowStateResolver.Resolve(visit, screening, consultation, visit.MedicalRecord)
+        };
+    }
+
+    private static string ResolvePatientName(PatientVisit visit, Dictionary<Guid, string> patientNames)
+    {
+        if (visit.Patient == null) return "Unknown Patient";
+        
+        if (visit.Patient.UserId.HasValue && patientNames.TryGetValue(visit.Patient.UserId.Value, out var pName))
+            return pName;
+        
+        return (visit.Patient.IsWalkIn && !string.IsNullOrWhiteSpace(visit.Patient.FullName))
+            ? visit.Patient.FullName
+            : "Unknown Patient";
     }
 
     private static int? CalculateAge(DateTime? dob)

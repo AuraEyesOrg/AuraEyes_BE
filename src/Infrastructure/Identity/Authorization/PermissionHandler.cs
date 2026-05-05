@@ -21,9 +21,9 @@ public class PermissionHandler : AuthorizationHandler<PermissionRequirement>
             return Task.CompletedTask;
         }
 
-        // Check for specific permission claim
-        var permissions = context.User.FindAll("permission");
-        if (permissions.Any(p => p.Value == requirement.Permission))
+        // Check for specific permission claim (OR logic)
+        var userPermissions = context.User.FindAll("permission");
+        if (requirement.Permissions.Any(rp => userPermissions.Any(up => up.Value == rp)))
         {
             context.Succeed(requirement);
         }

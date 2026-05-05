@@ -283,6 +283,7 @@ public static class Permissions
         AppointmentsRead, AppointmentsManage,
         OrdersRead, OrdersManage,
         PaymentsRead, PaymentsManage,
+        ScreeningRead,
     ];
 }
 

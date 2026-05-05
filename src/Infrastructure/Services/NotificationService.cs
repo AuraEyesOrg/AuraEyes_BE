@@ -64,15 +64,7 @@ public class NotificationService : INotificationService
         try
         {
             // Step A: Serialize payload to JSON string
-            string? payloadJson = null;
-            if (payload != null)
-            {
-                payloadJson = JsonSerializer.Serialize(payload, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    WriteIndented = false
-                });
-            }
+            var payloadJson = SerializePayload(payload);
 
             referenceId ??= ExtractReferenceId(type, payloadJson);
 
@@ -100,28 +92,20 @@ public class NotificationService : INotificationService
                 "Notification persisted: Id={NotificationId}, UserId={UserId}, Type={Type}",
                 notification.Id, userId, type);
 
-            // Step C: Broadcast via SignalR to the specific user
-            var notificationDto = new NotificationDto
-            {
-                Id = notification.Id,
-                UserId = userId,
-                Title = title,
-                Message = message,
-                Type = type,
-                ReferenceId = referenceId,
-                IsRead = false,
-                Payload = payloadJson,
-                CreatedAt = notification.CreatedAt
-            };
-
-            await _hubService.BroadcastToUserAsync(userId, notificationDto, cancellationToken);
-
             var unreadCount = await _notificationRepository
                 .Query()
                 .AsNoTracking()
                 .CountAsync(n => n.UserId == userId && !n.IsRead, cancellationToken);
 
-            await _hubService.BroadcastUnreadCountAsync(userId, unreadCount, cancellationToken);
+            await BroadcastPersistedNotificationAsync(
+                notification,
+                title,
+                message,
+                type,
+                payloadJson,
+                referenceId,
+                unreadCount,
+                cancellationToken);
 
             _logger.LogInformation(
                 "Notification broadcasted via SignalR to User {UserId}",
@@ -171,10 +155,95 @@ public class NotificationService : INotificationService
             return;
         }
 
+        var payloadJson = SerializePayload(payload);
+        var resolvedReferenceId = referenceId ?? ExtractReferenceId(type, payloadJson);
+        var notifications = new List<Notification>(users.Count);
+
         foreach (var user in users)
         {
-            await SendAsync(user.Id, title, message, type, payload, cancellationToken, referenceId);
+            var notification = new Notification(
+                user.Id,
+                title,
+                message,
+                type,
+                resolvedReferenceId,
+                payloadJson);
+
+            notifications.Add(notification);
+            await _notificationRepository.AddAsync(notification, cancellationToken);
         }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var userIds = users.Select(u => u.Id).ToArray();
+        var unreadCounts = await _notificationRepository
+            .Query()
+            .AsNoTracking()
+            .Where(n => userIds.Contains(n.UserId) && !n.IsRead)
+            .GroupBy(n => n.UserId)
+            .Select(group => new
+            {
+                UserId = group.Key,
+                Count = group.Count()
+            })
+            .ToDictionaryAsync(item => item.UserId, item => item.Count, cancellationToken);
+
+        var broadcastTasks = notifications.Select(notification =>
+        {
+            var unreadCount = unreadCounts.GetValueOrDefault(notification.UserId, 0);
+            return BroadcastPersistedNotificationAsync(
+                notification,
+                title,
+                message,
+                type,
+                payloadJson,
+                resolvedReferenceId,
+                unreadCount,
+                cancellationToken);
+        });
+
+        await Task.WhenAll(broadcastTasks);
+    }
+
+    private static string? SerializePayload(object? payload)
+    {
+        if (payload == null)
+        {
+            return null;
+        }
+
+        return JsonSerializer.Serialize(payload, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        });
+    }
+
+    private async Task BroadcastPersistedNotificationAsync(
+        Notification notification,
+        string title,
+        string message,
+        NotificationType type,
+        string? payloadJson,
+        Guid? referenceId,
+        int unreadCount,
+        CancellationToken cancellationToken)
+    {
+        var notificationDto = new NotificationDto
+        {
+            Id = notification.Id,
+            UserId = notification.UserId,
+            Title = title,
+            Message = message,
+            Type = type,
+            ReferenceId = referenceId,
+            IsRead = false,
+            Payload = payloadJson,
+            CreatedAt = notification.CreatedAt
+        };
+
+        await _hubService.BroadcastToUserAsync(notification.UserId, notificationDto, cancellationToken);
+        await _hubService.BroadcastUnreadCountAsync(notification.UserId, unreadCount, cancellationToken);
     }
 
     private static Guid? ExtractReferenceId(NotificationType type, string? payloadJson)

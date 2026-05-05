@@ -629,10 +629,11 @@ public class IdentityService : IIdentityService
     {
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
+            var pattern = $"%{searchTerm}%";
             query = query.Where(u =>
-                u.Email!.Contains(searchTerm) ||
-                u.FullName.Contains(searchTerm) ||
-                u.UserName!.Contains(searchTerm));
+                EF.Functions.ILike(u.Email!, pattern) ||
+                EF.Functions.ILike(u.FullName, pattern) ||
+                EF.Functions.ILike(u.UserName!, pattern));
         }
 
         if (!string.IsNullOrWhiteSpace(statusFilter))
