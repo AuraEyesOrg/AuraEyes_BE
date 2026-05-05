@@ -15,11 +15,22 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
     {
     }
 
+    private IQueryable<AppointmentSlot> GetActiveSlotsQuery()
+    {
+        return from s in _dbSet.AsNoTracking()
+               join o in _context.Ophthalmologists on s.OphthalId equals o.Id into oJoin
+               from o in oJoin.DefaultIfEmpty()
+               join u in _context.Users on o.UserId equals u.Id into uJoin
+               from u in uJoin.DefaultIfEmpty()
+               where s.OphthalId == null || (u != null && u.IsActive && !u.IsDeleted)
+               select s;
+    }
+
     public async Task<IReadOnlyList<AppointmentSlot>> GetByTemplateIdAsync(
         Guid scheduleTemplateId,
         CancellationToken cancellationToken = default)
     {
-        return await _dbSet
+        return await GetActiveSlotsQuery()
             .Where(s => s.ScheduleTemplateId == scheduleTemplateId)
             .OrderBy(s => s.Date)
             .ThenBy(s => s.StartTime)
@@ -32,7 +43,7 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
         DateOnly toDate,
         CancellationToken cancellationToken = default)
     {
-        return await _dbSet
+        return await GetActiveSlotsQuery()
             .Where(s => s.ScheduleTemplateId == scheduleTemplateId)
             .Where(s => s.Date >= fromDate && s.Date <= toDate)
             .OrderBy(s => s.Date)
@@ -45,7 +56,7 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
         DateOnly toDate,
         CancellationToken cancellationToken = default)
     {
-        return await _dbSet
+        return await GetActiveSlotsQuery()
             .Include(s => s.ScheduleTemplate)
             .Where(s => s.Date >= fromDate && s.Date <= toDate)
             .OrderBy(s => s.Date)
@@ -59,7 +70,7 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
         DateOnly? toDate = null,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbSet
+        var query = GetActiveSlotsQuery()
             .Include(s => s.ScheduleTemplate)
             .Where(s => s.Status == ScheduleStatus.Available)
             .Where(s => s.BookedCount < s.MaxCapacity);
@@ -99,27 +110,25 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
         int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbSet
-            .AsNoTracking()
+        IQueryable<AppointmentSlot> filteredQuery = GetActiveSlotsQuery()
             .Include(s => s.ScheduleTemplate)
             .Include(s => s.Appointments)
-                .ThenInclude(a => a.Patient)
-            .AsQueryable();
+                .ThenInclude(a => a.Patient);
 
         if (scheduleTemplateId.HasValue)
-            query = query.Where(s => s.ScheduleTemplateId == scheduleTemplateId.Value);
+            filteredQuery = filteredQuery.Where(s => s.ScheduleTemplateId == scheduleTemplateId.Value);
 
         if (ophthalId.HasValue)
-            query = query.Where(s => s.OphthalId == ophthalId.Value);
+            filteredQuery = filteredQuery.Where(s => s.OphthalId == ophthalId.Value);
 
         if (status.HasValue)
-            query = query.Where(s => s.Status == status.Value);
+            filteredQuery = filteredQuery.Where(s => s.Status == status.Value);
 
         if (fromDate.HasValue)
-            query = query.Where(s => s.Date >= fromDate.Value);
+            filteredQuery = filteredQuery.Where(s => s.Date >= fromDate.Value);
 
         if (toDate.HasValue)
-            query = query.Where(s => s.Date <= toDate.Value);
+            filteredQuery = filteredQuery.Where(s => s.Date <= toDate.Value);
 
         if (excludePastSlots)
         {
@@ -127,14 +136,14 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
             var vietnamToday = DateOnly.FromDateTime(vietnamNow);
             var vietnamTime = TimeOnly.FromDateTime(vietnamNow);
 
-            query = query.Where(s =>
+            filteredQuery = filteredQuery.Where(s =>
                 s.Date > vietnamToday ||
                 (s.Date == vietnamToday && s.StartTime > vietnamTime));
         }
 
-        var totalCount = await query.CountAsync(cancellationToken);
+        var totalCount = await filteredQuery.CountAsync(cancellationToken);
 
-        var items = await query
+        var items = await filteredQuery
             .OrderBy(s => s.Date)
             .ThenBy(s => s.StartTime)
             .Skip((pageNumber - 1) * pageSize)
@@ -197,7 +206,7 @@ public class AppointmentSlotRepository : Repository<AppointmentSlot>, IAppointme
         DateOnly fromDate,
         CancellationToken cancellationToken = default)
     {
-        return await _dbSet
+        return await GetActiveSlotsQuery()
             .Where(s => s.OphthalId == doctorId)
             .Where(s => s.Date >= fromDate)
             .Where(s => s.Status == ScheduleStatus.Available)
