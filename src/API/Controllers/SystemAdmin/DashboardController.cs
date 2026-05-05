@@ -12,6 +12,7 @@ using Application.SystemAdmin.Dashboard.Queries.GetScreeningVolumeTrends;
 using Application.SystemAdmin.Dashboard.Queries.GetSlotUtilization;
 using Application.SystemAdmin.Dashboard.Queries.GetSystemHealth;
 using Application.SystemAdmin.Dashboard.Queries.GetTodaySummary;
+using Application.SystemAdmin.Dashboard.Queries.GetTransactionStats;
 using Domain.Enums;
 using Infrastructure.Services;
 using MediatR;
@@ -272,6 +273,21 @@ public class DashboardController : BaseApiController
     public async Task<IActionResult> GetDoctorStatus(CancellationToken cancellationToken)
     {
         var result = await _mediator.Send(new GetDoctorStatusQuery(), cancellationToken);
+        return HandleResult(result);
+    }
+
+    /// <summary>
+    /// Get transaction statistics grouped by period (daily, weekly, monthly).
+    /// </summary>
+    /// <param name="period">Grouping period: "daily", "weekly", or "monthly"</param>
+    [HttpGet("transaction-stats")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<TransactionStatsDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetTransactionStats(
+        [FromQuery] string period = "daily")
+    {
+        var query = new GetTransactionStatsQuery { Period = period };
+        var result = await _mediator.Send(query);
         return HandleResult(result);
     }
 }

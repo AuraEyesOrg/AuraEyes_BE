@@ -16,6 +16,7 @@ using Application.SystemAdmin.Dashboard.Queries.GetScreeningVolumeTrends;
 using Application.SystemAdmin.Dashboard.Queries.GetSystemHealth;
 using Application.SystemAdmin.Dashboard.Queries.GetSlotUtilization;
 using Application.SystemAdmin.Dashboard.Queries.GetTodaySummary;
+using Application.SystemAdmin.Dashboard.Queries.GetTransactionStats;
 using Domain.Enums;
 using Domain.Entities.Users;
 using Infrastructure.Persistence;
@@ -762,6 +763,86 @@ public class DashboardMetricsService : IDashboardMetricsService
                           DoctorName = u.FullName,
                           CurrentStatus = "Available", // Simplified
                       }).ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TransactionStatsDto>> GetTransactionStatsAsync(string period, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(now, VietnamTimeZoneResolver.TimeZone);
+
+        // Base query: completed payments with a paid date
+        var paymentsQuery = _context.Payments
+            .Where(p => p.Status == PaymentStatus.Completed && p.PaidAt != null);
+
+        List<IGrouping<string, Domain.Entities.Financial.Payment>> groups;
+
+        if (period == "monthly")
+        {
+            // Group by month for the current year
+            var startOfYear = new DateTime(vietnamNow.Year, 1, 1, 0, 0, 0, DateTimeKind.Local);
+            var startUtc = startOfYear.ToUniversalTime();
+            var endUtc = startOfYear.AddYears(1).ToUniversalTime();
+
+            var payments = await paymentsQuery
+                .Where(p => p.PaidAt >= startUtc && p.PaidAt < endUtc)
+                .ToListAsync(cancellationToken);
+
+            groups = payments
+                .GroupBy(p =>
+                {
+                    var local = TimeZoneInfo.ConvertTimeFromUtc(p.PaidAt!.Value, VietnamTimeZoneResolver.TimeZone);
+                    return local.ToString("MMM yyyy", CultureInfo.InvariantCulture);
+                })
+                .ToList();
+        }
+        else if (period == "weekly")
+        {
+            // Group by ISO week for last 4 weeks
+            var weeksBack = vietnamNow.AddDays(-27);
+            var weeksBackUtc = weeksBack.ToUniversalTime();
+
+            var payments = await paymentsQuery
+                .Where(p => p.PaidAt >= weeksBackUtc)
+                .ToListAsync(cancellationToken);
+
+            groups = payments
+                .GroupBy(p =>
+                {
+                    var local = TimeZoneInfo.ConvertTimeFromUtc(p.PaidAt!.Value, VietnamTimeZoneResolver.TimeZone);
+                    var isoWeek = CultureInfo.InvariantCulture.Calendar.GetWeekOfYear(
+                        local, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+                    return $"Week {isoWeek}";
+                })
+                .ToList();
+        }
+        else // daily
+        {
+            // Group by day for last 7 days
+            var daysBack = vietnamNow.AddDays(-6);
+            var daysBackUtc = daysBack.ToUniversalTime();
+
+            var payments = await paymentsQuery
+                .Where(p => p.PaidAt >= daysBackUtc)
+                .ToListAsync(cancellationToken);
+
+            groups = payments
+                .GroupBy(p =>
+                {
+                    var local = TimeZoneInfo.ConvertTimeFromUtc(p.PaidAt!.Value, VietnamTimeZoneResolver.TimeZone);
+                    return local.ToString("MMM dd", CultureInfo.InvariantCulture);
+                })
+                .ToList();
+        }
+
+        return groups
+            .Select(g => new TransactionStatsDto
+            {
+                Date = g.Key,
+                Amount = g.Sum(p => p.Amount),
+                Count = g.Count(),
+            })
+            .OrderBy(x => x.Date)
+            .ToList();
     }
 
     // Helper methods for workload calculation
