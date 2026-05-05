@@ -53,6 +53,24 @@ public class ChatHub : Hub
                 await Groups.AddToGroupAsync(Context.ConnectionId, role);
                 _logger.LogDebug("User {UserId} added to SignalR group {Role}", userId, role);
             }
+
+            var profileIdClaim = Context.User.FindFirst("profile_id")?.Value;
+            if (Guid.TryParse(profileIdClaim, out var profileId))
+            {
+                var profileGroup = $"profile_{profileId}";
+                await Groups.AddToGroupAsync(Context.ConnectionId, profileGroup);
+                _logger.LogDebug(
+                    "User {UserId} added to SignalR group {ProfileGroup}",
+                    userId,
+                    profileGroup);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "ChatHub connected user {UserId} missing/invalid profile_id claim. ConnectionId={ConnectionId}",
+                    userId,
+                    Context.ConnectionId);
+            }
         }
 
         await base.OnConnectedAsync();
@@ -82,11 +100,23 @@ public class ChatHub : Hub
         var senderProfileIdRaw = Context.User?.FindFirst("profile_id")?.Value;
         if (!Guid.TryParse(senderProfileIdRaw, out var senderProfileId))
         {
+            _logger.LogWarning(
+                "JoinSession rejected due to invalid profile_id claim. ConnectionId={ConnectionId}, UserId={UserId}, SessionId={SessionId}",
+                Context.ConnectionId,
+                Context.UserIdentifier,
+                sessionId);
             return;
         }
 
         var session = await _sessionRepository.GetByIdAsync(sessionId, Context.ConnectionAborted);
-        if (session is null) return;
+        if (session is null)
+        {
+            _logger.LogWarning(
+                "JoinSession failed: session {SessionId} not found for UserId={UserId}",
+                sessionId,
+                Context.UserIdentifier);
+            return;
+        }
 
         // Verify participation
         bool isPatient = senderProfileId == session.PatientId;
@@ -105,8 +135,8 @@ public class ChatHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
         
         _logger.LogInformation(
-            "User {UserId} joined SignalR group {GroupName}",
-            Context.UserIdentifier, groupName);
+            "User {UserId} joined SignalR group {GroupName} for SessionId={SessionId}",
+            Context.UserIdentifier, groupName, sessionId);
     }
 
     /// <summary>

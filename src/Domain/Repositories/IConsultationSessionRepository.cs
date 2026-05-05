@@ -10,6 +10,10 @@ public interface IConsultationSessionRepository : IRepository<ConsultationSessio
         Guid id,
         CancellationToken cancellationToken = default);
 
+    Task<ConsultationSession?> GetByIdWithConversationsForUpdateAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<ConsultationSession>> GetByPatientIdAsync(
         Guid patientId,
         CancellationToken cancellationToken = default);
