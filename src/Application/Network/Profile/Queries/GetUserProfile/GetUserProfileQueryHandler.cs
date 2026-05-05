@@ -43,7 +43,8 @@ public class GetUserProfileQueryHandler : IQueryHandler<GetUserProfileQuery, Use
         // In Digital Clinic model there is no separate Organisation entity
 
         var postCount = await _postRepository.GetPostCountByAuthorAsync(request.UserId, cancellationToken);
-
+        var roles = await _identityService.GetUserRolesAsync(request.UserId);
+        
         var dto = new UserProfileDto
         {
             UserId = user.Id,
@@ -51,6 +52,7 @@ public class GetUserProfileQueryHandler : IQueryHandler<GetUserProfileQuery, Use
             AvatarUrl = user.AvatarUrl,
             Bio = bio,
             PostCount = postCount,
+            Roles = roles.ToList(),
             Certificates = ophthalmologist?.Certificates
                 .Select(c => new UserProfileCertificateDto
                 {

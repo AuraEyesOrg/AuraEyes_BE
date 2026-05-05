@@ -61,7 +61,8 @@ public class UploadCredentialsCommandHandler : ICommandHandler<UploadCredentials
             cert.IssuingAuthority,
             DateTime.SpecifyKind(cert.IssuedDate, DateTimeKind.Utc),
             cert.ExpiryDate.HasValue ? DateTime.SpecifyKind(cert.ExpiryDate.Value, DateTimeKind.Utc) : null,
-            uploadedUrl
+            uploadedUrl,
+            cert.LicenseNumber
         );
         ophthalmologist.AddCertificate(newCert);
 

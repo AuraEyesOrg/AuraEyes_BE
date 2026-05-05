@@ -1,5 +1,6 @@
 using Domain.Entities.Users;
 using Domain.Repositories;
+using Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Persistence.Repositories;
@@ -124,6 +125,13 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
 
         var uniqueIds = ophthalmologistIds.Distinct().ToArray();
 
+        // Calculate actual completed appointments count
+        var completedCounts = await _context.PatientVisits
+            .Where(v => v.AssignedDoctorId.HasValue && uniqueIds.Contains(v.AssignedDoctorId.Value) && v.Status == PatientVisitStatus.Completed)
+            .GroupBy(v => v.AssignedDoctorId.Value)
+            .Select(g => new { DoctorId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.DoctorId, x => x.Count, cancellationToken);
+
         var query = from ophthalmologist in _dbSet.AsNoTracking().Include(o => o.Certificates)
                     join user in _context.Users on ophthalmologist.UserId equals user.Id
                     join claim in _context.UserClaims on user.Id equals claim.UserId into claims
@@ -153,6 +161,7 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
                 x.Bio,
                 x.RatingAverage,
                 x.RatingCount,
+                completedCounts.GetValueOrDefault(x.Id, 0),
                 x.Certificates,
                 x.IsActive));
     }

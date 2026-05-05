@@ -52,5 +52,6 @@ public class CertificateDto
     public DateTime IssuedDate { get; set; }
     public DateTime? ExpiryDate { get; set; }
     public string? CertificateUrl { get; set; }
+    public string? LicenseNumber { get; set; }
     public bool IsExpired { get; set; }
 }

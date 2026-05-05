@@ -67,10 +67,14 @@ public class GetFeedQueryHandler : IQueryHandler<GetFeedQuery, PagedResult<PostF
         var userDict = users.ToDictionary(u => u.Id);
 
         // Map author details from posts to avoid repeated FirstOrDefault in the loop
-        var authorTypeMap = posts.ToDictionary(p => p.AuthorId, p => p.AuthorType);
-        foreach (var p in posts.Where(p => p.OriginalPost != null))
+        var authorTypeMap = new Dictionary<Guid, AuthorType>();
+        foreach (var p in posts)
         {
-            authorTypeMap.TryAdd(p.OriginalPost!.AuthorId, p.OriginalPost.AuthorType);
+            authorTypeMap.TryAdd(p.AuthorId, p.AuthorType);
+            if (p.OriginalPost != null)
+            {
+                authorTypeMap.TryAdd(p.OriginalPost.AuthorId, p.OriginalPost.AuthorType);
+            }
         }
 
         return authorIds.ToDictionary(

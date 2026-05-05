@@ -187,20 +187,21 @@ public class IdentityService : IIdentityService
     {
         // Optimization: Use a single query to fetch only the fields needed for DTO
         // and avoid the N+1 problem caused by fetching claims for each user in MapToDtoAsync
-        var users = await _userManager.Users
-            .AsNoTracking()
-            .Where(u => userIds.Contains(u.Id) && !u.IsDeleted)
-            .Select(u => new UserDto(
-                u.Id,
-                u.Email ?? string.Empty,
-                u.FullName,
-                u.EmailConfirmed,
-                u.IsActive,
-                u.IsDeleted,
-                u.TwoFactorEnabled,
-                u.AvatarUrl, // Direct from user table, ignores provider claims for performance
-                u.PhoneNumber,
-                u.MustUpdateProfile))
+        var users = await (from u in _userManager.Users.AsNoTracking()
+                           join c in _context.UserClaims on u.Id equals c.UserId into claims
+                           from providerAvatar in claims.Where(x => x.ClaimType == ProviderAvatarClaimType).DefaultIfEmpty()
+                           where userIds.Contains(u.Id) && !u.IsDeleted
+                           select new UserDto(
+                               u.Id,
+                               u.Email ?? string.Empty,
+                               u.FullName,
+                               u.EmailConfirmed,
+                               u.IsActive,
+                               u.IsDeleted,
+                               u.TwoFactorEnabled,
+                               u.AvatarUrl ?? (providerAvatar != null ? providerAvatar.ClaimValue : null),
+                               u.PhoneNumber,
+                               u.MustUpdateProfile))
             .ToListAsync(cancellationToken);
 
         return users.AsReadOnly();

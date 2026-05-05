@@ -14,6 +14,7 @@ public record UpdateCertificateCommand : ICommand
     public string Name { get; init; } = default!;
     public string? DegreeLevel { get; init; }
     public string? IssuingAuthority { get; init; }
+    public string? LicenseNumber { get; init; }
     public DateTime IssuedDate { get; init; }
     public DateTime? ExpiryDate { get; init; }
     public IFormFile? File { get; init; }
@@ -62,7 +63,7 @@ public class UpdateCertificateCommandHandler : ICommandHandler<UpdateCertificate
             request.IssuedDate,
             request.ExpiryDate,
             newUrl,
-            certificate.LicenseNumber,
+            request.LicenseNumber,
             certificate.ScopeOfPractice,
             certificate.IssuingInstitution);
 

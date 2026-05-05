@@ -27,7 +27,7 @@ public class GetTrendingTopicsQueryHandler : IQueryHandler<GetTrendingTopicsQuer
 
         var categoryNames = new Dictionary<PostCategory, string>
         {
-            { PostCategory.CasePresentation, "Case Presentations" },
+
             { PostCategory.PeerDiscussion, "Peer Discussions" },
             { PostCategory.KnowledgeShare, "Knowledge Sharing" },
             { PostCategory.Announcement, "Announcements" }

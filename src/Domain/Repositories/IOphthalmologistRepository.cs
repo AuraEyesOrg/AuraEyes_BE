@@ -70,6 +70,7 @@ public record EnhancedDoctorDetail(
     string? Bio,
     decimal RatingAverage,
     int RatingCount,
+    int CompletedPatientsCount,
     List<Certificate> Certificates,
     bool IsActive);
 

@@ -10,6 +10,7 @@ public class UserProfileDto
     public string? AvatarUrl { get; set; }
     public string? Bio { get; set; }
     public int PostCount { get; set; }
+    public List<string> Roles { get; set; } = new();
     public List<UserProfileCertificateDto> Certificates { get; set; } = new();
 }
 
