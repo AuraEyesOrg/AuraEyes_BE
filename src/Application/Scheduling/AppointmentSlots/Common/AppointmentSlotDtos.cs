@@ -86,6 +86,7 @@ public record DoctorSlotDetailDto
     public Guid DoctorId { get; init; }
     public string DoctorName { get; init; } = string.Empty;
     public string? DoctorAvatar { get; init; }
+    public string? ProviderAvatarUrl { get; init; }
     public bool IsBooked { get; init; }
     public decimal Price { get; init; }
     public string? Bio { get; init; }
@@ -104,6 +105,7 @@ public record CertificateDto
     public DateTime IssuedDate { get; init; }
     public DateTime? ExpiryDate { get; init; }
     public string? CertificateUrl { get; init; }
+    public string? LicenseNumber { get; init; }
 }
 
 public record AvailableSlotDto

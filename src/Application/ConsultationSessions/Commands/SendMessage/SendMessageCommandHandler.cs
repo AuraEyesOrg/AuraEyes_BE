@@ -5,6 +5,7 @@ using Domain.Entities.Consultation;
 using Domain.Entities.Users;
 using Domain.Enums;
 using Domain.Repositories;
+using Microsoft.Extensions.Logging;
 
 namespace Application.ConsultationSessions.Commands.SendMessage;
 
@@ -18,6 +19,7 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
     private readonly INotificationService _notificationService;
     private readonly IChatHubService _chatHubService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<SendMessageCommandHandler> _logger;
 
     public SendMessageCommandHandler(
         IConsultationSessionRepository sessionRepository,
@@ -27,7 +29,8 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         IRepository<Patient> patientRepository,
         INotificationService notificationService,
         IChatHubService chatHubService,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        ILogger<SendMessageCommandHandler> logger)
     {
         _sessionRepository = sessionRepository;
         _conversationRepository = conversationRepository;
@@ -37,6 +40,7 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         _notificationService = notificationService;
         _chatHubService = chatHubService;
         _unitOfWork = unitOfWork;
+        _logger = logger;
     }
 
     public async Task<Result> Handle(SendMessageCommand request, CancellationToken cancellationToken)
@@ -46,7 +50,7 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
 
         var senderProfileId = _currentUser.ProfileId.Value;
 
-        var session = await _sessionRepository.GetByIdWithConversationsAsync(
+        var session = await _sessionRepository.GetByIdWithConversationsForUpdateAsync(
             request.SessionId, cancellationToken);
 
         if (session is null)
@@ -71,8 +75,13 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         conversation.AddMessage(chatMessage);
 
         session.RecordActivity();
-        await _sessionRepository.UpdateAsync(session, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Persisted chat message {MessageId} in session {SessionId} from profile {SenderProfileId}",
+            chatMessage.Id,
+            session.Id,
+            senderProfileId);
 
         if (session.ChatStatus == ChatStatus.MemoOnly)
             return Result.Success();
@@ -137,15 +146,36 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         var participants = new List<Guid>();
         if (_currentUser.UserId.HasValue) participants.Add(_currentUser.UserId.Value);
         if (recipientUserId.HasValue) participants.Add(recipientUserId.Value);
+        var senderUserId = _currentUser.UserId;
 
         var distinctParticipants = participants.Distinct().ToList();
 
-        Console.WriteLine($"[SignalR_Debug] Broadcasting message {chatMessage.Id} to {distinctParticipants.Count} participants. RecipientUserId: {recipientUserId}");
+        _logger.LogInformation(
+            "Dispatching realtime chat message {MessageId} for session {SessionId} to {ParticipantCount} participants. RecipientUserId={RecipientUserId}",
+            chatMessage.Id,
+            session.Id,
+            distinctParticipants.Count,
+            recipientUserId);
+
+        if (!recipientUserId.HasValue)
+        {
+            _logger.LogWarning(
+                "No recipient user resolved for session {SessionId} and sender profile {SenderProfileId}. Realtime dispatch will only include sender user when available.",
+                session.Id,
+                senderProfileId);
+        }
 
         foreach (var userId in distinctParticipants)
         {
+            var targetProfileId = senderUserId.HasValue && userId == senderUserId.Value
+                ? senderProfileId
+                : isDoctor
+                    ? session.PatientId
+                    : session.OphthalmologistId ?? session.PatientId;
+
             await _chatHubService.BroadcastChatMessageAsync(
                 userId,
+                targetProfileId,
                 new ChatMessageRealtimeDto
                 {
                     SessionId = session.Id,

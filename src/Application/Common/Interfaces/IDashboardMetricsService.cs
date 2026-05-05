@@ -12,6 +12,7 @@ using Application.SystemAdmin.Dashboard.Queries.GetDoctorWorkloads;
 using Application.SystemAdmin.Dashboard.Queries.GetLiveQueue;
 using Application.SystemAdmin.Dashboard.Queries.GetSlotUtilization;
 using Application.SystemAdmin.Dashboard.Queries.GetTodaySummary;
+using Application.SystemAdmin.Dashboard.Queries.GetTransactionStats;
 using Application.Common.Models;
 using Domain.Enums;
 
@@ -48,4 +49,5 @@ public interface IDashboardMetricsService
     Task<SlotUtilizationDto> GetSlotUtilizationAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<LiveQueueItemDto>> GetLiveQueueAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<DoctorStatusDto>> GetDoctorStatusAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TransactionStatsDto>> GetTransactionStatsAsync(string period, CancellationToken cancellationToken = default);
 }

@@ -159,6 +159,26 @@ public class Appointment : BaseEntity, IAggregateRoot
     }
 
     /// <summary>
+    /// Reject a cancellation request (by admin).
+    /// Reverts status to Confirmed and clears refund info.
+    /// </summary>
+    public void RejectCancellation(string? reason = null)
+    {
+        if (Status != AppointmentStatus.CancellationRequested)
+            throw new InvalidOperationException("Only appointments with CancellationRequested status can be rejected.");
+
+        Status = AppointmentStatus.Confirmed;
+        RefundBankNumber = null;
+        RefundAccountName = null;
+        RefundBankName = null;
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            CancellationReason = $"[REJECTED] {reason} (Original: {CancellationReason})";
+        }
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
     /// Mark patient as no-show.
     /// </summary>
     public void MarkNoShow()
