@@ -60,7 +60,6 @@ public class PatientConfiguration : IEntityTypeConfiguration<Patient>
             .HasForeignKey(s => s.PatientId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Computed column — not mapped, EF ignores it
-        builder.Ignore(e => e.IsWalkIn);
+
     }
 }

@@ -144,10 +144,14 @@ public class FinalizeMedicalRecordCommandHandler : IRequestHandler<FinalizeMedic
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+            var tasks = new List<Func<Task>>();
+
             // 5. Send Email to Patient
             if (!string.IsNullOrEmpty(email))
             {
-                var emailBody = $@"
+                tasks.Add(async () =>
+                {
+                    var emailBody = $@"
                     <h3>Xin chào {patient.FullName},</h3>
                     <p>Hồ sơ bệnh án của bạn tại Aura Digital Clinic đã được hoàn thành.</p>
                     <p>Mã hồ sơ: <b>{record.MedicalRecordNumber}</b></p>
@@ -155,35 +159,38 @@ public class FinalizeMedicalRecordCommandHandler : IRequestHandler<FinalizeMedic
                     <br/>
                     <p>Trân trọng,<br/>Đội ngũ Aura Digital Clinic</p>";
 
-                await _emailService.SendWithAttachmentsAsync(
-                    email,
-                    "Hồ sơ bệnh án điện tử - Aura Digital Clinic",
-                    emailBody,
-                    new[] { new EmailAttachment(fileName, pdfBytes, "application/pdf") },
-                    true,
-                    cancellationToken);
+                    await _emailService.SendWithAttachmentsAsync(
+                        email,
+                        "Hồ sơ bệnh án điện tử - Aura Digital Clinic",
+                        emailBody,
+                        new[] { new EmailAttachment(fileName, pdfBytes, "application/pdf") },
+                        true,
+                        cancellationToken);
+                });
             }
 
             // 6. Send Notifications
             if (patient.UserId.HasValue)
             {
-                await _notificationService.SendAsync(
+                tasks.Add(() => _notificationService.SendAsync(
                     userId: patient.UserId.Value,
                     title: "Hồ sơ bệnh án đã hoàn thành",
                     message: $"Hồ sơ {record.MedicalRecordNumber} đã sẵn sàng. Bạn có thể xem trên ứng dụng hoặc email.",
                     type: NotificationType.ConsultationResultProvided, // Using existing type
                     payload: new { MedicalRecordId = record.Id, PdfUrl = relativePath },
-                    cancellationToken: cancellationToken);
+                    cancellationToken: cancellationToken));
             }
 
             // Notify Clinic Staff (Coordinator)
-            await _notificationService.SendToRoleAsync(
+            tasks.Add(() => _notificationService.SendToRoleAsync(
                 roleName: Application.Common.Constants.Roles.ClinicStaff,
                 title: "Medical Record Finalized",
                 message: $"Patient {patient.FullName}'s medical record ({record.MedicalRecordNumber}) has been locked and archived.",
                 type: NotificationType.SystemAlert,
                 payload: new { MedicalRecordId = record.Id, VisitId = record.PatientVisitId, Action = "cashier_payment_ready" },
-                cancellationToken: cancellationToken);
+                cancellationToken: cancellationToken));
+
+            await ExecuteFinalizeSideEffectsSafelyAsync(tasks, record.Id);
 
             return Result.Success();
         }
@@ -191,6 +198,34 @@ public class FinalizeMedicalRecordCommandHandler : IRequestHandler<FinalizeMedic
         {
             _logger.LogError(ex, "Error finalizing medical record {RecordId}", request.Id);
             return Result.Failure(ex.Message);
+        }
+    }
+
+    private async Task ExecuteFinalizeSideEffectsSafelyAsync(
+        IReadOnlyCollection<Func<Task>> tasks,
+        Guid recordId)
+    {
+        if (tasks.Count == 0)
+        {
+            return;
+        }
+
+        var sideEffectTasks = tasks.Select(task => ExecuteSideEffectSafelyAsync(task, recordId));
+        await Task.WhenAll(sideEffectTasks);
+    }
+
+    private async Task ExecuteSideEffectSafelyAsync(Func<Task> task, Guid recordId)
+    {
+        try
+        {
+            await task();
+        }
+        catch (Exception sideEffectEx)
+        {
+            _logger.LogWarning(
+                sideEffectEx,
+                "Finalize side effect failed for medical record {RecordId}",
+                recordId);
         }
     }
 }

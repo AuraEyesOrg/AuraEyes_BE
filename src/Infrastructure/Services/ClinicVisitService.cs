@@ -54,6 +54,39 @@ public class ClinicVisitService : IClinicVisitService
         try
         {
             var visit = await ResolveVisitAsync(order, cancellationToken);
+            
+            // Special handling for WALK-IN appointments: 
+            // If payment completes and no visit exists yet, it means it's the UPFRONT payment.
+            // We should auto-check-in the patient.
+            if (visit == null && order.AppointmentId.HasValue)
+            {
+                var appointment = await _appointmentRepository.GetByIdWithDetailsAsync(order.AppointmentId.Value, cancellationToken);
+                if (appointment != null)
+                {
+                    // Ensure Patient is loaded if not already
+                    if (appointment.Patient == null)
+                    {
+                        var patient = await _patientRepository.GetByIdAsync(appointment.PatientId, cancellationToken);
+                        if (patient != null)
+                        {
+                            // Using reflection or a private setter if necessary, but usually just setting the property works if public
+                            // appointment.Patient = patient; 
+                            // Actually, let's just check the patient record directly
+                            if (patient.IsWalkIn && (appointment.Status == AppointmentStatus.Pending || appointment.Status == AppointmentStatus.Confirmed))
+                            {
+                                await AutoCheckInWalkInAsync(appointment, cancellationToken);
+                                return;
+                            }
+                        }
+                    }
+                    else if (appointment.Patient.IsWalkIn && (appointment.Status == AppointmentStatus.Pending || appointment.Status == AppointmentStatus.Confirmed))
+                    {
+                        await AutoCheckInWalkInAsync(appointment, cancellationToken);
+                        return;
+                    }
+                }
+            }
+
             if (visit == null) return;
             
             // Allow both WaitingForPayment (PayOS flow) and Completed (Cash flow updated in handler)
@@ -108,7 +141,9 @@ public class ClinicVisitService : IClinicVisitService
         if (order.AppointmentId.HasValue)
         {
             var visitByAppt = await _patientVisitRepository.GetByAppointmentIdAsync(order.AppointmentId.Value, cancellationToken);
-            if (visitByAppt != null) return visitByAppt;
+            // If appointment is present, we ONLY want the visit linked to IT.
+            // If no visit exists for this appointment yet, we should return null to allow walk-in auto-check-in.
+            return visitByAppt;
         }
 
         // 2. Try resolving by METADATA in description (V: VisitId)
@@ -246,5 +281,20 @@ public class ClinicVisitService : IClinicVisitService
         {
             await _chatHubService.BroadcastRoomStateChangedAsync(role, payload, cancellationToken);
         }
+    }
+
+    private async Task AutoCheckInWalkInAsync(Appointment appointment, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Walk-in appointment {AppointmentId} fully paid. Auto-checking in.", appointment.Id);
+
+        // 1. Update appointment status
+        appointment.CheckIn();
+        await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
+
+        // 2. Create visit record
+        var newVisit = PatientVisit.CreateFromAppointment(appointment);
+        await _patientVisitRepository.AddAsync(newVisit, cancellationToken);
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }
