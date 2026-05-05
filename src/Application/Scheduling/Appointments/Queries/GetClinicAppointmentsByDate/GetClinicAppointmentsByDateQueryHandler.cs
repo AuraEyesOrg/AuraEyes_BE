@@ -229,8 +229,10 @@ public class GetClinicAppointmentsByDateQueryHandler
                 HasFeedback = false,
 
                 OphthalId = a.AppointmentSlot.OphthalId,
-                OphthalFullName = doc.FullName ?? "Clinic Doctor",
-                OphthalAvatarUrl = doc.AvatarUrl,
+                OphthalFullName = doc?.FullName != null 
+                    ? (doc.IsActive ? doc.FullName : $"{doc.FullName} (SUSPENDED)") 
+                    : "Clinic Doctor",
+                OphthalAvatarUrl = doc?.AvatarUrl,
 
                 OrderId = primaryOrder?.Id,
                 TotalAmount = totalAmount > 0 ? totalAmount : null,
