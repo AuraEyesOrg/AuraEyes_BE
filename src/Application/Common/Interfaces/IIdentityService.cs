@@ -241,7 +241,9 @@ public record UserAdminDto(
     bool IsActive,
     bool EmailConfirmed,
     DateTime CreatedAt,
-    DateTime? LastLoginAt
+    DateTime? LastLoginAt,
+    string? AvatarUrl = null,
+    string? ProviderAvatarUrl = null
 );
 
 /// <summary>

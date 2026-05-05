@@ -302,10 +302,18 @@ public class CreateClinicAppointmentCommandHandler
     {
         try
         {
+            var patientName = appointment.Patient?.FullName;
+            if (string.IsNullOrEmpty(patientName) && appointment.Patient?.UserId != null)
+            {
+                var userDto = await _identityService.GetUserByIdAsync(appointment.Patient.UserId.Value, cancellationToken);
+                patientName = userDto?.FullName;
+            }
+            patientName ??= "Bệnh nhân";
+
             await _notificationService.SendToRoleAsync(
                 roleName: Roles.ClinicStaff,
                 title: "New Patient in Queue",
-                message: $"Patient {appointment.Patient?.FullName ?? "Unknown"} has been added to the clinic queue.",
+                message: $"Patient {patientName} has been added to the clinic queue.",
                 type: NotificationType.SystemAlert,
                 payload: new { VisitId = visit.Id, PatientId = visit.PatientId },
                 cancellationToken: cancellationToken);

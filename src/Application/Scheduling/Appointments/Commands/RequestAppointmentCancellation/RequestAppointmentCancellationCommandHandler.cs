@@ -4,6 +4,7 @@ using Domain.Common;
 using Domain.Entities.Scheduling;
 using Domain.Enums;
 using Domain.Repositories;
+using Application.Common.Constants;
 
 namespace Application.Scheduling.Appointments.Commands.RequestAppointmentCancellation;
 
@@ -13,17 +14,26 @@ public class RequestAppointmentCancellationCommandHandler : ICommandHandler<Requ
     private readonly IOrderRepository _orderRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IIdentityService _identityService;
+    private readonly INotificationService _notificationService;
+    private readonly IOphthalmologistRepository _ophthalmologistRepository;
 
     public RequestAppointmentCancellationCommandHandler(
         IAppointmentRepository appointmentRepository,
         IOrderRepository orderRepository,
         IUnitOfWork unitOfWork,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IIdentityService identityService,
+        INotificationService notificationService,
+        IOphthalmologistRepository ophthalmologistRepository)
     {
         _appointmentRepository = appointmentRepository;
         _orderRepository = orderRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
+        _identityService = identityService;
+        _notificationService = notificationService;
+        _ophthalmologistRepository = ophthalmologistRepository;
     }
 
     public async Task<Result> Handle(RequestAppointmentCancellationCommand request, CancellationToken cancellationToken)
@@ -84,6 +94,53 @@ public class RequestAppointmentCancellationCommandHandler : ICommandHandler<Requ
 
         await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Send Notifications
+        var patientName = appointment.Patient?.FullName;
+        if (string.IsNullOrEmpty(patientName) && appointment.Patient?.UserId != null)
+        {
+            var user = await _identityService.GetUserByIdAsync(appointment.Patient.UserId.Value, cancellationToken);
+            patientName = user?.FullName;
+        }
+        patientName ??= "Bệnh nhân";
+
+        var notificationTitle = "Yêu cầu hoàn tiền lịch hẹn";
+        var notificationMessage = $"Bệnh nhân {patientName} đã yêu cầu hoàn tiền cho lịch hẹn vào lúc {appointment.AppointmentSlot?.StartTime:HH:mm} ngày {appointment.AppointmentSlot?.Date:dd/MM/yyyy}.";
+
+        // 1. Notify Admin
+        await _notificationService.SendToRoleAsync(
+            Roles.SystemAdmin,
+            notificationTitle,
+            notificationMessage,
+            NotificationType.AppointmentCancelled,
+            new { AppointmentId = appointment.Id, PatientName = patientName },
+            cancellationToken);
+
+        // 2. Notify Receptionists (ClinicStaff role)
+        await _notificationService.SendToRoleAsync(
+            Roles.ClinicStaff,
+            notificationTitle,
+            notificationMessage,
+            NotificationType.AppointmentCancelled,
+            new { AppointmentId = appointment.Id, PatientName = patientName },
+            cancellationToken);
+
+        // 3. Notify Assigned Doctor
+        var ophthalmologistId = appointment.RequestedDoctorId ?? appointment.AppointmentSlot?.OphthalId;
+        if (ophthalmologistId.HasValue)
+        {
+            var ophthalmologist = await _ophthalmologistRepository.GetByIdAsync(ophthalmologistId.Value, cancellationToken);
+            if (ophthalmologist != null)
+            {
+                await _notificationService.SendAsync(
+                    ophthalmologist.UserId,
+                    notificationTitle,
+                    notificationMessage,
+                    NotificationType.AppointmentCancelled,
+                    new { AppointmentId = appointment.Id, PatientName = patientName },
+                    cancellationToken);
+            }
+        }
 
         return Result.Success();
     }

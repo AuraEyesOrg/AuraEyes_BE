@@ -3,6 +3,7 @@ using Application.Common.Models;
 using Domain.Common;
 using Domain.Enums;
 using Domain.Repositories;
+using Application.Common.Constants;
 
 namespace Application.Scheduling.Appointments.Commands.ConfirmAppointmentCancellation;
 
@@ -12,6 +13,8 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
     private readonly IOrderRepository _orderRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
+
+    private readonly IIdentityService _identityService;
     private readonly INotificationService _notificationService;
 
     public ConfirmAppointmentCancellationCommandHandler(
@@ -19,12 +22,14 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
         IOrderRepository orderRepository,
         IUnitOfWork unitOfWork,
         ICurrentUserService currentUserService,
+        IIdentityService identityService,
         INotificationService notificationService)
     {
         _appointmentRepository = appointmentRepository;
         _orderRepository = orderRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
+        _identityService = identityService;
         _notificationService = notificationService;
     }
 
@@ -92,17 +97,25 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
 
         // Send notification to patient
         var targetUserId = appointment.Patient?.UserId;
-        if (targetUserId.HasValue)
+        // Notify Patient - Kết hợp thông tin số tiền và logic auto-refresh
+        if (appointment.Patient?.UserId != null)
         {
+            var title = "Hoàn tiền thành công";
+            var message = $"Yêu cầu hoàn tiền cho lịch hẹn vào lúc {appointment.AppointmentSlot?.StartTime:HH:mm} ngày {appointment.AppointmentSlot?.Date:dd/MM/yyyy} đã được duyệt. Số tiền: {totalRefunded:N0} VNĐ.";
+
             await _notificationService.SendAsync(
-                targetUserId.Value,
-                "Hoàn tiền thành công",
-                $"Yêu cầu hoàn tiền cho lịch khám ngày {appointment.AppointmentSlot?.Date:dd/MM/yyyy} đã được duyệt. Số tiền: {totalRefunded:N0} VNĐ.",
-                NotificationType.ScheduleChanged,
-                new { AppointmentId = appointment.Id, Action = "RefundConfirmed" },
+                appointment.Patient.UserId.Value,
+                title,
+                message,
+                NotificationType.RefundProcessed, // Dùng Type mới của develop
+                new { 
+                    AppointmentId = appointment.Id, 
+                    Action = "RefundConfirmed" // Giữ Action này để Frontend tự reload status
+                },
                 cancellationToken,
                 appointment.Id);
         }
+
 
         return Result.Success();
     }

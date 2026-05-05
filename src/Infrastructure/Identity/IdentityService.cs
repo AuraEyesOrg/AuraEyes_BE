@@ -662,6 +662,9 @@ public class IdentityService : IIdentityService
                 continue;
             }
 
+            var claims = await _userManager.GetClaimsAsync(user);
+            var providerAvatar = claims.FirstOrDefault(c => c.Type == ProviderAvatarClaimType)?.Value;
+
             items.Add(new UserAdminDto(
                 user.Id,
                 user.Email ?? string.Empty,
@@ -672,7 +675,9 @@ public class IdentityService : IIdentityService
                 user.IsActive,
                 user.EmailConfirmed,
                 user.CreatedAt,
-                user.LastLoginAt
+                user.LastLoginAt,
+                user.AvatarUrl,
+                providerAvatar
             ));
         }
         return items;
