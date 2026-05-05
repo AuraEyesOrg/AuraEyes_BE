@@ -59,7 +59,7 @@ public class SubmitVerificationReportCommandHandler
 
         var prescriptionResult = ProcessPrescription(request);
         if (!prescriptionResult.IsSuccess) return prescriptionResult.ToResult();
-        var (isFinalized, finalizedAtUtc, prescriptionSnapshot, normalizedItems) = prescriptionResult.Data;
+        var (isFinalized, finalizedAtUtc, normalizedItems) = prescriptionResult.Data;
 
         var doctorUser = await _identityService.GetUserByIdAsync(request.DoctorId, cancellationToken);
         var doctorName = doctorUser?.FullName?.Trim();
@@ -67,7 +67,7 @@ public class SubmitVerificationReportCommandHandler
         var diagnosisSnapshot = CreateDiagnosisSnapshot(request, normalizedItems, doctorName, finalizedAtUtc);
         var diagnosisSnapshotJson = JsonSerializer.Serialize(diagnosisSnapshot);
 
-        var normalizedLifestyleAdvice = CombineLifestyleAdvice(request, prescriptionSnapshot, isFinalized, diagnosisSnapshotJson);
+        var normalizedLifestyleAdvice = CombineLifestyleAdvice(request, isFinalized, diagnosisSnapshotJson);
 
         var screening = await _screeningRepository.GetByIdAsync(session.AiScreeningId!.Value, cancellationToken);
         if (screening is null) return Result.NotFound($"AI screening '{session.AiScreeningId.Value}' was not found.");
@@ -121,7 +121,7 @@ public class SubmitVerificationReportCommandHandler
         return Result<ConsultationSession>.Success(session);
     }
 
-    private static Result<(bool IsFinalized, DateTime? FinalizedAt, string? Snapshot, List<PrescriptionItemInput> Items)> ProcessPrescription(SubmitVerificationReportCommand request)
+    private static Result<(bool IsFinalized, DateTime? FinalizedAt, List<PrescriptionItemInput> Items)> ProcessPrescription(SubmitVerificationReportCommand request)
     {
         var isFinalized = request.Status?.Equals("Finalized", StringComparison.OrdinalIgnoreCase) == true;
         var finalizedAtUtc = request.FinalizedAt ?? (isFinalized ? DateTime.UtcNow : null);
@@ -139,48 +139,33 @@ public class SubmitVerificationReportCommandHandler
             .Where(item => !string.IsNullOrWhiteSpace(item.MedicineName) || !string.IsNullOrWhiteSpace(item.Unit) || !string.IsNullOrWhiteSpace(item.Dosage) || !string.IsNullOrWhiteSpace(item.Frequency) || !string.IsNullOrWhiteSpace(item.Duration) || !string.IsNullOrWhiteSpace(item.Instruction))
             .ToList();
 
-        if (isFinalized && !request.NoMedicationPrescribed && normalizedItems.Count == 0)
-            return Result<(bool, DateTime?, string?, List<PrescriptionItemInput>)>.Failure("At least one prescription item is required to finalize this report.");
-
-        if (isFinalized && !request.NoMedicationPrescribed && normalizedItems.Any(item => string.IsNullOrWhiteSpace(item.MedicineName) || string.IsNullOrWhiteSpace(item.Dosage) || string.IsNullOrWhiteSpace(item.Frequency) || string.IsNullOrWhiteSpace(item.Duration)))
-            return Result<(bool, DateTime?, string?, List<PrescriptionItemInput>)>.Failure("Each prescription item must include medicine name, dosage, frequency, and duration.");
-
-        var snapshot = normalizedItems.Count > 0 || request.NoMedicationPrescribed || !string.IsNullOrWhiteSpace(request.PrescriptionNote)
-            ? JsonSerializer.Serialize(new { request.NoMedicationPrescribed, PrescriptionNote = request.PrescriptionNote?.Trim(), Items = normalizedItems })
-            : null;
-
-        return Result<(bool, DateTime?, string?, List<PrescriptionItemInput>)>.Success((isFinalized, finalizedAtUtc, snapshot, normalizedItems));
+        return Result<(bool, DateTime?, List<PrescriptionItemInput>)>.Success((isFinalized, finalizedAtUtc, normalizedItems));
     }
 
     private static FinalizedDiagnosisSnapshot CreateDiagnosisSnapshot(SubmitVerificationReportCommand request, List<PrescriptionItemInput> items, string? doctorName, DateTime? finalizedAt)
     {
         return new FinalizedDiagnosisSnapshot
         {
-            DiagnosisCode = (request.DiagnosisCode ?? request.DiagnosesCode)?.Trim(),
-            CodingSystem = request.CodingSystem?.Trim(),
-            ClinicalFindings = (request.ClinicalFindings ?? request.DiagnosesText)?.Trim(),
-            SeverityLevel = request.SeverityLevel?.Trim(),
+            // Only store fields NOT available in the table columns to avoid redundancy
             PrescriptionItems = items.Select(item => new PrescriptionItemSnapshot { MedicineName = item.MedicineName ?? string.Empty, Unit = item.Unit, Dosage = item.Dosage ?? string.Empty, Frequency = item.Frequency ?? string.Empty, Duration = item.Duration ?? string.Empty, Instruction = item.Instruction }).ToList(),
             PrescriptionNote = request.PrescriptionNote?.Trim(),
             NoMedicationPrescribed = request.NoMedicationPrescribed,
-            Recommendations = request.Recommendations?.Trim(),
-            FollowUpDate = request.FollowUpDate,
             DiagnosedBy = new DiagnosedBySnapshot { DoctorId = request.DoctorId, DoctorName = doctorName },
             FinalizedAt = finalizedAt
         };
     }
 
-    private static string? CombineLifestyleAdvice(SubmitVerificationReportCommand request, string? prescriptionSnapshot, bool isFinalized, string diagnosisSnapshotJson)
+    private static string? CombineLifestyleAdvice(SubmitVerificationReportCommand request, bool isFinalized, string diagnosisSnapshotJson)
     {
         var advice = request.LifestyleAdvice?.Trim();
-        if (!string.IsNullOrWhiteSpace(prescriptionSnapshot))
-        {
-            advice = string.IsNullOrWhiteSpace(advice) ? $"PRESCRIPTION_JSON::{prescriptionSnapshot}" : $"{advice}\n\nPRESCRIPTION_JSON::{prescriptionSnapshot}";
-        }
+        
+        // We only use the DIAGNOSIS_SNAPSHOT_JSON marker now as it contains everything (including prescription)
+        // This avoids double serialization and keeps the database column lean.
         if (isFinalized)
         {
             advice = string.IsNullOrWhiteSpace(advice) ? $"DIAGNOSIS_SNAPSHOT_JSON::{diagnosisSnapshotJson}" : $"{advice}\n\nDIAGNOSIS_SNAPSHOT_JSON::{diagnosisSnapshotJson}";
         }
+        
         return advice;
     }
 
@@ -261,15 +246,9 @@ public class SubmitVerificationReportCommandHandler
 
 public sealed class FinalizedDiagnosisSnapshot
 {
-    public string? DiagnosisCode { get; init; }
-    public string? CodingSystem { get; init; }
-    public string? ClinicalFindings { get; init; }
-    public string? SeverityLevel { get; init; }
     public IReadOnlyList<PrescriptionItemSnapshot> PrescriptionItems { get; init; } = Array.Empty<PrescriptionItemSnapshot>();
     public string? PrescriptionNote { get; init; }
     public bool NoMedicationPrescribed { get; init; }
-    public string? Recommendations { get; init; }
-    public DateTime? FollowUpDate { get; init; }
     public DiagnosedBySnapshot DiagnosedBy { get; init; } = new();
     public DateTime? FinalizedAt { get; init; }
 }

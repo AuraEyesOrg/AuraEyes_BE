@@ -49,7 +49,7 @@ public class ClinicAppointmentsController : BaseApiController
     }
 
     [HttpDelete("{appointmentId:guid}")]
-    [AuthorizePermission(Permissions.AppointmentsManage)]
+    [AuthorizePermission(Permissions.AppointmentsManage, Permissions.AppointmentsCreate)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> CancelClinicAppointment(
         Guid appointmentId,

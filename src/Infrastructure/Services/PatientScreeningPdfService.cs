@@ -143,7 +143,7 @@ public sealed class PatientScreeningPdfService : IPatientScreeningPdfService
             column.Item().PaddingBottom(4).LineHorizontal(1).LineColor(Border);
 
             ComposeInfoRow(column, "Patient Name", model.PatientName);
-            ComposeInfoRow(column, "Patient ID", model.PatientId.ToString());
+            // Patient ID is hidden per user request for a cleaner report
         });
     }
 
@@ -158,7 +158,7 @@ public sealed class PatientScreeningPdfService : IPatientScreeningPdfService
                 .FontColor(BrandBlue);
             column.Item().PaddingBottom(4).LineHorizontal(1).LineColor(Border);
 
-            ComposeInfoRow(column, "Screening ID", model.ScreeningId.ToString());
+            // Screening ID is hidden per user request
             ComposeInfoRow(column, "Model Version", string.IsNullOrWhiteSpace(model.ModelVersion) ? "N/A" : model.ModelVersion);
             ComposeInfoRow(column, "Session Created", FormatReportDateTime(model.CreatedAt));
             ComposeInfoRow(column, "Reported By", string.IsNullOrWhiteSpace(model.ReportedByDoctorName) ? "N/A" : model.ReportedByDoctorName);
@@ -288,8 +288,110 @@ public sealed class PatientScreeningPdfService : IPatientScreeningPdfService
             column.Item().Element(c => ComposeLongFormText(c, "Recommendations", model.Recommendations));
 
             if (!string.IsNullOrWhiteSpace(model.LifestyleAdvice))
-                column.Item().Element(c => ComposeLongFormText(c, "Lifestyle Advice", model.LifestyleAdvice));
+            {
+                var formattedAdvice = TryParseLifestyleAdvice(model.LifestyleAdvice);
+                column.Item().Element(c => ComposeLongFormText(c, "Lifestyle Advice & Prescription", formattedAdvice));
+            }
         });
+    }
+
+    private string? TryParseLifestyleAdvice(string rawAdvice)
+    {
+        if (string.IsNullOrWhiteSpace(rawAdvice)) return null;
+
+        const string JsonPrefix = "DIAGNOSIS_SNAPSHOT_JSON:";
+        
+        // If it doesn't contain our special prefix, just return as is
+        if (!rawAdvice.Contains(JsonPrefix, StringComparison.OrdinalIgnoreCase))
+            return rawAdvice;
+
+        try
+        {
+            // Find the actual JSON boundaries
+            var jsonStart = rawAdvice.IndexOf('{');
+            var jsonEnd = rawAdvice.LastIndexOf('}');
+            
+            if (jsonStart == -1 || jsonEnd == -1 || jsonEnd <= jsonStart)
+                return rawAdvice;
+
+            var json = rawAdvice[jsonStart..(jsonEnd + 1)];
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var sb = new System.Text.StringBuilder();
+
+            // 1. Process any text that appeared BEFORE the JSON (if it wasn't just the prefix)
+            var prefixPos = rawAdvice.IndexOf(JsonPrefix, StringComparison.OrdinalIgnoreCase);
+            var preText = rawAdvice[..jsonStart]
+                .Replace(JsonPrefix, "", StringComparison.OrdinalIgnoreCase)
+                .Trim(' ', ':', '\r', '\n', '\t');
+                
+            if (!string.IsNullOrWhiteSpace(preText))
+            {
+                sb.AppendLine("GHI CHÚ CHẨN ĐOÁN:");
+                sb.AppendLine(preText);
+                sb.AppendLine();
+            }
+
+            // 2. Process Prescriptions
+            if (root.TryGetProperty("PrescriptionItems", out var prescriptions) && prescriptions.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                var items = prescriptions.EnumerateArray().ToList();
+                if (items.Count > 0)
+                {
+                    sb.AppendLine("TOA THUỐC CHI TIẾT:");
+                    foreach (var item in items)
+                    {
+                        var name = item.TryGetProperty("MedicineName", out var n) ? n.GetString() : "Thuốc không rõ tên";
+                        var dosage = item.TryGetProperty("Dosage", out var d) ? d.GetString() : "";
+                        var freq = item.TryGetProperty("Frequency", out var f) ? f.GetString() : "";
+                        var duration = item.TryGetProperty("Duration", out var dur) ? dur.GetString() : "";
+                        var instruction = item.TryGetProperty("Instruction", out var ins) ? ins.GetString() : "";
+
+                        sb.Append($"- {name}");
+                        if (!string.IsNullOrWhiteSpace(dosage)) sb.Append($" ({dosage})");
+                        if (!string.IsNullOrWhiteSpace(freq)) sb.Append($" | {freq}");
+                        if (!string.IsNullOrWhiteSpace(duration)) sb.Append($", dùng trong {duration} ngày");
+                        sb.AppendLine();
+                        
+                        if (!string.IsNullOrWhiteSpace(instruction))
+                            sb.AppendLine($"  • Hướng dẫn: {instruction}");
+                    }
+                    sb.AppendLine();
+                }
+            }
+
+            // 3. Process Lifestyle Advice
+            if (root.TryGetProperty("LifestyleAdvice", out var advice) && advice.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                var adviceText = advice.GetString();
+                if (!string.IsNullOrWhiteSpace(adviceText))
+                {
+                    sb.AppendLine("LỜI KHUYÊN & LỐI SỐNG:");
+                    sb.AppendLine(adviceText);
+                    sb.AppendLine();
+                }
+            }
+            
+            // 4. Process any extra notes
+            if (root.TryGetProperty("PrescriptionNote", out var note) && note.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                var noteText = note.GetString();
+                if (!string.IsNullOrWhiteSpace(noteText))
+                {
+                    sb.AppendLine("GHI CHÚ THÊM:");
+                    sb.AppendLine(noteText);
+                }
+            }
+
+            var result = sb.ToString().Trim();
+            return string.IsNullOrWhiteSpace(result) ? rawAdvice : result;
+        }
+        catch
+        {
+            // If anything fails during parsing, fallback to raw text but try to strip the prefix for a bit better look
+            return rawAdvice.Replace(JsonPrefix, "").Trim();
+        }
     }
 
     private void ComposeRetinalImagesSection(

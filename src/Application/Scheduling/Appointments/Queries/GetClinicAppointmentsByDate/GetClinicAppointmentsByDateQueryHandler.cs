@@ -226,11 +226,13 @@ public class GetClinicAppointmentsByDateQueryHandler
                 VisitStatus = visitStatus,
                 FlowState = flowState,
                 CreatedAt = a.CreatedAt,
-                HasFeedback = false,
+                // SubmittedFeedbackTargets defaults to empty; HasFeedback is computed from it
 
                 OphthalId = a.AppointmentSlot.OphthalId,
-                OphthalFullName = doc.FullName ?? "Clinic Doctor",
-                OphthalAvatarUrl = doc.AvatarUrl,
+                OphthalFullName = doc?.FullName != null 
+                    ? (doc.IsActive ? doc.FullName : $"{doc.FullName} (SUSPENDED)") 
+                    : "Clinic Doctor",
+                OphthalAvatarUrl = doc?.AvatarUrl,
 
                 OrderId = primaryOrder?.Id,
                 TotalAmount = totalAmount > 0 ? totalAmount : null,

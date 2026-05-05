@@ -32,10 +32,9 @@ public class ClinicAppointmentDto
     public Guid? StaffId { get; init; }
     public string? StaffName { get; init; }
 
-    /// <summary>
-    /// True when the current patient has already submitted feedback for this
-    /// </summary>
-    public bool HasFeedback { get; init; }
+    public IReadOnlyCollection<string> SubmittedFeedbackTargets { get; init; } = Array.Empty<string>();
+
+    public bool HasFeedback => SubmittedFeedbackTargets.Count > 0;
 
     // Billing info for Clinic Staff
     public Guid? OrderId { get; init; }

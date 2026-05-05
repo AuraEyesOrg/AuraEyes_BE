@@ -135,6 +135,7 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
                         user.FullName,
                         user.AvatarUrl,
                         ProviderAvatarUrl = c != null ? c.ClaimValue : null,
+                        user.IsActive,
                         ophthalmologist.Bio,
                         ophthalmologist.RatingAverage,
                         ophthalmologist.RatingCount,
@@ -152,7 +153,8 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
                 x.Bio,
                 x.RatingAverage,
                 x.RatingCount,
-                x.Certificates));
+                x.Certificates,
+                x.IsActive));
     }
     public async Task<List<ConsiliumDoctorDetail>> GetAvailableDoctorsForConsiliumAsync(
         DateTime windowStart,
