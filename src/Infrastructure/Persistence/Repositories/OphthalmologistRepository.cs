@@ -126,12 +126,15 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
 
         var query = from ophthalmologist in _dbSet.AsNoTracking().Include(o => o.Certificates)
                     join user in _context.Users on ophthalmologist.UserId equals user.Id
+                    join claim in _context.UserClaims on user.Id equals claim.UserId into claims
+                    from c in claims.Where(x => x.ClaimType == "provider_avatar_url").DefaultIfEmpty()
                     where uniqueIds.Contains(ophthalmologist.Id) && !user.IsDeleted
                     select new
                     {
                         ophthalmologist.Id,
                         user.FullName,
                         user.AvatarUrl,
+                        ProviderAvatarUrl = c != null ? c.ClaimValue : null,
                         user.IsActive,
                         ophthalmologist.Bio,
                         ophthalmologist.RatingAverage,
@@ -146,6 +149,7 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
             x => new EnhancedDoctorDetail(
                 x.FullName ?? "Unknown",
                 x.AvatarUrl,
+                x.ProviderAvatarUrl,
                 x.Bio,
                 x.RatingAverage,
                 x.RatingCount,

@@ -28,6 +28,7 @@ public class SendToDoctorCommandHandler
     private readonly IConsultationSessionRepository _consultationSessionRepository;
     private readonly IMedicalRecordRepository _medicalRecordRepository;
     private readonly IRepository<Ophthalmologist> _ophthalmologistRepository;
+    private readonly IIdentityService _identityService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
 
@@ -37,6 +38,7 @@ public class SendToDoctorCommandHandler
         IConsultationSessionRepository consultationSessionRepository,
         IMedicalRecordRepository medicalRecordRepository,
         IRepository<Ophthalmologist> ophthalmologistRepository,
+        IIdentityService identityService,
         IUnitOfWork unitOfWork,
         INotificationService notificationService)
     {
@@ -45,6 +47,7 @@ public class SendToDoctorCommandHandler
         _consultationSessionRepository = consultationSessionRepository;
         _medicalRecordRepository = medicalRecordRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
+        _identityService = identityService;
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
     }
@@ -138,10 +141,18 @@ public class SendToDoctorCommandHandler
 
                 await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
 
+                var patientName = visit.Patient?.FullName;
+                if (string.IsNullOrEmpty(patientName) && visit.Patient?.UserId != null)
+                {
+                    var userDto = await _identityService.GetUserByIdAsync(visit.Patient.UserId.Value, cancellationToken);
+                    patientName = userDto?.FullName;
+                }
+                patientName ??= "Bệnh nhân";
+
                 await _notificationService.SendAsync(
                     userId: doctor!.UserId,
                     title: "New Case Assigned",
-                    message: $"You have been assigned a new case for patient {visit.Patient?.FullName ?? "Unknown"}.",
+                    message: $"You have been assigned a new case for patient {patientName}.",
                     type: NotificationType.NewConsultationRequest,
                     payload: new
                     {
@@ -205,13 +216,20 @@ public class SendToDoctorCommandHandler
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // Notify doctor if assigned
         if (request.DoctorId.HasValue)
         {
+            var patientName = visit.Patient?.FullName;
+            if (string.IsNullOrEmpty(patientName) && visit.Patient?.UserId != null)
+            {
+                var userDto = await _identityService.GetUserByIdAsync(visit.Patient.UserId.Value, cancellationToken);
+                patientName = userDto?.FullName;
+            }
+            patientName ??= "Bệnh nhân";
+
             await _notificationService.SendAsync(
                 userId: doctor!.UserId, // doctor is queried earlier
                 title: "New Case Assigned",
-                message: $"You have been assigned a new case for patient {visit.Patient?.FullName ?? "Unknown"}.",
+                message: $"You have been assigned a new case for patient {patientName}.",
                 type: NotificationType.NewConsultationRequest, // or ConsultationAssigned if it exists
                 payload: new
                 {

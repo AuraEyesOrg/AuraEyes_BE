@@ -55,6 +55,7 @@ public class GetClinicScheduleQueryHandler : IQueryHandler<GetClinicScheduleQuer
                             ? (ophthalMeta.IsActive ? ophthalMeta.FullName : $"{ophthalMeta.FullName} (SUSPENDED)") 
                             : "Aura Doctor",
                         DoctorAvatar = ophthalMeta?.AvatarUrl,
+                        ProviderAvatarUrl = ophthalMeta?.ProviderAvatarUrl,
                         IsBooked = s.BookedCount >= s.MaxCapacity,
                         Price = s.Cost ?? 0,
                         Bio = ophthalMeta?.Bio,
@@ -69,7 +70,8 @@ public class GetClinicScheduleQueryHandler : IQueryHandler<GetClinicScheduleQuer
                             IssuingAuthority = c.IssuingAuthority,
                             IssuedDate = c.IssuedDate,
                             ExpiryDate = c.ExpiryDate,
-                            CertificateUrl = c.CertificateUrl
+                            CertificateUrl = c.CertificateUrl,
+                            LicenseNumber = c.LicenseNumber
                         }).ToList() ?? new List<CertificateDto>()
                     };
                 }).ToList()
