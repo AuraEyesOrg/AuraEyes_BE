@@ -79,34 +79,54 @@ public class GoogleMeetService : IGoogleMeetService, IDisposable
                 .ToList();
         }
 
-        var request = _calendarService.Events.Insert(calendarEvent, _settings.CalendarId);
-        request.ConferenceDataVersion = 1;
-        request.SendUpdates = EventsResource.InsertRequest.SendUpdatesEnum.All;
-
-        var createdEvent = await request.ExecuteAsync(cancellationToken);
-
-        var meetLink = ExtractMeetLink(createdEvent);
-
-        if (string.IsNullOrEmpty(meetLink))
+        try
         {
-            meetLink = await RetryGetMeetLinkAsync(createdEvent.Id, cancellationToken);
-        }
+            var request = _calendarService.Events.Insert(calendarEvent, _settings.CalendarId);
+            request.ConferenceDataVersion = 1;
+            request.SendUpdates = EventsResource.InsertRequest.SendUpdatesEnum.All;
 
-        if (string.IsNullOrEmpty(meetLink))
+            var createdEvent = await request.ExecuteAsync(cancellationToken);
+
+            var meetLink = ExtractMeetLink(createdEvent);
+
+            if (string.IsNullOrEmpty(meetLink))
+            {
+                meetLink = await RetryGetMeetLinkAsync(createdEvent.Id, cancellationToken);
+            }
+
+            if (string.IsNullOrEmpty(meetLink))
+            {
+                await CleanupOrphanedEventAsync(createdEvent.Id, cancellationToken);
+
+                throw new InvalidOperationException(
+                    "Failed to generate Google Meet link after retries. " +
+                    "The orphaned calendar event has been cleaned up. " +
+                    "Ensure the Google Workspace account has Google Meet enabled.");
+            }
+
+            _logger.LogInformation(
+                "Google Meet created: {MeetLink} (event {EventId}, attendees: {Attendees})",
+                meetLink, createdEvent.Id, string.Join(", ", attendeeEmails ?? []));
+
+            return new MeetingInfo(meetLink, createdEvent.Id);
+        }
+        catch (Google.GoogleApiException ex)
         {
-            await CleanupOrphanedEventAsync(createdEvent.Id, cancellationToken);
-
-            throw new InvalidOperationException(
-                "Failed to generate Google Meet link after retries. " +
-                "The orphaned calendar event has been cleaned up. " +
-                "Ensure the Google Workspace account has Google Meet enabled.");
+            _logger.LogError(ex, "Google API error occurred while creating meeting: {Message}. Detail: {ErrorDetail}", 
+                ex.Message, ex.Error?.ToString());
+            
+            if (ex.Error?.Errors?.Any(e => e.Reason == "authError" || e.Message.Contains("invalid_grant")) == true)
+            {
+                throw new InvalidOperationException("Google authentication failed (invalid_grant). Please check if the RefreshToken is valid.", ex);
+            }
+            
+            throw;
         }
-
-        _logger.LogInformation(
-            "Google Meet created: {MeetLink} (event {EventId}, attendees: {Attendees})",
-            meetLink, createdEvent.Id, string.Join(", ", attendeeEmails ?? []));
-
-        return new MeetingInfo(meetLink, createdEvent.Id);
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error occurred while creating Google Meet meeting");
+            throw;
+        }
     }
 
     public async Task DeleteMeetingAsync(
