@@ -130,6 +130,13 @@ public class GetClinicAppointmentsByDateQueryHandler
             bool isPaidDeposit = appointmentOrders.Count == 0
                 || appointmentOrders.All(o => o.IsClinicDepositSatisfiedForCheckIn());
 
+            // Special case: for walk-in appointments, we require 100% payment (FullyPaid) 
+            // before we consider the "deposit" (which is the full price) as satisfied for check-in.
+            if (a.Patient?.IsWalkIn == true && appointmentOrders.Count > 0)
+            {
+                isPaidDeposit = appointmentOrders.All(o => o.Status == OrderStatus.Completed);
+            }
+
             visitMap.TryGetValue(a.Id, out var visit);
 
             string? flowState = null;
@@ -180,13 +187,26 @@ public class GetClinicAppointmentsByDateQueryHandler
             string patientName = "Patient";
             if (a.Patient != null)
             {
-                if (a.Patient.IsWalkIn)
+                // Try Identity system first
+                if (a.Patient.UserId.HasValue && userMap.TryGetValue(a.Patient.UserId.Value, out var user))
                 {
-                    patientName = a.Patient.FullName ?? "Patient";
+                    if (!string.IsNullOrWhiteSpace(user.FullName))
+                    {
+                        patientName = user.FullName;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(a.Patient.FullName))
+                    {
+                        patientName = a.Patient.FullName;
+                    }
+                    else
+                    {
+                        patientName = user.Email ?? "Patient";
+                    }
                 }
-                else if (a.Patient.UserId.HasValue && userMap.TryGetValue(a.Patient.UserId.Value, out var user))
+                // Fallback to Patient profile name (especially for legacy walk-ins)
+                else if (!string.IsNullOrWhiteSpace(a.Patient.FullName))
                 {
-                    patientName = !string.IsNullOrWhiteSpace(user.FullName) ? user.FullName : (user.Email ?? "Patient");
+                    patientName = a.Patient.FullName!;
                 }
             }
 
@@ -196,6 +216,7 @@ public class GetClinicAppointmentsByDateQueryHandler
                 PatientId = a.PatientId,
                 PatientName = patientName,
                 PatientAvatarUrl = null,
+                IsWalkIn = a.Patient?.IsWalkIn ?? false,
                 SlotId = a.AppointmentSlotId,
                 Date = a.AppointmentSlot!.Date,
                 StartTime = a.AppointmentSlot.StartTime,

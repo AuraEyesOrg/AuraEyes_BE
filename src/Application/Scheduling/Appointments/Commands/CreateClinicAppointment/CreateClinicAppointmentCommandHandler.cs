@@ -130,7 +130,7 @@ public class CreateClinicAppointmentCommandHandler
         if (!pricingResult.IsSuccess) throw new InvalidOperationException(pricingResult.ErrorMessage);
         var (price, finalDoctorId, finalPricingType) = pricingResult.Data;
 
-        decimal? depositAmount = patientData.IsWalkIn ? null : Math.Max(1, Math.Round(price * DepositRatio, 0));
+        decimal? depositAmount = patientData.IsWalkIn ? price : Math.Max(1, Math.Round(price * DepositRatio, 0));
 
         slot.BookWithCapacity();
         var appointment = new Appointment(patientData.ProfileId, request.SlotId, price, finalPricingType, finalDoctorId, request.VisitReason);
@@ -138,7 +138,7 @@ public class CreateClinicAppointmentCommandHandler
         await _appointmentSlotRepository.UpdateAsync(slot, cancellationToken);
 
         var order = await CreateOrderAndPaymentAsync(appointment, patientData, price, depositAmount, slot, cancellationToken);
-        var visit = await CreateVisitIfWalkInAsync(appointment, patientData.IsWalkIn, cancellationToken);
+        // var visit = await CreateVisitIfWalkInAsync(appointment, patientData.IsWalkIn, cancellationToken);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -154,13 +154,13 @@ public class CreateClinicAppointmentCommandHandler
             patientData.IsWalkIn ? "Walk-in" : "Online", appointment.Id, patientData.ProfileId, order.Id);
 
         await SendBookingNotificationAsync(appointment, patientData.NotifyUserId, slot, request.VisitReason, patientData.IsWalkIn, cancellationToken);
-        if (visit != null) await SendQueueNotificationAsync(appointment, visit, cancellationToken);
+        // if (visit != null) await SendQueueNotificationAsync(appointment, visit, cancellationToken);
 
         return new CreateClinicAppointmentResult
         {
             AppointmentId = appointment.Id,
-            VisitId = visit?.Id,
-            Status = visit?.Status.ToString() ?? appointment.Status.ToString(),
+            VisitId = null,
+            Status = appointment.Status.ToString(),
             PaymentUrl = paymentUrl,
             OrderId = order.Id,
             DepositAmount = depositAmount,
