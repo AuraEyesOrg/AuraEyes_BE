@@ -15,7 +15,7 @@ public class PatientVisitConfiguration : IEntityTypeConfiguration<PatientVisit>
             .HasMaxLength(20);
 
         builder.Property(e => e.Notes)
-            .HasMaxLength(2000);
+            .HasColumnType("text");
 
         builder.Property(e => e.IsDeleted)
             .HasDefaultValue(false);

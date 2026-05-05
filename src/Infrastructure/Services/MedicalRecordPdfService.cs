@@ -78,7 +78,7 @@ public class MedicalRecordPdfService : IMedicalRecordPdfService
             ComposeMedicalHistorySection(col, adminData, clinicalData);
             ComposeExaminationSection(col, clinicalData);
             ComposePrescriptionSection(col, clinicalData);
-            ComposeTreatmentPlanSection(col, model);
+            ComposeTreatmentPlanSection(col, clinicalData, model);
             ComposeSignatures(col, adminData, clinicalData, model);
         });
     }
@@ -370,12 +370,41 @@ public class MedicalRecordPdfService : IMedicalRecordPdfService
         }
     }
 
-    private void ComposeTreatmentPlanSection(ColumnDescriptor col, MedicalRecordPdfModel model)
+    private void ComposeTreatmentPlanSection(ColumnDescriptor col, Dictionary<string, object> clinicalData, MedicalRecordPdfModel model)
     {
-        if (!string.IsNullOrWhiteSpace(model.TreatmentPlan))
+        var hasPlan = !string.IsNullOrWhiteSpace(model.TreatmentPlan);
+        var followUpDateRaw = clinicalData.GetValueOrDefault("followUpDate")?.ToString();
+        var hasFollowUp = !string.IsNullOrWhiteSpace(followUpDateRaw);
+
+        if (hasPlan || hasFollowUp)
         {
             col.Item().PaddingTop(8).Text("V. LỜI DẶN / TÁI KHÁM").SemiBold();
-            col.Item().PaddingLeft(10).Text(model.TreatmentPlan).Italic();
+            
+            if (hasPlan)
+            {
+                col.Item().PaddingLeft(10).Text(txt => {
+                    txt.Span("Lời dặn: ").SemiBold();
+                    txt.Span(model.TreatmentPlan).Italic();
+                });
+            }
+
+            if (hasFollowUp)
+            {
+                if (DateTime.TryParse(followUpDateRaw, out var dt))
+                {
+                    col.Item().PaddingLeft(10).Text(txt => {
+                        txt.Span("Ngày tái khám: ").SemiBold();
+                        txt.Span(dt.ToString("dd/MM/yyyy")).Italic();
+                    });
+                }
+                else
+                {
+                    col.Item().PaddingLeft(10).Text(txt => {
+                        txt.Span("Ngày tái khám: ").SemiBold();
+                        txt.Span(followUpDateRaw).Italic();
+                    });
+                }
+            }
         }
     }
 
@@ -388,8 +417,8 @@ public class MedicalRecordPdfService : IMedicalRecordPdfService
         col.Item().PaddingTop(5).AlignRight().Column(inner => {
             inner.Item().Text($"Ngày {model.CreatedAt:dd} tháng {model.CreatedAt:MM} năm {model.CreatedAt:yyyy}").Italic();
             inner.Item().PaddingTop(5).Text("BÁC SĨ ĐIỀU TRỊ").SemiBold().AlignCenter();
-            inner.Item().PaddingTop(20).Text(doctorName).SemiBold().AlignCenter();
             inner.Item().Text("(Ký và ghi rõ họ tên)").FontSize(8).Italic().AlignCenter();
+            inner.Item().PaddingTop(20).Text(doctorName).SemiBold().AlignCenter();
         });
     }
 
