@@ -13,6 +13,7 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
     private readonly IOrderRepository _orderRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
+
     private readonly IIdentityService _identityService;
     private readonly INotificationService _notificationService;
 
@@ -48,7 +49,11 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
         // Update appointment status to Cancelled
         var adminId = _currentUserService.UserId ?? Guid.Empty;
 
-        appointment.Cancel(adminId, "Refund processed by admin.");
+        var cancellationReason = string.IsNullOrWhiteSpace(request.AdminNote) 
+            ? "Refund processed by admin." 
+            : $"[REFUNDED] {request.AdminNote}";
+
+        appointment.Cancel(adminId, cancellationReason);
 
         // Also release the slot count
         if (appointment.AppointmentSlot != null)
@@ -58,6 +63,7 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
 
         // Update linked orders
         var orders = await _orderRepository.GetByAppointmentIdsAsync(new[] { request.AppointmentId }, cancellationToken);
+        decimal totalRefunded = 0;
         foreach (var order in orders)
         {
             if (order.Status != OrderStatus.Cancelled && order.Status != OrderStatus.Refunded)
@@ -66,6 +72,7 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
                 if (order.PaidAmount > 0)
                 {
                     var refundAmount = order.PaidAmount;
+                    totalRefunded += refundAmount;
                     var refundDesc = string.IsNullOrWhiteSpace(request.AdminNote) 
                         ? "Refund for appointment cancellation" 
                         : $"Refund: {request.AdminNote}";
@@ -88,20 +95,27 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
         await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // Notify Patient
+        // Send notification to patient
+        var targetUserId = appointment.Patient?.UserId;
+        // Notify Patient - Kết hợp thông tin số tiền và logic auto-refresh
         if (appointment.Patient?.UserId != null)
         {
-            var title = "Hoàn tiền lịch hẹn thành công";
-            var message = $"Yêu cầu hoàn tiền cho lịch hẹn vào lúc {appointment.AppointmentSlot?.StartTime:HH:mm} ngày {appointment.AppointmentSlot?.Date:dd/MM/yyyy} đã được xử lý.";
+            var title = "Hoàn tiền thành công";
+            var message = $"Yêu cầu hoàn tiền cho lịch hẹn vào lúc {appointment.AppointmentSlot?.StartTime:HH:mm} ngày {appointment.AppointmentSlot?.Date:dd/MM/yyyy} đã được duyệt. Số tiền: {totalRefunded:N0} VNĐ.";
 
             await _notificationService.SendAsync(
                 appointment.Patient.UserId.Value,
                 title,
                 message,
-                NotificationType.RefundProcessed,
-                new { AppointmentId = appointment.Id },
-                cancellationToken);
+                NotificationType.RefundProcessed, // Dùng Type mới của develop
+                new { 
+                    AppointmentId = appointment.Id, 
+                    Action = "RefundConfirmed" // Giữ Action này để Frontend tự reload status
+                },
+                cancellationToken,
+                appointment.Id);
         }
+
 
         return Result.Success();
     }
