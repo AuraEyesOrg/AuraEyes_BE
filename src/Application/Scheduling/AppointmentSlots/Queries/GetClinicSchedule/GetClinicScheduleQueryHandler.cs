@@ -51,7 +51,9 @@ public class GetClinicScheduleQueryHandler : IQueryHandler<GetClinicScheduleQuer
                     {
                         SlotId = s.Id,
                         DoctorId = s.OphthalId ?? Guid.Empty,
-                        DoctorName = ophthalMeta?.FullName ?? "Aura Doctor",
+                        DoctorName = ophthalMeta?.FullName != null 
+                            ? (ophthalMeta.IsActive ? ophthalMeta.FullName : $"{ophthalMeta.FullName} (SUSPENDED)") 
+                            : "Aura Doctor",
                         DoctorAvatar = ophthalMeta?.AvatarUrl,
                         IsBooked = s.BookedCount >= s.MaxCapacity,
                         Price = s.Cost ?? 0,

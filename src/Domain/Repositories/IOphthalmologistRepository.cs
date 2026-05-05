@@ -69,7 +69,8 @@ public record EnhancedDoctorDetail(
     string? Bio,
     decimal RatingAverage,
     int RatingCount,
-    List<Certificate> Certificates);
+    List<Certificate> Certificates,
+    bool IsActive);
 
 public record ConsiliumDoctorDetail(
     Guid Id,
