@@ -213,10 +213,18 @@ public class SubmitVerificationReportCommandHandler
         visit.FinishConsultation(diagnosis.ClinicalFindings);
         await _patientVisitRepository.UpdateAsync(visit, cancellationToken);
 
+        var patientName = patient?.FullName;
+        if (string.IsNullOrEmpty(patientName) && patient?.UserId != null)
+        {
+            var userDto = await _identityService.GetUserByIdAsync(patient.UserId.Value, cancellationToken);
+            patientName = userDto?.FullName;
+        }
+        patientName ??= "Bệnh nhân";
+
         await _notificationService.SendToRoleAsync(
             roleName: Application.Common.Constants.Roles.ClinicStaff,
             title: "Ready for Payment",
-            message: $"Consultation finished. Patient {patient?.FullName ?? "Unknown"} is waiting for payment.",
+            message: $"Consultation finished. Patient {patientName} is waiting for payment.",
             type: NotificationType.SystemAlert,
             payload: new
             {

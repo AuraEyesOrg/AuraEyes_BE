@@ -3,6 +3,7 @@ using Application.Common.Models;
 using Domain.Common;
 using Domain.Enums;
 using Domain.Repositories;
+using Application.Common.Constants;
 
 namespace Application.Scheduling.Appointments.Commands.ConfirmAppointmentCancellation;
 
@@ -12,17 +13,23 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
     private readonly IOrderRepository _orderRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IIdentityService _identityService;
+    private readonly INotificationService _notificationService;
 
     public ConfirmAppointmentCancellationCommandHandler(
         IAppointmentRepository appointmentRepository,
         IOrderRepository orderRepository,
         IUnitOfWork unitOfWork,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IIdentityService identityService,
+        INotificationService notificationService)
     {
         _appointmentRepository = appointmentRepository;
         _orderRepository = orderRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
+        _identityService = identityService;
+        _notificationService = notificationService;
     }
 
     public async Task<Result> Handle(ConfirmAppointmentCancellationCommand request, CancellationToken cancellationToken)
@@ -80,6 +87,21 @@ public class ConfirmAppointmentCancellationCommandHandler : ICommandHandler<Conf
 
         await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Notify Patient
+        if (appointment.Patient?.UserId != null)
+        {
+            var title = "Hoàn tiền lịch hẹn thành công";
+            var message = $"Yêu cầu hoàn tiền cho lịch hẹn vào lúc {appointment.AppointmentSlot?.StartTime:HH:mm} ngày {appointment.AppointmentSlot?.Date:dd/MM/yyyy} đã được xử lý.";
+
+            await _notificationService.SendAsync(
+                appointment.Patient.UserId.Value,
+                title,
+                message,
+                NotificationType.RefundProcessed,
+                new { AppointmentId = appointment.Id },
+                cancellationToken);
+        }
 
         return Result.Success();
     }

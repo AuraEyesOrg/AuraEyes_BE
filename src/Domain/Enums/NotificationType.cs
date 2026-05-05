@@ -69,5 +69,15 @@ public enum NotificationType
     /// Doctor receives invitation to join a clinical consilium
     /// Payload: { "GroupId": "guid", "InviterName": "string", "PatientName": "string" }
     /// </summary>
-    ConsiliumInvitation = 11
+    ConsiliumInvitation = 11,
+
+    /// <summary>
+    /// Notification for cancelled appointments.
+    /// </summary>
+    AppointmentCancelled = 12,
+
+    /// <summary>
+    /// Notification for processed refunds.
+    /// </summary>
+    RefundProcessed = 13
 }

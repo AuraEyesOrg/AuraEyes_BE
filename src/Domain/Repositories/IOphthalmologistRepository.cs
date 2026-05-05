@@ -66,6 +66,7 @@ public interface IOphthalmologistRepository : IRepository<Ophthalmologist>
 public record EnhancedDoctorDetail(
     string FullName,
     string? AvatarUrl,
+    string? ProviderAvatarUrl,
     string? Bio,
     decimal RatingAverage,
     int RatingCount,
