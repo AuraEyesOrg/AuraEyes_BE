@@ -172,7 +172,10 @@ public class NetworkController : BaseApiController
         {
             ConsultationSessionId = request.ConsultationSessionId,
             CurrentUserId = _currentUserService.UserId.Value,
-            CurrentProfileId = _currentUserService.ProfileId.Value
+            CurrentProfileId = _currentUserService.ProfileId.Value,
+            DoctorNote = request.DoctorNote,
+            AiSummary = request.AiSummary,
+            FinalDiagnosis = request.FinalDiagnosis
         };
 
         var result = await _mediator.Send(command);
@@ -525,6 +528,9 @@ public class CreatePostRequest
 public class ShareConsultationCaseRequest
 {
     public Guid ConsultationSessionId { get; set; }
+    public string? DoctorNote { get; set; }
+    public string? AiSummary { get; set; }
+    public string? FinalDiagnosis { get; set; }
 }
 
 public class UpdatePostRequest

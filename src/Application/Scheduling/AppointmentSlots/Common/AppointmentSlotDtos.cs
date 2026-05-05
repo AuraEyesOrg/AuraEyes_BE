@@ -92,6 +92,7 @@ public record DoctorSlotDetailDto
     public string? Bio { get; init; }
     public decimal RatingAverage { get; init; }
     public int RatingCount { get; init; }
+    public int CompletedPatientsCount { get; init; }
     public List<CertificateDto> Certificates { get; init; } = new();
 }
 

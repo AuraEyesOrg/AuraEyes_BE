@@ -18,5 +18,6 @@ public class UploadCredentialItemDto
     public string IssuingAuthority { get; set; } = string.Empty;
     public DateTime IssuedDate { get; set; }
     public DateTime? ExpiryDate { get; set; }
+    public string? LicenseNumber { get; set; }
     public IFormFile File { get; set; } = null!;
 }

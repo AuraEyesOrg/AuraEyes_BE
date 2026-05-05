@@ -61,6 +61,7 @@ public class GetClinicScheduleQueryHandler : IQueryHandler<GetClinicScheduleQuer
                         Bio = ophthalMeta?.Bio,
                         RatingAverage = ophthalMeta?.RatingAverage ?? 0,
                         RatingCount = ophthalMeta?.RatingCount ?? 0,
+                        CompletedPatientsCount = ophthalMeta?.CompletedPatientsCount ?? 0,
                         Certificates = ophthalMeta?.Certificates?.Select(c => new CertificateDto
                         {
                             Id = c.Id,
