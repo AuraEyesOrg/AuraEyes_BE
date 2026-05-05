@@ -37,4 +37,14 @@ public class AdminAppointmentsController : BaseApiController
         var result = await _mediator.Send(new ConfirmAppointmentCancellationCommand(appointmentId, payload.RefundTransactionId, payload.AdminNote));
         return HandleResult(result);
     }
+
+    public record RejectRefundPayload(string? AdminNote);
+
+    [HttpPost("{appointmentId:guid}/reject-refund")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> RejectRefund(Guid appointmentId, [FromBody] RejectRefundPayload payload)
+    {
+        var result = await _mediator.Send(new Application.Scheduling.Appointments.Commands.RejectAppointmentCancellation.RejectAppointmentCancellationCommand(appointmentId, payload.AdminNote));
+        return HandleResult(result);
+    }
 }
