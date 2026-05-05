@@ -226,7 +226,7 @@ public class GetClinicAppointmentsByDateQueryHandler
                 VisitStatus = visitStatus,
                 FlowState = flowState,
                 CreatedAt = a.CreatedAt,
-                HasFeedback = false,
+                // SubmittedFeedbackTargets defaults to empty; HasFeedback is computed from it
 
                 OphthalId = a.AppointmentSlot.OphthalId,
                 OphthalFullName = doc.FullName ?? "Clinic Doctor",

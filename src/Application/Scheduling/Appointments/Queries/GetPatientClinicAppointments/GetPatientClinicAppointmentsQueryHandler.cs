@@ -73,9 +73,9 @@ public class GetPatientClinicAppointmentsQueryHandler
             .ToArray();
 
         // Sequential awaits are required because EF Core DbContext is not thread-safe
-        var feedbackAppointmentIds = appointmentIds.Length == 0
-            ? new HashSet<Guid>()
-            : await _clinicFeedbackRepository.GetAppointmentIdsWithFeedbackAsync(
+        var submittedTargetsMap = appointmentIds.Length == 0
+            ? new Dictionary<Guid, IReadOnlySet<string>>()
+            : await _clinicFeedbackRepository.GetSubmittedTargetsByAppointmentsAsync(
                 request.PatientId,
                 appointmentIds,
                 cancellationToken);
@@ -113,7 +113,9 @@ public class GetPatientClinicAppointmentsQueryHandler
                     VisitReason = a.VisitReason,
                     Status = a.Status.ToString(),
                     CreatedAt = a.CreatedAt,
-                    HasFeedback = feedbackAppointmentIds.Contains(a.Id),
+                    SubmittedFeedbackTargets = submittedTargetsMap.TryGetValue(a.Id, out var targets)
+                        ? targets.ToList()
+                        : Array.Empty<string>(),
                     OrganisationId = null,
                     OrganisationName = "Aura Clinic",
                     OphthalId = a.AppointmentSlot.OphthalId,
