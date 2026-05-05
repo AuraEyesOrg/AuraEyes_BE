@@ -10,4 +10,7 @@ public class ShareConsultationToNetworkCommand : ICommand<Guid>
     public Guid ConsultationSessionId { get; set; }
     public Guid CurrentUserId { get; set; }
     public Guid CurrentProfileId { get; set; }
+    public string? DoctorNote { get; set; }
+    public string? AiSummary { get; set; }
+    public string? FinalDiagnosis { get; set; }
 }

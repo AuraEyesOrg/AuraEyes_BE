@@ -5,10 +5,7 @@ namespace Domain.Enums.Network;
 /// </summary>
 public enum PostCategory
 {
-    /// <summary>
-    /// 🔬 Case presentation - sharing treatment experiences
-    /// </summary>
-    CasePresentation,
+
 
     /// <summary>
     /// 💬 Peer discussion - professional discussions among colleagues
@@ -23,7 +20,12 @@ public enum PostCategory
     /// <summary>
     /// 📢 Announcement - announcements from organisations
     /// </summary>
-    Announcement
+    Announcement,
+
+    /// <summary>
+    /// 🩺 Case presentation - sharing clinical cases for peer review
+    /// </summary>
+    CasePresentation
 }
 
 /// <summary>

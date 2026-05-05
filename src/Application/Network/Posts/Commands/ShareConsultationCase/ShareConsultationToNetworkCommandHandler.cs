@@ -101,7 +101,7 @@ public class ShareConsultationToNetworkCommandHandler : ICommandHandler<ShareCon
         var post = new ProfessionalPost(
             request.CurrentUserId,
             AuthorType.Ophthalmologist,
-            BuildShareContent(patientAge, patientGender, latestResult),
+            BuildShareContent(patientAge, patientGender, latestResult, request.DoctorNote, request.AiSummary, request.FinalDiagnosis),
             PostCategory.CasePresentation,
             allowComments: true);
 
@@ -126,9 +126,19 @@ public class ShareConsultationToNetworkCommandHandler : ICommandHandler<ShareCon
     private static string BuildShareContent(
         int? patientAge,
         string? patientGender,
-        ScreeningResult? latestResult)
+        ScreeningResult? latestResult,
+        string? doctorNote = null,
+        string? aiSummary = null,
+        string? finalDiagnosis = null)
     {
         var builder = new StringBuilder();
+        
+        if (!string.IsNullOrWhiteSpace(doctorNote))
+        {
+            builder.AppendLine(doctorNote);
+            builder.AppendLine();
+        }
+
         builder.AppendLine("Internal clinical case shared from consultation.");
 
         if (patientAge.HasValue || !string.IsNullOrWhiteSpace(patientGender))
@@ -136,19 +146,24 @@ public class ShareConsultationToNetworkCommandHandler : ICommandHandler<ShareCon
             builder.AppendLine($"Patient profile: Age {patientAge?.ToString() ?? "N/A"}, Gender {patientGender ?? "N/A"}.");
         }
 
-        if (latestResult is not null)
+        if (latestResult is not null || !string.IsNullOrWhiteSpace(aiSummary) || !string.IsNullOrWhiteSpace(finalDiagnosis))
         {
-            builder.AppendLine($"AI risk level: {latestResult.RiskLevel}.");
-            builder.AppendLine($"AI confidence: {latestResult.ConfidenceScore:0.##}%.");
-
-            if (!string.IsNullOrWhiteSpace(latestResult.Summary))
+            if (latestResult is not null)
             {
-                builder.AppendLine($"Summary: {latestResult.Summary}");
+                builder.AppendLine($"AI risk level: {latestResult.RiskLevel}.");
+                builder.AppendLine($"AI confidence: {latestResult.ConfidenceScore:0.##}%.");
             }
 
-            if (!string.IsNullOrWhiteSpace(latestResult.Findings))
+            var summary = !string.IsNullOrWhiteSpace(aiSummary) ? aiSummary : latestResult?.Summary;
+            if (!string.IsNullOrWhiteSpace(summary))
             {
-                builder.AppendLine($"Findings: {latestResult.Findings}");
+                builder.AppendLine($"Summary: {summary}");
+            }
+
+            var findings = !string.IsNullOrWhiteSpace(finalDiagnosis) ? finalDiagnosis : latestResult?.Findings;
+            if (!string.IsNullOrWhiteSpace(findings))
+            {
+                builder.AppendLine($"Findings: {findings}");
             }
         }
 
