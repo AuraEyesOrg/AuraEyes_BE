@@ -22,6 +22,16 @@ public class ConsultationSessionRepository : Repository<ConsultationSession>, IC
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
     }
 
+    public async Task<ConsultationSession?> GetByIdWithConversationsForUpdateAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Include(s => s.Conversations)
+            .ThenInclude(c => c.Messages)
+            .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<ConsultationSession>> GetByPatientIdAsync(
         Guid patientId,
         CancellationToken cancellationToken = default)

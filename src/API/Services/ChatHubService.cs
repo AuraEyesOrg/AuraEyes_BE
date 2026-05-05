@@ -24,24 +24,44 @@ public class ChatHubService : IChatHubService
     /// <inheritdoc />
     public async Task BroadcastChatMessageAsync(
         Guid userId,
+        Guid recipientProfileId,
         ChatMessageRealtimeDto chatMessage,
         CancellationToken cancellationToken = default)
     {
         try
         {
             _logger.LogInformation(
-                "Attempting to broadcast chat message to UserId={UserId} for SessionId={SessionId}",
-                userId, chatMessage.SessionId);
+                "Attempting to broadcast chat message to UserId={UserId}, RecipientProfileId={RecipientProfileId} for SessionId={SessionId}",
+                userId,
+                recipientProfileId,
+                chatMessage.SessionId);
 
-            // Broadcast to the specific session group for high reliability [FR-47]
+            var userChannel = userId.ToString();
+            var profileGroupName = $"profile_{recipientProfileId}";
             var groupName = $"session_{chatMessage.SessionId}";
+
+            // Prefer direct user delivery so message is received even when session-group join/rejoin is delayed.
+            await _hubContext.Clients
+                .User(userChannel)
+                .SendAsync("ReceiveChatMessage", chatMessage, cancellationToken);
+
+            // Fallback to profile group to handle user-id claim mismatches across clients.
+            await _hubContext.Clients
+                .Group(profileGroupName)
+                .SendAsync("ReceiveChatMessage", chatMessage, cancellationToken);
+
+            // Keep group delivery as compatibility fallback for existing clients joined by session.
             await _hubContext.Clients
                 .Group(groupName)
                 .SendAsync("ReceiveChatMessage", chatMessage, cancellationToken);
 
             _logger.LogInformation(
-                "Chat message broadcast SUCCESS to Group={GroupName} for SessionId={SessionId}, MessageId={MessageId}",
-                groupName, chatMessage.SessionId, chatMessage.MessageId);
+                "Chat message broadcast SUCCESS to UserId={UserId}, ProfileGroup={ProfileGroup}, SessionGroup={GroupName} for SessionId={SessionId}, MessageId={MessageId}",
+                userId,
+                profileGroupName,
+                groupName,
+                chatMessage.SessionId,
+                chatMessage.MessageId);
         }
         catch (Exception ex)
         {
