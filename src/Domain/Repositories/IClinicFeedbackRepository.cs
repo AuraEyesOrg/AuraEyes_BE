@@ -10,10 +10,19 @@ public interface IClinicFeedbackRepository : IRepository<ClinicFeedback>
         Guid appointmentId,
         CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Given a set of appointment IDs, return the subset the patient has already rated.
-    /// </summary>
+    Task<bool> ExistsByTargetAsync(
+        Guid patientId,
+        Guid appointmentId,
+        Guid? doctorId,
+        Guid? staffId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlySet<Guid>> GetAppointmentIdsWithFeedbackAsync(
+        Guid patientId,
+        IReadOnlyCollection<Guid> appointmentIds,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyDictionary<Guid, IReadOnlySet<string>>> GetSubmittedTargetsByAppointmentsAsync(
         Guid patientId,
         IReadOnlyCollection<Guid> appointmentIds,
         CancellationToken cancellationToken = default);

@@ -20,6 +20,78 @@ public class ClinicFeedbackRepository : Repository<ClinicFeedback>, IClinicFeedb
             cancellationToken);
     }
 
+    public async Task<bool> ExistsByTargetAsync(
+        Guid patientId,
+        Guid appointmentId,
+        Guid? doctorId,
+        Guid? staffId,
+        CancellationToken cancellationToken = default)
+    {
+        if (doctorId.HasValue)
+        {
+            return await _dbSet.AnyAsync(
+                x => x.PatientId == patientId
+                     && x.AppointmentId == appointmentId
+                     && x.DoctorId == doctorId,
+                cancellationToken);
+        }
+
+        if (staffId.HasValue)
+        {
+            return await _dbSet.AnyAsync(
+                x => x.PatientId == patientId
+                     && x.AppointmentId == appointmentId
+                     && x.StaffId == staffId,
+                cancellationToken);
+        }
+
+        // CLINIC target: no doctorId, no staffId
+        return await _dbSet.AnyAsync(
+            x => x.PatientId == patientId
+                 && x.AppointmentId == appointmentId
+                 && x.DoctorId == null
+                 && x.StaffId == null,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlySet<string>>> GetSubmittedTargetsByAppointmentsAsync(
+        Guid patientId,
+        IReadOnlyCollection<Guid> appointmentIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (appointmentIds is null || appointmentIds.Count == 0)
+            return new Dictionary<Guid, IReadOnlySet<string>>();
+
+        var distinctIds = appointmentIds.Distinct().ToArray();
+
+        var rows = await _dbSet
+            .Where(x => x.PatientId == patientId && distinctIds.Contains(x.AppointmentId))
+            .Select(x => new { x.AppointmentId, x.DoctorId, x.StaffId })
+            .ToListAsync(cancellationToken);
+
+        // Build the map: each row determines its target type
+        var result = new Dictionary<Guid, HashSet<string>>();
+        foreach (var row in rows)
+        {
+            if (!result.TryGetValue(row.AppointmentId, out var set))
+            {
+                set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                result[row.AppointmentId] = set;
+            }
+
+            if (row.DoctorId.HasValue)
+                set.Add("DOCTOR");
+            else if (row.StaffId.HasValue)
+                set.Add("STAFF");
+            else
+                set.Add("CLINIC");
+        }
+
+        return result.ToDictionary(
+            kvp => kvp.Key,
+            kvp => (IReadOnlySet<string>)kvp.Value);
+    }
+
     public async Task<IReadOnlySet<Guid>> GetAppointmentIdsWithFeedbackAsync(
         Guid patientId,
         IReadOnlyCollection<Guid> appointmentIds,

@@ -39,13 +39,15 @@ public class CreateClinicFeedbackCommandHandler : ICommandHandler<CreateClinicFe
         if (appointment.PatientId != patientId)
             return Result<Guid>.Forbidden("You can only submit feedback for your own appointment.");
 
-        var isDuplicate = await _clinicFeedbackRepository.ExistsByPatientAndAppointmentAsync(
+        var isDuplicate = await _clinicFeedbackRepository.ExistsByTargetAsync(
             patientId,
             request.AppointmentId,
+            request.DoctorId,
+            request.StaffId,
             cancellationToken);
 
         if (isDuplicate)
-            return Result<Guid>.Conflict("Feedback already exists for this appointment.");
+            return Result<Guid>.Conflict("Feedback already exists for this target.");
 
         var feedback = new ClinicFeedback(
             patientId,
