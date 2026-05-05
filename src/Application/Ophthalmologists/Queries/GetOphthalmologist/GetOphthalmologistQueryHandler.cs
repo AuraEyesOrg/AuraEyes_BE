@@ -82,6 +82,7 @@ public class GetOphthalmologistQueryHandler : IQueryHandler<GetOphthalmologistQu
                     IssuedDate = c.IssuedDate,
                     ExpiryDate = c.ExpiryDate,
                     CertificateUrl = c.CertificateUrl,
+                    LicenseNumber = c.LicenseNumber,
                     IsExpired = c.IsExpired
                 })
                 .ToList()

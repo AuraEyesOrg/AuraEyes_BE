@@ -349,6 +349,7 @@ public class OphthalmologistsController : BaseApiController
         [FromForm] string name,
         [FromForm] string? degreeLevel,
         [FromForm] string? issuingAuthority,
+        [FromForm] string? licenseNumber,
         [FromForm] DateTime issuedDate,
         [FromForm] DateTime? expiryDate,
         IFormFile? file,
@@ -365,6 +366,7 @@ public class OphthalmologistsController : BaseApiController
             Name = name,
             DegreeLevel = degreeLevel,
             IssuingAuthority = issuingAuthority,
+            LicenseNumber = licenseNumber,
             IssuedDate = issuedDate,
             ExpiryDate = expiryDate,
             File = file
@@ -409,6 +411,7 @@ public class OphthalmologistsController : BaseApiController
         var typeStr = form[$"certificates[{index}][type]"].FirstOrDefault();
         var name = form[$"certificates[{index}][name]"].FirstOrDefault();
         var issuingAuthority = form[$"certificates[{index}][issuingAuthority]"].FirstOrDefault();
+        var licenseNumber = form[$"certificates[{index}][licenseNumber]"].FirstOrDefault();
         var issuedDateStr = form[$"certificates[{index}][issuedDate]"].FirstOrDefault();
         var expiryDateStr = form[$"certificates[{index}][expiryDate]"].FirstOrDefault();
         var file = form.Files.FirstOrDefault(f => f.Name == $"certificates[{index}][file]");
@@ -424,6 +427,7 @@ public class OphthalmologistsController : BaseApiController
                 Type = Enum.Parse<CertificateType>(typeStr ?? "License"),
                 Name = name,
                 IssuingAuthority = issuingAuthority,
+                LicenseNumber = licenseNumber,
                 IssuedDate = issuedDate,
                 ExpiryDate = DateTime.TryParse(expiryDateStr, out var expiryDate) ? expiryDate : null,
                 File = file
