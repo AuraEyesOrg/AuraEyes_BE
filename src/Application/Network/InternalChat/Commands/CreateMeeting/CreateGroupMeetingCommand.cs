@@ -19,19 +19,22 @@ public class CreateGroupMeetingCommandHandler : ICommandHandler<CreateGroupMeeti
     private readonly ICurrentUserService _currentUserService;
     private readonly IIdentityService _identityService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly MediatR.IMediator _mediator;
 
     public CreateGroupMeetingCommandHandler(
         IRepository<InternalGroupChat> groupChatRepository,
         IGoogleMeetService googleMeetService,
         ICurrentUserService currentUserService,
         IIdentityService identityService,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        MediatR.IMediator mediator)
     {
         _groupChatRepository = groupChatRepository;
         _googleMeetService = googleMeetService;
         _currentUserService = currentUserService;
         _identityService = identityService;
         _unitOfWork = unitOfWork;
+        _mediator = mediator;
     }
 
     public async Task<Result<MeetingInfo>> Handle(CreateGroupMeetingCommand request, CancellationToken cancellationToken)
@@ -80,6 +83,14 @@ public class CreateGroupMeetingCommandHandler : ICommandHandler<CreateGroupMeeti
         group.SetMeetingInfo(meetingInfo.MeetingLink, meetingInfo.CalendarEventId);
         await _groupChatRepository.UpdateAsync(group, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Automatically send a message to the group chat with the meeting link
+        var messageContent = $"[SYSTEM] A new consultation meeting has been created: {meetingInfo.MeetingLink}";
+        await _mediator.Send(new Application.Network.InternalChat.Commands.SendMessage.SendInternalGroupMessageCommand
+        {
+            GroupId = group.Id,
+            Content = messageContent
+        }, cancellationToken);
 
         return Result<MeetingInfo>.Success(meetingInfo);
     }
