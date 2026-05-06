@@ -62,8 +62,9 @@ public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologists
                     {
                         Id = c.Id,
                         Name = c.Name,
-                        DegreeLevel = c.DegreeLevel?.ToString(),
+                        DegreeLevel = (int?)c.DegreeLevel,
                         IssuingAuthority = c.IssuingAuthority,
+                        IssuingInstitution = c.IssuingInstitution,
                         IssuedDate = c.IssuedDate,
                         DegreeUrl = c.CertificateUrl,
                         Title = GetDegreeTitle(c.DegreeLevel),
@@ -78,12 +79,13 @@ public class GetOphthalmologistsQueryHandler : IQueryHandler<GetOphthalmologists
                         Id = c.Id,
                         Type = c.Type.ToString(),
                         Name = c.Name,
-                        DegreeLevel = c.DegreeLevel?.ToString(),
+                        DegreeLevel = (int?)c.DegreeLevel,
                         IssuingAuthority = c.IssuingAuthority,
+                        LicenseNumber = c.LicenseNumber,
+                        ScopeOfPractice = c.ScopeOfPractice,
                         IssuedDate = c.IssuedDate,
                         ExpiryDate = c.ExpiryDate,
                         CertificateUrl = c.CertificateUrl,
-                        LicenseNumber = c.LicenseNumber,
                         IsExpired = c.IsExpired
                     })
                     .ToList()
