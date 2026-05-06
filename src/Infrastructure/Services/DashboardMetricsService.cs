@@ -702,20 +702,83 @@ public class DashboardMetricsService : IDashboardMetricsService
 
     public async Task<TodaySummaryDto> GetTodaySummaryAsync(CancellationToken cancellationToken = default)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        var nowUtc = DateTime.UtcNow;
+        var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, VietnamTimeZoneResolver.TimeZone);
+        var today = DateOnly.FromDateTime(vietnamNow);
+        var yesterday = today.AddDays(-1);
+        
+        var currentMonthStart = today.AddDays(-today.Day + 1);
+        var lastMonthStart = currentMonthStart.AddMonths(-1);
+        var lastMonthEnd = currentMonthStart.AddDays(-1);
+
+        var currentYearStart = new DateOnly(today.Year, 1, 1);
+        var lastYearStart = currentYearStart.AddYears(-1);
+        var lastYearEnd = currentYearStart.AddDays(-1);
+
+        // Today stats
         var appointments = await _context.Appointments
             .CountAsync(a => a.AppointmentSlot!.Date == today, cancellationToken);
         var checkedIn = await _context.Appointments
             .CountAsync(a => a.AppointmentSlot!.Date == today && a.Status == AppointmentStatus.CheckedIn, cancellationToken);
         var completed = await _context.Appointments
             .CountAsync(a => a.AppointmentSlot!.Date == today && a.Status == AppointmentStatus.Completed, cancellationToken);
+        var noShow = await _context.Appointments
+            .CountAsync(a => a.AppointmentSlot!.Date == today && a.Status == AppointmentStatus.NoShow, cancellationToken);
+        var todayRevenue = await _context.Appointments
+            .Where(a => a.AppointmentSlot!.Date == today && a.Status == AppointmentStatus.Completed)
+            .SumAsync(a => a.Price, cancellationToken);
+
+        // Comparison stats for growth
+        var yesterdayCount = await _context.Appointments
+            .CountAsync(a => a.AppointmentSlot!.Date == yesterday, cancellationToken);
+        var yesterdayRevenue = await _context.Appointments
+            .Where(a => a.AppointmentSlot!.Date == yesterday && a.Status == AppointmentStatus.Completed)
+            .SumAsync(a => a.Price, cancellationToken);
+        
+        var thisMonthCount = await _context.Appointments
+            .CountAsync(a => a.AppointmentSlot!.Date >= currentMonthStart && a.AppointmentSlot!.Date <= today, cancellationToken);
+        var lastMonthCount = await _context.Appointments
+            .CountAsync(a => a.AppointmentSlot!.Date >= lastMonthStart && a.AppointmentSlot!.Date <= lastMonthEnd, cancellationToken);
+
+        var thisMonthRevenue = await _context.Appointments
+            .Where(a => a.AppointmentSlot!.Date >= currentMonthStart && a.AppointmentSlot!.Date <= today && a.Status == AppointmentStatus.Completed)
+            .SumAsync(a => a.Price, cancellationToken);
+        var lastMonthRevenue = await _context.Appointments
+            .Where(a => a.AppointmentSlot!.Date >= lastMonthStart && a.AppointmentSlot!.Date <= lastMonthEnd && a.Status == AppointmentStatus.Completed)
+            .SumAsync(a => a.Price, cancellationToken);
+
+        var thisYearCount = await _context.Appointments
+            .CountAsync(a => a.AppointmentSlot!.Date >= currentYearStart && a.AppointmentSlot!.Date <= today, cancellationToken);
+        var lastYearCount = await _context.Appointments
+            .CountAsync(a => a.AppointmentSlot!.Date >= lastYearStart && a.AppointmentSlot!.Date <= lastYearEnd, cancellationToken);
+
+        var thisYearRevenue = await _context.Appointments
+            .Where(a => a.AppointmentSlot!.Date >= currentYearStart && a.AppointmentSlot!.Date <= today && a.Status == AppointmentStatus.Completed)
+            .SumAsync(a => a.Price, cancellationToken);
+        var lastYearRevenue = await _context.Appointments
+            .Where(a => a.AppointmentSlot!.Date >= lastYearStart && a.AppointmentSlot!.Date <= lastYearEnd && a.Status == AppointmentStatus.Completed)
+            .SumAsync(a => a.Price, cancellationToken);
 
         return new TodaySummaryDto
         {
             TotalAppointments = appointments,
             CheckedInPatients = checkedIn,
-            CompletedVisits = completed
+            CompletedVisits = completed,
+            NoShowCount = noShow,
+            TodayRevenue = todayRevenue,
+            GrowthPercentageDay = CalculateGrowthPercentage(appointments, yesterdayCount),
+            GrowthPercentageMonth = CalculateGrowthPercentage(thisMonthCount, lastMonthCount),
+            GrowthPercentageYear = CalculateGrowthPercentage(thisYearCount, lastYearCount),
+            RevenueGrowthPercentageDay = CalculateGrowthPercentage((double)todayRevenue, (double)yesterdayRevenue),
+            RevenueGrowthPercentageMonth = CalculateGrowthPercentage((double)thisMonthRevenue, (double)lastMonthRevenue),
+            RevenueGrowthPercentageYear = CalculateGrowthPercentage((double)thisYearRevenue, (double)lastYearRevenue)
         };
+    }
+
+    private static decimal CalculateGrowthPercentage(double current, double previous)
+    {
+        if (previous == 0) return current > 0 ? 100 : 0;
+        return (decimal)Math.Round((current - previous) / previous * 100, 2);
     }
 
     public async Task<SlotUtilizationDto> GetSlotUtilizationAsync(CancellationToken cancellationToken = default)
@@ -738,31 +801,83 @@ public class DashboardMetricsService : IDashboardMetricsService
 
     public async Task<IReadOnlyList<LiveQueueItemDto>> GetLiveQueueAsync(CancellationToken cancellationToken = default)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
-        return await (from a in _context.Appointments
-                      join p in _context.Patients on a.PatientId equals p.Id
-                      join u in _context.Users on p.UserId equals u.Id
-                      where a.AppointmentSlot!.Date == today &&
-                            (a.Status == AppointmentStatus.CheckedIn || a.Status == AppointmentStatus.InProgress)
-                      select new LiveQueueItemDto
-                      {
-                          VisitId = a.Id,
-                          PatientName = u.FullName,
-                          Status = a.Status.ToString(),
-                          CheckedInAt = a.UpdatedAt // Simplified
-                      }).ToListAsync(cancellationToken);
+        var nowUtc = DateTime.UtcNow;
+        var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, VietnamTimeZoneResolver.TimeZone);
+        var today = DateOnly.FromDateTime(vietnamNow);
+
+        var queueItems = await (from a in _context.Appointments.AsNoTracking()
+                               join p in _context.Patients.AsNoTracking() on a.PatientId equals p.Id
+                               join u in _context.Users.AsNoTracking() on p.UserId equals u.Id
+                               join d in _context.Ophthalmologists.AsNoTracking() on a.AppointmentSlot!.OphthalId equals d.Id into doctorJoin
+                               from doctor in doctorJoin.DefaultIfEmpty()
+                               join du in _context.Users.AsNoTracking() on doctor.UserId equals du.Id into doctorUserJoin
+                               from doctorUser in doctorUserJoin.DefaultIfEmpty()
+                               where a.AppointmentSlot!.Date == today &&
+                                     (a.Status == AppointmentStatus.CheckedIn || a.Status == AppointmentStatus.InProgress)
+                               orderby a.Status == AppointmentStatus.InProgress descending, a.UpdatedAt ascending
+                               select new
+                               {
+                                   a.Id,
+                                   u.FullName,
+                                   a.Status,
+                                   a.UpdatedAt,
+                                   a.CreatedAt,
+                                   DoctorName = doctorUser != null ? doctorUser.FullName : null
+                               }).ToListAsync(cancellationToken);
+
+        return queueItems.Select(item =>
+        {
+            var waitMinutes = (int)(nowUtc - (item.UpdatedAt ?? item.CreatedAt)).TotalMinutes;
+            return new LiveQueueItemDto
+            {
+                VisitId = item.Id,
+                PatientName = item.FullName,
+                Status = item.Status.ToString(),
+                AssignedDoctorName = item.DoctorName,
+                WaitingTimeMinutes = Math.Max(0, waitMinutes),
+                CheckedInAt = item.UpdatedAt
+            };
+        }).ToList();
     }
 
     public async Task<IReadOnlyList<DoctorStatusDto>> GetDoctorStatusAsync(CancellationToken cancellationToken = default)
     {
-        return await (from d in _context.Ophthalmologists
-                      join u in _context.Users on d.UserId equals u.Id
-                      select new DoctorStatusDto
-                      {
-                          DoctorId = d.Id,
-                          DoctorName = u.FullName,
-                          CurrentStatus = "Available", // Simplified
-                      }).ToListAsync(cancellationToken);
+        var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, VietnamTimeZoneResolver.TimeZone);
+        var today = DateOnly.FromDateTime(vietnamNow);
+
+        var doctors = await (from d in _context.Ophthalmologists.AsNoTracking()
+                            join u in _context.Users.AsNoTracking() on d.UserId equals u.Id
+                            where !u.IsDeleted
+                            select new
+                            {
+                                d.Id,
+                                u.FullName
+                            }).ToListAsync(cancellationToken);
+
+        var doctorIds = doctors.Select(d => d.Id).ToList();
+
+        // Get handled count today per doctor
+        var handledCounts = await _context.Appointments.AsNoTracking()
+            .Where(a => a.AppointmentSlot!.Date == today && a.Status == AppointmentStatus.Completed && a.AppointmentSlot.OphthalId.HasValue && doctorIds.Contains(a.AppointmentSlot.OphthalId.Value))
+            .GroupBy(a => a.AppointmentSlot!.OphthalId)
+            .Select(g => new { DoctorId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.DoctorId!.Value, x => x.Count, cancellationToken);
+
+        // Get active load today per doctor
+        var activeLoads = await _context.Appointments.AsNoTracking()
+            .Where(a => a.AppointmentSlot!.Date == today && a.Status == AppointmentStatus.InProgress && a.AppointmentSlot.OphthalId.HasValue && doctorIds.Contains(a.AppointmentSlot.OphthalId.Value))
+            .GroupBy(a => a.AppointmentSlot!.OphthalId)
+            .Select(g => new { DoctorId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.DoctorId!.Value, x => x.Count, cancellationToken);
+
+        return doctors.Select(d => new DoctorStatusDto
+        {
+            DoctorId = d.Id,
+            DoctorName = d.FullName,
+            CurrentStatus = activeLoads.GetValueOrDefault(d.Id, 0) > 0 ? "In consultation" : "Available",
+            PatientsHandledToday = handledCounts.GetValueOrDefault(d.Id, 0),
+            ActiveLoad = activeLoads.GetValueOrDefault(d.Id, 0)
+        }).ToList();
     }
 
     public async Task<IReadOnlyList<TransactionStatsDto>> GetTransactionStatsAsync(string period, CancellationToken cancellationToken = default)
