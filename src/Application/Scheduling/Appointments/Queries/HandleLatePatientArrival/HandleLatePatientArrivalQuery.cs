@@ -16,6 +16,11 @@ public class LateArrivalCheckResult
     public int SlotDurationMinutes { get; init; }
     public IReadOnlyList<AvailableSlotOption> AvailableSlots { get; init; } = new List<AvailableSlotOption>();
     public AdHocDefaults AdHocDefaults { get; init; } = new();
+
+    // Debug info
+    public DateTime ServerTimeUtc { get; init; }
+    public DateTime VietnamNow { get; init; }
+    public DateTime ThresholdTimeLocal { get; init; }
 }
 
 public class AvailableSlotOption

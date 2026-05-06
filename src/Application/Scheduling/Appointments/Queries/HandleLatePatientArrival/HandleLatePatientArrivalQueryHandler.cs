@@ -1,3 +1,4 @@
+using Application.Common.Helpers;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
@@ -37,15 +38,26 @@ public class HandleLatePatientArrivalQueryHandler
                 "Appointment is not linked to a slot.");
 
         var slot = appointment.AppointmentSlot;
-        var now = DateTime.Now;
-        var slotStart = slot.Date.ToDateTime(slot.StartTime);
-        var slotEnd = slot.Date.ToDateTime(slot.EndTime);
-        var duration = slotEnd - slotStart;
-        var threshold = TimeSpan.FromTicks(duration.Ticks / 3);
-        var thresholdTime = slotStart.Add(threshold);
+        var vietnamTimeZone = VietnamTimeZoneResolver.TimeZone;
+        var utcNow = DateTime.UtcNow;
+        var nowVietnam = TimeZoneInfo.ConvertTimeFromUtc(utcNow, vietnamTimeZone);
 
-        var isLate = now > thresholdTime;
-        var lateMinutes = isLate ? (int)(now - thresholdTime).TotalMinutes : 0;
+        // Slot times are stored in Vietnam local time (UTC+7)
+        var slotStartLocal = slot.Date.ToDateTime(slot.StartTime);
+        var slotEndLocal = slot.Date.ToDateTime(slot.EndTime);
+        
+        // Handle slots that might cross midnight (though rare in clinic)
+        if (slotEndLocal < slotStartLocal)
+        {
+            slotEndLocal = slotEndLocal.AddDays(1);
+        }
+        
+        var duration = slotEndLocal - slotStartLocal;
+        var threshold = TimeSpan.FromTicks(duration.Ticks / 3);
+        var thresholdTimeLocal = slotStartLocal.Add(threshold);
+
+        var isLate = nowVietnam > thresholdTimeLocal;
+        var lateMinutes = isLate ? (int)(nowVietnam - thresholdTimeLocal).TotalMinutes : 0;
         var thresholdMinutes = (int)threshold.TotalMinutes;
 
         var availableSlots = new List<AvailableSlotOption>();
@@ -93,7 +105,11 @@ public class HandleLatePatientArrivalQueryHandler
             SlotEndTime = slot.EndTime,
             SlotDurationMinutes = (int)duration.TotalMinutes,
             AvailableSlots = availableSlots,
-            AdHocDefaults = adHocDefaults
+            AdHocDefaults = adHocDefaults,
+            // Debug info
+            ServerTimeUtc = utcNow,
+            VietnamNow = nowVietnam,
+            ThresholdTimeLocal = thresholdTimeLocal
         });
     }
 }

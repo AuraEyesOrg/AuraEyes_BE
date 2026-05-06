@@ -69,7 +69,7 @@ public interface IConsultationSessionRepository : IRepository<ConsultationSessio
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Returns ClinicBooking sessions in Open chat status that have exceeded the 14-day window.
+    /// Returns ClinicBooking sessions in Open chat status that have exceeded the 7-day window.
     /// </summary>
     Task<IReadOnlyList<ConsultationSession>> GetExpiredClinicSessionsAsync(
         TimeSpan threshold,

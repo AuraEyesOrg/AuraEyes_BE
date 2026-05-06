@@ -244,7 +244,7 @@ public class ClinicVisitService : IClinicVisitService
         await _notificationService.SendAsync(
             userId,
             "Kết quả khám lâm sàng & Tư vấn",
-            "Thanh toán hoàn tất. Bạn có thể trao đổi thêm với bác sĩ trong vòng 14 ngày qua mục Chat.",
+            "Thanh toán hoàn tất. Bạn có thể trao đổi thêm với bác sĩ trong vòng 7 ngày qua mục Chat.",
             NotificationType.ConsultationResultProvided,
             new { ConsultationId = sessionId, AppointmentId = appointmentId },
             cancellationToken,
