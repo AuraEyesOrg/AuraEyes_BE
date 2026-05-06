@@ -1,6 +1,7 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
+using Domain.Entities.Consultation;
 using Domain.Entities.Network.InternalChat;
 using Domain.Enums;
 using Domain.Enums.Network;
@@ -39,6 +40,7 @@ public class CreateClinicalGroupCommandHandler : ICommandHandler<CreateClinicalG
     private readonly ICurrentUserService _currentUserService;
     private readonly INotificationService _notificationService;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IRepository<ConsultationSession> _sessionRepository;
     private readonly ILogger<CreateClinicalGroupCommandHandler> _logger;
 
     public CreateClinicalGroupCommandHandler(
@@ -48,6 +50,7 @@ public class CreateClinicalGroupCommandHandler : ICommandHandler<CreateClinicalG
         IInternalChatHubService chatHubService,
         INotificationService notificationService,
         IOphthalmologistRepository ophthalmologistRepository,
+        IRepository<ConsultationSession> sessionRepository,
         ILogger<CreateClinicalGroupCommandHandler> logger)
     {
         _groupChatRepository = groupChatRepository;
@@ -56,6 +59,7 @@ public class CreateClinicalGroupCommandHandler : ICommandHandler<CreateClinicalG
         _chatHubService = chatHubService;
         _notificationService = notificationService;
         _ophthalmologistRepository = ophthalmologistRepository;
+        _sessionRepository = sessionRepository;
         _logger = logger;
     }
 
@@ -120,8 +124,22 @@ public class CreateClinicalGroupCommandHandler : ICommandHandler<CreateClinicalG
             ? $"\n🔗 Xem Bệnh án: /medical-records/{request.MedicalRecordId}"
             : string.Empty;
 
+        var screeningId = Guid.Empty;
+        if (request.ConsultationSessionId.HasValue)
+        {
+            var session = await _sessionRepository.GetByIdAsync(request.ConsultationSessionId.Value, cancellationToken);
+            if (session != null && session.AiScreeningId.HasValue)
+            {
+                screeningId = session.AiScreeningId.Value;
+            }
+        }
+
+        var screeningSection = screeningId != Guid.Empty
+            ? $"\n🔬 Xem Review Hội chẩn: /screening-review/{screeningId}"
+            : string.Empty;
+
         var systemMessageContent =
-            $"{emergencyPrefix}[HỘI CHẨN LÂM SÀNG]{reasonSection}{medicalRecordSection}\nPhiên hội chẩn này sẽ tự động kết thúc sau 20 phút.";
+            $"{emergencyPrefix}[HỘI CHẨN LÂM SÀNG]{reasonSection}{medicalRecordSection}{screeningSection}\nPhiên hội chẩn này sẽ tự động kết thúc sau 20 phút.";
 
         var systemMessage = new InternalGroupMessage(
             group.Id,

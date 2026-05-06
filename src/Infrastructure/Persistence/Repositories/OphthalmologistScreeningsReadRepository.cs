@@ -1,4 +1,5 @@
 using Domain.Entities.Consultation;
+using Domain.Entities.Network.InternalChat;
 using Domain.Entities.Screening;
 using Domain.Entities.Users;
 using Domain.Enums;
@@ -25,10 +26,20 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
         Guid ophthalmologistProfileId,
         CancellationToken cancellationToken = default)
     {
-        // 1. Get screening IDs for this ophthalmologist
+        // 1. Get UserId for this ophthalmologist to check group memberships
+        var userId = await _context.Set<Ophthalmologist>()
+            .AsNoTracking()
+            .Where(o => o.Id == ophthalmologistProfileId)
+            .Select(o => o.UserId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // 2. Get screening IDs for this ophthalmologist (Directly assigned OR via Consilium group)
         var screeningIds = await _context.Set<ConsultationSession>()
             .AsNoTracking()
-            .Where(cs => cs.OphthalmologistId == ophthalmologistProfileId && cs.AiScreeningId != null)
+            .Where(cs => cs.AiScreeningId != null && 
+                         (cs.OphthalmologistId == ophthalmologistProfileId ||
+                          _context.Set<InternalGroupChat>().Any(g => g.ConsultationSessionId == cs.Id && 
+                                                                   g.Members.Any(m => m.MemberId == userId))))
             .Select(cs => cs.AiScreeningId!.Value)
             .Distinct()
             .ToListAsync(cancellationToken);
@@ -121,15 +132,25 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
         Guid screeningId,
         CancellationToken cancellationToken = default)
     {
-        // Check access and read sharing metadata for this doctor-session link.
+        // Resolve UserId for group membership check
+        var userId = await _context.Set<Ophthalmologist>()
+            .AsNoTracking()
+            .Where(o => o.Id == ophthalmologistProfileId)
+            .Select(o => o.UserId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Check access: Directly assigned doctor OR invited member of a clinical consultation group
         var consultation = await _context.Set<ConsultationSession>()
             .AsNoTracking()
-            .Where(cs => cs.OphthalmologistId == ophthalmologistProfileId && cs.AiScreeningId == screeningId)
+            .Where(cs => cs.AiScreeningId == screeningId && 
+                         (cs.OphthalmologistId == ophthalmologistProfileId ||
+                          _context.Set<InternalGroupChat>().Any(g => g.ConsultationSessionId == cs.Id && 
+                                                                   g.Members.Any(m => m.MemberId == userId))))
             .Select(cs => new
             {
                 Id = cs.Id,
                 Type = cs.Type,
-                HasAssignedDoctor = cs.OphthalmologistId.HasValue
+                IsDirectlyAssigned = cs.OphthalmologistId == ophthalmologistProfileId
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -137,13 +158,18 @@ public sealed class OphthalmologistScreeningsReadRepository : IOphthalmologistSc
         if (consultation is null)
             return null;
         
-        var bypassRedactionForAssignedDoctor =
-            consultation.HasAssignedDoctor &&
-            (consultation.Type == ConsultationSessionType.Verification ||
-             consultation.Type == ConsultationSessionType.ClinicBooking);
+        // Invited doctors and assigned doctors on verification/clinic sessions 
+        // always receive full screening data (bypass redaction).
+        var isInvitedConsiliumDoctor = !consultation.IsDirectlyAssigned;
 
-        var canViewRetinalImages = bypassRedactionForAssignedDoctor;
-        var canViewAiResults = bypassRedactionForAssignedDoctor;
+        var bypassRedaction =
+            isInvitedConsiliumDoctor ||
+            (consultation.IsDirectlyAssigned &&
+             (consultation.Type == ConsultationSessionType.Verification ||
+              consultation.Type == ConsultationSessionType.ClinicBooking));
+
+        var canViewRetinalImages = bypassRedaction;
+        var canViewAiResults = bypassRedaction;
 
         var row = await (
             from scr in _context.Set<AiScreening>().AsNoTracking()
