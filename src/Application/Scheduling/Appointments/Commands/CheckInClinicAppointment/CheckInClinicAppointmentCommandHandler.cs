@@ -89,8 +89,8 @@ public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInCli
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         // Resolve patient name for notification
-        string patientName = "Patient";
-        if (appointment.Patient != null)
+        string patientName = request.PatientName ?? "Patient";
+        if (string.IsNullOrWhiteSpace(request.PatientName) && appointment.Patient != null)
         {
             if (appointment.Patient.UserId.HasValue)
             {
@@ -109,7 +109,7 @@ public class CheckInClinicAppointmentCommandHandler : ICommandHandler<CheckInCli
             title: "New Patient in Queue",
             message: $"{patientName} has checked in and is waiting for screening.",
             type: NotificationType.SystemAlert,
-            payload: new { VisitId = visit.Id, PatientId = visit.PatientId },
+            payload: new { VisitId = visit.Id, PatientId = visit.PatientId, PatientName = patientName },
             cancellationToken: cancellationToken
         );
 

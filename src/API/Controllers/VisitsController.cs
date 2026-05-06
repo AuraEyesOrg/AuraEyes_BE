@@ -21,10 +21,11 @@ public class VisitsController : BaseApiController
     /// </summary>
     [HttpPost("{id:guid}/check-in")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> CheckIn(Guid id)
+    public async Task<IActionResult> CheckIn(Guid id, [FromBody] CheckInRequest? request = null)
     {
         // Re-using the same command logic for consistency
-        var result = await _mediator.Send(new CheckInClinicAppointmentCommand(id));
+        var result = await _mediator.Send(new CheckInClinicAppointmentCommand(id, request?.PatientName));
         return HandleResult(result, "Patient checked in successfully.");
     }
 }
+
