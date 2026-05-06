@@ -39,15 +39,18 @@ public class HandleLatePatientArrivalQueryHandler
 
         var slot = appointment.AppointmentSlot;
         var utcNow = DateTime.UtcNow;
-        var localNow = TimeZoneInfo.ConvertTimeFromUtc(utcNow, VietnamTimeZoneResolver.TimeZone);
-        var slotStart = slot.Date.ToDateTime(slot.StartTime);
-        var slotEnd = slot.Date.ToDateTime(slot.EndTime);
-        var duration = slotEnd - slotStart;
+        // Slot times are stored in Vietnam local time (UTC+7)
+        // Convert to UTC for accurate comparison
+        var slotStartLocal = slot.Date.ToDateTime(slot.StartTime);
+        var slotEndLocal = slot.Date.ToDateTime(slot.EndTime);
+        var slotStartUtc = TimeZoneInfo.ConvertTimeToUtc(slotStartLocal, VietnamTimeZoneResolver.TimeZone);
+        var slotEndUtc = TimeZoneInfo.ConvertTimeToUtc(slotEndLocal, VietnamTimeZoneResolver.TimeZone);
+        var duration = slotEndUtc - slotStartUtc;
         var threshold = TimeSpan.FromTicks(duration.Ticks / 3);
-        var thresholdTime = slotStart.Add(threshold);
+        var thresholdTimeUtc = slotStartUtc.Add(threshold);
 
-        var isLate = localNow > thresholdTime;
-        var lateMinutes = isLate ? (int)(localNow - thresholdTime).TotalMinutes : 0;
+        var isLate = utcNow > thresholdTimeUtc;
+        var lateMinutes = isLate ? (int)(utcNow - thresholdTimeUtc).TotalMinutes : 0;
         var thresholdMinutes = (int)threshold.TotalMinutes;
 
         var availableSlots = new List<AvailableSlotOption>();
