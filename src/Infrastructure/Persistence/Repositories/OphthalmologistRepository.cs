@@ -187,10 +187,12 @@ public class OphthalmologistRepository : Repository<Ophthalmologist>, IOphthalmo
                     // Check Overlapping Busy Appointment Slots
                     && !_context.AppointmentSlots.Any(slot =>
                         slot.OphthalId == ophthal.Id &&
-                        slot.Date == startDay &&
-                        slot.StartTime < endTime &&
-                        slot.EndTime > startTime &&
-                        (slot.Status == Domain.Enums.ScheduleStatus.Blocked || slot.BookedCount > 0))
+                        // Handle midnight crossovers: split overlap check into two days if necessary
+                        ((startDay == endDay && slot.Date == startDay && slot.StartTime < endTime && slot.EndTime > startTime) ||
+                         (startDay != endDay && ((slot.Date == startDay && slot.EndTime > startTime) || 
+                                                 (slot.Date == endDay && slot.StartTime < endTime)))) &&
+                        // Only filter if explicitly BLOCKED by schedule (ignore BookedCount to allow inviting busy doctors)
+                        slot.Status == Domain.Enums.ScheduleStatus.Blocked)
                     select new ConsiliumDoctorDetail(
                         ophthal.Id,
                         user.FullName ?? "Doctor",
