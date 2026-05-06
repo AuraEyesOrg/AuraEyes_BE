@@ -1,3 +1,4 @@
+using Application.Common.Helpers;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
@@ -37,15 +38,16 @@ public class HandleLatePatientArrivalQueryHandler
                 "Appointment is not linked to a slot.");
 
         var slot = appointment.AppointmentSlot;
-        var now = DateTime.Now;
+        var utcNow = DateTime.UtcNow;
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(utcNow, VietnamTimeZoneResolver.TimeZone);
         var slotStart = slot.Date.ToDateTime(slot.StartTime);
         var slotEnd = slot.Date.ToDateTime(slot.EndTime);
         var duration = slotEnd - slotStart;
         var threshold = TimeSpan.FromTicks(duration.Ticks / 3);
         var thresholdTime = slotStart.Add(threshold);
 
-        var isLate = now > thresholdTime;
-        var lateMinutes = isLate ? (int)(now - thresholdTime).TotalMinutes : 0;
+        var isLate = localNow > thresholdTime;
+        var lateMinutes = isLate ? (int)(localNow - thresholdTime).TotalMinutes : 0;
         var thresholdMinutes = (int)threshold.TotalMinutes;
 
         var availableSlots = new List<AvailableSlotOption>();
