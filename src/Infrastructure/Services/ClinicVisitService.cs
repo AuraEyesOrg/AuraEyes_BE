@@ -1,8 +1,10 @@
 using Application.Common.Interfaces;
+using Application.Common.Constants;
 using Application.Common.Models;
 using Domain.Common;
 using Domain.Entities.Consultation;
 using Domain.Entities.Financial;
+using Domain.Entities.MedicalRecords;
 using Domain.Entities.Scheduling;
 using Domain.Enums;
 using Domain.Repositories;
@@ -20,7 +22,9 @@ public class ClinicVisitService : IClinicVisitService
     private readonly IConsultationSessionRepository _sessionRepository;
     private readonly IRepository<Domain.Entities.Users.Patient> _patientRepository;
     private readonly IOphthalmologistRepository _ophthalmologistRepository;
+    private readonly IMedicalRecordRepository _medicalRecordRepository;
     private readonly INotificationService _notificationService;
+    private readonly IIdentityService _identityService;
     private readonly IChatHubService _chatHubService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ClinicVisitService> _logger;
@@ -32,7 +36,9 @@ public class ClinicVisitService : IClinicVisitService
         IConsultationSessionRepository sessionRepository,
         IRepository<Domain.Entities.Users.Patient> patientRepository,
         IOphthalmologistRepository ophthalmologistRepository,
+        IMedicalRecordRepository medicalRecordRepository,
         INotificationService notificationService,
+        IIdentityService identityService,
         IChatHubService chatHubService,
         IUnitOfWork unitOfWork,
         ILogger<ClinicVisitService> logger)
@@ -43,7 +49,9 @@ public class ClinicVisitService : IClinicVisitService
         _sessionRepository = sessionRepository;
         _patientRepository = patientRepository;
         _ophthalmologistRepository = ophthalmologistRepository;
+        _medicalRecordRepository = medicalRecordRepository;
         _notificationService = notificationService;
+        _identityService = identityService;
         _chatHubService = chatHubService;
         _unitOfWork = unitOfWork;
         _logger = logger;
@@ -295,6 +303,38 @@ public class ClinicVisitService : IClinicVisitService
         var newVisit = PatientVisit.CreateFromAppointment(appointment);
         await _patientVisitRepository.AddAsync(newVisit, cancellationToken);
 
+        // 3. Create initial medical record, aligned with standard check-in flow.
+        var medicalRecordNumber = $"MT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}";
+        var medicalRecord = new MedicalRecord(newVisit.PatientId, medicalRecordNumber);
+        medicalRecord.LinkToPatientVisit(newVisit.Id);
+        await _medicalRecordRepository.AddAsync(medicalRecord, cancellationToken);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // 4. Notify coordinator role in realtime (same behavior as manual check-in).
+        string patientName = "Patient";
+        if (appointment.Patient != null)
+        {
+            if (appointment.Patient.UserId.HasValue)
+            {
+                var user = await _identityService.GetUserByIdAsync(
+                    appointment.Patient.UserId.Value,
+                    cancellationToken);
+                patientName = user?.FullName ?? "Patient";
+            }
+            else if (!string.IsNullOrWhiteSpace(appointment.Patient.FullName))
+            {
+                patientName = appointment.Patient.FullName;
+            }
+        }
+
+        await _notificationService.SendToRoleAsync(
+            roleName: Roles.ClinicStaff,
+            title: "New Patient in Queue",
+            message: $"{patientName} has checked in and is waiting for screening.",
+            type: NotificationType.SystemAlert,
+            payload: new { VisitId = newVisit.Id, PatientId = newVisit.PatientId },
+            cancellationToken: cancellationToken
+        );
     }
 }
