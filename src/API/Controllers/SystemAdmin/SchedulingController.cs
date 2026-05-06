@@ -23,7 +23,7 @@ public class SchedulingController : BaseApiController
 
     /// <summary>
     /// Manually trigger the recurring slot generation job.
-    /// This will generate missing slots for the next configured window (e.g., 14 days).
+    /// This will generate missing slots for the next configured window (e.g., 7 days).
     /// </summary>
     [HttpPost("trigger-generation")]
     [ProducesResponseType(typeof(ApiResponse<Unit>), StatusCodes.Status200OK)]

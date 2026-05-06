@@ -59,7 +59,7 @@ public class CompleteClinicAppointmentCommandHandler : ICommandHandler<CompleteC
             await _appointmentRepository.UpdateAsync(appointment, cancellationToken);
 
             // ── 8. Create Consultation Chat Session ───────────────────────────
-            // This allows the patient to chat with the doctor for 14 days post-visit
+            // This allows the patient to chat with the doctor for 7 days post-visit
             var patient = await _patientRepository.GetByIdAsync(appointment.PatientId, cancellationToken);
             if (appointment.AppointmentSlot?.ScheduleTemplate != null)
             {
@@ -79,7 +79,7 @@ public class CompleteClinicAppointmentCommandHandler : ICommandHandler<CompleteC
                     await _notificationService.SendAsync(
                         patient.UserId.Value,
                         "Kết quả khám lâm sàng",
-                        "Khám lâm sàng của bạn đã hoàn tất. Bạn có thể trao đổi thêm với bác sĩ trong vòng 14 ngày qua mục Chat.",
+                        "Khám lâm sàng của bạn đã hoàn tất. Bạn có thể trao đổi thêm với bác sĩ trong vòng 7 ngày qua mục Chat.",
                         NotificationType.ConsultationResultProvided,
                         new { ConsultationId = session.Id, AppointmentId = appointment.Id },
                         cancellationToken,

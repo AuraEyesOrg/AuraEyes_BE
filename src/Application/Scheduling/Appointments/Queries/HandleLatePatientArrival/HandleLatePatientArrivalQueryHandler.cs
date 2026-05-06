@@ -38,19 +38,26 @@ public class HandleLatePatientArrivalQueryHandler
                 "Appointment is not linked to a slot.");
 
         var slot = appointment.AppointmentSlot;
+        var vietnamTimeZone = VietnamTimeZoneResolver.TimeZone;
         var utcNow = DateTime.UtcNow;
+        var nowVietnam = TimeZoneInfo.ConvertTimeFromUtc(utcNow, vietnamTimeZone);
+
         // Slot times are stored in Vietnam local time (UTC+7)
-        // Convert to UTC for accurate comparison
         var slotStartLocal = slot.Date.ToDateTime(slot.StartTime);
         var slotEndLocal = slot.Date.ToDateTime(slot.EndTime);
-        var slotStartUtc = TimeZoneInfo.ConvertTimeToUtc(slotStartLocal, VietnamTimeZoneResolver.TimeZone);
-        var slotEndUtc = TimeZoneInfo.ConvertTimeToUtc(slotEndLocal, VietnamTimeZoneResolver.TimeZone);
-        var duration = slotEndUtc - slotStartUtc;
+        
+        // Handle slots that might cross midnight (though rare in clinic)
+        if (slotEndLocal < slotStartLocal)
+        {
+            slotEndLocal = slotEndLocal.AddDays(1);
+        }
+        
+        var duration = slotEndLocal - slotStartLocal;
         var threshold = TimeSpan.FromTicks(duration.Ticks / 3);
-        var thresholdTimeUtc = slotStartUtc.Add(threshold);
+        var thresholdTimeLocal = slotStartLocal.Add(threshold);
 
-        var isLate = utcNow > thresholdTimeUtc;
-        var lateMinutes = isLate ? (int)(utcNow - thresholdTimeUtc).TotalMinutes : 0;
+        var isLate = nowVietnam > thresholdTimeLocal;
+        var lateMinutes = isLate ? (int)(nowVietnam - thresholdTimeLocal).TotalMinutes : 0;
         var thresholdMinutes = (int)threshold.TotalMinutes;
 
         var availableSlots = new List<AvailableSlotOption>();
@@ -98,7 +105,11 @@ public class HandleLatePatientArrivalQueryHandler
             SlotEndTime = slot.EndTime,
             SlotDurationMinutes = (int)duration.TotalMinutes,
             AvailableSlots = availableSlots,
-            AdHocDefaults = adHocDefaults
+            AdHocDefaults = adHocDefaults,
+            // Debug info
+            ServerTimeUtc = utcNow,
+            VietnamNow = nowVietnam,
+            ThresholdTimeLocal = thresholdTimeLocal
         });
     }
 }

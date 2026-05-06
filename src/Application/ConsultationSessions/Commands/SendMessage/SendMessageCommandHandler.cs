@@ -109,8 +109,8 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand>
         if (session.ChatStatus == ChatStatus.Archived)
             return Result.Failure("Session has been archived. No new messages allowed.");
 
-        if (session.EndTime.HasValue && DateTime.UtcNow > session.EndTime.Value.AddDays(14))
-            return Result.Failure("Chat is locked as the 14-day grace period after consultation has expired.");
+        if (session.EndTime.HasValue && DateTime.UtcNow > session.EndTime.Value.AddDays(7))
+            return Result.Failure("Chat is locked as the 7-day grace period after consultation has expired.");
 
         if (session.ChatStatus == ChatStatus.MemoOnly && isDoctor)
             return Result.Failure("In MemoOnly mode, only the patient can send notes.");

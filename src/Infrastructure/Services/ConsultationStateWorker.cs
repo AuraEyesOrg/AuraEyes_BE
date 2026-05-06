@@ -241,12 +241,12 @@ public class ConsultationStateWorker : BackgroundService
         IUnitOfWork unitOfWork,
         CancellationToken cancellationToken)
     {
-        var threshold = TimeSpan.FromDays(14);
+        var threshold = TimeSpan.FromDays(7);
         var sessions = await sessionRepo.GetExpiredClinicSessionsAsync(threshold, cancellationToken);
 
         if (sessions.Count == 0) return;
 
-        _logger.LogInformation("Auto-completing {Count} clinic session(s) past 14-day window", sessions.Count);
+        _logger.LogInformation("Auto-completing {Count} clinic session(s) past 7-day window", sessions.Count);
 
         var closedSessions = new List<(Guid SessionId, Guid PatientId, Guid? OphthalmologistId)>();
 

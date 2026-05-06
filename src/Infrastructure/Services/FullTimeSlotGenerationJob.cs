@@ -13,7 +13,7 @@ namespace Infrastructure.Services;
 /// </summary>
 public class FullTimeSlotGenerationJob
 {
-    private const int RollingWindowDays = 14;
+    private const int RollingWindowDays = 7;
 
     private readonly ApplicationDbContext _context;
     private readonly ILogger<FullTimeSlotGenerationJob> _logger;
