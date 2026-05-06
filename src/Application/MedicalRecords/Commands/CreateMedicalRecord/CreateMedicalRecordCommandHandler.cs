@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Domain.Common;
 using Domain.Entities.MedicalRecords;
 using Domain.Repositories;
 using MediatR;
@@ -11,15 +12,18 @@ public class CreateMedicalRecordCommandHandler : IRequestHandler<CreateMedicalRe
     private readonly IMedicalRecordRepository _medicalRecordRepository;
     private readonly Domain.Common.IRepository<Domain.Entities.Users.Patient> _patientRepository;
     private readonly IIdentityService _identityService;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CreateMedicalRecordCommandHandler(
         IMedicalRecordRepository medicalRecordRepository,
         Domain.Common.IRepository<Domain.Entities.Users.Patient> patientRepository,
-        IIdentityService identityService)
+        IIdentityService identityService,
+        IUnitOfWork unitOfWork)
     {
         _medicalRecordRepository = medicalRecordRepository;
         _patientRepository = patientRepository;
         _identityService = identityService;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<Guid>> Handle(CreateMedicalRecordCommand request, CancellationToken cancellationToken)
@@ -92,6 +96,8 @@ public class CreateMedicalRecordCommandHandler : IRequestHandler<CreateMedicalRe
             patient.SetMedicalRecordNumber(request.MedicalRecordNumber);
             await _patientRepository.UpdateAsync(patient, cancellationToken);
         }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         
         return Result<Guid>.Success(record.Id);
     }
