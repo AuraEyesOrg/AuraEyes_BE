@@ -31,8 +31,9 @@ public class DegreeDto
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
-    public string? DegreeLevel { get; set; }
+    public int? DegreeLevel { get; set; }
     public string? IssuingAuthority { get; set; }
+    public string? IssuingInstitution { get; set; }
     public DateTime IssuedDate { get; set; }
     public string? DegreeUrl { get; set; }
     public string? Title { get; set; }
@@ -47,11 +48,12 @@ public class CertificateDto
     public Guid Id { get; set; }
     public string Type { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public string? DegreeLevel { get; set; }
+    public int? DegreeLevel { get; set; }
     public string? IssuingAuthority { get; set; }
+    public string? LicenseNumber { get; set; }
+    public string? ScopeOfPractice { get; set; }
     public DateTime IssuedDate { get; set; }
     public DateTime? ExpiryDate { get; set; }
     public string? CertificateUrl { get; set; }
-    public string? LicenseNumber { get; set; }
     public bool IsExpired { get; set; }
 }
