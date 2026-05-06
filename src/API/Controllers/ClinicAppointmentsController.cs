@@ -68,9 +68,9 @@ public class ClinicAppointmentsController : BaseApiController
     [HttpPut("{appointmentId:guid}/check-in")]
     [AuthorizePermission(Permissions.AppointmentsManage)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> CheckInClinicAppointment(Guid appointmentId)
+    public async Task<IActionResult> CheckInClinicAppointment(Guid appointmentId, [FromBody] CheckInRequest? request = null)
     {
-        var result = await _mediator.Send(new CheckInClinicAppointmentCommand(appointmentId));
+        var result = await _mediator.Send(new CheckInClinicAppointmentCommand(appointmentId, request?.PatientName));
         return HandleResult(result);
     }
 
@@ -195,6 +195,11 @@ public record CancelClinicAppointmentRequest
 public record CompleteClinicAppointmentRequest
 {
     public string? Notes { get; init; }
+}
+
+public record CheckInRequest
+{
+    public string? PatientName { get; init; }
 }
 
 public record RebookExistingRequest
