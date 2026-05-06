@@ -66,9 +66,11 @@ public class GetClinicScheduleQueryHandler : IQueryHandler<GetClinicScheduleQuer
                         {
                             Id = c.Id,
                             Type = c.Type.ToString(),
-                            DegreeLevel = c.DegreeLevel?.ToString(),
+                            DegreeLevel = (int?)c.DegreeLevel,
                             Name = c.Name,
                             IssuingAuthority = c.IssuingAuthority,
+                            IssuingInstitution = c.IssuingInstitution,
+                            ScopeOfPractice = c.ScopeOfPractice,
                             IssuedDate = c.IssuedDate,
                             ExpiryDate = c.ExpiryDate,
                             CertificateUrl = c.CertificateUrl,
