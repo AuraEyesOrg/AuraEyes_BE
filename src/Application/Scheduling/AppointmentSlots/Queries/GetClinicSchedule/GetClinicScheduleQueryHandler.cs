@@ -84,8 +84,8 @@ public class GetClinicScheduleQueryHandler : IQueryHandler<GetClinicScheduleQuer
         var dto = new ClinicScheduleDto
         {
             Id = Guid.Empty,
-            Name = "Aura Eyes Clinic",
-            Address = "123 Healthcare Ave, Digital City",
+            Name = "Aura Eyes",
+            Address = "7 Đường D1, Khu CNC, Quận 9, TP.HCM",
             Description = "Premium Retinal Care & AI Screening",
             RatingAverage = 4.8,
             RatingCount = 120,
