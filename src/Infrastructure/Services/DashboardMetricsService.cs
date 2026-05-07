@@ -762,10 +762,14 @@ public class DashboardMetricsService : IDashboardMetricsService
         return new TodaySummaryDto
         {
             TotalAppointments = appointments,
+            MonthAppointments = thisMonthCount,
+            YearAppointments = thisYearCount,
             CheckedInPatients = checkedIn,
             CompletedVisits = completed,
             NoShowCount = noShow,
             TodayRevenue = todayRevenue,
+            MonthRevenue = thisMonthRevenue,
+            YearRevenue = thisYearRevenue,
             GrowthPercentageDay = CalculateGrowthPercentage(appointments, yesterdayCount),
             GrowthPercentageMonth = CalculateGrowthPercentage(thisMonthCount, lastMonthCount),
             GrowthPercentageYear = CalculateGrowthPercentage(thisYearCount, lastYearCount),

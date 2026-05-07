@@ -20,8 +20,8 @@ public class GetAvailableDoctorsForConsiliumQueryHandler : IQueryHandler<GetAvai
 
     public async Task<Result<List<AvailableDoctorDto>>> Handle(GetAvailableDoctorsForConsiliumQuery request, CancellationToken cancellationToken)
     {
-        // 1. Time Window Calculation: 20-minute block + 5-minute buffer = 25 minutes
-        var windowStart = _dateTime.UtcNow;
+        // 1. Time Window Calculation: Use local time to match AppointmentSlot storage
+        var windowStart = _dateTime.Now;
         var windowEnd = windowStart.AddMinutes(25);
 
         // 2. Fetch available doctors using optimized repository query

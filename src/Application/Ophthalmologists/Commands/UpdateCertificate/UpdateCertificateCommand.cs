@@ -15,6 +15,8 @@ public record UpdateCertificateCommand : ICommand
     public string? DegreeLevel { get; init; }
     public string? IssuingAuthority { get; init; }
     public string? LicenseNumber { get; init; }
+    public string? IssuingInstitution { get; init; }
+    public string? ScopeOfPractice { get; init; }
     public DateTime IssuedDate { get; init; }
     public DateTime? ExpiryDate { get; init; }
     public IFormFile? File { get; init; }
@@ -64,8 +66,8 @@ public class UpdateCertificateCommandHandler : ICommandHandler<UpdateCertificate
             request.ExpiryDate,
             newUrl,
             request.LicenseNumber,
-            certificate.ScopeOfPractice,
-            certificate.IssuingInstitution);
+            request.ScopeOfPractice,
+            request.IssuingInstitution);
 
         await _repository.UpdateAsync(ophthalmologist, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

@@ -100,9 +100,11 @@ public record CertificateDto
 {
     public Guid Id { get; init; }
     public string Type { get; init; } = string.Empty;
-    public string? DegreeLevel { get; init; }
+    public int? DegreeLevel { get; init; }
     public string Name { get; init; } = string.Empty;
     public string? IssuingAuthority { get; init; }
+    public string? IssuingInstitution { get; init; }
+    public string? ScopeOfPractice { get; init; }
     public DateTime IssuedDate { get; init; }
     public DateTime? ExpiryDate { get; init; }
     public string? CertificateUrl { get; init; }
